@@ -29,3 +29,47 @@ class WarmScoreResponse(BaseModel):
     computed_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# -- Intro messages --
+
+
+class IntroRequestCreate(BaseModel):
+    contact_id: uuid.UUID
+    match_result_id: uuid.UUID | None = None
+    context: str | None = None
+    tone: str = "professional"
+    channel: str = "linkedin"
+
+
+class IntroMessageResponse(BaseModel):
+    id: uuid.UUID
+    variant_label: str | None = None
+    subject_line: str | None = None
+    message_body: str
+    is_selected: bool | None = False
+    user_edited_body: str | None = None
+    ai_model_version: str | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class IntroRequestResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    contact_id: uuid.UUID
+    match_result_id: uuid.UUID | None = None
+    context: str | None = None
+    tone: str | None = None
+    channel: str | None = None
+    status: str
+    messages: list[IntroMessageResponse] = []
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class IntroMessageUpdate(BaseModel):
+    is_selected: bool | None = None
+    user_edited_body: str | None = None
