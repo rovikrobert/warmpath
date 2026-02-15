@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me-to-a-random-secret"
     ACCESS_TOKEN_EXPIRE_DAYS: int = 7
     ANTHROPIC_API_KEY: str = ""
+    AI_MOCK_MODE: bool = True
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
