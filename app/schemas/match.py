@@ -13,3 +13,19 @@ class MatchResultResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class WarmScoreResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    contact_id: uuid.UUID
+    total_score: float
+    recency_score: float
+    context_score: float
+    role_score: float
+    tenure_score: float
+    score_factors: dict | None = None
+    algorithm_version: str
+    computed_at: datetime
+
+    model_config = {"from_attributes": True}
