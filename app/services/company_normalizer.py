@@ -126,9 +126,7 @@ def normalize_company_name(name: str | None) -> str | None:
     return cleaned.title() if cleaned.islower() else cleaned
 
 
-async def find_or_create_company(
-    name: str, db: AsyncSession
-) -> Company | None:
+async def find_or_create_company(name: str, db: AsyncSession) -> Company | None:
     """Look up a company by normalized name. Create if not found.
 
     Uses case-insensitive exact match on the name column.
@@ -152,9 +150,7 @@ async def find_or_create_company(
     return company
 
 
-async def link_contact_to_company(
-    contact: Contact, db: AsyncSession
-) -> None:
+async def link_contact_to_company(contact: Contact, db: AsyncSession) -> None:
     """Set contact.company_id based on its current_company field."""
     if not contact.current_company:
         return

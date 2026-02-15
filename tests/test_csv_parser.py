@@ -134,8 +134,12 @@ class TestParseLinkedinCsv:
 
 class TestGenerateFingerprint:
     def test_same_inputs_same_hash(self):
-        fp1 = generate_fingerprint("Alice Smith", "Acme Corp", "https://linkedin.com/in/alice")
-        fp2 = generate_fingerprint("Alice Smith", "Acme Corp", "https://linkedin.com/in/alice")
+        fp1 = generate_fingerprint(
+            "Alice Smith", "Acme Corp", "https://linkedin.com/in/alice"
+        )
+        fp2 = generate_fingerprint(
+            "Alice Smith", "Acme Corp", "https://linkedin.com/in/alice"
+        )
         assert fp1 == fp2
 
     def test_case_insensitive(self):
@@ -161,7 +165,11 @@ class TestGenerateFingerprint:
 async def _signup_and_get_token(client: AsyncClient) -> str:
     resp = await client.post(
         "/api/v1/auth/signup",
-        json={"email": "csv@example.com", "password": "secret123", "full_name": "CSV User"},
+        json={
+            "email": "csv@example.com",
+            "password": "secret123",
+            "full_name": "CSV User",
+        },
     )
     return resp.json()["data"]["access_token"]
 
@@ -192,8 +200,12 @@ async def test_upload_deduplication(client: AsyncClient):
     headers = {"Authorization": f"Bearer {token}"}
 
     # Upload the same CSV twice
-    await client.post("/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV))
-    await client.post("/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV))
+    await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
+    await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
 
     # Should still have only 5 contacts, not 10
     resp = await client.get("/api/v1/contacts", headers=headers)
@@ -214,7 +226,9 @@ async def test_upload_rejects_non_csv(client: AsyncClient):
 async def test_list_contacts_pagination(client: AsyncClient):
     token = await _signup_and_get_token(client)
     headers = {"Authorization": f"Bearer {token}"}
-    await client.post("/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV))
+    await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
 
     resp = await client.get("/api/v1/contacts?per_page=2&page=1", headers=headers)
     body = resp.json()
@@ -226,7 +240,9 @@ async def test_list_contacts_pagination(client: AsyncClient):
 async def test_list_contacts_search(client: AsyncClient):
     token = await _signup_and_get_token(client)
     headers = {"Authorization": f"Bearer {token}"}
-    await client.post("/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV))
+    await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
 
     resp = await client.get("/api/v1/contacts?search=Acme", headers=headers)
     body = resp.json()
@@ -237,7 +253,9 @@ async def test_list_contacts_search(client: AsyncClient):
 async def test_get_single_contact(client: AsyncClient):
     token = await _signup_and_get_token(client)
     headers = {"Authorization": f"Bearer {token}"}
-    await client.post("/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV))
+    await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
 
     list_resp = await client.get("/api/v1/contacts", headers=headers)
     contact_id = list_resp.json()["data"][0]["id"]
@@ -250,7 +268,9 @@ async def test_get_single_contact(client: AsyncClient):
 async def test_delete_contact_soft_delete(client: AsyncClient):
     token = await _signup_and_get_token(client)
     headers = {"Authorization": f"Bearer {token}"}
-    await client.post("/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV))
+    await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
 
     list_resp = await client.get("/api/v1/contacts", headers=headers)
     contact_id = list_resp.json()["data"][0]["id"]
@@ -269,7 +289,11 @@ async def test_contacts_are_user_scoped(client: AsyncClient):
     # User A uploads contacts
     resp_a = await client.post(
         "/api/v1/auth/signup",
-        json={"email": "usera@example.com", "password": "secret123", "full_name": "User A"},
+        json={
+            "email": "usera@example.com",
+            "password": "secret123",
+            "full_name": "User A",
+        },
     )
     token_a = resp_a.json()["data"]["access_token"]
     await client.post(
@@ -281,7 +305,11 @@ async def test_contacts_are_user_scoped(client: AsyncClient):
     # User B should see 0 contacts
     resp_b = await client.post(
         "/api/v1/auth/signup",
-        json={"email": "userb@example.com", "password": "secret123", "full_name": "User B"},
+        json={
+            "email": "userb@example.com",
+            "password": "secret123",
+            "full_name": "User B",
+        },
     )
     token_b = resp_b.json()["data"]["access_token"]
     resp = await client.get(

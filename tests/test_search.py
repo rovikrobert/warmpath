@@ -5,7 +5,6 @@ import pytest
 from httpx import AsyncClient
 
 from app.services.ai_matcher import (
-    ContactMatch,
     _mock_score_contacts,
 )
 
@@ -62,7 +61,9 @@ SAMPLE_CSV = (
 )
 
 
-async def _signup_and_get_token(client: AsyncClient, email: str = "search@example.com") -> str:
+async def _signup_and_get_token(
+    client: AsyncClient, email: str = "search@example.com"
+) -> str:
     resp = await client.post(
         "/api/v1/auth/signup",
         json={"email": email, "password": "secret123", "full_name": "Search User"},
@@ -71,7 +72,9 @@ async def _signup_and_get_token(client: AsyncClient, email: str = "search@exampl
 
 
 def _csv_file(content: str):
-    return {"file": ("connections.csv", io.BytesIO(content.encode("utf-8")), "text/csv")}
+    return {
+        "file": ("connections.csv", io.BytesIO(content.encode("utf-8")), "text/csv")
+    }
 
 
 # ---------------------------------------------------------------------------

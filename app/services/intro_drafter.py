@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from app.config import settings
 from app.models.contact import Contact
-from app.models.match_result import IntroMessage, MatchResult
+from app.models.match_result import MatchResult
 from app.models.user import ConnectorProfile
 
 
@@ -33,6 +33,7 @@ class DraftedMessage:
 # Mock drafts (deterministic, for dev/test)
 # ---------------------------------------------------------------------------
 
+
 def _mock_drafts(
     contact: Contact,
     profile: ConnectorProfile | None,
@@ -44,14 +45,6 @@ def _mock_drafts(
     contact_first = contact.first_name or contact.full_name.split()[0]
     contact_title = contact.current_title or "professional"
     contact_company = contact.current_company or "your company"
-
-    user_name = "there"
-    user_title = ""
-    user_company = ""
-    if profile:
-        user_name = profile.current_title or "there"
-        user_title = profile.current_title or ""
-        user_company = profile.current_company or ""
 
     match_context = ""
     if match_result and match_result.match_reasoning:
@@ -69,25 +62,29 @@ def _mock_drafts(
             f"have a valuable conversation."
         )
         if len(body) > LINKEDIN_CHAR_LIMIT:
-            body = body[:LINKEDIN_CHAR_LIMIT - 3] + "..."
-        drafts.append(DraftedMessage(
-            variant_label="direct",
-            subject_line=None,
-            message_body=body,
-        ))
+            body = body[: LINKEDIN_CHAR_LIMIT - 3] + "..."
+        drafts.append(
+            DraftedMessage(
+                variant_label="direct",
+                subject_line=None,
+                message_body=body,
+            )
+        )
     else:
-        drafts.append(DraftedMessage(
-            variant_label="direct",
-            subject_line=f"Quick intro — connecting on {contact_company}",
-            message_body=(
-                f"Hi {contact_first},\n\n"
-                f"I'm reaching out because I noticed you're {contact_title} "
-                f"at {contact_company}.{match_context}\n\n"
-                f"I'd love to set up a brief call to discuss how we might "
-                f"collaborate.\n\n"
-                f"Best regards"
-            ),
-        ))
+        drafts.append(
+            DraftedMessage(
+                variant_label="direct",
+                subject_line=f"Quick intro — connecting on {contact_company}",
+                message_body=(
+                    f"Hi {contact_first},\n\n"
+                    f"I'm reaching out because I noticed you're {contact_title} "
+                    f"at {contact_company}.{match_context}\n\n"
+                    f"I'd love to set up a brief call to discuss how we might "
+                    f"collaborate.\n\n"
+                    f"Best regards"
+                ),
+            )
+        )
 
     # --- Mutual-interest variant ---
     shared = ""
@@ -101,25 +98,29 @@ def _mock_drafts(
             f"what you're building."
         )
         if len(body) > LINKEDIN_CHAR_LIMIT:
-            body = body[:LINKEDIN_CHAR_LIMIT - 3] + "..."
-        drafts.append(DraftedMessage(
-            variant_label="mutual-interest",
-            subject_line=None,
-            message_body=body,
-        ))
+            body = body[: LINKEDIN_CHAR_LIMIT - 3] + "..."
+        drafts.append(
+            DraftedMessage(
+                variant_label="mutual-interest",
+                subject_line=None,
+                message_body=body,
+            )
+        )
     else:
-        drafts.append(DraftedMessage(
-            variant_label="mutual-interest",
-            subject_line=f"Shared interest in {industry}",
-            message_body=(
-                f"Hi {contact_first},\n\n"
-                f"{shared}I've been impressed by what {contact_company} is doing. "
-                f"{match_context}\n\n"
-                f"Would you be open to a 15-minute chat? I think we could "
-                f"find some interesting overlap.\n\n"
-                f"Cheers"
-            ),
-        ))
+        drafts.append(
+            DraftedMessage(
+                variant_label="mutual-interest",
+                subject_line=f"Shared interest in {industry}",
+                message_body=(
+                    f"Hi {contact_first},\n\n"
+                    f"{shared}I've been impressed by what {contact_company} is doing. "
+                    f"{match_context}\n\n"
+                    f"Would you be open to a 15-minute chat? I think we could "
+                    f"find some interesting overlap.\n\n"
+                    f"Cheers"
+                ),
+            )
+        )
 
     # --- Casual variant ---
     if is_linkedin:
@@ -129,24 +130,28 @@ def _mock_drafts(
             f"folks doing interesting things in the space."
         )
         if len(body) > LINKEDIN_CHAR_LIMIT:
-            body = body[:LINKEDIN_CHAR_LIMIT - 3] + "..."
-        drafts.append(DraftedMessage(
-            variant_label="casual",
-            subject_line=None,
-            message_body=body,
-        ))
+            body = body[: LINKEDIN_CHAR_LIMIT - 3] + "..."
+        drafts.append(
+            DraftedMessage(
+                variant_label="casual",
+                subject_line=None,
+                message_body=body,
+            )
+        )
     else:
-        drafts.append(DraftedMessage(
-            variant_label="casual",
-            subject_line=f"Hey from a fellow {industry} person",
-            message_body=(
-                f"Hey {contact_first},\n\n"
-                f"Hope this isn't too random! I came across your profile and "
-                f"thought it'd be cool to connect. {match_context}\n\n"
-                f"No pressure — just thought a quick chat could be fun.\n\n"
-                f"Cheers"
-            ),
-        ))
+        drafts.append(
+            DraftedMessage(
+                variant_label="casual",
+                subject_line=f"Hey from a fellow {industry} person",
+                message_body=(
+                    f"Hey {contact_first},\n\n"
+                    f"Hope this isn't too random! I came across your profile and "
+                    f"thought it'd be cool to connect. {match_context}\n\n"
+                    f"No pressure — just thought a quick chat could be fun.\n\n"
+                    f"Cheers"
+                ),
+            )
+        )
 
     return drafts
 
@@ -154,6 +159,7 @@ def _mock_drafts(
 # ---------------------------------------------------------------------------
 # Real Claude API
 # ---------------------------------------------------------------------------
+
 
 def _build_prompt(
     contact: Contact,
@@ -257,12 +263,14 @@ async def _call_claude_api(
         body = item["message_body"]
         # Enforce LinkedIn char limit
         if channel == "linkedin" and len(body) > LINKEDIN_CHAR_LIMIT:
-            body = body[:LINKEDIN_CHAR_LIMIT - 3] + "..."
-        results.append(DraftedMessage(
-            variant_label=item["variant_label"],
-            subject_line=item.get("subject_line"),
-            message_body=body,
-        ))
+            body = body[: LINKEDIN_CHAR_LIMIT - 3] + "..."
+        results.append(
+            DraftedMessage(
+                variant_label=item["variant_label"],
+                subject_line=item.get("subject_line"),
+                message_body=body,
+            )
+        )
 
     return results
 
@@ -270,6 +278,7 @@ async def _call_claude_api(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 async def draft_intro(
     contact: Contact,

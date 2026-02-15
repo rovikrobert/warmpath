@@ -61,9 +61,7 @@ async def create_intro(
 
     # Load connector profile for context
     profile_result = await db.execute(
-        select(ConnectorProfile).where(
-            ConnectorProfile.user_id == current_user.id
-        )
+        select(ConnectorProfile).where(ConnectorProfile.user_id == current_user.id)
     )
     connector_profile = profile_result.scalar_one_or_none()
 

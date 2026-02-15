@@ -19,7 +19,9 @@ SAMPLE_CSV = (
 )
 
 
-async def _signup_and_get_token(client: AsyncClient, email: str = "usage@example.com") -> str:
+async def _signup_and_get_token(
+    client: AsyncClient, email: str = "usage@example.com"
+) -> str:
     resp = await client.post(
         "/api/v1/auth/signup",
         json={"email": email, "password": "secret123", "full_name": "Usage User"},
@@ -28,7 +30,9 @@ async def _signup_and_get_token(client: AsyncClient, email: str = "usage@example
 
 
 def _csv_file(content: str = SAMPLE_CSV):
-    return {"file": ("connections.csv", io.BytesIO(content.encode("utf-8")), "text/csv")}
+    return {
+        "file": ("connections.csv", io.BytesIO(content.encode("utf-8")), "text/csv")
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -66,9 +70,7 @@ async def test_usage_stats_tracks_uploads(client: AsyncClient):
     headers = {"Authorization": f"Bearer {token}"}
 
     # Do an upload (which the middleware logs)
-    await client.post(
-        "/api/v1/contacts/upload", headers=headers, files=_csv_file()
-    )
+    await client.post("/api/v1/contacts/upload", headers=headers, files=_csv_file())
 
     resp = await client.get("/api/v1/usage/me", headers=headers)
     body = resp.json()["data"]
@@ -138,6 +140,7 @@ async def test_csv_upload_rate_limit(client: AsyncClient):
     """Exceeding the CSV upload rate limit should return 429."""
     # We'll set a very low limit via monkeypatch
     from app.config import settings
+
     original = settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY
     settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY = 2
 
@@ -171,6 +174,7 @@ async def test_csv_upload_rate_limit(client: AsyncClient):
 async def test_search_run_rate_limit(client: AsyncClient):
     """Exceeding the search run rate limit should return 429."""
     from app.config import settings
+
     original = settings.RATE_LIMIT_SEARCH_RUNS_PER_DAY
     settings.RATE_LIMIT_SEARCH_RUNS_PER_DAY = 1
 
@@ -187,15 +191,11 @@ async def test_search_run_rate_limit(client: AsyncClient):
         search_id = create_resp.json()["data"]["id"]
 
         # Run #1 — should succeed
-        resp1 = await client.post(
-            f"/api/v1/search/{search_id}/run", headers=headers
-        )
+        resp1 = await client.post(f"/api/v1/search/{search_id}/run", headers=headers)
         assert resp1.status_code == 200
 
         # Run #2 — should be rate limited
-        resp2 = await client.post(
-            f"/api/v1/search/{search_id}/run", headers=headers
-        )
+        resp2 = await client.post(f"/api/v1/search/{search_id}/run", headers=headers)
         assert resp2.status_code == 429
         assert resp2.json()["error"]["code"] == "RATE_LIMIT_EXCEEDED"
     finally:
@@ -243,6 +243,7 @@ async def test_cors_blocks_unknown_origin(client: AsyncClient):
 class TestCustomExceptions:
     def test_rate_limit_error_format(self):
         from app.utils.exceptions import RateLimitError
+
         err = RateLimitError("Too many requests")
         assert err.status_code == 429
         assert err.code == "RATE_LIMIT_EXCEEDED"
@@ -250,29 +251,34 @@ class TestCustomExceptions:
 
     def test_not_found_error_format(self):
         from app.utils.exceptions import NotFoundError
+
         err = NotFoundError("Contact not found")
         assert err.status_code == 404
         assert err.code == "NOT_FOUND"
 
     def test_unauthorized_error_format(self):
         from app.utils.exceptions import UnauthorizedError
+
         err = UnauthorizedError()
         assert err.status_code == 401
         assert err.code == "UNAUTHORIZED"
 
     def test_forbidden_error_format(self):
         from app.utils.exceptions import ForbiddenError
+
         err = ForbiddenError()
         assert err.status_code == 403
         assert err.code == "FORBIDDEN"
 
     def test_validation_error_format(self):
         from app.utils.exceptions import ValidationError
+
         err = ValidationError("Bad field")
         assert err.status_code == 422
         assert err.code == "VALIDATION_ERROR"
 
     def test_app_error_is_base(self):
         from app.utils.exceptions import AppError, NotFoundError
+
         assert issubclass(NotFoundError, AppError)
         assert issubclass(NotFoundError, Exception)

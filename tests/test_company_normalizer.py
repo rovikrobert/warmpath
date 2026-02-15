@@ -96,7 +96,9 @@ SAMPLE_CSV = (
 )
 
 
-async def _signup_and_get_token(client: AsyncClient, email: str = "co@example.com") -> str:
+async def _signup_and_get_token(
+    client: AsyncClient, email: str = "co@example.com"
+) -> str:
     resp = await client.post(
         "/api/v1/auth/signup",
         json={"email": email, "password": "secret123", "full_name": "Test User"},
@@ -187,9 +189,7 @@ async def test_no_company_for_empty_company_field(client: AsyncClient):
     )
     token = await _signup_and_get_token(client, email="solo@example.com")
     headers = {"Authorization": f"Bearer {token}"}
-    await client.post(
-        "/api/v1/contacts/upload", headers=headers, files=_csv_file(csv)
-    )
+    await client.post("/api/v1/contacts/upload", headers=headers, files=_csv_file(csv))
 
     resp = await client.get("/api/v1/companies", headers=headers)
     assert resp.json()["meta"]["total"] == 0

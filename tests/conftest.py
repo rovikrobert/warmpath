@@ -20,7 +20,7 @@ SQLiteTypeCompiler.visit_ARRAY = lambda self, type_, **kw: "JSON"
 SQLiteTypeCompiler.visit_uuid = lambda self, type_, **kw: "CHAR(36)"
 
 # SQLite needs explicit adapters to bind/read Python lists for ARRAY→JSON columns
-sqlite3.register_adapter(list, lambda l: json.dumps(l))
+sqlite3.register_adapter(list, lambda val: json.dumps(val))
 sqlite3.register_adapter(dict, lambda d: json.dumps(d))
 
 

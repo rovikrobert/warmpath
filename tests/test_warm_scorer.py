@@ -1,6 +1,5 @@
 import io
 from datetime import date, timedelta
-from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
@@ -223,7 +222,10 @@ class TestTenureScore:
 
 class TestComputeWarmScore:
     def test_weights_sum_to_one(self):
-        assert abs(WEIGHT_RECENCY + WEIGHT_CONTEXT + WEIGHT_ROLE + WEIGHT_TENURE - 1.0) < 0.001
+        assert (
+            abs(WEIGHT_RECENCY + WEIGHT_CONTEXT + WEIGHT_ROLE + WEIGHT_TENURE - 1.0)
+            < 0.001
+        )
 
     def test_basic_computation(self):
         contact = _contact(
@@ -333,7 +335,9 @@ SAMPLE_CSV = (
 )
 
 
-async def _signup_and_get_token(client: AsyncClient, email: str = "ws@example.com") -> str:
+async def _signup_and_get_token(
+    client: AsyncClient, email: str = "ws@example.com"
+) -> str:
     resp = await client.post(
         "/api/v1/auth/signup",
         json={"email": email, "password": "secret123", "full_name": "WS User"},
@@ -342,14 +346,18 @@ async def _signup_and_get_token(client: AsyncClient, email: str = "ws@example.co
 
 
 def _csv_file(content: str):
-    return {"file": ("connections.csv", io.BytesIO(content.encode("utf-8")), "text/csv")}
+    return {
+        "file": ("connections.csv", io.BytesIO(content.encode("utf-8")), "text/csv")
+    }
 
 
 async def test_upload_auto_computes_scores(client: AsyncClient):
     token = await _signup_and_get_token(client)
     headers = {"Authorization": f"Bearer {token}"}
 
-    await client.post("/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV))
+    await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
 
     resp = await client.get("/api/v1/contacts", headers=headers)
     body = resp.json()
@@ -362,7 +370,9 @@ async def test_compute_scores_endpoint(client: AsyncClient):
     token = await _signup_and_get_token(client, email="compute@example.com")
     headers = {"Authorization": f"Bearer {token}"}
 
-    await client.post("/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV))
+    await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
 
     resp = await client.post("/api/v1/contacts/compute-scores", headers=headers)
     assert resp.status_code == 200
@@ -373,7 +383,9 @@ async def test_sort_by_warm_score(client: AsyncClient):
     token = await _signup_and_get_token(client, email="sort@example.com")
     headers = {"Authorization": f"Bearer {token}"}
 
-    await client.post("/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV))
+    await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
 
     # Sort desc — highest score first
     resp = await client.get(
@@ -391,7 +403,9 @@ async def test_single_contact_includes_warm_score(client: AsyncClient):
     token = await _signup_and_get_token(client, email="single@example.com")
     headers = {"Authorization": f"Bearer {token}"}
 
-    await client.post("/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV))
+    await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
 
     list_resp = await client.get("/api/v1/contacts", headers=headers)
     contact_id = list_resp.json()["data"][0]["id"]
