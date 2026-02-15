@@ -7,7 +7,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.database import get_db
+from app.middleware.rate_limit import check_rate_limit
 from app.models.contact import Contact, CsvUpload
 from app.models.match_result import WarmScore
 from app.models.user import User
@@ -15,6 +17,7 @@ from app.schemas.contact import ContactResponse, CsvUploadResponse, PaginationMe
 from app.services.company_normalizer import link_contact_to_company
 from app.services.csv_parser import parse_linkedin_csv
 from app.services.warm_scorer import batch_compute_scores
+from app.utils.exceptions import RateLimitError
 from app.utils.security import get_current_user
 
 router = APIRouter()
@@ -33,6 +36,15 @@ async def upload_csv(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    # Rate limit check
+    allowed, count = await check_rate_limit(
+        current_user.id, "csv_upload", settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY, db
+    )
+    if not allowed:
+        raise RateLimitError(
+            f"CSV upload limit reached ({settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY}/day)"
+        )
+
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

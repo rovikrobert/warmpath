@@ -7,7 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
+from app.middleware.rate_limit import check_rate_limit
 from app.models.contact import Contact
 from app.models.match_result import MatchResult, WarmScore
 from app.models.search_request import SearchRequest
@@ -15,6 +17,7 @@ from app.models.user import User
 from app.schemas.contact import PaginationMeta
 from app.schemas.search import MatchResultResponse, SearchRequestCreate, SearchRequestResponse
 from app.services.ai_matcher import run_search
+from app.utils.exceptions import RateLimitError
 from app.utils.security import get_current_user
 
 router = APIRouter()
@@ -116,6 +119,15 @@ async def execute_search(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    # Rate limit check
+    allowed, count = await check_rate_limit(
+        current_user.id, "search_run", settings.RATE_LIMIT_SEARCH_RUNS_PER_DAY, db
+    )
+    if not allowed:
+        raise RateLimitError(
+            f"Search run limit reached ({settings.RATE_LIMIT_SEARCH_RUNS_PER_DAY}/day)"
+        )
+
     try:
         match_results = await run_search(search_id, current_user.id, db)
     except ValueError as exc:
