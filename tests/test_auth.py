@@ -7,7 +7,11 @@ pytestmark = pytest.mark.asyncio
 async def test_signup_returns_token(client: AsyncClient):
     resp = await client.post(
         "/api/v1/auth/signup",
-        json={"email": "new@example.com", "password": "secret123", "full_name": "New User"},
+        json={
+            "email": "new@example.com",
+            "password": "secret123",
+            "full_name": "New User",
+        },
     )
     assert resp.status_code == 201
     body = resp.json()
@@ -18,7 +22,11 @@ async def test_signup_returns_token(client: AsyncClient):
 
 
 async def test_signup_duplicate_email(client: AsyncClient):
-    payload = {"email": "dup@example.com", "password": "secret123", "full_name": "Dup User"}
+    payload = {
+        "email": "dup@example.com",
+        "password": "secret123",
+        "full_name": "Dup User",
+    }
     await client.post("/api/v1/auth/signup", json=payload)
     resp = await client.post("/api/v1/auth/signup", json=payload)
     assert resp.status_code == 409
@@ -27,7 +35,11 @@ async def test_signup_duplicate_email(client: AsyncClient):
 async def test_login_success(client: AsyncClient):
     await client.post(
         "/api/v1/auth/signup",
-        json={"email": "login@example.com", "password": "secret123", "full_name": "Login User"},
+        json={
+            "email": "login@example.com",
+            "password": "secret123",
+            "full_name": "Login User",
+        },
     )
     resp = await client.post(
         "/api/v1/auth/login",
@@ -42,7 +54,11 @@ async def test_login_success(client: AsyncClient):
 async def test_login_wrong_password(client: AsyncClient):
     await client.post(
         "/api/v1/auth/signup",
-        json={"email": "wrong@example.com", "password": "secret123", "full_name": "Wrong"},
+        json={
+            "email": "wrong@example.com",
+            "password": "secret123",
+            "full_name": "Wrong",
+        },
     )
     resp = await client.post(
         "/api/v1/auth/login",
@@ -62,7 +78,11 @@ async def test_login_nonexistent_email(client: AsyncClient):
 async def test_me_with_valid_token(client: AsyncClient):
     resp = await client.post(
         "/api/v1/auth/signup",
-        json={"email": "me@example.com", "password": "secret123", "full_name": "Me User"},
+        json={
+            "email": "me@example.com",
+            "password": "secret123",
+            "full_name": "Me User",
+        },
     )
     token = resp.json()["data"]["access_token"]
     resp = await client.get(

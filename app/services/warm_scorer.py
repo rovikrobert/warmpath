@@ -34,6 +34,7 @@ class WarmScoreResult:
 # Component: Recency Score (0-100)
 # ---------------------------------------------------------------------------
 
+
 def compute_recency_score(connected_on: date | None) -> float:
     """Score based on how recently the contact was connected."""
     if connected_on is None:
@@ -58,6 +59,7 @@ def compute_recency_score(connected_on: date | None) -> float:
 # ---------------------------------------------------------------------------
 # Component: Context Score (0-100)
 # ---------------------------------------------------------------------------
+
 
 def compute_context_score(
     contact: Contact,
@@ -84,8 +86,7 @@ def compute_context_score(
 
     # Same industry (+25)
     if (
-        profile.industry
-        and contact.current_title
+        profile.industry and contact.current_title
         # We don't have industry on contacts directly, but we can
         # check if the profile industry appears in the contact's company
         # context. For now, this is a placeholder — enrichment will improve it.
@@ -165,6 +166,7 @@ def compute_role_score(title: str | None) -> float:
 # Component: Tenure Score (0-100)
 # ---------------------------------------------------------------------------
 
+
 def compute_tenu[RESEND_KEY_REDACTED]() -> float:
     """Tenure at current company. Requires enrichment data — default for now."""
     return 50.0
@@ -173,6 +175,7 @@ def compute_tenu[RESEND_KEY_REDACTED]() -> float:
 # ---------------------------------------------------------------------------
 # Composite score
 # ---------------------------------------------------------------------------
+
 
 def compute_warm_score(
     contact: Contact,
@@ -212,6 +215,7 @@ def compute_warm_score(
 # ---------------------------------------------------------------------------
 # Batch computation
 # ---------------------------------------------------------------------------
+
 
 async def batch_compute_scores(
     user_id: uuid.UUID,

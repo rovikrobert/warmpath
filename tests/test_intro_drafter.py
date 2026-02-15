@@ -5,7 +5,6 @@ import pytest
 from httpx import AsyncClient
 
 from app.services.intro_drafter import (
-    DraftedMessage,
     LINKEDIN_CHAR_LIMIT,
     _mock_drafts,
 )
@@ -65,7 +64,9 @@ SAMPLE_CSV = (
 )
 
 
-async def _signup_and_get_token(client: AsyncClient, email: str = "intro@example.com") -> str:
+async def _signup_and_get_token(
+    client: AsyncClient, email: str = "intro@example.com"
+) -> str:
     resp = await client.post(
         "/api/v1/auth/signup",
         json={"email": email, "password": "secret123", "full_name": "Intro User"},
@@ -74,7 +75,9 @@ async def _signup_and_get_token(client: AsyncClient, email: str = "intro@example
 
 
 def _csv_file(content: str):
-    return {"file": ("connections.csv", io.BytesIO(content.encode("utf-8")), "text/csv")}
+    return {
+        "file": ("connections.csv", io.BytesIO(content.encode("utf-8")), "text/csv")
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -137,8 +140,12 @@ class TestMockDraftsEmail:
             assert len(draft.subject_line) > 0
 
     def test_email_body_longer_than_linkedin(self):
-        linkedin_drafts = _mock_drafts(_contact(), _profile(), None, "professional", "linkedin")
-        email_drafts = _mock_drafts(_contact(), _profile(), None, "professional", "email")
+        linkedin_drafts = _mock_drafts(
+            _contact(), _profile(), None, "professional", "linkedin"
+        )
+        email_drafts = _mock_drafts(
+            _contact(), _profile(), None, "professional", "email"
+        )
         # Email bodies should generally be longer
         linkedin_total = sum(len(d.message_body) for d in linkedin_drafts)
         email_total = sum(len(d.message_body) for d in email_drafts)

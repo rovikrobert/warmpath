@@ -44,9 +44,7 @@ class User(Base):
     )
     contacts: Mapped[list["Contact"]] = relationship(back_populates="user")
     csv_uploads: Mapped[list["CsvUpload"]] = relationship(back_populates="user")
-    search_requests: Mapped[list["SearchRequest"]] = relationship(
-        back_populates="user"
-    )
+    search_requests: Mapped[list["SearchRequest"]] = relationship(back_populates="user")
     match_results: Mapped[list["MatchResult"]] = relationship(back_populates="user")
     warm_scores: Mapped[list["WarmScore"]] = relationship(back_populates="user")
     intro_requests: Mapped[list["IntroRequest"]] = relationship(back_populates="user")
@@ -55,9 +53,7 @@ class User(Base):
 
 class ConnectorProfile(Base):
     __tablename__ = "connector_profiles"
-    __table_args__ = (
-        UniqueConstraint("user_id", name="uq_connector_profile_user"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", name="uq_connector_profile_user"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

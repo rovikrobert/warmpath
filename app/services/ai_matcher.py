@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.contact import Contact
-from app.models.match_result import MatchResult, WarmScore
+from app.models.match_result import MatchResult
 from app.models.search_request import SearchRequest
 
 
@@ -31,9 +31,19 @@ class ContactMatch:
     match_type: str  # "direct", "indirect", "weak"
 
 
+def _ensu[RESEND_KEY_REDACTED](val: list | str | None) -> list:
+    """Convert ARRAY column values that may come back as JSON strings from SQLite."""
+    if val is None:
+        return []
+    if isinstance(val, str):
+        return json.loads(val)
+    return val
+
+
 # ---------------------------------------------------------------------------
 # Mock AI (deterministic scoring for dev/test)
 # ---------------------------------------------------------------------------
+
 
 def _mock_sco[RESEND_KEY_REDACTED](
     search: SearchRequest,
@@ -42,10 +52,10 @@ def _mock_sco[RESEND_KEY_REDACTED](
     """Return deterministic mock scores based on simple heuristics."""
     results: list[ContactMatch] = []
 
-    target_titles = [t.lower() for t in (search.target_titles or [])]
-    target_companies = [c.lower() for c in (search.target_companies or [])]
-    target_locations = [loc.lower() for loc in (search.target_locations or [])]
-    target_keywords = [k.lower() for k in (search.target_keywords or [])]
+    target_titles = [t.lower() for t in _ensu[RESEND_KEY_REDACTED](search.target_titles)]
+    target_companies = [c.lower() for c in _ensu[RESEND_KEY_REDACTED](search.target_companies)]
+    target_locations = [loc.lower() for loc in _ensu[RESEND_KEY_REDACTED](search.target_locations)]
+    target_keywords = [k.lower() for k in _ensu[RESEND_KEY_REDACTED](search.target_keywords)]
 
     for contact in contacts:
         score = 0.0
@@ -89,14 +99,20 @@ def _mock_sco[RESEND_KEY_REDACTED](
             score = 5.0
             reasons.append("No direct criteria match")
 
-        match_type = "direct" if score >= 50 else ("indirect" if score >= 20 else "weak")
+        match_type = (
+            "direct" if score >= 50 else ("indirect" if score >= 20 else "weak")
+        )
 
-        results.append(ContactMatch(
-            contact_id=contact.id,
-            relevance_score=round(score, 2),
-            reasoning="; ".join(reasons) if reasons else "No matching criteria found",
-            match_type=match_type,
-        ))
+        results.append(
+            ContactMatch(
+                contact_id=contact.id,
+                relevance_score=round(score, 2),
+                reasoning="; ".join(reasons)
+                if reasons
+                else "No matching criteria found",
+                match_type=match_type,
+            )
+        )
 
     return results
 
@@ -105,31 +121,39 @@ def _mock_sco[RESEND_KEY_REDACTED](
 # Real Claude API (will be activated when API key is configured)
 # ---------------------------------------------------------------------------
 
+
 def _build_prompt(search: SearchRequest, contacts: list[Contact]) -> str:
     """Build the Claude prompt for a batch of contacts."""
     criteria = []
-    if search.target_titles:
-        criteria.append(f"Target titles: {', '.join(search.target_titles)}")
-    if search.target_companies:
-        criteria.append(f"Target companies: {', '.join(search.target_companies)}")
-    if search.target_industries:
-        criteria.append(f"Target industries: {', '.join(search.target_industries)}")
-    if search.target_locations:
-        criteria.append(f"Target locations: {', '.join(search.target_locations)}")
-    if search.target_keywords:
-        criteria.append(f"Keywords: {', '.join(search.target_keywords)}")
+    titles = _ensu[RESEND_KEY_REDACTED](search.target_titles)
+    companies = _ensu[RESEND_KEY_REDACTED](search.target_companies)
+    industries = _ensu[RESEND_KEY_REDACTED](search.target_industries)
+    locations = _ensu[RESEND_KEY_REDACTED](search.target_locations)
+    keywords = _ensu[RESEND_KEY_REDACTED](search.target_keywords)
+    if titles:
+        criteria.append(f"Target titles: {', '.join(titles)}")
+    if companies:
+        criteria.append(f"Target companies: {', '.join(companies)}")
+    if industries:
+        criteria.append(f"Target industries: {', '.join(industries)}")
+    if locations:
+        criteria.append(f"Target locations: {', '.join(locations)}")
+    if keywords:
+        criteria.append(f"Keywords: {', '.join(keywords)}")
     if search.description:
         criteria.append(f"Description: {search.description}")
 
     contacts_data = []
     for c in contacts:
-        contacts_data.append({
-            "contact_id": str(c.id),
-            "name": c.full_name,
-            "title": c.current_title,
-            "company": c.current_company,
-            "location": c.location,
-        })
+        contacts_data.append(
+            {
+                "contact_id": str(c.id),
+                "name": c.full_name,
+                "title": c.current_title,
+                "company": c.current_company,
+                "location": c.location,
+            }
+        )
 
     return f"""You are a sales intelligence assistant. Score each contact for relevance to the following search criteria.
 
@@ -178,12 +202,14 @@ async def _call_claude_api(
 
     results: list[ContactMatch] = []
     for item in parsed:
-        results.append(ContactMatch(
-            contact_id=uuid.UUID(item["contact_id"]),
-            relevance_score=float(item["relevance_score"]),
-            reasoning=item.get("reasoning", ""),
-            match_type=item.get("match_type", "weak"),
-        ))
+        results.append(
+            ContactMatch(
+                contact_id=uuid.UUID(item["contact_id"]),
+                relevance_score=float(item["relevance_score"]),
+                reasoning=item.get("reasoning", ""),
+                match_type=item.get("match_type", "weak"),
+            )
+        )
 
     return results
 
@@ -191,6 +217,7 @@ async def _call_claude_api(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 async def sco[RESEND_KEY_REDACTED](
     search: SearchRequest,

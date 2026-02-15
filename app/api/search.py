@@ -1,6 +1,5 @@
 import math
 import uuid
-from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -15,7 +14,11 @@ from app.models.match_result import MatchResult, WarmScore
 from app.models.search_request import SearchRequest
 from app.models.user import User
 from app.schemas.contact import PaginationMeta
-from app.schemas.search import MatchResultResponse, SearchRequestCreate, SearchRequestResponse
+from app.schemas.search import (
+    MatchResultResponse,
+    SearchRequestCreate,
+    SearchRequestResponse,
+)
 from app.services.ai_matcher import run_search
 from app.utils.exceptions import RateLimitError
 from app.utils.security import get_current_user
@@ -192,16 +195,13 @@ async def get_search_results(
 
     # Sort by combined score: relevance * 0.5 + warm_score * 0.5
     # Use COALESCE for null warm scores
-    combined_expr = (
-        MatchResult.relevance_score * Decimal("0.5")
-        + func.coalesce(WarmScore.total_score, 0) * Decimal("0.5")
-    )
+    combined_expr = MatchResult.relevance_score * Decimal("0.5") + func.coalesce(
+        WarmScore.total_score, 0
+    ) * Decimal("0.5")
 
     offset = (page - 1) * per_page
     result = await db.execute(
-        base_query.order_by(combined_expr.desc())
-        .offset(offset)
-        .limit(per_page)
+        base_query.order_by(combined_expr.desc()).offset(offset).limit(per_page)
     )
     rows = result.all()
 

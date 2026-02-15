@@ -4,6 +4,7 @@ Revision ID: 001
 Revises:
 Create Date: 2026-02-15
 """
+
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -102,9 +103,7 @@ def upgrade() -> None:
         sa.Column("filename", sa.String(500), nullable=False),
         sa.Column("file_size_bytes", sa.Integer()),
         sa.Column("row_count", sa.Integer()),
-        sa.Column(
-            "processed_count", sa.Integer(), server_default=sa.text("0")
-        ),
+        sa.Column("processed_count", sa.Integer(), server_default=sa.text("0")),
         sa.Column("error_count", sa.Integer(), server_default=sa.text("0")),
         sa.Column(
             "status",
@@ -215,17 +214,13 @@ def upgrade() -> None:
     )
     op.create_index("ix_contacts_user_id", "contacts", ["user_id"])
     op.create_index("ix_contacts_company_id", "contacts", ["company_id"])
-    op.create_index(
-        "idx_contacts_fingerprint", "contacts", ["user_id", "fingerprint"]
-    )
+    op.create_index("idx_contacts_fingerprint", "contacts", ["user_id", "fingerprint"])
     op.create_index(
         "idx_contacts_dedup",
         "contacts",
         ["user_id", "fingerprint"],
         unique=True,
-        postgresql_where=sa.text(
-            "deleted_at IS NULL AND fingerprint IS NOT NULL"
-        ),
+        postgresql_where=sa.text("deleted_at IS NULL AND fingerprint IS NOT NULL"),
     )
 
     # 6. contact_companies
@@ -391,9 +386,7 @@ def upgrade() -> None:
         sa.Column("tenu[RESEND_KEY_REDACTED]", sa.Numeric(5, 2), nullable=False),
         sa.Column("context_score", sa.Numeric(5, 2), nullable=False),
         sa.Column("role_score", sa.Numeric(5, 2), nullable=False),
-        sa.Column(
-            "engagement_score", sa.Numeric(5, 2), server_default=sa.text("0")
-        ),
+        sa.Column("engagement_score", sa.Numeric(5, 2), server_default=sa.text("0")),
         sa.Column("sco[RESEND_KEY_REDACTED]", postgresql.JSONB()),
         sa.Column(
             "algorithm_version",
@@ -494,9 +487,7 @@ def upgrade() -> None:
         sa.Column("subject_line", sa.String(500)),
         sa.Column("message_body", sa.Text(), nullable=False),
         sa.Column("variant_label", sa.String(100)),
-        sa.Column(
-            "is_selected", sa.Boolean(), server_default=sa.text("false")
-        ),
+        sa.Column("is_selected", sa.Boolean(), server_default=sa.text("false")),
         sa.Column("user_edited_body", sa.Text()),
         sa.Column("ai_model_version", sa.String(100)),
         sa.Column(

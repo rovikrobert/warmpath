@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_db
@@ -181,7 +180,8 @@ async def list_contacts(
         select(Contact, WarmScore.total_score)
         .outerjoin(
             WarmScore,
-            (WarmScore.contact_id == Contact.id) & (WarmScore.user_id == Contact.user_id),
+            (WarmScore.contact_id == Contact.id)
+            & (WarmScore.user_id == Contact.user_id),
         )
         .where(
             Contact.user_id == current_user.id,
@@ -251,7 +251,8 @@ async def get_contact(
         select(Contact, WarmScore.total_score)
         .outerjoin(
             WarmScore,
-            (WarmScore.contact_id == Contact.id) & (WarmScore.user_id == Contact.user_id),
+            (WarmScore.contact_id == Contact.id)
+            & (WarmScore.user_id == Contact.user_id),
         )
         .where(
             Contact.id == contact_id,
