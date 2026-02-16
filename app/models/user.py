@@ -53,10 +53,6 @@ class User(Base):
     job_preferences: Mapped["UserJobPreferences | None"] = relationship(
         back_populates="user", uselist=False
     )
-    applications: Mapped[list["Application"]] = relationship(back_populates="user")
-    job_preferences: Mapped["UserJobPreferences | None"] = relationship(
-        back_populates="user", uselist=False
-    )
 
 
 class ConnectorProfile(Base):

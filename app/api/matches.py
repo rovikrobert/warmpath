@@ -257,9 +257,32 @@ async def update_message(
     await db.commit()
     await db.refresh(msg)
 
+    resp_data = IntroMessageResponse.model_validate(msg).model_dump(mode="json")
+    meta: dict = {}
+
+    # When a message is selected, suggest tracking as an application
+    if body.is_selected:
+        # Reload intro request to get contact/company info
+        ir_result = await db.execute(
+            select(IntroRequest).where(IntroRequest.id == intro_id)
+        )
+        ir = ir_result.scalar_one()
+        contact_result = await db.execute(
+            select(Contact).where(Contact.id == ir.contact_id)
+        )
+        contact = contact_result.scalar_one_or_none()
+        meta["suggest_track"] = True
+        meta["prefilled_application"] = {
+            "company_name": contact.current_company if contact else "Unknown",
+            "contact_id": str(ir.contact_id),
+            "job_opening_id": str(ir.job_opening_id) if ir.job_opening_id else None,
+            "match_result_id": str(ir.match_result_id) if ir.match_result_id else None,
+            "channel": ir.channel,
+        }
+
     return {
-        "data": IntroMessageResponse.model_validate(msg).model_dump(mode="json"),
-        "meta": {},
+        "data": resp_data,
+        "meta": meta,
     }
 
 
