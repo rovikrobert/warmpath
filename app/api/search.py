@@ -564,11 +564,15 @@ async def _process_company(
 
     # Step 1: Look up board registry and fetch job openings
     boards = lookup_boards(company_name)
+    total_jobs_fetched = 0
+    job_scan_status = "no_board"
     if boards:
         raw_jobs = await fetcher.fetch_jobs_for_company(company_name, boards)
+        total_jobs_fetched = len(raw_jobs)
         matched_jobs = await fetcher.match_jobs_to_role(
             raw_jobs, target_role, target_seniority
         )
+        job_scan_status = "matched" if matched_jobs else "no_match"
         for job in matched_jobs:
             active_openings.append(
                 {
@@ -638,6 +642,8 @@ async def _process_company(
         "referral_paths": referral_paths,
         "has_openings": len(active_openings) > 0,
         "has_referral_paths": len(referral_paths) > 0,
+        "job_scan_status": job_scan_status,
+        "total_jobs_fetched": total_jobs_fetched,
         "source": "own_network",
     }
 
