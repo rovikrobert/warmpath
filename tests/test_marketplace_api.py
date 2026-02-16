@@ -14,7 +14,7 @@ from app.models.marketplace import (
     NetworkSharingPreferences,
 )
 from app.models.match_result import WarmScore
-from app.services.credits import earn_credits, get_balance
+from app.services.credits import earn_credits, get_balance, spend_credits
 from tests.conftest import TestSessionLocal
 
 
@@ -250,6 +250,14 @@ class TestMarketplaceSearch:
         self, client: AsyncClient, seeker_auth, marketplace_data
     ):
         """No credits → 402."""
+        # Spend down welcome bonus credits first
+        uid = uuid_mod.UUID(seeker_auth["user_id"])
+        async with TestSessionLocal() as db:
+            bal = await get_balance(uid, db)
+            if bal > 0:
+                await spend_credits(uid, bal, "drain_for_test", db)
+                await db.commit()
+
         resp = await client.post(
             "/api/v1/marketplace/search",
             json={"company_names": ["Stripe"]},
@@ -360,6 +368,14 @@ class TestIntroRequestFlow:
         self, client: AsyncClient, seeker_auth, marketplace_data
     ):
         """No credits → 402."""
+        # Spend down welcome bonus credits first
+        uid = uuid_mod.UUID(seeker_auth["user_id"])
+        async with TestSessionLocal() as db:
+            bal = await get_balance(uid, db)
+            if bal > 0:
+                await spend_credits(uid, bal, "drain_for_test", db)
+                await db.commit()
+
         listing_id = str(marketplace_data["listing_ids"][0])
         resp = await client.post(
             "/api/v1/marketplace/request-intro",
@@ -837,6 +853,14 @@ class TestSmartSearchMarketplace:
         self, client: AsyncClient, seeker_auth
     ):
         """Marketplace scope without credits → 402."""
+        # Spend down welcome bonus credits first
+        uid = uuid_mod.UUID(seeker_auth["user_id"])
+        async with TestSessionLocal() as db:
+            bal = await get_balance(uid, db)
+            if bal > 0:
+                await spend_credits(uid, bal, "drain_for_test", db)
+                await db.commit()
+
         await client.put(
             "/api/v1/preferences/job",
             json={"target_role": "Software Engineer"},

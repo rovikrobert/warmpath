@@ -9,6 +9,7 @@ from app.api import (
     auth,
     companies,
     contacts,
+    credits,
     health,
     jobs,
     marketplace,
@@ -86,3 +87,4 @@ app.include_router(
 app.include_router(
     marketplace.router, prefix="/api/v1/marketplace", tags=["marketplace"]
 )
+app.include_router(credits.router, prefix="/api/v1/credits", tags=["credits"])

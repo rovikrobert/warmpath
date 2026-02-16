@@ -12,6 +12,7 @@ from app.schemas.user import (
     UserLogin,
     UserResponse,
 )
+from app.services.credits import earn_credits
 from app.utils.security import (
     create_access_token,
     get_current_user,
@@ -58,6 +59,9 @@ async def signup(body: UserCreate, db: AsyncSession = Depends(get_db)) -> dict:
     if profile_fields:
         profile = ConnectorProfile(user_id=user.id, **profile_fields)
         db.add(profile)
+
+    # Award welcome bonus credits
+    await earn_credits(user.id, 50, "welcome_bonus", db)
 
     await db.commit()
     await db.refresh(user)
