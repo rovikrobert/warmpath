@@ -51,6 +51,7 @@ class SearchRequestResponse(BaseModel):
 
 class SmartSearchCreate(BaseModel):
     company_names: list[str]
+    scope: str = "own_network"  # "own_network" (default, free) or "marketplace"
 
 
 class SmartSearchResponse(BaseModel):

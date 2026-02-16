@@ -24,9 +24,15 @@ from app.schemas.search import (
     SearchRequestResponse,
     SmartSearchCreate,
 )
+from app.models.company import Company
+from app.models.marketplace import (
+    ConnectorReputation,
+    MarketplaceListing,
+)
 from app.services.ai_matcher import sco[RESEND_KEY_REDACTED]
 from app.services.ai_matcher import run_search
 from app.services.board_registry import lookup_boards
+from app.services.credits import get_balance, spend_credits
 from app.services.job_fetcher import JobFetcher
 from app.services.warm_scorer import compute_warm_score
 from app.utils.exceptions import RateLimitError
@@ -388,6 +394,19 @@ async def smart_search(
             detail="Set job preferences first (PUT /preferences/job with target_role)",
         )
 
+    scope = body.scope or "own_network"
+
+    # Marketplace scope costs credits
+    if scope == "marketplace":
+        balance = await get_balance(current_user.id, db)
+        if balance < 5:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="Insufficient credits for marketplace search. "
+                "You need 5 credits. Earn credits by uploading your network.",
+            )
+        await spend_credits(current_user.id, 5, "smart_search_marketplace", db)
+
     # Create SearchRequest for history tracking
     search_req = SearchRequest(
         user_id=current_user.id,
@@ -408,6 +427,7 @@ async def smart_search(
             target_role=target_role,
             target_seniority=target_seniority,
             user=current_user,
+            scope=scope,
             db=db,
         )
 
@@ -448,6 +468,7 @@ async def _run_smart_search(
     target_seniority: str | None,
     user: User,
     db: AsyncSession,
+    scope: str = "own_network",
 ) -> dict:
     """Execute the smart search pipeline for each company."""
     fetcher = JobFetcher()
@@ -483,6 +504,18 @@ async def _run_smart_search(
             fetcher=fetcher,
             db=db,
         )
+
+        # If marketplace scope, also search marketplace listings
+        if scope == "marketplace":
+            marketplace_paths = await _search_marketplace_for_company(
+                company_name=company_name,
+                user_id=user.id,
+                db=db,
+            )
+            company_data["referral_paths"].extend(marketplace_paths)
+            if marketplace_paths:
+                company_data["has_referral_paths"] = True
+
         companies_results.append(company_data)
 
     # Sort: companies with BOTH openings AND referral paths first,
@@ -607,3 +640,70 @@ async def _process_company(
         "has_referral_paths": len(referral_paths) > 0,
         "source": "own_network",
     }
+
+
+async def _search_marketplace_for_company(
+    company_name: str,
+    user_id: uuid.UUID,
+    db: AsyncSession,
+) -> list[dict]:
+    """Search marketplace listings for a company and return anonymized paths."""
+    # Find company by name
+    company_result = await db.execute(
+        select(Company).where(Company.name.ilike(f"%{company_name}%"))
+    )
+    companies = list(company_result.scalars())
+    if not companies:
+        return []
+
+    company_ids = [c.id for c in companies]
+
+    # Query active marketplace listings (not the user's own)
+    result = await db.execute(
+        select(MarketplaceListing).where(
+            MarketplaceListing.company_id.in_(company_ids),
+            MarketplaceListing.is_available.is_(True),
+            MarketplaceListing.deleted_at.is_(None),
+            MarketplaceListing.network_holder_id != user_id,
+        )
+    )
+    listings = list(result.scalars())
+
+    # Load reputations
+    holder_ids = {listing.network_holder_id for listing in listings}
+    rep_map: dict[uuid.UUID, ConnectorReputation] = {}
+    if holder_ids:
+        rep_result = await db.execute(
+            select(ConnectorReputation).where(
+                ConnectorReputation.user_id.in_(holder_ids)
+            )
+        )
+        for rep in rep_result.scalars():
+            rep_map[rep.user_id] = rep
+
+    paths: list[dict] = []
+    for listing in listings:
+        reputation = rep_map.get(listing.network_holder_id)
+        rep_dict = None
+        if reputation:
+            rep_dict = {
+                "intros_facilitated": reputation.intros_facilitated,
+                "response_rate": reputation.response_rate,
+                "avg_rating": reputation.avg_rating,
+            }
+
+        paths.append(
+            {
+                "listing": {
+                    "id": str(listing.id),
+                    "role_level": listing.role_level,
+                    "department_category": listing.department_category,
+                    "warm_sco[RESEND_KEY_REDACTED]": listing.warm_sco[RESEND_KEY_REDACTED],
+                    "connection_recency": listing.connection_recency,
+                },
+                "network_holder_reputation": rep_dict,
+                "source": "marketplace",
+            }
+        )
+
+    return paths
