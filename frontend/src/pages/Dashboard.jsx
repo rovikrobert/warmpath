@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { contacts as contactsApi, search as searchApi, usage as usageApi, credits as creditsApi, marketplace as mpApi } from '../api/client';
+import { contacts as contactsApi, search as searchApi, usage as usageApi, marketplace as mpApi } from '../api/client';
 import UploadModal from '../components/UploadModal';
 
 export default function Dashboard() {
@@ -10,7 +10,6 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [searches, setSearches] = useState([]);
   const [contactCount, setContactCount] = useState(null);
-  const [balance, setBalance] = useState(null);
   const [marketplaceStats, setMarketplaceStats] = useState(null);
   const [usageData, setUsageData] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
@@ -22,11 +21,10 @@ export default function Dashboard() {
   const load = async () => {
     setLoading(true);
     try {
-      const [contactsRes, searchRes, usageRes, balRes] = await Promise.all([
+      const [contactsRes, searchRes, usageRes] = await Promise.all([
         contactsApi.list({ page: 1, per_page: 1 }),
         searchApi.list(),
         usageApi.summary().catch(() => null),
-        creditsApi.balance().catch(() => ({ data: { balance: 0 } })),
       ]);
       setContactCount(contactsRes.meta?.total ?? contactsRes.data?.length ?? 0);
       setSearches(searchRes.data ?? []);
@@ -34,7 +32,6 @@ export default function Dashboard() {
         setStats(usageRes.data);
         setUsageData(usageRes.data);
       }
-      setBalance(balRes.data?.balance ?? 0);
 
       // Load marketplace stats for holders
       if (isHolder) {
@@ -86,10 +83,6 @@ export default function Dashboard() {
             <p className="text-2xl font-bold text-slate-900">{marketplaceStats.listings}</p>
           </div>
         )}
-        <div className="rounded-lg bg-white p-4 ring-1 ring-slate-200">
-          <p className="text-xs text-slate-500">Credits</p>
-          <p className="text-2xl font-bold text-amber-600">{balance ?? 0}</p>
-        </div>
         {isHolder && marketplaceStats && (
           <div className="rounded-lg bg-white p-4 ring-1 ring-slate-200">
             <p className="text-xs text-slate-500">Pending Requests</p>
