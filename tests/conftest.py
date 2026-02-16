@@ -1,6 +1,10 @@
 import json
+import os
 import sqlite3
 from collections.abc import AsyncGenerator
+
+# Force mock mode for tests — must be set before importing app modules
+os.environ["AI_MOCK_MODE"] = "true"
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
