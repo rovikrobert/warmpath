@@ -17,6 +17,7 @@ from app.celery_app import celery_app
 from app.config import settings
 from app.models.contact import Contact, CsvUpload
 from app.services.company_normalizer import link_contact_to_company
+from app.services.credits import earn_credits
 from app.services.csv_parser import parse_linkedin_csv
 from app.services.suppression import check_suppression
 from app.services.warm_scorer import batch_compute_scores
@@ -129,6 +130,13 @@ async def process_csv_upload_core(
 
         # Auto-compute warm scores after upload
         await batch_compute_scores(user_uuid, db)
+
+        # Award credits for CSV upload
+        if created > 0:
+            await earn_credits(
+                user_uuid, 100, "csv_upload", db, reference_id=upload_uuid
+            )
+
         await db.flush()
 
     except Exception as exc:
