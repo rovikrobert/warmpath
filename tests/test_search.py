@@ -269,7 +269,8 @@ async def test_run_search_with_contacts(client: AsyncClient):
     # Run the search
     run_resp = await client.post(f"/api/v1/search/{search_id}/run", headers=headers)
     assert run_resp.status_code == 200
-    assert run_resp.json()["data"]["matches_found"] == 3  # all 3 contacts scored
+    # Only Bob (VP at Fintech Inc) scores >= 20; Alice and Charlie score 5 (skipped)
+    assert run_resp.json()["data"]["matches_found"] == 1
 
 
 async def test_run_search_no_contacts(client: AsyncClient):
@@ -311,17 +312,13 @@ async def test_search_results_sorted_by_combined_score(client: AsyncClient):
 
     await client.post(f"/api/v1/search/{search_id}/run", headers=headers)
 
-    # Get results
+    # Get results — only Bob scores >= 40 (default min_score); Alice/Charlie not persisted
     resp = await client.get(f"/api/v1/search/{search_id}/results", headers=headers)
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body["data"]) == 3
+    assert len(body["data"]) == 1
 
-    # Results should be sorted by combined_score descending
-    combined_scores = [r["combined_score"] for r in body["data"]]
-    assert combined_scores == sorted(combined_scores, reverse=True)
-
-    # Bob (VP of Engineering at Fintech Inc) should be first
+    # Bob (VP of Engineering at Fintech Inc) should be the only result
     assert body["data"][0]["contact_name"] == "Bob Jones"
     assert body["data"][0]["relevance_score"] == 70.0  # 40 title + 30 company
 
@@ -401,7 +398,8 @@ async def test_rerun_search_updates_results(client: AsyncClient):
     count2 = resp2.json()["meta"]["total"]
 
     # Should have same count (upsert, not duplicate)
-    assert count1 == count2 == 3
+    # Only Alice (CEO, score 40) is persisted; Bob/Charlie score 5 (below 20)
+    assert count1 == count2 == 1
 
 
 async def test_search_user_scoped(client: AsyncClient):

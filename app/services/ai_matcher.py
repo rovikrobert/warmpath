@@ -274,9 +274,12 @@ async def run_search(
     # Score contacts via AI (mock or real)
     matches = await score_contacts(search, contacts)
 
-    # Upsert match results
+    # Upsert match results (skip scores below 20 to keep the database clean)
+    MIN_PERSIST_SCORE = 20.0
     match_results: list[MatchResult] = []
     for m in matches:
+        if m.relevance_score < MIN_PERSIST_SCORE:
+            continue
         existing_result = await db.execute(
             select(MatchResult).where(
                 MatchResult.search_request_id == search_id,
