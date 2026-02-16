@@ -47,3 +47,6 @@ class Company(Base):
     )
     job_openings: Mapped[list["JobOpening"]] = relationship(back_populates="company")
     applications: Mapped[list["Application"]] = relationship(back_populates="company")
+    marketplace_listings: Mapped[list["MarketplaceListing"]] = relationship(
+        back_populates="company"
+    )

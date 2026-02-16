@@ -28,6 +28,9 @@ class User(Base):
     plan_tier: Mapped[str] = mapped_column(
         String(50), nullable=False, server_default="free"
     )
+    user_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="job_seeker"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -52,6 +55,31 @@ class User(Base):
     applications: Mapped[list["Application"]] = relationship(back_populates="user")
     job_preferences: Mapped["UserJobPreferences | None"] = relationship(
         back_populates="user", uselist=False
+    )
+    # Marketplace & privacy relationships
+    marketplace_listings: Mapped[list["MarketplaceListing"]] = relationship(
+        back_populates="network_holder",
+        foreign_keys="MarketplaceListing.network_holder_id",
+    )
+    network_sharing_preferences: Mapped["NetworkSharingPreferences | None"] = (
+        relationship(back_populates="user", uselist=False)
+    )
+    intro_facilitations_as_seeker: Mapped[list["IntroFacilitation"]] = relationship(
+        back_populates="job_seeker",
+        foreign_keys="IntroFacilitation.job_seeker_id",
+    )
+    intro_facilitations_as_holder: Mapped[list["IntroFacilitation"]] = relationship(
+        back_populates="network_holder",
+        foreign_keys="IntroFacilitation.network_holder_id",
+    )
+    credit_transactions: Mapped[list["CreditTransaction"]] = relationship(
+        back_populates="user"
+    )
+    connector_reputation: Mapped["ConnectorReputation | None"] = relationship(
+        back_populates="user", uselist=False
+    )
+    network_holder_availability: Mapped[list["NetworkHolderAvailability"]] = (
+        relationship(back_populates="user")
     )
 
 

@@ -135,6 +135,9 @@ class Contact(Base):
         back_populates="contact"
     )
     applications: Mapped[list["Application"]] = relationship(back_populates="contact")
+    marketplace_listings: Mapped[list["MarketplaceListing"]] = relationship(
+        back_populates="contact"
+    )
 
 
 class ContactCompany(Base):
