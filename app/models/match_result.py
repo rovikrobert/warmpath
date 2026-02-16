@@ -61,6 +61,8 @@ class MatchResult(Base):
     feedback_note: Mapped[str | None] = mapped_column(Text)
 
     ai_model_version: Mapped[str | None] = mapped_column(String(100))
+    cultural_context: Mapped[dict | None] = mapped_column(JSONB)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

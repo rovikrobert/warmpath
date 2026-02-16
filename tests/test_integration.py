@@ -193,6 +193,8 @@ async def test_full_user_journey(client: AsyncClient):
             ],
             "target_industries": ["fintech", "financial technology"],
             "target_keywords": ["engineering", "fintech"],
+            "target_role": "VP Engineering",
+            "target_seniority": "VP",
         },
     )
     assert search_resp.status_code == 201
@@ -231,13 +233,21 @@ async def test_full_user_journey(client: AsyncClient):
     top = results[0]
     assert top["combined_score"] > 0
     assert top["relevance_score"] > 0
-    assert top["match_type"] in ("direct", "indirect", "weak")
+    assert top["match_type"] in ("direct", "adjacent", "senior_advocate", "alumni")
     assert top["contact_name"] is not None
 
     # Sarah Chen (VP Eng @ Stripe) should be near the top — title + company match
     sarah_result = next(r for r in results if r["contact_name"] == "Sarah Chen")
     assert sarah_result["match_type"] == "direct"
     assert sarah_result["relevance_score"] >= 50  # title + company match
+
+    # Every result should have cultural_context
+    for r in results:
+        assert r.get("cultural_context") is not None
+        ctx = r["cultural_context"]
+        assert "approach_style" in ctx
+        assert "recommended_channel" in ctx
+        assert "message_sequence" in ctx
 
     # Low-relevance contacts (e.g. Alex Brown, score 5) are not persisted at all
     alex_names = [r for r in results if r["contact_name"] == "Alex Brown"]
@@ -356,7 +366,7 @@ async def test_user_data_isolation(client: AsyncClient):
     search_resp = await client.post(
         "/api/v1/search",
         headers=headers_a,
-        json={"name": "User A's search"},
+        json={"name": "User A's search", "target_role": "VP Engineering"},
     )
     search_id = search_resp.json()["data"]["id"]
 
@@ -386,6 +396,7 @@ async def test_search_results_have_warm_and_relevance_scores(client: AsyncClient
             "name": "Score check",
             "target_titles": ["VP Engineering"],
             "target_companies": ["Stripe"],
+            "target_role": "VP Engineering",
         },
     )
     search_id = search_resp.json()["data"]["id"]

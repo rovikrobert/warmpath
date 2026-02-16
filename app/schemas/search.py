@@ -13,6 +13,8 @@ class SearchRequestCreate(BaseModel):
     target_industries: list[str] | None = None
     target_locations: list[str] | None = None
     target_keywords: list[str] | None = None
+    target_role: str
+    target_seniority: str | None = None
 
 
 class SearchRequestResponse(BaseModel):
@@ -24,6 +26,8 @@ class SearchRequestResponse(BaseModel):
     target_industries: list[str] | None = None
     target_locations: list[str] | None = None
     target_keywords: list[str] | None = None
+    target_role: str | None = None
+    target_seniority: str | None = None
     status: str
     last_run_at: datetime | None = None
     created_at: datetime
@@ -54,6 +58,11 @@ class MatchResultResponse(BaseModel):
     match_type: str
     warm_score: float | None = None
     combined_score: float | None = None
+    # Referral-specific fields
+    referral_likelihood: str | None = None
+    cultural_context: dict | None = None
+    recommended_channel: str | None = None
+    message_sequence: list[str] | None = None
     # Inline contact info for convenience
     contact_name: str | None = None
     contact_title: str | None = None

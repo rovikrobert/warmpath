@@ -186,7 +186,7 @@ async def test_search_run_rate_limit(client: AsyncClient):
         create_resp = await client.post(
             "/api/v1/search",
             headers=headers,
-            json={"name": "Rate limit test"},
+            json={"name": "Rate limit test", "target_role": "Engineer"},
         )
         search_id = create_resp.json()["data"]["id"]
 
