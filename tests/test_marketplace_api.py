@@ -30,7 +30,7 @@ async def seeker_auth(client: AsyncClient) -> dict:
         "/api/v1/auth/signup",
         json={
             "email": "seeker@test.com",
-            "password": "testpass123",
+            "password": "Testpass123",
             "full_name": "Job Seeker",
         },
     )
@@ -46,7 +46,7 @@ async def seeker_auth(client: AsyncClient) -> dict:
 
     login = await client.post(
         "/api/v1/auth/login",
-        json={"email": "seeker@test.com", "password": "testpass123"},
+        json={"email": "seeker@test.com", "password": "Testpass123"},
     )
     token = login.json()["data"]["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -61,7 +61,7 @@ async def holder_auth(client: AsyncClient) -> dict:
         "/api/v1/auth/signup",
         json={
             "email": "holder@test.com",
-            "password": "testpass123",
+            "password": "Testpass123",
             "full_name": "Network Holder",
         },
     )
@@ -77,7 +77,7 @@ async def holder_auth(client: AsyncClient) -> dict:
 
     login = await client.post(
         "/api/v1/auth/login",
-        json={"email": "holder@test.com", "password": "testpass123"},
+        json={"email": "holder@test.com", "password": "Testpass123"},
     )
     token = login.json()["data"]["access_token"]
     headers = {"Authorization": f"Bearer {token}"}

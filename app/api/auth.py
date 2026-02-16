@@ -12,6 +12,8 @@ from app.schemas.user import (
     ChangePasswordRequest,
     ConnectorProfileResponse,
     ConnectorProfileUpsert,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
     TokenResponse,
     UserCreate,
     UserLogin,
@@ -20,13 +22,18 @@ from app.schemas.user import (
 )
 from app.services.audit_logger import log_event
 from app.services.credits import earn_credits
-from app.services.email_service import send_verification_email, verify_token
+from app.services.email_service import (
+    send_password_reset_email,
+    send_verification_email,
+    verify_token,
+)
 from app.utils.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
     get_current_user,
     hash_password,
+    validate_password_strength,
     verify_password,
 )
 
@@ -74,6 +81,14 @@ async def signup(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    try:
+        validate_password_strength(body.password)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(e),
+        )
+
     result = await db.execute(select(User).where(User.email == body.email))
     if result.scalar_one_or_none() is not None:
         raise HTTPException(
@@ -318,6 +333,14 @@ async def change_password(
             detail="Current password is incorrect",
         )
 
+    try:
+        validate_password_strength(body.new_password)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(e),
+        )
+
     current_user.password_hash = hash_password(body.new_password)
     current_user.token_version += 1
     await log_event(db, "password_change", user_id=current_user.id)
@@ -452,3 +475,99 @@ async def resend_verification(
     await send_verification_email(current_user, db)
     await db.commit()
     return {"data": {"message": "Verification email sent"}, "meta": {}}
+
+
+# ---------------------------------------------------------------------------
+# Forgot / Reset password
+# ---------------------------------------------------------------------------
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Send a password reset email. Always returns success (no email enumeration)."""
+    result = await db.execute(
+        select(User).where(User.email == body.email, User.deleted_at.is_(None))
+    )
+    user = result.scalar_one_or_none()
+
+    if user is not None:
+        # Rate limit: 1 per 5 minutes
+        if user.password_reset_sent_at is not None:
+            sent_at = user.password_reset_sent_at
+            if sent_at.tzinfo is None:
+                sent_at = sent_at.replace(tzinfo=timezone.utc)
+            elapsed = (datetime.now(timezone.utc) - sent_at).total_seconds()
+            if elapsed < 300:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Please wait 5 minutes before requesting another reset email",
+                )
+
+        await send_password_reset_email(user, db)
+        await db.commit()
+
+    # Always return success to prevent email enumeration
+    return {
+        "data": {"message": "If that email is registered, a reset link has been sent"},
+        "meta": {},
+    }
+
+
+@router.post("/reset-password")
+async def reset_password(
+    body: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Reset password using a valid reset token."""
+    result = await db.execute(
+        select(User).where(
+            User.password_reset_token == body.token,
+            User.deleted_at.is_(None),
+        )
+    )
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    # Check token is less than 1 hour old
+    if user.password_reset_sent_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    sent_at = user.password_reset_sent_at
+    if sent_at.tzinfo is None:
+        sent_at = sent_at.replace(tzinfo=timezone.utc)
+    elapsed = (datetime.now(timezone.utc) - sent_at).total_seconds()
+    if elapsed > 3600:  # 1 hour
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired",
+        )
+
+    # Validate password strength
+    try:
+        validate_password_strength(body.new_password)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(e),
+        )
+
+    # Update password and invalidate all sessions
+    user.password_hash = hash_password(body.new_password)
+    user.token_version += 1
+    user.password_reset_token = None
+    user.password_reset_sent_at = None
+
+    await log_event(db, "password_reset", user_id=user.id)
+    await db.commit()
+
+    return {"data": {"message": "Password has been reset successfully"}, "meta": {}}

@@ -24,7 +24,7 @@ SAMPLE_CSV = (
 async def _signup(client: AsyncClient, email: str = "reltest@test.com") -> dict:
     resp = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": "secret123", "full_name": "Rel User"},
+        json={"email": email, "password": "Secret123", "full_name": "Rel User"},
     )
     token = resp.json()["data"]["access_token"]
     headers = {"Authorization": f"Bearer {token}"}

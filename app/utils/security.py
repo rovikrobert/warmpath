@@ -142,6 +142,21 @@ async def get_current_user(
     return user
 
 
+def validate_password_strength(password: str) -> None:
+    """Raise ValueError if password doesn't meet requirements."""
+    errors = []
+    if len(password) < 8:
+        errors.append("at least 8 characters")
+    if not any(c.isupper() for c in password):
+        errors.append("one uppercase letter")
+    if not any(c.islower() for c in password):
+        errors.append("one lowercase letter")
+    if not any(c.isdigit() for c in password):
+        errors.append("one number")
+    if errors:
+        raise ValueError(f"Password must contain: {', '.join(errors)}")
+
+
 async def require_verified_email(
     current_user: User = Depends(get_current_user),
 ) -> User:

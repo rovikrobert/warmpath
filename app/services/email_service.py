@@ -1,7 +1,7 @@
-"""Email verification service — token generation, "sending", and validation.
+"""Email service — verification and password reset emails.
 
-For MVP, send_verification_email just logs the verification URL to console.
-Real email sending (SES/SendGrid/Postmark) is a post-deploy task.
+Uses Resend SDK when RESEND_API_KEY is configured.
+Falls back to console logging when no API key is set (local dev).
 """
 
 import logging
@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -21,20 +22,87 @@ def generate_verification_token() -> str:
     return secrets.token_urlsafe(32)
 
 
-async def send_verification_email(user: User, db: AsyncSession) -> None:
-    """Store verification token on user and "send" verification email.
+def _send_email(to: str, subject: str, html: str) -> None:
+    """Send an email via Resend SDK or log to console."""
+    if settings.RESEND_API_KEY:
+        import resend
 
-    For MVP, this logs the URL to console. In production, this would
-    dispatch an actual email via SES/SendGrid/Postmark.
-    """
+        resend.api_key = settings.RESEND_API_KEY
+        resend.Emails.send(
+            {
+                "from": settings.FROM_EMAIL,
+                "to": [to],
+                "subject": subject,
+                "html": html,
+            }
+        )
+        logger.info("Email sent to %s via Resend: %s", to, subject)
+    else:
+        logger.info("Email (console mode) to %s: %s\n%s", to, subject, html)
+
+
+async def send_verification_email(user: User, db: AsyncSession) -> None:
+    """Store verification token on user and send verification email."""
     token = generate_verification_token()
     user.email_verification_token = token
     user.email_verification_sent_at = datetime.now(timezone.utc)
     await db.flush()
 
-    # MVP: log to console instead of sending email
-    verify_url = f"https://warmpath.com/verify-email?token={token}"
-    logger.info("Verification email for %s: %s", user.email, verify_url)
+    verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+    html = f"""\
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+  <h2 style="color: #1e293b; margin-bottom: 8px;">
+    <span style="color: #f59e0b;">~</span> WarmPath
+  </h2>
+  <p style="color: #475569; font-size: 16px; line-height: 1.5;">
+    Welcome! Please verify your email address to unlock marketplace features.
+  </p>
+  <a href="{verify_url}"
+     style="display: inline-block; background: #f59e0b; color: #fff; padding: 12px 28px;
+            border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0;">
+    Verify Email
+  </a>
+  <p style="color: #94a3b8; font-size: 13px;">
+    Or copy this link: {verify_url}
+  </p>
+  <p style="color: #94a3b8; font-size: 13px;">
+    This link expires in 24 hours.
+  </p>
+</div>"""
+
+    _send_email(user.email, "Verify your WarmPath email", html)
+
+
+async def send_password_reset_email(user: User, db: AsyncSession) -> None:
+    """Generate a password reset token, store it, and send the reset email."""
+    token = generate_verification_token()
+    user.password_reset_token = token
+    user.password_reset_sent_at = datetime.now(timezone.utc)
+    await db.flush()
+
+    reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+    html = f"""\
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+  <h2 style="color: #1e293b; margin-bottom: 8px;">
+    <span style="color: #f59e0b;">~</span> WarmPath
+  </h2>
+  <p style="color: #475569; font-size: 16px; line-height: 1.5;">
+    We received a request to reset your password. Click the button below to set a new one.
+  </p>
+  <a href="{reset_url}"
+     style="display: inline-block; background: #f59e0b; color: #fff; padding: 12px 28px;
+            border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0;">
+    Reset Password
+  </a>
+  <p style="color: #94a3b8; font-size: 13px;">
+    Or copy this link: {reset_url}
+  </p>
+  <p style="color: #94a3b8; font-size: 13px;">
+    This link expires in 1 hour. If you didn't request a password reset, ignore this email.
+  </p>
+</div>"""
+
+    _send_email(user.email, "Reset your WarmPath password", html)
 
 
 async def verify_token(token: str, db: AsyncSession) -> User:
