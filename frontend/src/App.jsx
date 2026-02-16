@@ -13,6 +13,7 @@ import MyRequests from './pages/MyRequests';
 import CreditsPage from './pages/CreditsPage';
 import SharingSettings from './pages/SharingSettings';
 import ApplicationsPage from './pages/ApplicationsPage';
+import ContactsPage from './pages/ContactsPage';
 
 function ProtectedRoute({ children }) {
   const { token, loading } = useAuth();
@@ -50,6 +51,7 @@ export default function App() {
       <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/search/new" element={<FindReferrals />} />
         <Route path="/search/:id" element={<SearchResults />} />
         <Route path="/referrals" element={<FindReferrals />} />

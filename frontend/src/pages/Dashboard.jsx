@@ -23,7 +23,7 @@ export default function Dashboard() {
     setLoading(true);
     try {
       const [contactsRes, searchRes, usageRes, balRes] = await Promise.all([
-        contactsApi.list(1, 1),
+        contactsApi.list({ page: 1, per_page: 1 }),
         searchApi.list(),
         usageApi.summary().catch(() => null),
         creditsApi.balance().catch(() => ({ data: { balance: 0 } })),
