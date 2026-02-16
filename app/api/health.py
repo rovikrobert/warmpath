@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
@@ -9,12 +10,27 @@ from app.models.enrichment import UsageLog
 from app.models.user import User
 from app.utils.security import get_current_user
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 
 @router.get("/health")
 def health_check() -> dict:
-    return {"data": {"status": "healthy"}, "meta": {}}
+    celery_status = "unavailable"
+    try:
+        from app.celery_app import celery_app
+
+        result = celery_app.control.ping(timeout=2.0)
+        if result:
+            celery_status = "connected"
+    except Exception:
+        logger.debug("Celery ping failed", exc_info=True)
+
+    return {
+        "data": {"status": "healthy", "celery": celery_status},
+        "meta": {},
+    }
 
 
 @router.get("/api/v1/usage/me")

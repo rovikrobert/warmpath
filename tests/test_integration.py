@@ -124,6 +124,17 @@ async def test_full_user_journey(client: AsyncClient):
     upload_data = upload_resp.json()["data"]
     assert upload_data["status"] == "completed"
     assert upload_data["row_count"] == 20  # 20 CSV data rows
+    assert upload_data["contacts_created"] == 19  # 1 duplicate deduped
+    assert upload_data["duplicates_skipped"] == 1
+    assert upload_data["completed_at"] is not None
+
+    # Poll the upload status endpoint
+    upload_id = upload_data["id"]
+    poll_resp = await client.get(
+        f"/api/v1/contacts/uploads/{upload_id}", headers=headers
+    )
+    assert poll_resp.status_code == 200
+    assert poll_resp.json()["data"]["status"] == "completed"
 
     # -----------------------------------------------------------------------
     # Step 3: Verify contacts — 19 created (1 duplicate deduped)

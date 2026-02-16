@@ -187,10 +187,28 @@ def _fuzzy_eq(a: str, b: str) -> bool:
 
 # Department/function keywords for matching
 _DEPT_KEYWORDS: dict[str, list[str]] = {
-    "engineering": ["engineer", "developer", "software", "sre", "devops", "platform", "backend", "frontend", "fullstack", "infrastructure"],
+    "engineering": [
+        "engineer",
+        "developer",
+        "software",
+        "sre",
+        "devops",
+        "platform",
+        "backend",
+        "frontend",
+        "fullstack",
+        "infrastructure",
+    ],
     "product": ["product manager", "product lead", "product owner", "pm"],
     "design": ["designer", "ux", "ui", "design lead"],
-    "data": ["data scientist", "data engineer", "data analyst", "machine learning", "ml", "analytics"],
+    "data": [
+        "data scientist",
+        "data engineer",
+        "data analyst",
+        "machine learning",
+        "ml",
+        "analytics",
+    ],
     "marketing": ["marketing", "growth", "brand", "content", "communications"],
     "sales": ["sales", "account executive", "ae", "business development", "bdr", "sdr"],
     "finance": ["finance", "accounting", "controller", "treasury", "fp&a"],
@@ -250,11 +268,16 @@ def compute_role_score(title: str | None, target_role: str | None = None) -> flo
         if contact_dept and target_dept:
             same_dept = contact_dept == target_dept
             adjacent = (contact_dept, target_dept) in [
-                ("engineering", "product"), ("product", "engineering"),
-                ("engineering", "data"), ("data", "engineering"),
-                ("product", "design"), ("design", "product"),
-                ("marketing", "product"), ("product", "marketing"),
-                ("sales", "marketing"), ("marketing", "sales"),
+                ("engineering", "product"),
+                ("product", "engineering"),
+                ("engineering", "data"),
+                ("data", "engineering"),
+                ("product", "design"),
+                ("design", "product"),
+                ("marketing", "product"),
+                ("product", "marketing"),
+                ("sales", "marketing"),
+                ("marketing", "sales"),
             ]
 
             if same_dept:

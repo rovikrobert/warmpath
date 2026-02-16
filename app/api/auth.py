@@ -43,7 +43,15 @@ async def signup(body: UserCreate, db: AsyncSession = Depends(get_db)) -> dict:
     profile_fields = {
         k: v
         for k, v in body.model_dump(
-            include={"headline", "current_company", "current_title", "industry", "location", "linkedin_url", "bio_summary"}
+            include={
+                "headline",
+                "current_company",
+                "current_title",
+                "industry",
+                "location",
+                "linkedin_url",
+                "bio_summary",
+            }
         ).items()
         if v is not None
     }
@@ -117,6 +125,8 @@ async def upsert_profile(
     await db.refresh(profile)
 
     return {
-        "data": ConnectorProfileResponse.model_validate(profile).model_dump(mode="json"),
+        "data": ConnectorProfileResponse.model_validate(profile).model_dump(
+            mode="json"
+        ),
         "meta": {},
     }

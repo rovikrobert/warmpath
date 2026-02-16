@@ -167,9 +167,7 @@ async def scan_target_companies(
     """Scan all target companies from user's searches for relevant openings."""
     # Get user's job preferences for role matching
     prefs_result = await db.execute(
-        select(UserJobPreferences).where(
-            UserJobPreferences.user_id == current_user.id
-        )
+        select(UserJobPreferences).where(UserJobPreferences.user_id == current_user.id)
     )
     prefs = prefs_result.scalar_one_or_none()
     target_role = prefs.target_role if prefs else None
@@ -189,6 +187,7 @@ async def scan_target_companies(
         companies = s.target_companies
         if isinstance(companies, str):
             import json
+
             companies = json.loads(companies)
         if companies:
             target_companies.update(c.strip().lower() for c in companies)

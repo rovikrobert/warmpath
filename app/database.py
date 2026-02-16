@@ -1,7 +1,9 @@
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 from functools import lru_cache
 
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
 
@@ -23,3 +25,32 @@ def _get_session_factory():
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with _get_session_factory()() as session:
         yield session
+
+
+# ---------------------------------------------------------------------------
+# Sync engine + session — for Celery workers
+# ---------------------------------------------------------------------------
+
+
+@lru_cache
+def _get_sync_engine():
+    url = settings.DATABASE_URL
+    # Ensure we use the psycopg2 sync driver
+    url = url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    return create_engine(url, echo=False)
+
+
+@lru_cache
+def _get_sync_session_factory():
+    return sessionmaker(bind=_get_sync_engine(), expire_on_commit=False)
+
+
+def get_sync_db() -> Generator[Session, None, None]:
+    """Yield a sync session for Celery workers."""
+    session = _get_sync_session_factory()()
+    try:
+        yield session
+    finally:
+        session.close()

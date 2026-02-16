@@ -14,6 +14,10 @@ class CsvUploadResponse(BaseModel):
     row_count: int | None
     processed_count: int | None
     error_count: int | None
+    contacts_created: int | None = None
+    duplicates_skipped: int | None = None
+    completed_at: datetime | None = None
+    error_message: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -37,9 +37,7 @@ class JobFetcher:
                 resp = await client.get(url)
                 resp.raise_for_status()
         except httpx.HTTPError as exc:
-            logger.warning(
-                "Greenhouse fetch failed for '%s': %s", board_name, exc
-            )
+            logger.warning("Greenhouse fetch failed for '%s': %s", board_name, exc)
             return []
 
         data = resp.json()
@@ -63,9 +61,7 @@ class JobFetcher:
             updated = job.get("updated_at")
             if updated:
                 try:
-                    posted_at = datetime.fromisoformat(
-                        updated.replace("Z", "+00:00")
-                    )
+                    posted_at = datetime.fromisoformat(updated.replace("Z", "+00:00"))
                 except (ValueError, TypeError):
                     pass
 
@@ -99,9 +95,7 @@ class JobFetcher:
                 resp = await client.get(url)
                 resp.raise_for_status()
         except httpx.HTTPError as exc:
-            logger.warning(
-                "Lever fetch failed for '%s': %s", company_slug, exc
-            )
+            logger.warning("Lever fetch failed for '%s': %s", company_slug, exc)
             return []
 
         postings = resp.json()
@@ -120,9 +114,7 @@ class JobFetcher:
             if created:
                 try:
                     # Lever returns epoch milliseconds
-                    posted_at = datetime.fromtimestamp(
-                        created / 1000, tz=timezone.utc
-                    )
+                    posted_at = datetime.fromtimestamp(created / 1000, tz=timezone.utc)
                 except (ValueError, TypeError, OSError):
                     pass
 
@@ -140,9 +132,7 @@ class JobFetcher:
                 }
             )
 
-        logger.info(
-            "Lever: fetched %d jobs for slug '%s'", len(results), company_slug
-        )
+        logger.info("Lever: fetched %d jobs for slug '%s'", len(results), company_slug)
         return results
 
     async def fetch_jobs_for_company(
@@ -205,7 +195,9 @@ class JobFetcher:
 
             # Score based on word overlap
             role_overlap = len(role_words & title_words)
-            seniority_overlap = len(seniority_words & title_words) if seniority_words else 0
+            seniority_overlap = (
+                len(seniority_words & title_words) if seniority_words else 0
+            )
 
             if role_overlap == 0:
                 # Check for substring match (e.g. "engineer" in "software engineer")
@@ -215,7 +207,13 @@ class JobFetcher:
             if role_overlap == 0:
                 continue
 
-            score = min(100, int((role_overlap / max(len(role_words), 1)) * 70 + seniority_overlap * 30))
+            score = min(
+                100,
+                int(
+                    (role_overlap / max(len(role_words), 1)) * 70
+                    + seniority_overlap * 30
+                ),
+            )
             if score >= 50:
                 scored.append({**job, "role_relevance": score})
 
@@ -232,7 +230,11 @@ class JobFetcher:
         import anthropic
 
         titles = [
-            {"index": i, "title": j.get("title", ""), "department": j.get("department", "")}
+            {
+                "index": i,
+                "title": j.get("title", ""),
+                "department": j.get("department", ""),
+            }
             for i, j in enumerate(jobs)
         ]
 

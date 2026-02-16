@@ -297,62 +297,42 @@ class TestMatchTypes:
     """Match types are correctly assigned based on referral path."""
 
     def test_direct_same_dept_at_company(self):
-        search = _search(
-            target_companies=["Stripe"], target_role="Software Engineer"
-        )
-        contact = _contact(
-            current_company="Stripe", current_title="Software Engineer"
-        )
+        search = _search(target_companies=["Stripe"], target_role="Software Engineer")
+        contact = _contact(current_company="Stripe", current_title="Software Engineer")
         results = _mock_score_contacts(search, [contact])
         assert results[0].match_type == "direct"
 
     def test_adjacent_dept_at_company(self):
-        search = _search(
-            target_companies=["Stripe"], target_role="Software Engineer"
-        )
-        contact = _contact(
-            current_company="Stripe", current_title="Data Scientist"
-        )
+        search = _search(target_companies=["Stripe"], target_role="Software Engineer")
+        contact = _contact(current_company="Stripe", current_title="Data Scientist")
         results = _mock_score_contacts(search, [contact])
         assert results[0].match_type == "adjacent"
 
     def test_senior_advocate_csuite(self):
-        search = _search(
-            target_companies=["Stripe"], target_role="Software Engineer"
-        )
-        contact = _contact(
-            current_company="Stripe", current_title="CEO"
-        )
+        search = _search(target_companies=["Stripe"], target_role="Software Engineer")
+        contact = _contact(current_company="Stripe", current_title="CEO")
         results = _mock_score_contacts(search, [contact])
         assert results[0].match_type == "senior_advocate"
 
     def test_senior_advocate_vp_diff_dept(self):
-        search = _search(
-            target_companies=["Stripe"], target_role="Software Engineer"
-        )
-        contact = _contact(
-            current_company="Stripe", current_title="VP Sales"
-        )
+        search = _search(target_companies=["Stripe"], target_role="Software Engineer")
+        contact = _contact(current_company="Stripe", current_title="VP Sales")
         results = _mock_score_contacts(search, [contact])
         assert results[0].match_type == "senior_advocate"
 
     def test_alumni_low_score(self):
-        search = _search(
-            target_companies=["Stripe"], target_role="Software Engineer"
-        )
-        contact = _contact(
-            current_company="Random Corp", current_title="Analyst"
-        )
+        search = _search(target_companies=["Stripe"], target_role="Software Engineer")
+        contact = _contact(current_company="Random Corp", current_title="Analyst")
         results = _mock_score_contacts(search, [contact])
         assert results[0].match_type == "alumni"
 
     def test_four_valid_types(self):
         """All match types returned by mock are from the valid set."""
-        search = _search(
-            target_companies=["Stripe"], target_role="Software Engineer"
-        )
+        search = _search(target_companies=["Stripe"], target_role="Software Engineer")
         contacts = [
-            _contact(current_company="Stripe", current_title="Senior Software Engineer"),
+            _contact(
+                current_company="Stripe", current_title="Senior Software Engineer"
+            ),
             _contact(current_company="Stripe", current_title="Product Manager"),
             _contact(current_company="Stripe", current_title="CEO"),
             _contact(current_company="Other", current_title="Analyst"),
@@ -370,9 +350,7 @@ class TestMatchTypes:
 
 class TestReferralLikelihood:
     def test_high_likelihood(self):
-        search = _search(
-            target_companies=["Stripe"], target_role="Software Engineer"
-        )
+        search = _search(target_companies=["Stripe"], target_role="Software Engineer")
         contact = _contact(
             current_company="Stripe",
             current_title="Senior Software Engineer",
@@ -383,23 +361,15 @@ class TestReferralLikelihood:
         assert results[0].relevance_score >= 70
 
     def test_medium_likelihood(self):
-        search = _search(
-            target_companies=["Stripe"], target_role="Software Engineer"
-        )
-        contact = _contact(
-            current_company="Stripe", current_title="CEO"
-        )
+        search = _search(target_companies=["Stripe"], target_role="Software Engineer")
+        contact = _contact(current_company="Stripe", current_title="CEO")
         results = _mock_score_contacts(search, [contact])
         assert results[0].referral_likelihood == "medium"
         assert 45 <= results[0].relevance_score < 70
 
     def test_low_likelihood(self):
-        search = _search(
-            target_companies=["Stripe"], target_role="Software Engineer"
-        )
-        contact = _contact(
-            current_company="Random", current_title="Analyst"
-        )
+        search = _search(target_companies=["Stripe"], target_role="Software Engineer")
+        contact = _contact(current_company="Random", current_title="Analyst")
         results = _mock_score_contacts(search, [contact])
         assert results[0].referral_likelihood == "low"
         assert results[0].relevance_score < 45

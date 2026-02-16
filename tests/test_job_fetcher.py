@@ -1,18 +1,14 @@
 """Tests for job board fetching, parsing, deduplication, role matching, and registry."""
 
-import uuid
 from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 
-from app.main import app
-from app.models.user import User
 from app.services.board_registry import BOARD_REGISTRY, lookup_boards, register_board
 from app.services.job_fetcher import JobFetcher
-from app.utils.security import create_access_token, hash_password
 
 # ---------------------------------------------------------------------------
 # Realistic fixtures for Greenhouse and Lever API responses
@@ -101,7 +97,9 @@ class TestGreenhouseFetcher:
         fetcher = JobFetcher()
         with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
             mock_client = AsyncMock()
-            mock_client.get = AsyncMock(return_value=_mock_response(GREENHOUSE_RESPONSE))
+            mock_client.get = AsyncMock(
+                return_value=_mock_response(GREENHOUSE_RESPONSE)
+            )
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
             MockClient.return_value = mock_client
@@ -122,7 +120,9 @@ class TestGreenhouseFetcher:
         fetcher = JobFetcher()
         with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
             mock_client = AsyncMock()
-            mock_client.get = AsyncMock(return_value=_mock_response(GREENHOUSE_RESPONSE))
+            mock_client.get = AsyncMock(
+                return_value=_mock_response(GREENHOUSE_RESPONSE)
+            )
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
             MockClient.return_value = mock_client
@@ -139,7 +139,9 @@ class TestGreenhouseFetcher:
         fetcher = JobFetcher()
         with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
             mock_client = AsyncMock()
-            mock_client.get = AsyncMock(side_effect=httpx.HTTPError("Connection failed"))
+            mock_client.get = AsyncMock(
+                side_effect=httpx.HTTPError("Connection failed")
+            )
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
             MockClient.return_value = mock_client
@@ -360,28 +362,24 @@ class TestJobsAPI:
             ],
         ):
             # First scan
-            resp1 = await client.get(
-                "/api/v1/jobs/scan/stripe", headers=auth_headers
-            )
+            resp1 = await client.get("/api/v1/jobs/scan/stripe", headers=auth_headers)
             assert resp1.status_code == 200
             assert resp1.json()["meta"]["openings_count"] == 2
 
             # Second scan — same jobs, should upsert not duplicate
-            resp2 = await client.get(
-                "/api/v1/jobs/scan/stripe", headers=auth_headers
-            )
+            resp2 = await client.get("/api/v1/jobs/scan/stripe", headers=auth_headers)
             assert resp2.status_code == 200
             assert resp2.json()["meta"]["openings_count"] == 2
 
         # Verify via list endpoint — still just 2
-        resp3 = await client.get(
-            "/api/v1/jobs/openings", headers=auth_headers
-        )
+        resp3 = await client.get("/api/v1/jobs/openings", headers=auth_headers)
         assert resp3.status_code == 200
         assert len(resp3.json()["data"]) == 2
 
     @pytest.mark.asyncio
-    async def test_list_openings_filter_by_role(self, client: AsyncClient, auth_headers):
+    async def test_list_openings_filter_by_role(
+        self, client: AsyncClient, auth_headers
+    ):
         """Test filtering openings by role keyword."""
         with patch.object(
             JobFetcher,

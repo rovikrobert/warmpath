@@ -1,3 +1,4 @@
+import base64
 import math
 import uuid
 from datetime import datetime, timezone
@@ -13,9 +14,7 @@ from app.models.contact import Contact, CsvUpload
 from app.models.match_result import WarmScore
 from app.models.user import User
 from app.schemas.contact import ContactResponse, CsvUploadResponse, PaginationMeta
-from app.services.company_normalizer import link_contact_to_company
 from app.services.csv_parser import parse_linkedin_csv
-from app.services.warm_scorer import batch_compute_scores
 from app.utils.exceptions import RateLimitError
 from app.utils.security import get_current_user
 
@@ -52,95 +51,70 @@ async def upload_csv(
 
     raw_bytes = await file.read()
 
-    # Create csv_upload record
-    csv_upload = CsvUpload(
-        user_id=current_user.id,
-        filename=file.filename,
-        file_size_bytes=len(raw_bytes),
-        status="processing",
-        started_at=datetime.now(timezone.utc),
-    )
-    db.add(csv_upload)
-    await db.flush()
-
-    # Parse CSV
+    # Validate CSV is parseable before queuing
     try:
-        parsed = parse_linkedin_csv(raw_bytes)
+        parse_linkedin_csv(raw_bytes)
     except Exception as exc:
-        csv_upload.status = "failed"
-        csv_upload.error_message = str(exc)
-        csv_upload.completed_at = datetime.now(timezone.utc)
-        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Failed to parse CSV: {exc}",
         ) from exc
 
-    csv_upload.row_count = len(parsed)
+    # Base64-encode for safe serialization
+    content_b64 = base64.b64encode(raw_bytes).decode("ascii")
 
-    # Upsert contacts — deduplicate by fingerprint within this user's contacts
-    processed = 0
-    errors = 0
-    for row in parsed:
-        fingerprint = row.get("fingerprint")
-        if fingerprint:
-            result = await db.execute(
-                select(Contact).where(
-                    Contact.user_id == current_user.id,
-                    Contact.fingerprint == fingerprint,
-                    Contact.deleted_at.is_(None),
-                )
-            )
-            existing = result.scalar_one_or_none()
-        else:
-            existing = None
+    # Create csv_upload record
+    csv_upload = CsvUpload(
+        user_id=current_user.id,
+        filename=file.filename,
+        file_size_bytes=len(raw_bytes),
+        status="queued",
+    )
+    db.add(csv_upload)
+    await db.flush()
 
-        if existing:
-            # Update existing contact with fresh data
-            existing.first_name = row["first_name"]
-            existing.last_name = row["last_name"]
-            existing.full_name = row["full_name"]
-            existing.email = row.get("email") or existing.email
-            existing.current_title = row.get("current_title") or existing.current_title
-            existing.current_company = (
-                row.get("current_company") or existing.current_company
-            )
-            existing.linkedin_url = row.get("linkedin_url") or existing.linkedin_url
-            existing.connected_on = row.get("connected_on") or existing.connected_on
-            existing.raw_csv_row = row.get("raw_csv_row")
-            existing.csv_upload_id = csv_upload.id
-            await link_contact_to_company(existing, db)
-            processed += 1
-        else:
-            contact = Contact(
-                user_id=current_user.id,
-                csv_upload_id=csv_upload.id,
-                first_name=row["first_name"],
-                last_name=row["last_name"],
-                full_name=row["full_name"],
-                email=row.get("email"),
-                current_title=row.get("current_title"),
-                current_company=row.get("current_company"),
-                linkedin_url=row.get("linkedin_url"),
-                connected_on=row.get("connected_on"),
-                fingerprint=fingerprint,
-                raw_csv_row=row.get("raw_csv_row"),
-            )
-            db.add(contact)
-            await db.flush()
-            await link_contact_to_company(contact, db)
-            processed += 1
+    if settings.CSV_ASYNC_PROCESSING:
+        # Commit so the Celery worker can see the row, then dispatch
+        await db.commit()
+        from app.tasks.csv_processing import process_csv_upload
 
-    csv_upload.processed_count = processed
-    csv_upload.error_count = errors
-    csv_upload.status = "completed"
-    csv_upload.completed_at = datetime.now(timezone.utc)
+        process_csv_upload.delay(str(csv_upload.id), str(current_user.id), content_b64)
+    else:
+        # Inline processing (tests, or when no Redis available)
+        from app.tasks.csv_processing import process_csv_upload_core
 
-    # Auto-compute warm scores after upload
-    await batch_compute_scores(current_user.id, db)
+        await process_csv_upload_core(
+            str(csv_upload.id), str(current_user.id), content_b64, db
+        )
 
     await db.commit()
     await db.refresh(csv_upload)
+
+    return {
+        "data": CsvUploadResponse.model_validate(csv_upload).model_dump(mode="json"),
+        "meta": {},
+    }
+
+
+@router.get("/uploads/{upload_id}")
+async def get_upload_status(
+    upload_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Poll the status of a CSV upload."""
+    result = await db.execute(
+        select(CsvUpload).where(
+            CsvUpload.id == upload_id,
+            CsvUpload.user_id == current_user.id,
+        )
+    )
+    csv_upload = result.scalar_one_or_none()
+    if csv_upload is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Upload not found",
+        )
 
     return {
         "data": CsvUploadResponse.model_validate(csv_upload).model_dump(mode="json"),
@@ -154,6 +128,8 @@ async def compute_scores(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Trigger batch recomputation of warm scores for all contacts."""
+    from app.services.warm_scorer import batch_compute_scores
+
     scores = await batch_compute_scores(current_user.id, db)
     await db.commit()
     return {

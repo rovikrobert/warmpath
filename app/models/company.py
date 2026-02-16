@@ -45,15 +45,7 @@ class Company(Base):
     contact_companies: Mapped[list["ContactCompany"]] = relationship(
         back_populates="company"
     )
-    job_openings: Mapped[list["JobOpening"]] = relationship(
-        back_populates="company"
-    )
-    applications: Mapped[list["Application"]] = relationship(
-        back_populates="company"
-    )
-    job_openings: Mapped[list["JobOpening"]] = relationship(
-        back_populates="company"
-    )
-    applications: Mapped[list["Application"]] = relationship(
-        back_populates="company"
-    )
+    job_openings: Mapped[list["JobOpening"]] = relationship(back_populates="company")
+    applications: Mapped[list["Application"]] = relationship(back_populates="company")
+    job_openings: Mapped[list["JobOpening"]] = relationship(back_populates="company")
+    applications: Mapped[list["Application"]] = relationship(back_populates="company")

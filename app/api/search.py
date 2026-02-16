@@ -154,11 +154,24 @@ async def get_search_results(
     search_id: uuid.UUID,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
-    min_score: float = Query(40.0, ge=0, le=100, description="Minimum relevance score (alias for min_relevance)"),
-    min_relevance: float | None = Query(None, ge=0, le=100, description="Minimum relevance score"),
-    min_warm: float | None = Query(None, ge=0, le=100, description="Minimum warm score"),
-    match_type: str | None = Query(None, description="Filter by match type: direct, indirect, or weak"),
-    company: str | None = Query(None, description="Filter by company name (substring match)"),
+    min_score: float = Query(
+        40.0,
+        ge=0,
+        le=100,
+        description="Minimum relevance score (alias for min_relevance)",
+    ),
+    min_relevance: float | None = Query(
+        None, ge=0, le=100, description="Minimum relevance score"
+    ),
+    min_warm: float | None = Query(
+        None, ge=0, le=100, description="Minimum warm score"
+    ),
+    match_type: str | None = Query(
+        None, description="Filter by match type: direct, indirect, or weak"
+    ),
+    company: str | None = Query(
+        None, description="Filter by company name (substring match)"
+    ),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -315,7 +328,9 @@ async def get_search_results(
             ).model_dump(),
             "total_matches": total,
             "shown": len(data),
-            "avg_relevance": round(sum(all_relevance) / len(all_relevance), 1) if all_relevance else 0,
+            "avg_relevance": round(sum(all_relevance) / len(all_relevance), 1)
+            if all_relevance
+            else 0,
             "avg_warm": round(sum(all_warm) / len(all_warm), 1) if all_warm else 0,
             "score_distribution": score_dist,
         },
