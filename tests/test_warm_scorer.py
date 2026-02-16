@@ -1,7 +1,6 @@
 import io
 from datetime import date, timedelta
 
-import pytest
 from httpx import AsyncClient
 
 from app.services.warm_scorer import (
@@ -16,8 +15,6 @@ from app.services.warm_scorer import (
     compute_tenure_score,
     compute_warm_score,
 )
-
-pytestmark = pytest.mark.asyncio
 
 
 # ---------------------------------------------------------------------------

@@ -1,11 +1,8 @@
 import io
 
-import pytest
 from httpx import AsyncClient
 
 from app.services.company_normalizer import normalize_company_name
-
-pytestmark = pytest.mark.asyncio
 
 
 # ---------------------------------------------------------------------------

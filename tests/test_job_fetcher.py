@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, patch
 
 import httpx
-import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
@@ -92,7 +91,7 @@ def _mock_response(json_data, status_code=200):
 
 
 class TestGreenhouseFetcher:
-    @pytest.mark.asyncio
+
     async def test_parses_jobs_correctly(self):
         fetcher = JobFetcher()
         with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
@@ -115,7 +114,7 @@ class TestGreenhouseFetcher:
         assert jobs[0]["url"] == "https://boards.greenhouse.io/stripe/jobs/4012345"
         assert jobs[0]["is_remote"] is False
 
-    @pytest.mark.asyncio
+
     async def test_detects_remote(self):
         fetcher = JobFetcher()
         with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
@@ -134,7 +133,7 @@ class TestGreenhouseFetcher:
         assert jobs[0]["is_remote"] is False
         assert jobs[2]["is_remote"] is False
 
-    @pytest.mark.asyncio
+
     async def test_handles_http_error(self):
         fetcher = JobFetcher()
         with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
@@ -157,7 +156,7 @@ class TestGreenhouseFetcher:
 
 
 class TestLeverFetcher:
-    @pytest.mark.asyncio
+
     async def test_parses_jobs_correctly(self):
         fetcher = JobFetcher()
         with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
@@ -177,7 +176,7 @@ class TestLeverFetcher:
         assert jobs[0]["location"] == "San Francisco, CA"
         assert jobs[0]["is_remote"] is False
 
-    @pytest.mark.asyncio
+
     async def test_detects_remote_lever(self):
         fetcher = JobFetcher()
         with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
@@ -193,7 +192,7 @@ class TestLeverFetcher:
         assert jobs[1]["is_remote"] is True
         assert jobs[0]["is_remote"] is False
 
-    @pytest.mark.asyncio
+
     async def test_handles_http_error(self):
         fetcher = JobFetcher()
         with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
@@ -214,7 +213,7 @@ class TestLeverFetcher:
 
 
 class TestRoleMatching:
-    @pytest.mark.asyncio
+
     async def test_mock_match_keyword_overlap(self):
         fetcher = JobFetcher()
         jobs = [
@@ -231,7 +230,7 @@ class TestRoleMatching:
         assert "Sales Development Representative" not in titles
         assert len(matched) >= 1
 
-    @pytest.mark.asyncio
+
     async def test_mock_match_with_seniority(self):
         fetcher = JobFetcher()
         jobs = [
@@ -245,7 +244,7 @@ class TestRoleMatching:
         # Senior match should appear and score higher
         assert any("Senior" in j["title"] for j in matched)
 
-    @pytest.mark.asyncio
+
     async def test_empty_inputs(self):
         fetcher = JobFetcher()
         assert await fetcher.match_jobs_to_role([], "Engineer") == []
@@ -322,7 +321,7 @@ async def auth_headers(client: AsyncClient) -> dict:
 
 
 class TestJobsAPI:
-    @pytest.mark.asyncio
+
     async def test_scan_unknown_company(self, client: AsyncClient, auth_headers):
         resp = await client.get(
             "/api/v1/jobs/scan/completely_unknown_xyz",
@@ -330,7 +329,7 @@ class TestJobsAPI:
         )
         assert resp.status_code == 404
 
-    @pytest.mark.asyncio
+
     async def test_scan_and_dedup(self, client: AsyncClient, auth_headers):
         """Scanning the same company twice should not create duplicate openings."""
         with patch.object(
@@ -376,7 +375,7 @@ class TestJobsAPI:
         assert resp3.status_code == 200
         assert len(resp3.json()["data"]) == 2
 
-    @pytest.mark.asyncio
+
     async def test_list_openings_filter_by_role(
         self, client: AsyncClient, auth_headers
     ):
@@ -420,7 +419,7 @@ class TestJobsAPI:
         assert len(data) == 1
         assert "Engineer" in data[0]["title"]
 
-    @pytest.mark.asyncio
+
     async def test_scan_requires_auth(self, client: AsyncClient):
         resp = await client.get("/api/v1/jobs/scan/stripe")
         assert resp.status_code in (401, 403)

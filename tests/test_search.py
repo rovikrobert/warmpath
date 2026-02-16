@@ -1,15 +1,12 @@
 import io
 from datetime import date, timedelta
 
-import pytest
 from httpx import AsyncClient
 
 from app.services.ai_matcher import (
-    _mock_score_contacts,
     _mock_cultural_context,
+    _mock_score_contacts,
 )
-
-pytestmark = pytest.mark.asyncio
 
 
 # ---------------------------------------------------------------------------
