@@ -8,11 +8,22 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.config import settings
 
 
+def _pool_kwargs(url: str) -> dict:
+    """Return connection-pool settings for PostgreSQL; empty dict for SQLite."""
+    if url.startswith("sqlite"):
+        return {}
+    return {
+        "pool_size": 5,
+        "max_overflow": 10,
+        "pool_p[RESEND_KEY_REDACTED]": True,
+    }
+
+
 @lru_cache
 def _get_engine():
     # Swap driver for async: postgresql:// → postgresql+asyncpg://
     url = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
-    return create_async_engine(url, echo=False)
+    return create_async_engine(url, echo=False, **_pool_kwargs(url))
 
 
 @lru_cache
@@ -39,7 +50,7 @@ def _get_sync_engine():
     url = url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
     if url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
-    return create_engine(url, echo=False)
+    return create_engine(url, echo=False, **_pool_kwargs(url))
 
 
 @lru_cache
