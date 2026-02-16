@@ -1,6 +1,5 @@
 """Tests for P15: SEA board registry expansion + career page fallback."""
 
-import re
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -9,7 +8,6 @@ from httpx import AsyncClient
 
 from app.services.board_registry import BOARD_REGISTRY, REGIONS, lookup_boards
 from app.services.career_page_fetcher import (
-    CAREER_PAGES,
     _extract_jobs_from_html,
     fetch_career_page,
     lookup_career_page,
@@ -25,9 +23,20 @@ from app.services.job_fetcher import JobFetcher
 class TestSEABoardRegistry:
     def test_singapore_companies_present(self):
         sea_companies = [
-            "grab", "sea-group", "shopee", "lazada", "gojek", "carousell",
-            "foodpanda", "ninja-van", "patsnap", "endowus", "syfe", "aspire",
-            "funding-societies", "carro",
+            "grab",
+            "sea-group",
+            "shopee",
+            "lazada",
+            "gojek",
+            "carousell",
+            "foodpanda",
+            "ninja-van",
+            "patsnap",
+            "endowus",
+            "syfe",
+            "aspire",
+            "funding-societies",
+            "carro",
         ]
         for company in sea_companies:
             assert company in BOARD_REGISTRY, f"{company} missing from registry"
@@ -71,9 +80,7 @@ class TestSEABoardRegistry:
         valid_sources = {"greenhouse", "lever"}
         for name, entry in BOARD_REGISTRY.items():
             for source in entry:
-                assert source in valid_sources, (
-                    f"{name} has invalid source '{source}'"
-                )
+                assert source in valid_sources, f"{name} has invalid source '{source}'"
 
 
 # ---------------------------------------------------------------------------
@@ -228,13 +235,14 @@ class TestFallbackChain:
     async def test_uses_greenhouse_first(self):
         """When Greenhouse returns results, career page is not called."""
         fetcher = JobFetcher()
-        with patch.object(
-            fetcher,
-            "fetch_greenhouse_jobs",
-            return_value=[{"title": "SWE", "source": "greenhouse"}],
-        ) as gh_mock, patch(
-            "app.services.career_page_fetcher.fetch_career_page"
-        ) as cp_mock:
+        with (
+            patch.object(
+                fetcher,
+                "fetch_greenhouse_jobs",
+                return_value=[{"title": "SWE", "source": "greenhouse"}],
+            ) as gh_mock,
+            patch("app.services.career_page_fetcher.fetch_career_page") as cp_mock,
+        ):
             jobs = await fetcher.fetch_jobs_for_company(
                 "stripe", {"greenhouse": "stripe"}
             )
@@ -246,18 +254,18 @@ class TestFallbackChain:
     async def test_falls_back_to_career_page(self):
         """When ATS returns nothing and career page exists, use it."""
         fetcher = JobFetcher()
-        with patch.object(
-            fetcher, "fetch_greenhouse_jobs", return_value=[]
-        ), patch(
-            "app.services.career_page_fetcher.lookup_career_page",
-            return_value="https://example.com/careers",
-        ), patch(
-            "app.services.career_page_fetcher.fetch_career_page",
-            return_value=[{"title": "Dev", "source": "career_page"}],
-        ) as cp_mock:
-            jobs = await fetcher.fetch_jobs_for_company(
-                "grab", {"greenhouse": "grab"}
-            )
+        with (
+            patch.object(fetcher, "fetch_greenhouse_jobs", return_value=[]),
+            patch(
+                "app.services.career_page_fetcher.lookup_career_page",
+                return_value="https://example.com/careers",
+            ),
+            patch(
+                "app.services.career_page_fetcher.fetch_career_page",
+                return_value=[{"title": "Dev", "source": "career_page"}],
+            ) as cp_mock,
+        ):
+            jobs = await fetcher.fetch_jobs_for_company("grab", {"greenhouse": "grab"})
             cp_mock.assert_called_once_with("https://example.com/careers")
             assert len(jobs) == 1
             assert jobs[0]["source"] == "career_page"
@@ -265,12 +273,15 @@ class TestFallbackChain:
     async def test_no_boards_tries_career_page(self):
         """When no board_ids at all, try career page directly."""
         fetcher = JobFetcher()
-        with patch(
-            "app.services.career_page_fetcher.lookup_career_page",
-            return_value="https://example.com/careers",
-        ), patch(
-            "app.services.career_page_fetcher.fetch_career_page",
-            return_value=[{"title": "PM", "source": "career_page"}],
+        with (
+            patch(
+                "app.services.career_page_fetcher.lookup_career_page",
+                return_value="https://example.com/careers",
+            ),
+            patch(
+                "app.services.career_page_fetcher.fetch_career_page",
+                return_value=[{"title": "PM", "source": "career_page"}],
+            ),
         ):
             jobs = await fetcher.fetch_jobs_for_company("newco", None)
             assert len(jobs) == 1
@@ -330,9 +341,7 @@ class TestScanAPIFallback:
                 }
             ],
         ):
-            resp = await client.get(
-                "/api/v1/jobs/scan/grab", headers=auth_headers
-            )
+            resp = await client.get("/api/v1/jobs/scan/grab", headers=auth_headers)
             assert resp.status_code == 200
             assert resp.json()["meta"]["openings_count"] == 1
 
@@ -367,8 +376,6 @@ class TestScanAPIFallback:
                 }
             ],
         ):
-            resp = await client.get(
-                "/api/v1/jobs/scan/stripe", headers=auth_headers
-            )
+            resp = await client.get("/api/v1/jobs/scan/stripe", headers=auth_headers)
             assert resp.status_code == 200
             assert resp.json()["meta"]["openings_count"] == 1
