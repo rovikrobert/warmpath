@@ -1,16 +1,18 @@
-"""AI-powered contact matching service.
+"""AI-powered referral matching service.
 
-Uses the Anthropic Claude API to score contacts against search criteria.
-When AI_MOCK_MODE=true (default), returns deterministic fake scores so
-development and testing work without an API key.
+Uses the Anthropic Claude API to assess referral paths between a user's
+contacts and target companies.  When AI_MOCK_MODE=true (default), returns
+deterministic scores based on company match, department alignment, and
+seniority heuristics — no API key required.
 """
 
 import asyncio
 import json
 import logging
+import re
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -24,12 +26,18 @@ from app.models.contact import Contact
 from app.models.enrichment import UsageLog
 from app.models.match_result import MatchResult
 from app.models.search_request import SearchRequest
+from app.models.user import ConnectorProfile, User
 
 logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 100  # contacts per Claude API call
-MAX_CONCURRENT_BATCHES = 10  # max batches in flight at once
+MAX_CONCURRENT_BATCHES = 10
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
+
+
+# ---------------------------------------------------------------------------
+# Data classes
+# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -37,13 +45,78 @@ class ContactMatch:
     contact_id: uuid.UUID
     relevance_score: float
     reasoning: str
-    match_type: str  # "direct", "indirect", "weak"
+    match_type: str  # "direct", "adjacent", "senior_advocate", "alumni"
+    referral_likelihood: str  # "high", "medium", "low"
+    cultural_context: dict = field(default_factory=dict)
+    recommended_channel: str = "linkedin_message"
+    message_sequence: list[str] = field(default_factory=lambda: ["reconnect", "ask"])
 
 
 @dataclass
 class TokenUsage:
     input_tokens: int
     output_tokens: int
+
+
+# ---------------------------------------------------------------------------
+# Department / seniority detection (shared patterns)
+# ---------------------------------------------------------------------------
+
+_DEPT_KEYWORDS: dict[str, list[str]] = {
+    "engineering": ["engineer", "developer", "software", "sre", "devops", "platform", "backend", "frontend", "fullstack", "infrastructure"],
+    "product": ["product manager", "product lead", "product owner", "pm"],
+    "design": ["designer", "ux", "ui", "design lead"],
+    "data": ["data scientist", "data engineer", "data analyst", "machine learning", "ml", "analytics"],
+    "marketing": ["marketing", "growth", "brand", "content", "communications"],
+    "sales": ["sales", "account executive", "ae", "business development", "bdr", "sdr"],
+    "finance": ["finance", "accounting", "controller", "treasury", "fp&a"],
+    "hr": ["hr", "human resources", "people", "talent", "recruiting", "recruiter"],
+    "operations": ["operations", "ops", "logistics", "supply chain"],
+    "legal": ["legal", "counsel", "compliance", "attorney"],
+}
+
+_ADJACENT_DEPTS: set[tuple[str, str]] = {
+    ("engineering", "product"), ("product", "engineering"),
+    ("engineering", "data"), ("data", "engineering"),
+    ("product", "design"), ("design", "product"),
+    ("marketing", "product"), ("product", "marketing"),
+    ("sales", "marketing"), ("marketing", "sales"),
+}
+
+_CSUITE_PATTERN = re.compile(
+    r"\b(c[eotifsm]o|chief|founder|co-founder|cofounder|president|owner|partner)\b",
+    re.IGNORECASE,
+)
+_VP_PATTERN = re.compile(r"\b(vp|vice\s*president|svp|evp|avp)\b", re.IGNORECASE)
+_DIRECTOR_PATTERN = re.compile(r"\b(director)\b", re.IGNORECASE)
+_MANAGER_PATTERN = re.compile(
+    r"\b(manager|head\s+of|lead|team\s+lead|principal)\b", re.IGNORECASE
+)
+_SENIOR_PATTERN = re.compile(r"\b(senior|sr\.?|staff)\b", re.IGNORECASE)
+
+# Location keywords for cultural context detection
+_ASIA_KEYWORDS = [
+    "japan", "tokyo", "osaka", "korea", "seoul", "china", "beijing",
+    "shanghai", "shenzhen", "singapore", "hong kong", "taipei", "taiwan",
+    "bangkok", "thailand", "vietnam", "indonesia", "jakarta", "manila",
+    "philippines", "malaysia", "kuala lumpur",
+]
+_US_UK_KEYWORDS = [
+    "united states", "new york", "san francisco", "los angeles", "seattle",
+    "austin", "boston", "chicago", "denver", "portland", "atlanta",
+    "united kingdom", "london", "manchester", "edinburgh",
+    "toronto", "vancouver", "canada",
+    ", ca", ", ny", ", wa", ", tx", ", ma", ", il", ", co",
+]
+
+
+def _detect_department(title: str) -> str | None:
+    """Detect department from a job title."""
+    title_lower = title.lower()
+    for dept, keywords in _DEPT_KEYWORDS.items():
+        if any(kw in title_lower for kw in keywords):
+            return dept
+    return None
 
 
 def _ensu[RESEND_KEY_REDACTED](val: list | str | None) -> list:
@@ -56,6 +129,55 @@ def _ensu[RESEND_KEY_REDACTED](val: list | str | None) -> list:
 
 
 # ---------------------------------------------------------------------------
+# Cultural context (mock)
+# ---------------------------------------------------------------------------
+
+
+def _mock_cultural_context(location: str, title: str) -> dict:
+    """Generate plausible cultural context based on location."""
+    loc_lower = (location or "").lower()
+
+    is_asia = any(kw in loc_lower for kw in _ASIA_KEYWORDS)
+    is_us_uk = any(kw in loc_lower for kw in _US_UK_KEYWORDS)
+
+    if is_us_uk:
+        return {
+            "approach_style": "direct",
+            "recommended_channel": "linkedin_message",
+            "cultural_notes": (
+                f"Based in {location}. Direct approach works well. "
+                "Lead with your connection and be specific about what you're looking for."
+            ),
+            "warm_up_suggested": False,
+            "message_sequence": ["direct_ask"],
+        }
+    elif is_asia:
+        return {
+            "approach_style": "relationship-first",
+            "recommended_channel": "linkedin_message",
+            "cultural_notes": (
+                f"Based in {location}. Consider reconnecting first before making "
+                "your ask. Build on shared experience and show genuine interest "
+                "in their work."
+            ),
+            "warm_up_suggested": True,
+            "message_sequence": ["reconnect", "explore", "ask"],
+        }
+    else:
+        return {
+            "approach_style": "formal-indirect",
+            "recommended_channel": "linkedin_message",
+            "cultural_notes": (
+                f"Based in {location or 'unknown location'}. A professional, "
+                "somewhat formal approach is recommended. Reference your shared "
+                "connection or experience."
+            ),
+            "warm_up_suggested": False,
+            "message_sequence": ["reconnect", "ask"],
+        }
+
+
+# ---------------------------------------------------------------------------
 # Mock AI (deterministic scoring for dev/test)
 # ---------------------------------------------------------------------------
 
@@ -63,14 +185,25 @@ def _ensu[RESEND_KEY_REDACTED](val: list | str | None) -> list:
 def _mock_sco[RESEND_KEY_REDACTED](
     search: SearchRequest,
     contacts: list[Contact],
+    profile: ConnectorProfile | None = None,
 ) -> list[ContactMatch]:
-    """Return deterministic mock scores based on simple heuristics."""
+    """Return deterministic mock scores based on referral heuristics.
+
+    Scoring logic:
+    - With target_companies: company match is the primary signal (+50)
+      plus department alignment, seniority, and title keyword bonuses.
+    - Without target_companies: falls back to title + keyword matching
+      (backward-compatible with generic searches).
+    """
     results: list[ContactMatch] = []
 
-    target_titles = [t.lower() for t in _ensu[RESEND_KEY_REDACTED](search.target_titles)]
     target_companies = [c.lower() for c in _ensu[RESEND_KEY_REDACTED](search.target_companies)]
-    target_locations = [loc.lower() for loc in _ensu[RESEND_KEY_REDACTED](search.target_locations)]
+    target_titles = [t.lower() for t in _ensu[RESEND_KEY_REDACTED](search.target_titles)]
     target_keywords = [k.lower() for k in _ensu[RESEND_KEY_REDACTED](search.target_keywords)]
+    target_locations = [loc.lower() for loc in _ensu[RESEND_KEY_REDACTED](search.target_locations)]
+    target_role = getattr(search, "target_role", None) or ""
+    target_dept = _detect_department(target_role) if target_role else None
+    has_company_targets = bool(target_companies)
 
     for contact in contacts:
         score = 0.0
@@ -78,54 +211,134 @@ def _mock_sco[RESEND_KEY_REDACTED](
         ct = (contact.current_title or "").lower()
         cc = (contact.current_company or "").lower()
         cl = (contact.location or "").lower()
+        contact_dept = _detect_department(ct) if ct else None
+        profile_text = f"{ct} {cc} {cl}"
 
-        # Title match (+40)
-        for title in target_titles:
-            if title in ct:
-                score += 40
-                reasons.append(f"Title matches '{title}'")
-                break
+        # Seniority detection
+        is_csuite = bool(_CSUITE_PATTERN.search(ct))
+        is_vp_dir = bool(_VP_PATTERN.search(ct) or _DIRECTOR_PATTERN.search(ct))
+        is_manager = bool(_MANAGER_PATTERN.search(ct)) and not is_vp_dir
+        is_senior_ic = bool(_SENIOR_PATTERN.search(ct))
 
-        # Company match (+30)
-        for company in target_companies:
-            if company in cc:
-                score += 30
-                reasons.append(f"Works at target company '{company}'")
-                break
+        company_match = False
+        same_dept = False
+        adjacent_dept = False
 
-        # Location match (+15)
-        for loc in target_locations:
-            if loc in cl:
-                score += 15
-                reasons.append(f"Located in '{loc}'")
-                break
+        if has_company_targets:
+            # --- Referral-focused scoring ---
+            company_match = any(tc in cc for tc in target_companies)
 
-        # Keyword match (+15)
-        profile_text = f"{ct} {cc} {cl}".lower()
-        for kw in target_keywords:
-            if kw in profile_text:
-                score += 15
-                reasons.append(f"Profile contains keyword '{kw}'")
-                break
+            if target_dept and contact_dept:
+                same_dept = contact_dept == target_dept
+                adjacent_dept = not same_dept and (
+                    (contact_dept, target_dept) in _ADJACENT_DEPTS
+                )
+
+            if company_match:
+                score += 50
+                reasons.append("Works at target company")
+
+                if same_dept:
+                    score += 25
+                    reasons.append(f"Same department ({contact_dept})")
+                elif adjacent_dept:
+                    score += 15
+                    reasons.append(f"Adjacent department ({contact_dept})")
+
+                # Seniority bonus
+                if is_csuite:
+                    score += 5
+                    reasons.append("C-suite — senior advocate")
+                elif is_vp_dir or is_manager:
+                    score += 10
+                    reasons.append("Senior enough to personally refer")
+                elif is_senior_ic:
+                    score += 5
+                    reasons.append("Experienced IC")
+
+                # Title keyword match
+                for title in target_titles:
+                    if title in ct:
+                        score += 10
+                        reasons.append(f"Title matches '{title}'")
+                        break
+            else:
+                # No company match — very limited score
+                for title in target_titles:
+                    if title in ct:
+                        score += 10
+                        reasons.append(
+                            f"Title matches '{title}' (not at target company)"
+                        )
+                        break
+
+                for kw in target_keywords:
+                    if kw in profile_text:
+                        score += 5
+                        reasons.append(f"Profile keyword '{kw}'")
+                        break
+        else:
+            # --- No company filter — legacy/generic mode ---
+            for title in target_titles:
+                if title in ct:
+                    score += 40
+                    reasons.append(f"Title matches '{title}'")
+                    break
+
+            for kw in target_keywords:
+                if kw in profile_text:
+                    score += 15
+                    reasons.append(f"Keyword '{kw}'")
+                    break
+
+            for loc in target_locations:
+                if loc in cl:
+                    score += 10
+                    reasons.append(f"Location '{loc}'")
+                    break
 
         score = min(score, 100.0)
-
         if score == 0:
             score = 5.0
-            reasons.append("No direct criteria match")
+            reasons.append("No direct referral path found")
 
-        match_type = (
-            "direct" if score >= 50 else ("indirect" if score >= 20 else "weak")
-        )
+        # Match type
+        if company_match and same_dept:
+            match_type = "direct"
+        elif company_match and adjacent_dept:
+            match_type = "adjacent"
+        elif company_match and (is_vp_dir or is_manager or is_csuite):
+            match_type = "senior_advocate"
+        elif company_match:
+            match_type = "direct"  # at target company, no dept detection
+        elif score >= 50:
+            match_type = "direct"
+        elif score >= 30:
+            match_type = "adjacent"
+        else:
+            match_type = "alumni"
+
+        # Referral likelihood
+        if score >= 70:
+            referral_likelihood = "high"
+        elif score >= 45:
+            referral_likelihood = "medium"
+        else:
+            referral_likelihood = "low"
+
+        # Cultural context
+        cultural_ctx = _mock_cultural_context(cl, ct)
 
         results.append(
             ContactMatch(
                 contact_id=contact.id,
                 relevance_score=round(score, 2),
-                reasoning="; ".join(reasons)
-                if reasons
-                else "No matching criteria found",
+                reasoning="; ".join(reasons) if reasons else "No matching criteria",
                 match_type=match_type,
+                referral_likelihood=referral_likelihood,
+                cultural_context=cultural_ctx,
+                recommended_channel=cultural_ctx["recommended_channel"],
+                message_sequence=cultural_ctx["message_sequence"],
             )
         )
 
@@ -136,85 +349,143 @@ def _mock_sco[RESEND_KEY_REDACTED](
 # Real Claude API
 # ---------------------------------------------------------------------------
 
+_SYSTEM_PROMPT = """You are a career networking advisor. The user is job hunting and needs employee referrals. For each contact, assess:
 
-def _build_prompt(search: SearchRequest, contacts: list[Contact]) -> str:
-    """Build the Claude prompt for a batch of contacts."""
-    criteria = []
-    titles = _ensu[RESEND_KEY_REDACTED](search.target_titles)
-    companies = _ensu[RESEND_KEY_REDACTED](search.target_companies)
-    industries = _ensu[RESEND_KEY_REDACTED](search.target_industries)
-    locations = _ensu[RESEND_KEY_REDACTED](search.target_locations)
-    keywords = _ensu[RESEND_KEY_REDACTED](search.target_keywords)
-    if titles:
-        criteria.append(f"Target titles: {', '.join(titles)}")
-    if companies:
-        criteria.append(f"Target companies: {', '.join(companies)}")
-    if industries:
-        criteria.append(f"Target industries: {', '.join(industries)}")
-    if locations:
-        criteria.append(f"Target locations: {', '.join(locations)}")
-    if keywords:
-        criteria.append(f"Keywords: {', '.join(keywords)}")
-    if search.description:
-        criteria.append(f"Description: {search.description}")
+1. Can this person refer the user to the target company?
+2. How likely are they to actually do it?
+3. What's the best approach given the contact's likely communication style?
 
-    contacts_data = []
-    for c in contacts:
-        contacts_data.append(
-            {
-                "contact_id": str(c.id),
-                "name": c.full_name,
-                "title": c.current_title,
-                "company": c.current_company,
-                "location": c.location,
-            }
-        )
+For each contact, return a JSON array of objects. Only include contacts that score 20 or above. Each object must have:
 
-    return f"""You are a sales intelligence assistant. Score each contact for relevance to the following search criteria.
-
-SEARCH CRITERIA:
-{chr(10).join(criteria)}
-
-CONTACTS:
-{json.dumps(contacts_data, indent=2)}
-
-For each contact, return a JSON array of objects. Only include contacts that score 20 or above. Skip contacts with no meaningful match.
-
-Each object must have:
 - "contact_id": the exact contact_id string from the input
 - "relevance_score": integer 0-100
-- "reasoning": 1-2 sentence explanation of why this contact matches (or doesn't)
-- "match_type": one of "direct", "indirect", or "weak"
+- "referral_likelihood": "high" | "medium" | "low"
+- "reasoning": why this person can/would refer the user
+- "match_type": one of "direct", "adjacent", "senior_advocate", "alumni"
+- "cultural_context": {
+    "approach_style": "direct" | "formal-indirect" | "casual" | "relationship-first",
+    "recommended_channel": "linkedin_message" | "linkedin_inmail" | "email" | "whatsapp",
+    "cultural_notes": "Free text advice on how to approach this person given their likely communication norms. Consider their location, company culture, seniority level, and the user's relationship with them.",
+    "warm_up_suggested": true | false,
+    "message_sequence": ["reconnect", "ask"] or ["reconnect", "explore", "ask"] or ["direct_ask"]
+  }
+
+MATCH TYPES:
+- direct: Works in same department as target role
+- adjacent: Works in related department, can introduce to hiring manager
+- senior_advocate: Senior enough to refer to any role
+- alumni: Former employee who still has connections there
+
+CULTURAL CONTEXT GUIDELINES:
+- US tech companies, IC-to-IC: usually "direct" or "casual"
+- US tech companies, to senior leader: "formal-indirect"
+- East Asian business culture (Japan, Korea, China): almost always "relationship-first", suggest warm_up first
+- Singapore/Southeast Asia: mix of Western and Asian norms, default to "formal-indirect"
+- Europe varies: UK/Netherlands tend direct, France/Germany more formal, Nordics direct but understated
+- Indian tech companies: relationship-oriented, but Indian professionals at US companies often adapt to US norms
+- If location is ambiguous, default to the company's HQ culture
+
+IMPORTANT: Frame cultural notes as "communication style suggestions" not "cultural profiles." Be specific and actionable.
 
 Scoring guidelines (be strict — differentiate aggressively):
-- 90-100: ALL criteria match — right title level AND right company/industry AND right location. Reserve this tier for truly perfect fits.
-- 70-89: 2 out of 3 criteria match (e.g. right title + right industry, but wrong location)
-- 50-69: 1 criterion matches strongly (e.g. exact title match but unrelated company/industry)
-- 20-49: Tangential match — adjacent role, loosely related industry, or only keyword overlap
-- Below 20: No meaningful match — omit from results
+- 90-100: Works at target company, same department, strong shared context
+- 70-89: Works at target company, adjacent department or senior enough to refer
+- 50-69: Works at target company but limited referral path, or very strong indirect connection
+- 20-49: Tangential connection — former employee, same industry, loose overlap
+- Below 20: No meaningful referral path — omit from results
 
-IMPORTANT: Spread your scores across the full range. If most contacts score similarly, you're not being selective enough. A VP at a non-tech company should NOT score the same as a VP at a target enterprise SaaS company.
+Return ONLY the JSON array. No markdown fences, no explanation."""
 
-match_type rules:
-- "direct" if relevance_score >= 70
-- "indirect" if relevance_score 50-69
-- "weak" if relevance_score 20-49
 
-Return ONLY the JSON array. No markdown fences, no explanation, no other text."""
+def _build_user_prompt(
+    search: SearchRequest,
+    contacts: list[Contact],
+    profile: ConnectorProfile | None,
+    user_name: str | None = None,
+) -> str:
+    """Build the user prompt with profile, target, and contact data."""
+    # User profile section
+    profile_parts: list[str] = []
+    if user_name:
+        profile_parts.append(f"Name: {user_name}")
+    if profile:
+        if profile.current_title:
+            profile_parts.append(f"Title: {profile.current_title}")
+        if profile.current_company:
+            profile_parts.append(f"Company: {profile.current_company}")
+        if profile.industry:
+            profile_parts.append(f"Industry: {profile.industry}")
+        if profile.location:
+            profile_parts.append(f"Location: {profile.location}")
+        if profile.bio_summary:
+            profile_parts.append(f"Bio: {profile.bio_summary}")
+    profile_info = "\n".join(profile_parts) if profile_parts else "No profile set"
+
+    # Target section
+    target_companies = _ensu[RESEND_KEY_REDACTED](search.target_companies)
+    target_role = getattr(search, "target_role", None) or "General"
+    target_seniority = getattr(search, "target_seniority", None) or "Any"
+
+    # Contact data
+    contacts_data = []
+    for c in contacts:
+        entry: dict = {
+            "contact_id": str(c.id),
+            "name": c.full_name,
+            "title": c.current_title,
+            "company": c.current_company,
+            "location": c.location,
+            "connected_on": str(c.connected_on) if c.connected_on else None,
+        }
+
+        # Add shared context notes
+        shared: list[str] = []
+        if profile:
+            if (
+                profile.current_company
+                and c.current_company
+                and profile.current_company.strip().lower()
+                == c.current_company.strip().lower()
+            ):
+                shared.append("Same current company")
+            if profile.location and c.location:
+                if (
+                    profile.location.strip().lower() in c.location.lower()
+                    or c.location.strip().lower() in profile.location.lower()
+                ):
+                    shared.append("Same location area")
+        if shared:
+            entry["shared_context"] = "; ".join(shared)
+
+        contacts_data.append(entry)
+
+    return f"""USER PROFILE:
+{profile_info}
+
+TARGET:
+Company: {', '.join(target_companies) if target_companies else 'Any'}
+Role: {target_role}
+Seniority: {target_seniority}
+
+CONTACTS:
+{json.dumps(contacts_data, indent=2)}"""
 
 
 async def _call_claude_api(
     search: SearchRequest,
     contacts: list[Contact],
+    profile: ConnectorProfile | None = None,
+    user_name: str | None = None,
 ) -> tuple[list[ContactMatch], TokenUsage]:
-    """Call the real Claude API. Returns matches and token usage."""
+    """Call the real Claude API with the referral-focused prompt."""
     client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-    prompt = _build_prompt(search, contacts)
+    user_prompt = _build_user_prompt(search, contacts, profile, user_name)
 
     message = await client.messages.create(
         model=CLAUDE_MODEL,
         max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}],
+        system=_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
     )
 
     usage = TokenUsage(
@@ -228,8 +499,6 @@ async def _call_claude_api(
         raw = raw.rsplit("```", 1)[0].strip()
 
     parsed = json.loads(raw)
-
-    # Build a set of valid contact IDs for this batch
     valid_ids = {str(c.id) for c in contacts}
 
     results: list[ContactMatch] = []
@@ -238,12 +507,22 @@ async def _call_claude_api(
         if cid not in valid_ids:
             logger.warning("Claude returned unknown contact_id: %s — skipping", cid)
             continue
+
+        cultural_ctx = item.get("cultural_context", {})
         results.append(
             ContactMatch(
                 contact_id=uuid.UUID(cid),
                 relevance_score=max(0, min(100, float(item["relevance_score"]))),
                 reasoning=item.get("reasoning", ""),
-                match_type=item.get("match_type", "weak"),
+                match_type=item.get("match_type", "alumni"),
+                referral_likelihood=item.get("referral_likelihood", "low"),
+                cultural_context=cultural_ctx,
+                recommended_channel=cultural_ctx.get(
+                    "recommended_channel", "linkedin_message"
+                ),
+                message_sequence=cultural_ctx.get(
+                    "message_sequence", ["reconnect", "ask"]
+                ),
             )
         )
 
@@ -254,7 +533,6 @@ async def _call_claude_api(
 # Pre-filter (cheap local filter before sending to the API)
 # ---------------------------------------------------------------------------
 
-# Common title synonyms — if search mentions one, also match the others
 _TITLE_SYNONYMS: list[set[str]] = [
     {"vp", "vice president"},
     {"head of", "director"},
@@ -282,7 +560,7 @@ def _expand_title_synonyms(titles: list[str]) -> list[str]:
 
 
 def _extract_description_terms(description: str | None) -> list[str]:
-    """Extract meaningful terms from the search description."""
+    """Extract meaningful terms from a description string."""
     if not description:
         return []
     stop_words = {
@@ -297,7 +575,11 @@ def _extract_description_terms(description: str | None) -> list[str]:
         "level", "looking", "find", "search", "want", "like",
     }
     words = description.lower().split()
-    return [w.strip(".,;:!?()\"'") for w in words if len(w) > 2 and w.lower().strip(".,;:!?()\"'") not in stop_words]
+    return [
+        w.strip(".,;:!?()\"'")
+        for w in words
+        if len(w) > 2 and w.lower().strip(".,;:!?()\"'") not in stop_words
+    ]
 
 
 def _p[RESEND_KEY_REDACTED](
@@ -307,23 +589,32 @@ def _p[RESEND_KEY_REDACTED](
     """Filter contacts locally before sending to the Claude API."""
     total = len(contacts)
 
-    # Build search terms from all criteria
     title_terms = _expand_title_synonyms(_ensu[RESEND_KEY_REDACTED](search.target_titles))
     company_terms = [t.lower() for t in _ensu[RESEND_KEY_REDACTED](search.target_companies)]
     industry_terms = [t.lower() for t in _ensu[RESEND_KEY_REDACTED](search.target_industries)]
     keyword_terms = [t.lower() for t in _ensu[RESEND_KEY_REDACTED](search.target_keywords)]
     desc_terms = _extract_description_terms(search.description)
 
-    all_terms = title_terms + company_terms + industry_terms + keyword_terms + desc_terms
+    # Include target_role terms for pre-filtering
+    target_role = getattr(search, "target_role", None) or ""
+    role_terms = [
+        t.lower() for t in target_role.split() if len(t) > 2
+    ]
+
+    all_terms = (
+        title_terms + company_terms + industry_terms
+        + keyword_terms + desc_terms + role_terms
+    )
     if not all_terms:
-        logger.info("Pre-filter: no search terms to filter on, sending all %d contacts", total)
+        logger.info(
+            "Pre-filter: no search terms to filter on, sending all %d contacts", total
+        )
         return contacts
 
     filtered = []
     for c in contacts:
         ct = (c.current_title or "").lower()
         cc = (c.current_company or "").lower()
-        # Industry from linked company record
         ci = ""
         if c.company and c.company.industry:
             ci = c.company.industry.lower()
@@ -334,13 +625,10 @@ def _p[RESEND_KEY_REDACTED](
             filtered.append(c)
 
     logger.info(
-        "Pre-filter: %d total contacts, %d passed filter, %d skipped, sending %d to API",
-        total,
-        len(filtered),
-        total - len(filtered),
-        len(filtered) if filtered else total,
+        "Pre-filter: %d total, %d passed, %d skipped",
+        total, len(filtered), total - len(filtered),
     )
-    return filtered if filtered else contacts  # fallback to all if none match
+    return filtered if filtered else contacts
 
 
 # ---------------------------------------------------------------------------
@@ -351,17 +639,17 @@ def _p[RESEND_KEY_REDACTED](
 async def sco[RESEND_KEY_REDACTED](
     search: SearchRequest,
     contacts: list[Contact],
+    profile: ConnectorProfile | None = None,
+    user_name: str | None = None,
     user_id: uuid.UUID | None = None,
     db: AsyncSession | None = None,
 ) -> list[ContactMatch]:
-    """Score contacts against search criteria.
+    """Score contacts against search criteria for referral potential.
 
     Uses mock mode when AI_MOCK_MODE=true, real Claude API otherwise.
-    Handles batching internally with concurrent API calls.
-    Logs token usage when db is provided.
     """
     if settings.AI_MOCK_MODE:
-        return _mock_sco[RESEND_KEY_REDACTED](search, contacts)
+        return _mock_sco[RESEND_KEY_REDACTED](search, contacts, profile)
 
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_BATCHES)
     batches = [
@@ -369,36 +657,36 @@ async def sco[RESEND_KEY_REDACTED](
         for i in range(0, len(contacts), BATCH_SIZE)
     ]
     num_batches = len(batches)
-    logger.info("Scoring %d contacts in %d batches (concurrency: %d)", len(contacts), num_batches, MAX_CONCURRENT_BATCHES)
+    logger.info(
+        "Scoring %d contacts in %d batches (concurrency: %d)",
+        len(contacts), num_batches, MAX_CONCURRENT_BATCHES,
+    )
 
     async def _process_batch(
         batch_num: int, batch: list[Contact]
     ) -> tuple[list[ContactMatch], int, int]:
         async with semaphore:
             try:
-                batch_results, usage = await _call_claude_api(search, batch)
+                batch_results, usage = await _call_claude_api(
+                    search, batch, profile, user_name
+                )
                 logger.info(
-                    "Batch %d/%d: scored %d contacts, %d matches (tokens: %d in / %d out)",
-                    batch_num,
-                    num_batches,
-                    len(batch),
+                    "Batch %d/%d: scored %d contacts, %d matches "
+                    "(tokens: %d in / %d out)",
+                    batch_num, num_batches, len(batch),
                     len(batch_results),
-                    usage.input_tokens,
-                    usage.output_tokens,
+                    usage.input_tokens, usage.output_tokens,
                 )
                 return batch_results, usage.input_tokens, usage.output_tokens
             except anthropic.APIError as exc:
                 logger.error(
-                    "Claude API error on batch %d (%d contacts): %s — skipping batch",
-                    batch_num,
-                    len(batch),
-                    exc,
+                    "Claude API error on batch %d (%d contacts): %s — skipping",
+                    batch_num, len(batch), exc,
                 )
             except (json.JSONDecodeError, KeyError, ValueError) as exc:
                 logger.error(
-                    "Failed to parse Claude response for batch %d: %s — skipping batch",
-                    batch_num,
-                    exc,
+                    "Failed to parse Claude response for batch %d: %s — skipping",
+                    batch_num, exc,
                 )
             return [], 0, 0
 
@@ -454,6 +742,14 @@ async def run_search(
     if search is None:
         raise ValueError("Search request not found")
 
+    # Load user and connector profile for the referral prompt
+    user = await db.get(User, user_id)
+    profile_result = await db.execute(
+        select(ConnectorProfile).where(ConnectorProfile.user_id == user_id)
+    )
+    profile = profile_result.scalar_one_or_none()
+    user_name = user.full_name if user else None
+
     # Load user's active contacts (eagerly load company for industry filtering)
     result = await db.execute(
         select(Contact)
@@ -470,21 +766,34 @@ async def run_search(
         await db.flush()
         return []
 
-    # Pre-filter: only send contacts with title/company/industry overlap to the API
+    # Pre-filter: only send contacts with relevant overlap to the API
     total_contacts = len(contacts)
     if not settings.AI_MOCK_MODE:
         contacts = _p[RESEND_KEY_REDACTED](search, contacts)
 
     # Score contacts via AI (mock or real)
-    matches = await sco[RESEND_KEY_REDACTED](search, contacts, user_id=user_id, db=db)
+    matches = await sco[RESEND_KEY_REDACTED](
+        search, contacts,
+        profile=profile, user_name=user_name,
+        user_id=user_id, db=db,
+    )
 
-    # Upsert match results (skip scores below 20 to keep the database clean)
+    # Upsert match results (skip scores below 20)
     MIN_PERSIST_SCORE = 20.0
-    model_version = "mock-v1" if settings.AI_MOCK_MODE else CLAUDE_MODEL
+    model_version = "mock-v2-referral" if settings.AI_MOCK_MODE else CLAUDE_MODEL
     match_results: list[MatchResult] = []
     for m in matches:
         if m.relevance_score < MIN_PERSIST_SCORE:
             continue
+
+        # Build cultural_context blob for storage
+        ctx_blob = {
+            **m.cultural_context,
+            "referral_likelihood": m.referral_likelihood,
+            "recommended_channel": m.recommended_channel,
+            "message_sequence": m.message_sequence,
+        }
+
         existing_result = await db.execute(
             select(MatchResult).where(
                 MatchResult.search_request_id == search_id,
@@ -498,6 +807,7 @@ async def run_search(
             existing.match_reasoning = m.reasoning
             existing.match_type = m.match_type
             existing.ai_model_version = model_version
+            existing.cultural_context = ctx_blob
             match_results.append(existing)
         else:
             mr = MatchResult(
@@ -508,6 +818,7 @@ async def run_search(
                 match_reasoning=m.reasoning,
                 match_type=m.match_type,
                 ai_model_version=model_version,
+                cultural_context=ctx_blob,
             )
             db.add(mr)
             match_results.append(mr)
@@ -517,12 +828,9 @@ async def run_search(
 
     elapsed = time.monotonic() - t0
     logger.info(
-        "Search complete in %.1fs: %d total contacts, %d sent to API, %d returned score >= 20, %d persisted",
-        elapsed,
-        total_contacts,
-        len(contacts),
-        len(matches),
-        len(match_results),
+        "Search complete in %.1fs: %d total contacts, %d sent to scorer, "
+        "%d returned score >= 20, %d persisted",
+        elapsed, total_contacts, len(contacts), len(matches), len(match_results),
     )
 
     await db.flush()

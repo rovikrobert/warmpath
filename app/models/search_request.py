@@ -31,6 +31,10 @@ class SearchRequest(Base):
     target_locations: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     target_keywords: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
 
+    # Referral-specific fields
+    target_role: Mapped[str | None] = mapped_column(String(255))
+    target_seniority: Mapped[str | None] = mapped_column(String(100))
+
     status: Mapped[str] = mapped_column(
         String(50), nullable=False, server_default="active"
     )

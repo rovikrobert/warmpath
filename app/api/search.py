@@ -41,6 +41,8 @@ async def create_search(
         target_industries=body.target_industries,
         target_locations=body.target_locations,
         target_keywords=body.target_keywords,
+        target_role=body.target_role,
+        target_seniority=body.target_seniority,
         status="active",
     )
     db.add(search)
@@ -278,6 +280,9 @@ async def get_search_results(
         relevance = float(match.relevance_score)
         combined = relevance * 0.5 + (warm or 0) * 0.5
 
+        # Extract cultural context fields
+        ctx = match.cultural_context or {}
+
         data.append(
             MatchResultResponse(
                 id=match.id,
@@ -288,6 +293,10 @@ async def get_search_results(
                 match_type=match.match_type,
                 warm_score=warm,
                 combined_score=round(combined, 2),
+                referral_likelihood=ctx.get("referral_likelihood"),
+                cultural_context=ctx,
+                recommended_channel=ctx.get("recommended_channel"),
+                message_sequence=ctx.get("message_sequence"),
                 contact_name=contact_name,
                 contact_title=contact_title,
                 contact_company=contact_company,
