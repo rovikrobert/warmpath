@@ -24,13 +24,13 @@ async def auth_headers(client: AsyncClient) -> dict:
         "/api/v1/auth/signup",
         json={
             "email": "apptest@test.com",
-            "password": "testpass123",
+            "password": "Testpass123",
             "full_name": "App Tester",
         },
     )
     login_res = await client.post(
         "/api/v1/auth/login",
-        json={"email": "apptest@test.com", "password": "testpass123"},
+        json={"email": "apptest@test.com", "password": "Testpass123"},
     )
     token = login_res.json()["data"]["access_token"]
     return {"Authorization": f"Bearer {token}"}

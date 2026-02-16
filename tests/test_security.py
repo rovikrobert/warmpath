@@ -23,14 +23,14 @@ async def _signup(client: AsyncClient, email: str = "sec@example.com") -> dict:
     """Signup and return full response (including cookies)."""
     resp = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": "secret123", "full_name": "Sec User"},
+        json={"email": email, "password": "Secret123", "full_name": "Sec User"},
     )
     assert resp.status_code == 201
     return resp
 
 
 async def _login(
-    client: AsyncClient, email: str = "sec@example.com", password: str = "secret123"
+    client: AsyncClient, email: str = "sec@example.com", password: str = "Secret123"
 ) -> dict:
     """Login and return full response."""
     resp = await client.post(
@@ -234,7 +234,7 @@ class TestChangePassword:
         resp2 = await client.post(
             "/api/v1/auth/change-password",
             headers={"Authorization": f"Bearer {token}"},
-            json={"old_password": "secret123", "new_password": "newsecret456"},
+            json={"old_password": "Secret123", "new_password": "Newsecret456"},
         )
         assert resp2.status_code == 200
         new_token = resp2.json()["data"]["access_token"]
@@ -247,7 +247,7 @@ class TestChangePassword:
         resp2 = await client.post(
             "/api/v1/auth/change-password",
             headers={"Authorization": f"Bearer {token}"},
-            json={"old_password": "wrongpassword", "new_password": "newsecret456"},
+            json={"old_password": "wrongpassword", "new_password": "Newsecret456"},
         )
         assert resp2.status_code == 401
 
@@ -258,7 +258,7 @@ class TestChangePassword:
         resp2 = await client.post(
             "/api/v1/auth/change-password",
             headers={"Authorization": f"Bearer {old_token}"},
-            json={"old_password": "secret123", "new_password": "newsecret456"},
+            json={"old_password": "Secret123", "new_password": "Newsecret456"},
         )
         assert resp2.status_code == 200
 
@@ -276,11 +276,11 @@ class TestChangePassword:
         await client.post(
             "/api/v1/auth/change-password",
             headers={"Authorization": f"Bearer {token}"},
-            json={"old_password": "secret123", "new_password": "newsecret456"},
+            json={"old_password": "Secret123", "new_password": "Newsecret456"},
         )
 
         # Login with new password
-        resp2 = await _login(client, password="newsecret456")
+        resp2 = await _login(client, password="Newsecret456")
         assert resp2.status_code == 200
 
     async def test_change_password_old_password_fails(self, client: AsyncClient):
@@ -290,11 +290,11 @@ class TestChangePassword:
         await client.post(
             "/api/v1/auth/change-password",
             headers={"Authorization": f"Bearer {token}"},
-            json={"old_password": "secret123", "new_password": "newsecret456"},
+            json={"old_password": "Secret123", "new_password": "Newsecret456"},
         )
 
         # Login with old password should fail
-        resp2 = await _login(client, password="secret123")
+        resp2 = await _login(client, password="Secret123")
         assert resp2.status_code == 401
 
 
@@ -332,7 +332,7 @@ def _make_csv(rows: list[list[str]]) -> bytes:
 async def _get_auth_token(client: AsyncClient, email: str = "csv@example.com") -> str:
     resp = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": "secret123", "full_name": "CSV User"},
+        json={"email": email, "password": "Secret123", "full_name": "CSV User"},
     )
     return resp.json()["data"]["access_token"]
 
@@ -580,7 +580,7 @@ class TestAccountLockout:
             await _login(client, email="lock2@example.com", password="wrong")
 
         # Correct password during lockout → still 429
-        resp = await _login(client, email="lock2@example.com", password="secret123")
+        resp = await _login(client, email="lock2@example.com", password="Secret123")
         assert resp.status_code == 429
 
     async def test_lockout_expires(self, client: AsyncClient):
@@ -605,7 +605,7 @@ class TestAccountLockout:
             await session.commit()
 
         # Should be able to log in now
-        resp = await _login(client, email="lock3@example.com", password="secret123")
+        resp = await _login(client, email="lock3@example.com", password="Secret123")
         assert resp.status_code == 200
 
     async def test_successful_login_resets_counter(self, client: AsyncClient):
@@ -617,7 +617,7 @@ class TestAccountLockout:
             await _login(client, email="lock4@example.com", password="wrong")
 
         # Successful login
-        resp = await _login(client, email="lock4@example.com", password="secret123")
+        resp = await _login(client, email="lock4@example.com", password="Secret123")
         assert resp.status_code == 200
 
         # Fail 3 more times (counter was reset, so still under threshold)
@@ -853,7 +853,7 @@ class TestAuditLog:
         await client.post(
             "/api/v1/auth/change-password",
             headers={"Authorization": f"Bearer {token}"},
-            json={"old_password": "secret123", "new_password": "newpass456"},
+            json={"old_password": "Secret123", "new_password": "Newpass456"},
         )
 
         from tests.conftest import TestSessionLocal
@@ -990,3 +990,226 @@ class TestStripeWebhook:
             assert "Missing" in resp.json()["detail"]
         finally:
             settings.STRIPE_WEBHOOK_SECRET = original
+
+
+# ===========================================================================
+# Password Strength Validation
+# ===========================================================================
+
+
+class TestPasswordStrength:
+    def test_too_short(self):
+        from app.utils.security import validate_password_strength
+
+        try:
+            validate_password_strength("Ab1")
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "8 characters" in str(e)
+
+    def test_no_uppercase(self):
+        from app.utils.security import validate_password_strength
+
+        try:
+            validate_password_strength("abcdefg1")
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "uppercase" in str(e)
+
+    def test_no_lowercase(self):
+        from app.utils.security import validate_password_strength
+
+        try:
+            validate_password_strength("ABCDEFG1")
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "lowercase" in str(e)
+
+    def test_no_number(self):
+        from app.utils.security import validate_password_strength
+
+        try:
+            validate_password_strength("Abcdefgh")
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "number" in str(e)
+
+    def test_valid_password(self):
+        from app.utils.security import validate_password_strength
+
+        validate_password_strength("Secret123")  # Should not raise
+
+    async def test_signup_weak_password_rejected(self, client: AsyncClient):
+        resp = await client.post(
+            "/api/v1/auth/signup",
+            json={"email": "weak@test.com", "password": "weak", "full_name": "Weak"},
+        )
+        assert resp.status_code == 422
+        assert "Password must contain" in resp.json()["detail"]
+
+    async def test_change_password_weak_rejected(self, client: AsyncClient):
+        resp = await _signup(client, email="chgweak@test.com")
+        token = resp.json()["data"]["access_token"]
+
+        resp2 = await client.post(
+            "/api/v1/auth/change-password",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"old_password": "Secret123", "new_password": "weak"},
+        )
+        assert resp2.status_code == 422
+        assert "Password must contain" in resp2.json()["detail"]
+
+
+# ===========================================================================
+# Forgot / Reset Password
+# ===========================================================================
+
+
+class TestForgotPassword:
+    async def test_creates_token(self, client: AsyncClient):
+        await _signup(client, email="forgot@test.com")
+
+        resp = await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "forgot@test.com"},
+        )
+        assert resp.status_code == 200
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.user import User
+
+            result = await session.execute(
+                select(User).where(User.email == "forgot@test.com")
+            )
+            user = result.scalar_one()
+            assert user.password_reset_token is not None
+            assert user.password_reset_sent_at is not None
+
+    async def test_unknown_email_succeeds(self, client: AsyncClient):
+        """No email enumeration — always returns success."""
+        resp = await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "nobody@nowhere.com"},
+        )
+        assert resp.status_code == 200
+
+    async def test_rate_limited(self, client: AsyncClient):
+        await _signup(client, email="ratelimit@test.com")
+
+        resp1 = await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "ratelimit@test.com"},
+        )
+        assert resp1.status_code == 200
+
+        resp2 = await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "ratelimit@test.com"},
+        )
+        assert resp2.status_code == 429
+
+
+class TestResetPassword:
+    async def test_valid_token(self, client: AsyncClient):
+        await _signup(client, email="reset@test.com")
+
+        await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "reset@test.com"},
+        )
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.user import User
+
+            result = await session.execute(
+                select(User).where(User.email == "reset@test.com")
+            )
+            user = result.scalar_one()
+            token = user.password_reset_token
+            old_version = user.token_version
+
+        resp = await client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": token, "new_password": "NewPass789"},
+        )
+        assert resp.status_code == 200
+
+        # Verify password was updated and token_version bumped
+        async with TestSessionLocal() as session:
+            result = await session.execute(
+                select(User).where(User.email == "reset@test.com")
+            )
+            user = result.scalar_one()
+            assert user.password_reset_token is None
+            assert user.token_version == old_version + 1
+
+        # Login with new password works
+        resp2 = await _login(client, email="reset@test.com", password="NewPass789")
+        assert resp2.status_code == 200
+
+    async def test_expired_token(self, client: AsyncClient):
+        await _signup(client, email="expired@test.com")
+        await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "expired@test.com"},
+        )
+
+        from datetime import datetime, timedelta, timezone
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.user import User
+
+            result = await session.execute(
+                select(User).where(User.email == "expired@test.com")
+            )
+            user = result.scalar_one()
+            token = user.password_reset_token
+            user.password_reset_sent_at = datetime.now(timezone.utc) - timedelta(
+                hours=2
+            )
+            await session.commit()
+
+        resp = await client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": token, "new_password": "NewPass789"},
+        )
+        assert resp.status_code == 400
+        assert "expired" in resp.json()["detail"].lower()
+
+    async def test_invalid_token(self, client: AsyncClient):
+        resp = await client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": "bogus-token", "new_password": "NewPass789"},
+        )
+        assert resp.status_code == 400
+
+    async def test_weak_password(self, client: AsyncClient):
+        await _signup(client, email="resetweak@test.com")
+        await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "resetweak@test.com"},
+        )
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.user import User
+
+            result = await session.execute(
+                select(User).where(User.email == "resetweak@test.com")
+            )
+            user = result.scalar_one()
+            token = user.password_reset_token
+
+        resp = await client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": token, "new_password": "weak"},
+        )
+        assert resp.status_code == 422
+        assert "Password must contain" in resp.json()["detail"]

@@ -345,7 +345,7 @@ async def auth_headers(client: AsyncClient) -> dict:
         "/api/v1/auth/signup",
         json={
             "email": "credits@test.com",
-            "password": "testpass123",
+            "password": "Testpass123",
             "full_name": "Credit Tester",
         },
     )
@@ -363,7 +363,7 @@ async def auth_headers(client: AsyncClient) -> dict:
 
     login = await client.post(
         "/api/v1/auth/login",
-        json={"email": "credits@test.com", "password": "testpass123"},
+        json={"email": "credits@test.com", "password": "Testpass123"},
     )
     token = login.json()["data"]["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -540,13 +540,13 @@ class TestCreditTriggers:
             "/api/v1/auth/signup",
             json={
                 "email": "welcome@test.com",
-                "password": "testpass123",
+                "password": "Testpass123",
                 "full_name": "Welcome User",
             },
         )
         login = await client.post(
             "/api/v1/auth/login",
-            json={"email": "welcome@test.com", "password": "testpass123"},
+            json={"email": "welcome@test.com", "password": "Testpass123"},
         )
         token = login.json()["data"]["access_token"]
         headers = {"Authorization": f"Bearer {token}"}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PasswordStrength from '../components/PasswordStrength';
 
 export default function AuthPage() {
   const { login, signup } = useAuth();
@@ -86,6 +87,12 @@ export default function AuthPage() {
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Password</label>
             <input type="password" value={form.password} onChange={set('password')} className={inputClass} placeholder="••••••••" required />
+            {isSignup && <PasswordStrength password={form.password} />}
+            {!isSignup && (
+              <div className="mt-1 text-right">
+                <Link to="/forgot-password" className="text-xs text-amber-600 hover:text-amber-700">Forgot password?</Link>
+              </div>
+            )}
           </div>
 
           {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}

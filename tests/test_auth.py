@@ -6,7 +6,7 @@ async def test_signup_returns_token(client: AsyncClient):
         "/api/v1/auth/signup",
         json={
             "email": "new@example.com",
-            "password": "secret123",
+            "password": "Secret123",
             "full_name": "New User",
         },
     )
@@ -21,7 +21,7 @@ async def test_signup_returns_token(client: AsyncClient):
 async def test_signup_duplicate_email(client: AsyncClient):
     payload = {
         "email": "dup@example.com",
-        "password": "secret123",
+        "password": "Secret123",
         "full_name": "Dup User",
     }
     await client.post("/api/v1/auth/signup", json=payload)
@@ -34,13 +34,13 @@ async def test_login_success(client: AsyncClient):
         "/api/v1/auth/signup",
         json={
             "email": "login@example.com",
-            "password": "secret123",
+            "password": "Secret123",
             "full_name": "Login User",
         },
     )
     resp = await client.post(
         "/api/v1/auth/login",
-        json={"email": "login@example.com", "password": "secret123"},
+        json={"email": "login@example.com", "password": "Secret123"},
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -53,7 +53,7 @@ async def test_login_wrong_password(client: AsyncClient):
         "/api/v1/auth/signup",
         json={
             "email": "wrong@example.com",
-            "password": "secret123",
+            "password": "Secret123",
             "full_name": "Wrong",
         },
     )
@@ -67,7 +67,7 @@ async def test_login_wrong_password(client: AsyncClient):
 async def test_login_nonexistent_email(client: AsyncClient):
     resp = await client.post(
         "/api/v1/auth/login",
-        json={"email": "nobody@example.com", "password": "secret123"},
+        json={"email": "nobody@example.com", "password": "Secret123"},
     )
     assert resp.status_code == 401
 
@@ -77,7 +77,7 @@ async def test_me_with_valid_token(client: AsyncClient):
         "/api/v1/auth/signup",
         json={
             "email": "me@example.com",
-            "password": "secret123",
+            "password": "Secret123",
             "full_name": "Me User",
         },
     )

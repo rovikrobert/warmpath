@@ -37,7 +37,9 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (credentials) => {
     const res = await authApi.login(credentials);
-    setToken(res.data.access_token);
+    const newToken = res.data.access_token;
+    setToken(newToken);
+    setTokenGetter(() => newToken);
     const me = await authApi.me();
     setUser(me.data);
     setJustSignedUp(false);
@@ -46,7 +48,9 @@ export function AuthProvider({ children }) {
 
   const signup = useCallback(async (body) => {
     const res = await authApi.signup(body);
-    setToken(res.data.access_token);
+    const newToken = res.data.access_token;
+    setToken(newToken);
+    setTokenGetter(() => newToken);
     const me = await authApi.me();
     setUser(me.data);
     setJustSignedUp(true);

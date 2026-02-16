@@ -525,7 +525,7 @@ async def _signup_and_get_token(
 ) -> str:
     resp = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": "secret123", "full_name": "WS User"},
+        json={"email": email, "password": "Secret123", "full_name": "WS User"},
     )
     return resp.json()["data"]["access_token"]
 

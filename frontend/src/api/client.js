@@ -58,6 +58,10 @@ export const auth = {
     api('/api/v1/auth/user-type', { method: 'PATCH', body: { user_type: userType } }),
   resendVerification: () =>
     api('/api/v1/auth/resend-verification', { method: 'POST' }),
+  forgotPassword: (body) =>
+    api('/api/v1/auth/forgot-password', { method: 'POST', body }),
+  resetPassword: (body) =>
+    api('/api/v1/auth/reset-password', { method: 'POST', body }),
 };
 
 export const contacts = {

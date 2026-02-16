@@ -35,13 +35,13 @@ async def auth_headers(client: AsyncClient) -> dict:
         "/api/v1/auth/signup",
         json={
             "email": "privacy@test.com",
-            "password": "testpass123",
+            "password": "Testpass123",
             "full_name": "Privacy Tester",
         },
     )
     login_res = await client.post(
         "/api/v1/auth/login",
-        json={"email": "privacy@test.com", "password": "testpass123"},
+        json={"email": "privacy@test.com", "password": "Testpass123"},
     )
     token = login_res.json()["data"]["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -60,13 +60,13 @@ async def second_user_id(client: AsyncClient) -> str:
         "/api/v1/auth/signup",
         json={
             "email": "holder2@test.com",
-            "password": "testpass123",
+            "password": "Testpass123",
             "full_name": "Second Holder",
         },
     )
     login_res = await client.post(
         "/api/v1/auth/login",
-        json={"email": "holder2@test.com", "password": "testpass123"},
+        json={"email": "holder2@test.com", "password": "Testpass123"},
     )
     token = login_res.json()["data"]["access_token"]
     resp = await client.get(

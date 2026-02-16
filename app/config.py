@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "*"
     PORT: int = 8000  # Railway injects via env
     STRIPE_WEBHOOK_SECRET: str = ""
+    RESEND_API_KEY: str = ""
+    FROM_EMAIL: str = "WarmPath <noreply@majiq.agency>"
+    FRONTEND_URL: str = "http://localhost:3000"
     RATE_LIMIT_CSV_UPLOADS_PER_DAY: int = 10
     RATE_LIMIT_SEARCH_RUNS_PER_DAY: int = 50
 

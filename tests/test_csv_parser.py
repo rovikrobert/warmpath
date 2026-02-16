@@ -165,7 +165,7 @@ async def _signup_and_get_token(client: AsyncClient) -> str:
         "/api/v1/auth/signup",
         json={
             "email": "csv@example.com",
-            "password": "secret123",
+            "password": "Secret123",
             "full_name": "CSV User",
         },
     )
@@ -340,7 +340,7 @@ async def test_contacts_a[RESEND_KEY_REDACTED](client: AsyncClient):
         "/api/v1/auth/signup",
         json={
             "email": "usera@example.com",
-            "password": "secret123",
+            "password": "Secret123",
             "full_name": "User A",
         },
     )
@@ -356,7 +356,7 @@ async def test_contacts_a[RESEND_KEY_REDACTED](client: AsyncClient):
         "/api/v1/auth/signup",
         json={
             "email": "userb@example.com",
-            "password": "secret123",
+            "password": "Secret123",
             "full_name": "User B",
         },
     )
