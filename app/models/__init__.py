@@ -17,3 +17,12 @@ from app.models.match_result import (  # noqa: E402, F401
 )
 from app.models.enrichment import EnrichmentCache, UsageLog  # noqa: E402, F401
 from app.models.job import Application, JobOpening, UserJobPreferences  # noqa: E402, F401
+from app.models.marketplace import (  # noqa: E402, F401
+    ConnectorReputation,
+    IntroFacilitation,
+    MarketplaceListing,
+    NetworkHolderAvailability,
+    NetworkSharingPreferences,
+)
+from app.models.credits import CreditTransaction  # noqa: E402, F401
+from app.models.privacy import SuppressionList  # noqa: E402, F401

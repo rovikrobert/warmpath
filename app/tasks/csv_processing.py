@@ -18,6 +18,7 @@ from app.config import settings
 from app.models.contact import Contact, CsvUpload
 from app.services.company_normalizer import link_contact_to_company
 from app.services.csv_parser import parse_linkedin_csv
+from app.services.suppression import check_suppression
 from app.services.warm_scorer import batch_compute_scores
 
 
@@ -53,8 +54,21 @@ async def process_csv_upload_core(
 
         created = 0
         duplicates = 0
+        suppressed_count = 0
 
         for row in parsed:
+            # Check suppression list before inserting
+            is_suppressed = await check_suppression(
+                email=row.get("email"),
+                first_name=row.get("first_name", ""),
+                last_name=row.get("last_name", ""),
+                company=row.get("current_company", ""),
+                db=db,
+            )
+            if is_suppressed:
+                suppressed_count += 1
+                continue
+
             fingerprint = row.get("fingerprint")
             if fingerprint:
                 existing_result = await db.execute(
