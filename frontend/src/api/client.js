@@ -108,6 +108,16 @@ export const preferences = {
   deleteJob: () => api('/api/v1/preferences/job', { method: 'DELETE' }),
 };
 
+export const applications = {
+  list: (status) => {
+    const qs = status ? `?status=${status}` : '';
+    return api(`/api/v1/applications${qs}`);
+  },
+  create: (body) => api('/api/v1/applications', { method: 'POST', body }),
+  update: (id, body) => api(`/api/v1/applications/${id}`, { method: 'PATCH', body }),
+  stats: () => api('/api/v1/applications/stats'),
+};
+
 export const health = {
   check: () => api('/health'),
   usage: () => api('/usage/me'),
