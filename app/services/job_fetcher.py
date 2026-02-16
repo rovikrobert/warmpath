@@ -136,21 +136,37 @@ class JobFetcher:
         return results
 
     async def fetch_jobs_for_company(
-        self, company_name: str, board_ids: dict[str, str]
+        self, company_name: str, board_ids: dict[str, str] | None = None
     ) -> list[dict]:
-        """Fetch jobs from all known boards for a company.
+        """Fetch jobs for a company using the best available source.
 
+        Fallback chain: Greenhouse/Lever boards → career page scraper → empty.
         board_ids is a dict like {"greenhouse": "stripe", "lever": "notion"}.
         """
+        from app.services.career_page_fetcher import fetch_career_page, lookup_career_page
+
         all_jobs: list[dict] = []
 
-        if "greenhouse" in board_ids:
-            jobs = await self.fetch_greenhouse_jobs(board_ids["greenhouse"])
-            all_jobs.extend(jobs)
+        # 1. Try ATS boards (Greenhouse / Lever)
+        if board_ids:
+            if "greenhouse" in board_ids:
+                jobs = await self.fetch_greenhouse_jobs(board_ids["greenhouse"])
+                all_jobs.extend(jobs)
 
-        if "lever" in board_ids:
-            jobs = await self.fetch_lever_jobs(board_ids["lever"])
-            all_jobs.extend(jobs)
+            if "lever" in board_ids:
+                jobs = await self.fetch_lever_jobs(board_ids["lever"])
+                all_jobs.extend(jobs)
+
+        # 2. If ATS boards returned nothing, try career page scraper
+        if not all_jobs:
+            career_url = lookup_career_page(company_name)
+            if career_url:
+                logger.info(
+                    "No ATS results for '%s', falling back to career page: %s",
+                    company_name,
+                    career_url,
+                )
+                all_jobs = await fetch_career_page(career_url)
 
         logger.info(
             "Fetched %d total jobs for company '%s'", len(all_jobs), company_name
