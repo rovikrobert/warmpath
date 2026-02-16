@@ -152,10 +152,17 @@ async def get_search_results(
     search_id: uuid.UUID,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
-    min_score: float = Query(40.0, ge=0, le=100, description="Minimum relevance score"),
+    min_score: float = Query(40.0, ge=0, le=100, description="Minimum relevance score (alias for min_relevance)"),
+    min_relevance: float | None = Query(None, ge=0, le=100, description="Minimum relevance score"),
+    min_warm: float | None = Query(None, ge=0, le=100, description="Minimum warm score"),
+    match_type: str | None = Query(None, description="Filter by match type: direct, indirect, or weak"),
+    company: str | None = Query(None, description="Filter by company name (substring match)"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    # min_relevance takes precedence over min_score for backwards compat
+    effective_min_relevance = min_relevance if min_relevance is not None else min_score
+
     # Verify search exists and belongs to user
     search_result = await db.execute(
         select(SearchRequest).where(
@@ -188,9 +195,19 @@ async def get_search_results(
         .where(
             MatchResult.search_request_id == search_id,
             MatchResult.user_id == current_user.id,
-            MatchResult.relevance_score >= min_score,
+            MatchResult.relevance_score >= effective_min_relevance,
         )
     )
+
+    # Apply optional filters
+    if match_type is not None:
+        base_query = base_query.where(MatchResult.match_type == match_type)
+    if company is not None:
+        base_query = base_query.where(Contact.current_company.ilike(f"%{company}%"))
+    if min_warm is not None:
+        base_query = base_query.where(
+            func.coalesce(WarmScore.total_score, 0) >= min_warm
+        )
 
     count_query = select(func.count()).select_from(base_query.subquery())
     total = (await db.execute(count_query)).scalar() or 0
@@ -207,7 +224,55 @@ async def get_search_results(
     )
     rows = result.all()
 
+    # Build response data + collect stats
     data = []
+    all_relevance: list[float] = []
+    all_warm: list[float] = []
+    score_dist = {"90-100": 0, "70-89": 0, "50-69": 0, "20-49": 0}
+
+    # We need all matching rows for stats, not just the current page.
+    # Run a lightweight stats query over the full filtered set.
+    stats_query = (
+        select(
+            MatchResult.relevance_score,
+            func.coalesce(WarmScore.total_score, 0).label("warm"),
+        )
+        .join(Contact, MatchResult.contact_id == Contact.id)
+        .outerjoin(
+            WarmScore,
+            (WarmScore.contact_id == MatchResult.contact_id)
+            & (WarmScore.user_id == MatchResult.user_id),
+        )
+        .where(
+            MatchResult.search_request_id == search_id,
+            MatchResult.user_id == current_user.id,
+            MatchResult.relevance_score >= effective_min_relevance,
+        )
+    )
+    if match_type is not None:
+        stats_query = stats_query.where(MatchResult.match_type == match_type)
+    if company is not None:
+        stats_query = stats_query.where(Contact.current_company.ilike(f"%{company}%"))
+    if min_warm is not None:
+        stats_query = stats_query.where(
+            func.coalesce(WarmScore.total_score, 0) >= min_warm
+        )
+
+    stats_rows = (await db.execute(stats_query)).all()
+    for rel, warm_val in stats_rows:
+        r = float(rel)
+        w = float(warm_val)
+        all_relevance.append(r)
+        all_warm.append(w)
+        if r >= 90:
+            score_dist["90-100"] += 1
+        elif r >= 70:
+            score_dist["70-89"] += 1
+        elif r >= 50:
+            score_dist["50-69"] += 1
+        else:
+            score_dist["20-49"] += 1
+
     for match, contact_name, contact_title, contact_company, warm_score_val in rows:
         warm = float(warm_score_val) if warm_score_val is not None else None
         relevance = float(match.relevance_score)
@@ -232,10 +297,17 @@ async def get_search_results(
 
     return {
         "data": data,
-        "meta": PaginationMeta(
-            page=page,
-            per_page=per_page,
-            total=total,
-            total_pages=max(1, math.ceil(total / per_page)),
-        ).model_dump(),
+        "meta": {
+            **PaginationMeta(
+                page=page,
+                per_page=per_page,
+                total=total,
+                total_pages=max(1, math.ceil(total / per_page)),
+            ).model_dump(),
+            "total_matches": total,
+            "shown": len(data),
+            "avg_relevance": round(sum(all_relevance) / len(all_relevance), 1) if all_relevance else 0,
+            "avg_warm": round(sum(all_warm) / len(all_warm), 1) if all_warm else 0,
+            "score_distribution": score_dist,
+        },
     }

@@ -3,8 +3,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.user import User
-from app.schemas.user import TokenResponse, UserCreate, UserLogin, UserResponse
+from app.models.user import ConnectorProfile, User
+from app.schemas.user import (
+    ConnectorProfileResponse,
+    ConnectorProfileUpsert,
+    TokenResponse,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)
 from app.utils.security import (
     create_access_token,
     get_current_user,
@@ -30,6 +37,20 @@ async def signup(body: UserCreate, db: AsyncSession = Depends(get_db)) -> dict:
         full_name=body.full_name,
     )
     db.add(user)
+    await db.flush()
+
+    # Create connector profile if any profile fields were provided
+    profile_fields = {
+        k: v
+        for k, v in body.model_dump(
+            include={"headline", "current_company", "current_title", "industry", "location", "linkedin_url", "bio_summary"}
+        ).items()
+        if v is not None
+    }
+    if profile_fields:
+        profile = ConnectorProfile(user_id=user.id, **profile_fields)
+        db.add(profile)
+
     await db.commit()
     await db.refresh(user)
 
@@ -68,5 +89,34 @@ async def login(body: UserLogin, db: AsyncSession = Depends(get_db)) -> dict:
 async def get_me(current_user: User = Depends(get_current_user)) -> dict:
     return {
         "data": UserResponse.model_validate(current_user).model_dump(mode="json"),
+        "meta": {},
+    }
+
+
+@router.post("/profile")
+async def upsert_profile(
+    body: ConnectorProfileUpsert,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    result = await db.execute(
+        select(ConnectorProfile).where(ConnectorProfile.user_id == current_user.id)
+    )
+    profile = result.scalar_one_or_none()
+
+    fields = body.model_dump(exclude_unset=True)
+
+    if profile is None:
+        profile = ConnectorProfile(user_id=current_user.id, **fields)
+        db.add(profile)
+    else:
+        for key, value in fields.items():
+            setattr(profile, key, value)
+
+    await db.commit()
+    await db.refresh(profile)
+
+    return {
+        "data": ConnectorProfileResponse.model_validate(profile).model_dump(mode="json"),
         "meta": {},
     }
