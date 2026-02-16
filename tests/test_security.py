@@ -6,6 +6,7 @@ import hmac
 import io
 import json
 import time
+import uuid
 
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -1213,3 +1214,230 @@ class TestResetPassword:
         )
         assert resp.status_code == 422
         assert "Password must contain" in resp.json()["detail"]
+
+
+# ===========================================================================
+# Account Deletion
+# ===========================================================================
+
+
+async def _signup_and_get_token(
+    client: AsyncClient, email: str = "del@example.com"
+) -> str:
+    """Signup and return access token."""
+    resp = await client.post(
+        "/api/v1/auth/signup",
+        json={"email": email, "password": "Secret123", "full_name": "Del User"},
+    )
+    assert resp.status_code == 201
+    return resp.json()["data"]["access_token"]
+
+
+class TestDeleteAccount:
+    async def test_delete_account_success(self, client: AsyncClient):
+        """Password confirmed, user removed from DB."""
+        token = await _signup_and_get_token(client, "del1@example.com")
+
+        resp = await client.post(
+            "/api/v1/auth/delete-account",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"password": "Secret123", "confirm_deletion": True},
+        )
+        assert resp.status_code == 200
+        assert "deleted" in resp.json()["data"]["message"].lower()
+
+        # User should not exist anymore
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.user import User
+
+            result = await session.execute(
+                select(User).where(User.email == "del1@example.com")
+            )
+            assert result.scalar_one_or_none() is None
+
+    async def test_delete_account_wrong_password(self, client: AsyncClient):
+        """Wrong password returns 401."""
+        token = await _signup_and_get_token(client, "del2@example.com")
+
+        resp = await client.post(
+            "/api/v1/auth/delete-account",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"password": "WrongPass1", "confirm_deletion": True},
+        )
+        assert resp.status_code == 401
+
+    async def test_delete_account_without_confirmation(self, client: AsyncClient):
+        """confirm_deletion=false returns 422."""
+        token = await _signup_and_get_token(client, "del3@example.com")
+
+        resp = await client.post(
+            "/api/v1/auth/delete-account",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"password": "Secret123", "confirm_deletion": False},
+        )
+        assert resp.status_code == 422
+
+    async def test_delete_account_creates_audit_entry(self, client: AsyncClient):
+        """audit_logs has action='account_deleted' after deletion."""
+        token = await _signup_and_get_token(client, "del4@example.com")
+
+        await client.post(
+            "/api/v1/auth/delete-account",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"password": "Secret123", "confirm_deletion": True},
+        )
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            result = await session.execute(
+                select(AuditLog).where(AuditLog.action == "account_deleted")
+            )
+            entries = list(result.scalars())
+            assert len(entries) >= 1
+            # user_id should be SET NULL (user was deleted)
+            assert any(e.metadata_.get("email") == "del4@example.com" for e in entries)
+
+    async def test_delete_account_cascades_contacts(self, client: AsyncClient):
+        """User with contacts can be deleted; user row is removed.
+
+        Note: DB-level CASCADE (ondelete='CASCADE') deletes child rows in
+        production PostgreSQL. SQLite in tests doesn't enforce FK CASCADE
+        by default, so we verify the user row is gone and the FK definitions
+        are correct in the model layer.
+        """
+        token = await _signup_and_get_token(client, "del5@example.com")
+
+        # Upload a CSV to create contacts
+        csv_bytes = b"First Name,Last Name,Company,Position,Connected On\nJohn,Doe,Acme,Engineer,01 Jan 2024\n"
+        resp = await client.post(
+            "/api/v1/contacts/upload",
+            headers={"Authorization": f"Bearer {token}"},
+            files={"file": ("test.csv", csv_bytes, "text/csv")},
+        )
+        assert resp.status_code == 201
+
+        # Verify contact exists before deletion
+        resp2 = await client.get(
+            "/api/v1/contacts",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert len(resp2.json()["data"]) > 0
+
+        # Delete account — should succeed even with child records
+        resp3 = await client.post(
+            "/api/v1/auth/delete-account",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"password": "Secret123", "confirm_deletion": True},
+        )
+        assert resp3.status_code == 200
+
+        # User should be gone from DB
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.user import User
+
+            result = await session.execute(
+                select(User).where(User.email == "del5@example.com")
+            )
+            assert result.scalar_one_or_none() is None
+
+        # Verify FK definitions are set up for CASCADE
+        from app.models.contact import Contact
+
+        fk = next(
+            fk
+            for fk in Contact.__table__.foreign_keys
+            if fk.column.name == "id" and fk.column.table.name == "users"
+        )
+        assert fk.ondelete == "CASCADE"
+
+    async def test_delete_account_adds_suppression_entry(self, client: AsyncClient):
+        """suppression_list gets an email hash with reason='account_deleted'."""
+        token = await _signup_and_get_token(client, "del6@example.com")
+
+        await client.post(
+            "/api/v1/auth/delete-account",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"password": "Secret123", "confirm_deletion": True},
+        )
+
+        import hashlib
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.privacy import SuppressionList
+
+            email_hash = hashlib.sha256(
+                "del6@example.com".encode()
+            ).hexdigest()
+            result = await session.execute(
+                select(SuppressionList).where(
+                    SuppressionList.email_hash == email_hash,
+                    SuppressionList.reason == "account_deleted",
+                )
+            )
+            entry = result.scalar_one_or_none()
+            assert entry is not None
+
+    async def test_reregistration_after_deletion_no_welcome_bonus(
+        self, client: AsyncClient
+    ):
+        """Signup after delete creates account but awards 0 credits."""
+        token = await _signup_and_get_token(client, "del7@example.com")
+
+        # Delete account
+        await client.post(
+            "/api/v1/auth/delete-account",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"password": "Secret123", "confirm_deletion": True},
+        )
+
+        # Re-register with same email
+        resp = await client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "del7@example.com",
+                "password": "Secret123",
+                "full_name": "Del User 2",
+            },
+        )
+        assert resp.status_code == 201
+        new_token = resp.json()["data"]["access_token"]
+
+        # Check credits balance — should be 0 (no welcome bonus)
+        resp2 = await client.get(
+            "/api/v1/credits/balance",
+            headers={"Authorization": f"Bearer {new_token}"},
+        )
+        assert resp2.status_code == 200
+        assert resp2.json()["data"]["balance"] == 0
+
+    async def test_delete_account_blocked_if_paid_plan(self, client: AsyncClient):
+        """400 if plan_tier != 'free'."""
+        token = await _signup_and_get_token(client, "del8@example.com")
+
+        # Set plan_tier to a paid plan
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.user import User
+
+            result = await session.execute(
+                select(User).where(User.email == "del8@example.com")
+            )
+            user = result.scalar_one()
+            user.plan_tier = "pro"
+            await session.commit()
+
+        resp = await client.post(
+            "/api/v1/auth/delete-account",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"password": "Secret123", "confirm_deletion": True},
+        )
+        assert resp.status_code == 400
+        assert "subscription" in resp.json()["detail"].lower()

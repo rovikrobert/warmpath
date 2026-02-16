@@ -41,6 +41,11 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+class DeleteAccountRequest(BaseModel):
+    password: str
+    confirm_deletion: bool
+
+
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: str

@@ -69,45 +69,64 @@ class User(Base):
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    # Relationships
+    # Relationships (passive_deletes=True defers to DB-level ON DELETE CASCADE)
     connector_profile: Mapped["ConnectorProfile | None"] = relationship(
-        back_populates="user", uselist=False
+        back_populates="user", uselist=False, passive_deletes=True
     )
-    contacts: Mapped[list["Contact"]] = relationship(back_populates="user")
-    csv_uploads: Mapped[list["CsvUpload"]] = relationship(back_populates="user")
-    search_requests: Mapped[list["SearchRequest"]] = relationship(back_populates="user")
-    match_results: Mapped[list["MatchResult"]] = relationship(back_populates="user")
-    warm_scores: Mapped[list["WarmScore"]] = relationship(back_populates="user")
-    intro_requests: Mapped[list["IntroRequest"]] = relationship(back_populates="user")
-    usage_logs: Mapped[list["UsageLog"]] = relationship(back_populates="user")
-    applications: Mapped[list["Application"]] = relationship(back_populates="user")
+    contacts: Mapped[list["Contact"]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
+    csv_uploads: Mapped[list["CsvUpload"]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
+    search_requests: Mapped[list["SearchRequest"]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
+    match_results: Mapped[list["MatchResult"]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
+    warm_scores: Mapped[list["WarmScore"]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
+    intro_requests: Mapped[list["IntroRequest"]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
+    usage_logs: Mapped[list["UsageLog"]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
+    applications: Mapped[list["Application"]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
     job_preferences: Mapped["UserJobPreferences | None"] = relationship(
-        back_populates="user", uselist=False
+        back_populates="user", uselist=False, passive_deletes=True
     )
     # Marketplace & privacy relationships
     marketplace_listings: Mapped[list["MarketplaceListing"]] = relationship(
         back_populates="network_holder",
         foreign_keys="MarketplaceListing.network_holder_id",
+        passive_deletes=True,
     )
     network_sharing_preferences: Mapped["NetworkSharingPreferences | None"] = (
-        relationship(back_populates="user", uselist=False)
+        relationship(back_populates="user", uselist=False, passive_deletes=True)
     )
     intro_facilitations_as_seeker: Mapped[list["IntroFacilitation"]] = relationship(
         back_populates="job_seeker",
         foreign_keys="IntroFacilitation.job_seeker_id",
+        passive_deletes=True,
     )
     intro_facilitations_as_holder: Mapped[list["IntroFacilitation"]] = relationship(
         back_populates="network_holder",
         foreign_keys="IntroFacilitation.network_holder_id",
+        passive_deletes=True,
     )
     credit_transactions: Mapped[list["CreditTransaction"]] = relationship(
-        back_populates="user"
+        back_populates="user", passive_deletes=True
     )
     connector_reputation: Mapped["ConnectorReputation | None"] = relationship(
-        back_populates="user", uselist=False
+        back_populates="user", uselist=False, passive_deletes=True
     )
     network_holder_availability: Mapped[list["NetworkHolderAvailability"]] = (
-        relationship(back_populates="user")
+        relationship(back_populates="user", passive_deletes=True)
     )
 
 

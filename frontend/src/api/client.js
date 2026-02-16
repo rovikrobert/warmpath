@@ -62,6 +62,8 @@ export const auth = {
     api('/api/v1/auth/forgot-password', { method: 'POST', body }),
   resetPassword: (body) =>
     api('/api/v1/auth/reset-password', { method: 'POST', body }),
+  deleteAccount: (body) =>
+    api('/api/v1/auth/delete-account', { method: 'POST', body }),
 };
 
 export const contacts = {

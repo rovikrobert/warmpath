@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 const EMPTY_ENTRY = { company: '', title: '', start_date: '', end_date: '', is_current: false };
 
 export default function EditProfile() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [form, setForm] = useState({
     headline: '', current_company: '', current_title: '',
     industry: '', location: '', linkedin_url: '', bio_summary: '',
@@ -16,6 +16,11 @@ export default function EditProfile() {
   const [saved, setSaved] = useState(false);
   const [matchFeedback, setMatchFeedback] = useState(null);
   const [error, setError] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -99,6 +104,20 @@ export default function EditProfile() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      await authApi.deleteAccount({ password: deletePassword, confirm_deletion: true });
+      logout();
+      navigate('/');
+    } catch (err) {
+      setDeleteError(err.message);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -267,6 +286,85 @@ export default function EditProfile() {
           {loading ? 'Saving...' : 'Save Profile'}
         </button>
       </form>
+
+      {/* Danger Zone */}
+      <div className="mt-8 rounded-xl border-2 border-red-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-bold text-red-700">Danger Zone</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Permanently delete your account and all associated data. This action cannot be undone.
+        </p>
+        <ul className="mt-3 space-y-1 text-xs text-slate-500">
+          <li>All data permanently deleted (contacts, searches, applications, messages)</li>
+          <li>Credits forfeited with no refund</li>
+          <li>Re-registration will not include welcome bonus credits</li>
+          <li>Active subscriptions must be cancelled first</li>
+        </ul>
+        <button
+          type="button"
+          onClick={() => { setShowDeleteModal(true); setDeletePassword(''); setDeleteConfirmed(false); setDeleteError(''); }}
+          className="mt-4 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+        >
+          Delete my account
+        </button>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-red-700">Delete Account</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              This will permanently delete your account, all contacts, search history, applications,
+              and credits. This cannot be undone.
+            </p>
+
+            <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={deleteConfirmed}
+                onChange={(e) => setDeleteConfirmed(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-red-500 focus:ring-red-500"
+              />
+              I understand this action is permanent and my data cannot be recovered
+            </label>
+
+            <div className="mt-4">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Enter your password to confirm
+              </label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                className={inputClass}
+                placeholder="Your current password"
+              />
+            </div>
+
+            {deleteError && (
+              <p className="mt-3 rounded-md bg-red-50 p-2 text-sm text-red-600">{deleteError}</p>
+            )}
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={!deleteConfirmed || !deletePassword || deleteLoading}
+                className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleteLoading ? 'Deleting...' : 'Delete Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

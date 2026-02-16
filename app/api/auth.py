@@ -1,17 +1,20 @@
+import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
+from app.models.privacy import SuppressionList
 from app.models.user import ConnectorProfile, User
 from app.schemas.user import (
     ChangePasswordRequest,
     ConnectorProfileResponse,
     ConnectorProfileUpsert,
+    DeleteAccountRequest,
     ForgotPasswordRequest,
     ResetPasswordRequest,
     TokenResponse,
@@ -23,6 +26,7 @@ from app.schemas.user import (
 from app.services.audit_logger import log_event
 from app.services.credits import earn_credits
 from app.services.email_service import (
+    _send_email,
     send_password_reset_email,
     send_verification_email,
     verify_token,
@@ -124,8 +128,16 @@ async def signup(
         profile = ConnectorProfile(user_id=user.id, **profile_fields)
         db.add(profile)
 
-    # Award welcome bonus credits
-    await earn_credits(user.id, 50, "welcome_bonus", db)
+    # Check if this email was previously deleted — skip welcome bonus if so
+    email_hash = hashlib.sha256(body.email.lower().strip().encode()).hexdigest()
+    suppression_result = await db.execute(
+        select(SuppressionList).where(
+            SuppressionList.email_hash == email_hash,
+            SuppressionList.reason == "account_deleted",
+        )
+    )
+    if suppression_result.scalar_one_or_none() is None:
+        await earn_credits(user.id, 50, "welcome_bonus", db)
 
     # Send verification email
     await send_verification_email(user, db)
@@ -312,6 +324,90 @@ async def logout_all(
     await db.commit()
     _clear_refresh_cookie(response)
     return {"data": {"message": "All sessions invalidated"}, "meta": {}}
+
+
+# ---------------------------------------------------------------------------
+# Delete account
+# ---------------------------------------------------------------------------
+
+
+@router.post("/delete-account")
+async def delete_account(
+    body: DeleteAccountRequest,
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Permanently delete the authenticated user's account and all data."""
+    # Must explicitly confirm deletion
+    if not body.confirm_deletion:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="confirm_deletion must be true",
+        )
+
+    # Verify password
+    if not verify_password(body.password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Password is incorrect",
+        )
+
+    # Block if user has active paid subscription
+    if current_user.plan_tier != "free":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please cancel your subscription before deleting your account",
+        )
+
+    user_email = current_user.email
+    user_id = current_user.id
+
+    # 1. Log audit event BEFORE delete (SET NULL preserves the entry)
+    await log_event(
+        db,
+        "account_deleted",
+        user_id=user_id,
+        metadata={"email": user_email},
+    )
+
+    # 2. Add email hash to suppression list (re-registration guard)
+    email_hash = hashlib.sha256(user_email.lower().strip().encode()).hexdigest()
+    suppression_entry = SuppressionList(
+        email_hash=email_hash,
+        reason="account_deleted",
+        requested_at=datetime.now(timezone.utc),
+    )
+    db.add(suppression_entry)
+
+    # 3. Commit audit + suppression before deleting user
+    await db.flush()
+
+    # 4. Hard-delete user row — CASCADE removes all child records
+    #    Use SQL DELETE (not ORM session.delete) so the DB-level CASCADE fires
+    #    reliably regardless of ORM session state.
+    await db.execute(delete(User).where(User.id == user_id))
+    await db.commit()
+
+    # 5. Clear refresh cookie
+    _clear_refresh_cookie(response)
+
+    # 6. Send deletion confirmation email (best-effort, outside transaction)
+    _send_email(
+        to=user_email,
+        subject="Your WarmPath account has been deleted",
+        html=(
+            "<p>Your WarmPath account and all associated data have been "
+            "permanently deleted.</p>"
+            "<p>If you did not request this, please contact us immediately "
+            "at rovik@majiq.agency.</p>"
+        ),
+    )
+
+    return {
+        "data": {"message": "Account permanently deleted"},
+        "meta": {},
+    }
 
 
 # ---------------------------------------------------------------------------
