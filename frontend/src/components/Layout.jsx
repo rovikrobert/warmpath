@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { credits as creditsApi, onUsageWarning } from '../api/client';
+import { auth as authApi, credits as creditsApi, onUsageWarning } from '../api/client';
 
 export default function Layout() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [balance, setBalance] = useState(null);
   const [mobileNav, setMobileNav] = useState(false);
   const [usageWarning, setUsageWarning] = useState(null);
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState('');
+  const [verifyDismissed, setVerifyDismissed] = useState(false);
 
   useEffect(() => {
     creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
@@ -20,8 +23,24 @@ export default function Layout() {
     navigate('/');
   };
 
+  const handleResendVerification = async () => {
+    setResending(true);
+    setResendMsg('');
+    try {
+      await authApi.resendVerification();
+      setResendMsg('Verification email sent!');
+      // Refresh user in case they verified between page loads
+      await refreshUser();
+    } catch (err) {
+      setResendMsg(err.message || 'Failed to resend');
+    } finally {
+      setResending(false);
+    }
+  };
+
   const isSeeker = !user?.user_type || user.user_type === 'job_seeker' || user.user_type === 'both';
   const isHolder = user?.user_type === 'network_holder' || user?.user_type === 'both';
+  const isUnverified = user && !user.email_verified;
 
   const navLinkClass = ({ isActive }) =>
     `text-sm ${isActive ? 'font-medium text-amber-600' : 'text-slate-600 hover:text-slate-900'}`;
@@ -38,7 +57,7 @@ export default function Layout() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-6">
@@ -108,6 +127,34 @@ export default function Layout() {
         )}
       </header>
 
+      {/* Email verification banner */}
+      {isUnverified && !verifyDismissed && (
+        <div className="border-b border-blue-300 bg-blue-50 px-4 py-2.5">
+          <div className="mx-auto flex max-w-6xl items-center justify-between">
+            <p className="text-sm text-blue-800">
+              Please verify your email to access marketplace features.{' '}
+              {resendMsg ? (
+                <span className="font-medium">{resendMsg}</span>
+              ) : (
+                <button
+                  onClick={handleResendVerification}
+                  disabled={resending}
+                  className="font-medium text-blue-700 underline hover:text-blue-900 disabled:opacity-50"
+                >
+                  {resending ? 'Sending...' : 'Resend verification email'}
+                </button>
+              )}
+            </p>
+            <button
+              onClick={() => setVerifyDismissed(true)}
+              className="ml-4 text-blue-600 hover:text-blue-800"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Usage warning banner */}
       {usageWarning && (
         <div className="border-b border-amber-300 bg-amber-50 px-4 py-2.5">
@@ -129,9 +176,21 @@ export default function Layout() {
         </div>
       )}
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
         <Outlet />
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
+          <p className="text-xs text-slate-400">
+            WarmPath &mdash; Majiq Pte Ltd
+          </p>
+          <Link to="/privacy" className="text-xs text-slate-400 hover:text-slate-600">
+            Privacy Policy
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }

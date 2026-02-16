@@ -56,6 +56,8 @@ export const auth = {
   upsertProfile: (body) => api('/api/v1/auth/profile', { method: 'POST', body }),
   updateUserType: (userType) =>
     api('/api/v1/auth/user-type', { method: 'PATCH', body: { user_type: userType } }),
+  resendVerification: () =>
+    api('/api/v1/auth/resend-verification', { method: 'POST' }),
 };
 
 export const contacts = {

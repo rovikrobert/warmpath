@@ -38,6 +38,7 @@ class UserResponse(BaseModel):
     full_name: str
     plan_tier: str
     user_type: str
+    email_verified: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { auth as authApi, contacts as contactsApi, preferences, marketplace } from '../api/client';
 import TagInput from '../components/TagInput';
@@ -7,6 +7,60 @@ import TagInput from '../components/TagInput';
 const EMPTY_WORK = { company: '', title: '', start_date: '', end_date: '', is_current: false };
 
 const SENIORITY_OPTIONS = ['Entry Level', 'Mid Level', 'Senior', 'Staff / Principal', 'Manager', 'Director', 'VP', 'C-Suite'];
+
+const TOTAL_STEPS = 8;
+
+// Privacy step data (steps 3-6)
+const PRIVACY_STEPS = [
+  {
+    step: 3,
+    title: 'Your Data Stays Private',
+    text: 'Everything you upload lives in your Private Vault \u2014 encrypted and visible only to you. Your full contact data is never shared with other users.',
+    icon: (
+      <svg className="h-10 w-10 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+      </svg>
+    ),
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-200',
+  },
+  {
+    step: 4,
+    title: 'Contacts Are Protected',
+    text: 'If you share contacts on the marketplace, only anonymised info is shown (company + role level). Names and emails are never revealed without your explicit approval.',
+    icon: (
+      <svg className="h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+      </svg>
+    ),
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-200',
+  },
+  {
+    step: 5,
+    title: "Your Employer Can't See You",
+    text: 'Your job search activity is completely invisible. No employer \u2014 including yours \u2014 can discover you\'re looking for new opportunities.',
+    icon: (
+      <svg className="h-10 w-10 text-purple-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+      </svg>
+    ),
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-200',
+  },
+  {
+    step: 6,
+    title: 'Anyone Can Opt Out',
+    text: 'Any person can request removal from WarmPath at any time, even if they don\'t have an account. We maintain a permanent suppression list.',
+    icon: (
+      <svg className="h-10 w-10 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+      </svg>
+    ),
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200',
+  },
+];
 
 export default function OnboardingPage() {
   const { refreshUser, setJustSignedUp } = useAuth();
@@ -26,7 +80,7 @@ export default function OnboardingPage() {
   // Step 2: User type
   const [userType, setUserType] = useState('');
 
-  // Step 3: Upload
+  // Step 7: Upload
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
@@ -35,7 +89,7 @@ export default function OnboardingPage() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Step 4: Work history
+  // Step 8: Work history
   const [workHistory, setWorkHistory] = useState([]);
 
   const setPref = (key) => (e) => setPrefs({ ...prefs, [key]: typeof e === 'object' && e.target ? e.target.value : e });
@@ -63,7 +117,7 @@ export default function OnboardingPage() {
     }
   };
 
-  // Step 2 -> 3
+  // Step 2 -> 3 (privacy steps)
   const handleUserType = async () => {
     if (!userType) return;
     setSaving(true);
@@ -121,6 +175,9 @@ export default function OnboardingPage() {
 
   const inputClass = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
 
+  // Check if current step is a privacy step
+  const privacyStep = PRIVACY_STEPS.find((ps) => ps.step === step);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
       <div className="w-full max-w-lg">
@@ -132,8 +189,8 @@ export default function OnboardingPage() {
         </div>
 
         {/* Progress */}
-        <div className="mb-6 flex items-center gap-2">
-          {[1, 2, 3, 4].map((s) => (
+        <div className="mb-6 flex items-center gap-1">
+          {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
             <div key={s} className={`h-1.5 flex-1 rounded-full ${s <= step ? 'bg-amber-500' : 'bg-slate-200'}`} />
           ))}
         </div>
@@ -241,8 +298,42 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 3: Upload CSV */}
-          {step === 3 && !uploadResult && (
+          {/* Steps 3-6: Privacy Explainer */}
+          {privacyStep && (
+            <div className="space-y-5">
+              <div className="text-center">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-400">How we protect your data</p>
+                <h2 className="text-lg font-semibold text-slate-900">{privacyStep.title}</h2>
+              </div>
+
+              <div className={`flex flex-col items-center rounded-xl border ${privacyStep.borderColor} ${privacyStep.bgColor} p-8`}>
+                {privacyStep.icon}
+                <p className="mt-4 text-center text-sm leading-relaxed text-slate-700">
+                  {privacyStep.text}
+                </p>
+              </div>
+
+              {/* Show privacy policy link on last privacy step */}
+              {step === 6 && (
+                <p className="text-center text-sm text-slate-500">
+                  Learn more in our{' '}
+                  <Link to="/privacy" className="font-medium text-amber-600 hover:text-amber-700 hover:underline">
+                    Privacy Policy
+                  </Link>
+                </p>
+              )}
+
+              <button
+                onClick={() => setStep(step + 1)}
+                className="w-full rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600"
+              >
+                Next
+              </button>
+            </div>
+          )}
+
+          {/* Step 7: Upload CSV */}
+          {step === 7 && !uploadResult && (
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Upload your LinkedIn connections</h2>
@@ -311,8 +402,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 3 done — prompt for work history */}
-          {step === 3 && uploadResult && (
+          {/* Step 7 done — prompt for work history */}
+          {step === 7 && uploadResult && (
             <div className="space-y-4 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
                 <span className="text-xl text-green-600">&#10003;</span>
@@ -327,15 +418,15 @@ export default function OnboardingPage() {
                 <button onClick={finish} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
                   Skip for now
                 </button>
-                <button onClick={() => setStep(4)} className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600">
+                <button onClick={() => setStep(8)} className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600">
                   Add Work History
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 4: Work History */}
-          {step === 4 && (
+          {/* Step 8: Work History */}
+          {step === 8 && (
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Your work history</h2>
