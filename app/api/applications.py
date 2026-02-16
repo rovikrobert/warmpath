@@ -373,7 +373,7 @@ async def update_application(
     if body.status is not None:
         if body.status not in VALID_STATUSES:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"Invalid status. Must be one of: {sorted(VALID_STATUSES)}",
             )
         old_status = app_record.status

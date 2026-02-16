@@ -289,7 +289,7 @@ async def update_user_type(
     valid_types = {"job_seeker", "network_holder", "both"}
     if body.user_type not in valid_types:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"user_type must be one of: {', '.join(sorted(valid_types))}",
         )
     current_user.user_type = body.user_type
