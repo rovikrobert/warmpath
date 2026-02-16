@@ -5,8 +5,10 @@ When AI_MOCK_MODE=true (default), returns deterministic fake scores so
 development and testing work without an API key.
 """
 
+import asyncio
 import json
 import logging
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -15,6 +17,7 @@ from decimal import Decimal
 import anthropic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.models.contact import Contact
@@ -24,7 +27,8 @@ from app.models.search_request import SearchRequest
 
 logger = logging.getLogger(__name__)
 
-BATCH_SIZE = 50  # contacts per Claude API call
+BATCH_SIZE = 100  # contacts per Claude API call
+MAX_CONCURRENT_BATCHES = 10  # max batches in flight at once
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
 
 
@@ -182,16 +186,19 @@ Each object must have:
 - "reasoning": 1-2 sentence explanation of why this contact matches (or doesn't)
 - "match_type": one of "direct", "indirect", or "weak"
 
-Scoring guidelines:
-- 80-100: Strong direct match — title AND company/industry closely align with criteria
-- 50-79: Good indirect match — partial criteria overlap (e.g. right title, wrong industry)
-- 20-49: Weak match — tangential connection (e.g. adjacent role or industry)
+Scoring guidelines (be strict — differentiate aggressively):
+- 90-100: ALL criteria match — right title level AND right company/industry AND right location. Reserve this tier for truly perfect fits.
+- 70-89: 2 out of 3 criteria match (e.g. right title + right industry, but wrong location)
+- 50-69: 1 criterion matches strongly (e.g. exact title match but unrelated company/industry)
+- 20-49: Tangential match — adjacent role, loosely related industry, or only keyword overlap
 - Below 20: No meaningful match — omit from results
 
+IMPORTANT: Spread your scores across the full range. If most contacts score similarly, you're not being selective enough. A VP at a non-tech company should NOT score the same as a VP at a target enterprise SaaS company.
+
 match_type rules:
-- "direct" if relevance_score >= 50
-- "indirect" if relevance_score 20-49
-- "weak" should be rare; use only for borderline 20-29 cases
+- "direct" if relevance_score >= 70
+- "indirect" if relevance_score 50-69
+- "weak" if relevance_score 20-49
 
 Return ONLY the JSON array. No markdown fences, no explanation, no other text."""
 
@@ -201,10 +208,10 @@ async def _call_claude_api(
     contacts: list[Contact],
 ) -> tuple[list[ContactMatch], TokenUsage]:
     """Call the real Claude API. Returns matches and token usage."""
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
     prompt = _build_prompt(search, contacts)
 
-    message = client.messages.create(
+    message = await client.messages.create(
         model=CLAUDE_MODEL,
         max_tokens=4096,
         messages=[{"role": "user", "content": prompt}],
@@ -244,6 +251,99 @@ async def _call_claude_api(
 
 
 # ---------------------------------------------------------------------------
+# Pre-filter (cheap local filter before sending to the API)
+# ---------------------------------------------------------------------------
+
+# Common title synonyms — if search mentions one, also match the others
+_TITLE_SYNONYMS: list[set[str]] = [
+    {"vp", "vice president"},
+    {"head of", "director"},
+    {"ceo", "chief executive officer"},
+    {"cto", "chief technology officer"},
+    {"cfo", "chief financial officer"},
+    {"coo", "chief operating officer"},
+    {"cmo", "chief marketing officer"},
+    {"svp", "senior vice president"},
+    {"evp", "executive vice president"},
+    {"avp", "assistant vice president"},
+    {"md", "managing director"},
+    {"gm", "general manager"},
+]
+
+
+def _expand_title_synonyms(titles: list[str]) -> list[str]:
+    """Expand title terms with known synonyms."""
+    expanded = set(t.lower() for t in titles)
+    for term in list(expanded):
+        for syn_group in _TITLE_SYNONYMS:
+            if term in syn_group:
+                expanded.update(syn_group)
+    return list(expanded)
+
+
+def _extract_description_terms(description: str | None) -> list[str]:
+    """Extract meaningful terms from the search description."""
+    if not description:
+        return []
+    stop_words = {
+        "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
+        "of", "with", "by", "from", "is", "are", "was", "were", "be", "been",
+        "being", "have", "has", "had", "do", "does", "did", "will", "would",
+        "could", "should", "may", "might", "shall", "can", "need", "must",
+        "that", "this", "these", "those", "i", "we", "you", "they", "it",
+        "who", "what", "which", "where", "when", "how", "not", "no", "nor",
+        "as", "if", "then", "than", "too", "very", "just", "about", "above",
+        "after", "before", "between", "into", "through", "during", "each",
+        "level", "looking", "find", "search", "want", "like",
+    }
+    words = description.lower().split()
+    return [w.strip(".,;:!?()\"'") for w in words if len(w) > 2 and w.lower().strip(".,;:!?()\"'") not in stop_words]
+
+
+def _p[RESEND_KEY_REDACTED](
+    search: SearchRequest,
+    contacts: list[Contact],
+) -> list[Contact]:
+    """Filter contacts locally before sending to the Claude API."""
+    total = len(contacts)
+
+    # Build search terms from all criteria
+    title_terms = _expand_title_synonyms(_ensu[RESEND_KEY_REDACTED](search.target_titles))
+    company_terms = [t.lower() for t in _ensu[RESEND_KEY_REDACTED](search.target_companies)]
+    industry_terms = [t.lower() for t in _ensu[RESEND_KEY_REDACTED](search.target_industries)]
+    keyword_terms = [t.lower() for t in _ensu[RESEND_KEY_REDACTED](search.target_keywords)]
+    desc_terms = _extract_description_terms(search.description)
+
+    all_terms = title_terms + company_terms + industry_terms + keyword_terms + desc_terms
+    if not all_terms:
+        logger.info("Pre-filter: no search terms to filter on, sending all %d contacts", total)
+        return contacts
+
+    filtered = []
+    for c in contacts:
+        ct = (c.current_title or "").lower()
+        cc = (c.current_company or "").lower()
+        # Industry from linked company record
+        ci = ""
+        if c.company and c.company.industry:
+            ci = c.company.industry.lower()
+
+        searchable = f"{ct} {cc} {ci}"
+
+        if any(term in searchable for term in all_terms):
+            filtered.append(c)
+
+    logger.info(
+        "Pre-filter: %d total contacts, %d passed filter, %d skipped, sending %d to API",
+        total,
+        len(filtered),
+        total - len(filtered),
+        len(filtered) if filtered else total,
+    )
+    return filtered if filtered else contacts  # fallback to all if none match
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -257,44 +357,62 @@ async def sco[RESEND_KEY_REDACTED](
     """Score contacts against search criteria.
 
     Uses mock mode when AI_MOCK_MODE=true, real Claude API otherwise.
-    Handles batching internally. Logs token usage when db is provided.
+    Handles batching internally with concurrent API calls.
+    Logs token usage when db is provided.
     """
     if settings.AI_MOCK_MODE:
         return _mock_sco[RESEND_KEY_REDACTED](search, contacts)
 
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_BATCHES)
+    batches = [
+        contacts[i : i + BATCH_SIZE]
+        for i in range(0, len(contacts), BATCH_SIZE)
+    ]
+    num_batches = len(batches)
+    logger.info("Scoring %d contacts in %d batches (concurrency: %d)", len(contacts), num_batches, MAX_CONCURRENT_BATCHES)
+
+    async def _process_batch(
+        batch_num: int, batch: list[Contact]
+    ) -> tuple[list[ContactMatch], int, int]:
+        async with semaphore:
+            try:
+                batch_results, usage = await _call_claude_api(search, batch)
+                logger.info(
+                    "Batch %d/%d: scored %d contacts, %d matches (tokens: %d in / %d out)",
+                    batch_num,
+                    num_batches,
+                    len(batch),
+                    len(batch_results),
+                    usage.input_tokens,
+                    usage.output_tokens,
+                )
+                return batch_results, usage.input_tokens, usage.output_tokens
+            except anthropic.APIError as exc:
+                logger.error(
+                    "Claude API error on batch %d (%d contacts): %s — skipping batch",
+                    batch_num,
+                    len(batch),
+                    exc,
+                )
+            except (json.JSONDecodeError, KeyError, ValueError) as exc:
+                logger.error(
+                    "Failed to parse Claude response for batch %d: %s — skipping batch",
+                    batch_num,
+                    exc,
+                )
+            return [], 0, 0
+
+    results = await asyncio.gather(
+        *(_process_batch(i + 1, batch) for i, batch in enumerate(batches))
+    )
+
     all_results: list[ContactMatch] = []
     total_input_tokens = 0
     total_output_tokens = 0
-
-    for i in range(0, len(contacts), BATCH_SIZE):
-        batch = contacts[i : i + BATCH_SIZE]
-        batch_num = i // BATCH_SIZE + 1
-        try:
-            batch_results, usage = await _call_claude_api(search, batch)
-            all_results.extend(batch_results)
-            total_input_tokens += usage.input_tokens
-            total_output_tokens += usage.output_tokens
-            logger.info(
-                "Batch %d: scored %d contacts, %d matches (tokens: %d in / %d out)",
-                batch_num,
-                len(batch),
-                len(batch_results),
-                usage.input_tokens,
-                usage.output_tokens,
-            )
-        except anthropic.APIError as exc:
-            logger.error(
-                "Claude API error on batch %d (%d contacts): %s — skipping batch",
-                batch_num,
-                len(batch),
-                exc,
-            )
-        except (json.JSONDecodeError, KeyError, ValueError) as exc:
-            logger.error(
-                "Failed to parse Claude response for batch %d: %s — skipping batch",
-                batch_num,
-                exc,
-            )
+    for batch_results, in_tokens, out_tokens in results:
+        all_results.extend(batch_results)
+        total_input_tokens += in_tokens
+        total_output_tokens += out_tokens
 
     # Log token usage
     if db is not None and user_id is not None and total_input_tokens > 0:
@@ -310,7 +428,7 @@ async def sco[RESEND_KEY_REDACTED](
                 "total_tokens": total_input_tokens + total_output_tokens,
                 "contacts_scored": len(contacts),
                 "matches_returned": len(all_results),
-                "batches": (len(contacts) + BATCH_SIZE - 1) // BATCH_SIZE,
+                "batches": num_batches,
             },
         )
         db.add(usage_log)
@@ -324,6 +442,7 @@ async def run_search(
     db: AsyncSession,
 ) -> list[MatchResult]:
     """Execute a search: load contacts, score them, persist MatchResult rows."""
+    t0 = time.monotonic()
     result = await db.execute(
         select(SearchRequest).where(
             SearchRequest.id == search_id,
@@ -335,9 +454,11 @@ async def run_search(
     if search is None:
         raise ValueError("Search request not found")
 
-    # Load user's active contacts
+    # Load user's active contacts (eagerly load company for industry filtering)
     result = await db.execute(
-        select(Contact).where(
+        select(Contact)
+        .options(selectinload(Contact.company))
+        .where(
             Contact.user_id == user_id,
             Contact.deleted_at.is_(None),
         )
@@ -348,6 +469,11 @@ async def run_search(
         search.last_run_at = datetime.now(timezone.utc)
         await db.flush()
         return []
+
+    # Pre-filter: only send contacts with title/company/industry overlap to the API
+    total_contacts = len(contacts)
+    if not settings.AI_MOCK_MODE:
+        contacts = _p[RESEND_KEY_REDACTED](search, contacts)
 
     # Score contacts via AI (mock or real)
     matches = await sco[RESEND_KEY_REDACTED](search, contacts, user_id=user_id, db=db)
@@ -388,6 +514,16 @@ async def run_search(
 
     search.last_run_at = datetime.now(timezone.utc)
     search.status = "completed"
+
+    elapsed = time.monotonic() - t0
+    logger.info(
+        "Search complete in %.1fs: %d total contacts, %d sent to API, %d returned score >= 20, %d persisted",
+        elapsed,
+        total_contacts,
+        len(contacts),
+        len(matches),
+        len(match_results),
+    )
 
     await db.flush()
     return match_results

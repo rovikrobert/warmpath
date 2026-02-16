@@ -266,10 +266,10 @@ async def _call_claude_api(
     channel: str,
 ) -> tuple[list[DraftedMessage], IntroTokenUsage]:
     """Call the real Claude API for intro message generation."""
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
     prompt = _build_prompt(contact, profile, match_result, tone, channel)
 
-    message = client.messages.create(
+    message = await client.messages.create(
         model=CLAUDE_MODEL,
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
