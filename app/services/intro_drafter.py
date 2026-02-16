@@ -1,19 +1,24 @@
 """AI-powered intro message drafting service.
 
-Generates 2-3 message variants for reaching out to a contact.
+Generates 3 message variants for reaching out to a contact.
 Uses the Anthropic Claude API in production, deterministic mock in dev/test.
 """
 
 import json
+import logging
 from dataclasses import dataclass
+
+import anthropic
 
 from app.config import settings
 from app.models.contact import Contact
 from app.models.match_result import MatchResult
 from app.models.user import ConnectorProfile
 
+logger = logging.getLogger(__name__)
 
 LINKEDIN_CHAR_LIMIT = 300
+CLAUDE_MODEL = "claude-sonnet-4-20250514"
 
 VARIANTS = [
     ("direct", "Straightforward professional ask"),
@@ -27,6 +32,12 @@ class DraftedMessage:
     variant_label: str
     subject_line: str | None  # only for email
     message_body: str
+
+
+@dataclass
+class IntroTokenUsage:
+    input_tokens: int
+    output_tokens: int
 
 
 # ---------------------------------------------------------------------------
@@ -169,67 +180,82 @@ def _build_prompt(
     channel: str,
 ) -> str:
     """Build the Claude prompt for intro message generation."""
-    user_info = "Unknown user"
+    # --- Sender (connector) profile ---
     if profile:
-        parts = []
+        sender_parts = []
         if profile.current_title:
-            parts.append(f"Title: {profile.current_title}")
+            sender_parts.append(f"Title: {profile.current_title}")
         if profile.current_company:
-            parts.append(f"Company: {profile.current_company}")
+            sender_parts.append(f"Company: {profile.current_company}")
         if profile.industry:
-            parts.append(f"Industry: {profile.industry}")
+            sender_parts.append(f"Industry: {profile.industry}")
         if profile.location:
-            parts.append(f"Location: {profile.location}")
+            sender_parts.append(f"Location: {profile.location}")
         if profile.bio_summary:
-            parts.append(f"Bio: {profile.bio_summary}")
-        user_info = "\n".join(parts) if parts else "No profile details"
+            sender_parts.append(f"Bio: {profile.bio_summary}")
+        sender_info = "\n".join(sender_parts) if sender_parts else "No profile details"
+    else:
+        sender_info = "No profile available — write as a generic professional"
 
-    contact_info_parts = [f"Name: {contact.full_name}"]
+    # --- Recipient (contact) ---
+    contact_parts = [f"Name: {contact.full_name}"]
     if contact.current_title:
-        contact_info_parts.append(f"Title: {contact.current_title}")
+        contact_parts.append(f"Title: {contact.current_title}")
     if contact.current_company:
-        contact_info_parts.append(f"Company: {contact.current_company}")
+        contact_parts.append(f"Company: {contact.current_company}")
     if contact.location:
-        contact_info_parts.append(f"Location: {contact.location}")
-    contact_info = "\n".join(contact_info_parts)
+        contact_parts.append(f"Location: {contact.location}")
+    contact_info = "\n".join(contact_parts)
 
+    # --- Match context ---
     match_info = ""
-    if match_result:
-        match_info = f"\nMatch context: {match_result.match_reasoning}"
+    if match_result and match_result.match_reasoning:
+        match_info = f"\nWhy this contact was matched: {match_result.match_reasoning}"
 
-    channel_instruction = ""
+    # --- Channel-specific instructions ---
     if channel == "linkedin":
         channel_instruction = (
-            f"\nIMPORTANT: LinkedIn connection request messages must be "
-            f"under {LINKEDIN_CHAR_LIMIT} characters. Do NOT include a subject line."
+            f"\nCHANNEL: LinkedIn connection request"
+            f"\n- Each message MUST be under {LINKEDIN_CHAR_LIMIT} characters"
+            f"\n- Do NOT include a subject line (set subject_line to null)"
+            f"\n- Keep it concise and personal — LinkedIn messages are short"
         )
     else:
         channel_instruction = (
-            "\nThis is for email. Include a subject line for each variant."
+            "\nCHANNEL: Email"
+            "\n- Include a compelling subject line for each variant"
+            "\n- Subject lines should be short (under 60 chars), not clickbaity"
+            "\n- Body can be 3-5 sentences"
         )
 
-    return f"""You are a networking and sales communication expert. Generate 3 intro message variants for the user to send to this contact.
+    return f"""You are a networking and warm intro expert. Write 3 intro message variants that the sender can use to reach out to this contact.
 
-SENDER (the user):
-{user_info}
+SENDER (the person sending the message):
+{sender_info}
 
-RECIPIENT (the contact):
+RECIPIENT (the contact being reached out to):
 {contact_info}
 {match_info}
 
-CHANNEL: {channel}
 TONE: {tone}
 {channel_instruction}
 
-Generate exactly 3 variants:
-1. "direct" — Straightforward professional ask
-2. "mutual-interest" — Lead with shared context or mutual interest
-3. "casual" — Lighter, conversational touch
+Write exactly 3 variants:
+1. "direct" — Lead with a clear reason for reaching out. Reference the sender's role/company and why connecting makes sense. Be specific, not generic.
+2. "mutual-interest" — Find a shared thread (industry, company type, location, mutual challenge). Make it feel like a natural connection, not a sales pitch.
+3. "casual" — Conversational and low-pressure. Acknowledge their work genuinely. End with an easy ask.
 
-Return a JSON array:
+Guidelines:
+- Use the sender's profile to position them credibly (mention their company/role when relevant)
+- Reference specific details about the recipient (their title, company) — never be generic
+- Avoid cliches like "I'd love to pick your brain" or "synergies"
+- Don't be sycophantic — be genuine and direct
+- Each variant should feel distinct in approach, not just rewording
+
+Return a JSON array with exactly 3 objects:
 [{{"variant_label": "direct", "subject_line": "..." or null, "message_body": "..."}}]
 
-Return ONLY the JSON array, no other text."""
+Return ONLY the JSON array. No markdown fences, no explanation."""
 
 
 async def _call_claude_api(
@@ -238,23 +264,26 @@ async def _call_claude_api(
     match_result: MatchResult | None,
     tone: str,
     channel: str,
-) -> list[DraftedMessage]:
+) -> tuple[list[DraftedMessage], IntroTokenUsage]:
     """Call the real Claude API for intro message generation."""
-    import anthropic
-
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
     prompt = _build_prompt(contact, profile, match_result, tone, channel)
 
     message = client.messages.create(
-        model="claude-sonnet-4-5-20250929",
+        model=CLAUDE_MODEL,
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
+    )
+
+    usage = IntroTokenUsage(
+        input_tokens=message.usage.input_tokens,
+        output_tokens=message.usage.output_tokens,
     )
 
     raw = message.content[0].text.strip()
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1]
-        raw = raw.rsplit("```", 1)[0]
+        raw = raw.rsplit("```", 1)[0].strip()
 
     parsed = json.loads(raw)
 
@@ -272,7 +301,7 @@ async def _call_claude_api(
             )
         )
 
-    return results
+    return results, usage
 
 
 # ---------------------------------------------------------------------------
@@ -287,13 +316,29 @@ async def draft_intro(
     tone: str = "professional",
     channel: str = "linkedin",
 ) -> list[DraftedMessage]:
-    """Generate 2-3 intro message variants for a contact.
+    """Generate 3 intro message variants for a contact.
 
     Uses mock mode when AI_MOCK_MODE=true, real Claude API otherwise.
     """
     if settings.AI_MOCK_MODE:
         return _mock_drafts(contact, connector_profile, match_result, tone, channel)
 
-    return await _call_claude_api(
-        contact, connector_profile, match_result, tone, channel
-    )
+    try:
+        drafts, usage = await _call_claude_api(
+            contact, connector_profile, match_result, tone, channel
+        )
+        logger.info(
+            "Intro drafted for %s (tokens: %d in / %d out)",
+            contact.full_name,
+            usage.input_tokens,
+            usage.output_tokens,
+        )
+        return drafts
+    except anthropic.APIError as exc:
+        logger.error(
+            "Claude API error drafting intro for %s: %s", contact.full_name, exc
+        )
+        return _mock_drafts(contact, connector_profile, match_result, tone, channel)
+    except (json.JSONDecodeError, KeyError, ValueError) as exc:
+        logger.error("Failed to parse Claude intro response: %s", exc)
+        return _mock_drafts(contact, connector_profile, match_result, tone, channel)

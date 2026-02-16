@@ -16,7 +16,7 @@ from app.schemas.match import (
     IntroRequestCreate,
     IntroRequestResponse,
 )
-from app.services.intro_drafter import draft_intro
+from app.services.intro_drafter import CLAUDE_MODEL as INTRO_MODEL, draft_intro
 from app.utils.security import get_current_user
 
 router = APIRouter()
@@ -87,7 +87,7 @@ async def create_intro(
         channel=body.channel,
     )
 
-    model_version = "mock-v1" if settings.AI_MOCK_MODE else "claude-sonnet-4-5"
+    model_version = "mock-v1" if settings.AI_MOCK_MODE else INTRO_MODEL
 
     for draft in drafts:
         msg = IntroMessage(
