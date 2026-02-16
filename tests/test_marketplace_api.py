@@ -455,6 +455,126 @@ class TestIntroRequestFlow:
 
 
 # ---------------------------------------------------------------------------
+# Duplicate Detection (contact already in seeker's vault)
+# ---------------------------------------------------------------------------
+
+
+class TestDuplicateDetection:
+    async def test_intro_blocked_when_contact_in_seeker_vault(
+        self,
+        client: AsyncClient,
+        seeker_with_credits,
+        holder_auth,
+        marketplace_data,
+    ):
+        """If the listed contact is already in the seeker's vault, return 409."""
+        seeker_uid = uuid_mod.UUID(seeker_with_credits["user_id"])
+
+        # Add "Alice Engineer" to the seeker's own contacts (same email)
+        async with TestSessionLocal() as db:
+            db.add(
+                Contact(
+                    user_id=seeker_uid,
+                    full_name="Alice Engineer",
+                    first_name="Alice",
+                    last_name="Engineer",
+                    email="alice@stripe.com",
+                    current_company="Stripe",
+                    current_title="Senior Software Engineer",
+                    connected_on=date.today(),
+                )
+            )
+            await db.commit()
+
+        # Get balance before
+        bal_resp = await client.get(
+            "/api/v1/credits/balance",
+            headers=seeker_with_credits["headers"],
+        )
+        balance_before = bal_resp.json()["data"]["balance"]
+
+        # Request intro for Alice's listing → should be blocked
+        listing_id = str(marketplace_data["listing_ids"][0])
+        resp = await client.post(
+            "/api/v1/marketplace/request-intro",
+            json={"marketplace_listing_id": listing_id},
+            headers=seeker_with_credits["headers"],
+        )
+        assert resp.status_code == 409
+        assert "already in your network" in resp.json()["detail"]
+
+        # Credits should NOT be deducted
+        bal_resp2 = await client.get(
+            "/api/v1/credits/balance",
+            headers=seeker_with_credits["headers"],
+        )
+        assert bal_resp2.json()["data"]["balance"] == balance_before
+
+    async def test_intro_succeeds_when_contact_not_in_vault(
+        self,
+        client: AsyncClient,
+        seeker_with_credits,
+        marketplace_data,
+    ):
+        """If the contact is NOT in the seeker's vault, intro proceeds normally."""
+        # Get balance before
+        bal_resp = await client.get(
+            "/api/v1/credits/balance",
+            headers=seeker_with_credits["headers"],
+        )
+        balance_before = bal_resp.json()["data"]["balance"]
+
+        listing_id = str(marketplace_data["listing_ids"][0])
+        resp = await client.post(
+            "/api/v1/marketplace/request-intro",
+            json={"marketplace_listing_id": listing_id},
+            headers=seeker_with_credits["headers"],
+        )
+        assert resp.status_code == 201
+
+        # Credits should be deducted (20 for intro)
+        bal_resp2 = await client.get(
+            "/api/v1/credits/balance",
+            headers=seeker_with_credits["headers"],
+        )
+        assert bal_resp2.json()["data"]["balance"] == balance_before - 20
+
+    async def test_name_company_fallback_match(
+        self,
+        client: AsyncClient,
+        seeker_with_credits,
+        marketplace_data,
+    ):
+        """Duplicate detected via name+company hash even without email match."""
+        seeker_uid = uuid_mod.UUID(seeker_with_credits["user_id"])
+
+        # Add contact with same name+company but different email
+        async with TestSessionLocal() as db:
+            db.add(
+                Contact(
+                    user_id=seeker_uid,
+                    full_name="Alice Engineer",
+                    first_name="Alice",
+                    last_name="Engineer",
+                    email="alice-personal@gmail.com",
+                    current_company="Stripe",
+                    current_title="Engineer",
+                    connected_on=date.today(),
+                )
+            )
+            await db.commit()
+
+        listing_id = str(marketplace_data["listing_ids"][0])
+        resp = await client.post(
+            "/api/v1/marketplace/request-intro",
+            json={"marketplace_listing_id": listing_id},
+            headers=seeker_with_credits["headers"],
+        )
+        assert resp.status_code == 409
+        assert "already in your network" in resp.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
 # Test My Requests (Job Seeker View)
 # ---------------------------------------------------------------------------
 

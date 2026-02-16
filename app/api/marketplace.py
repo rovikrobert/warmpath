@@ -21,6 +21,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.company import Company
+from app.models.contact import Contact
 from app.models.marketplace import (
     ConnectorReputation,
     IntroFacilitation,
@@ -47,6 +48,7 @@ from app.services.credits import (
 )
 from app.services.audit_logger import log_event
 from app.services.marketplace_indexer import generate_marketplace_listings
+from app.utils.hashing import hash_for_suppression
 from app.utils.security import get_current_user, require_verified_email
 
 router = APIRouter()
@@ -228,6 +230,56 @@ async def request_intro(
             status_code=status.HTTP_409_CONFLICT,
             detail="You already have a pending request for this listing",
         )
+
+    # Duplicate detection: check if the underlying contact is already in
+    # the job seeker's vault. Uses hash comparison only — never exposes
+    # the network holder's contact PII to the job seeker.
+    contact_result = await db.execute(
+        select(Contact).where(Contact.id == listing.contact_id)
+    )
+    listed_contact = contact_result.scalar_one_or_none()
+    if listed_contact is not None:
+        # Build hashes for the listed contact
+        hashes_to_check: list[str] = []
+        if listed_contact.email:
+            hashes_to_check.append(hash_for_suppression(listed_contact.email))
+        if (
+            listed_contact.first_name
+            and listed_contact.last_name
+            and listed_contact.current_company
+        ):
+            name_company = (
+                f"{listed_contact.first_name}"
+                f"{listed_contact.last_name}"
+                f"{listed_contact.current_company}"
+            )
+            hashes_to_check.append(hash_for_suppression(name_company))
+
+        if hashes_to_check:
+            # Load seeker's contacts and compare by hash
+            seeker_contacts_result = await db.execute(
+                select(Contact).where(
+                    Contact.user_id == current_user.id,
+                    Contact.deleted_at.is_(None),
+                )
+            )
+            for sc in seeker_contacts_result.scalars():
+                if sc.email and hash_for_suppression(sc.email) in hashes_to_check:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="This person is already in your network "
+                        "— you can reach out directly from your contacts page.",
+                    )
+                if sc.first_name and sc.last_name and sc.current_company:
+                    sc_hash = hash_for_suppression(
+                        f"{sc.first_name}{sc.last_name}{sc.current_company}"
+                    )
+                    if sc_hash in hashes_to_check:
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail="This person is already in your network "
+                            "— you can reach out directly from your contacts page.",
+                        )
 
     # Check credits (20 per intro request)
     balance = await get_balance(current_user.id, db)
