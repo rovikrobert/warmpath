@@ -75,7 +75,7 @@ async def upload_csv(
     raw_bytes = await file.read()
     if len(raw_bytes) > MAX_CSV_FILE_SIZE:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=f"CSV file exceeds the maximum allowed size of "
             f"{MAX_CSV_FILE_SIZE // (1024 * 1024)} MB.",
         )
@@ -90,7 +90,7 @@ async def upload_csv(
         ) from exc
     except Exception as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Failed to parse CSV: {exc}",
         ) from exc
 

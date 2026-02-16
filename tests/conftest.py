@@ -10,6 +10,7 @@ os.environ["CSV_ASYNC_PROCESSING"] = "false"
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -31,7 +32,7 @@ sqlite3.register_adapter(dict, lambda d: json.dumps(d))
 
 
 # ---------------------------------------------------------------------------
-# Test database setup
+# Test database setup — create tables once, truncate between tests
 # ---------------------------------------------------------------------------
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -41,13 +42,26 @@ TestSessionLocal = async_sessionmaker(
 )
 
 
-@pytest_asyncio.fixture(autouse=True)
-async def setup_db():
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def create_tables():
+    """Create all tables once at session start, drop at session end."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def truncate_tables():
+    """Delete all rows between tests — much faster than DROP/CREATE."""
+    yield
+    async with engine.begin() as conn:
+        # Disable FK checks for clean truncation, then re-enable
+        await conn.execute(text("PRAGMA foreign_keys = OFF"))
+        for table in reversed(Base.metadata.sorted_tables):
+            await conn.execute(table.delete())
+        await conn.execute(text("PRAGMA foreign_keys = ON"))
 
 
 async def override_get_db() -> AsyncGenerator[AsyncSession, None]:

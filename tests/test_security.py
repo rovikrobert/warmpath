@@ -90,10 +90,8 @@ class TestRefreshToken:
         resp = await _signup(client)
         refresh = _get_refresh_cookie(resp)
 
-        resp2 = await client.post(
-            "/api/v1/auth/refresh",
-            cookies={"warmpath_refresh_token": refresh},
-        )
+        client.cookies.set("warmpath_refresh_token", refresh)
+        resp2 = await client.post("/api/v1/auth/refresh")
         assert resp2.status_code == 200
         body = resp2.json()
         assert body["data"]["access_token"]
@@ -110,10 +108,8 @@ class TestRefreshToken:
         resp = await _signup(client)
         access = resp.json()["data"]["access_token"]
 
-        resp2 = await client.post(
-            "/api/v1/auth/refresh",
-            cookies={"warmpath_refresh_token": access},
-        )
+        client.cookies.set("warmpath_refresh_token", access)
+        resp2 = await client.post("/api/v1/auth/refresh")
         assert resp2.status_code == 401
 
     async def test_refresh_rotates_token(self, client: AsyncClient):
@@ -121,10 +117,8 @@ class TestRefreshToken:
         resp = await _signup(client)
         refresh1 = _get_refresh_cookie(resp)
 
-        resp2 = await client.post(
-            "/api/v1/auth/refresh",
-            cookies={"warmpath_refresh_token": refresh1},
-        )
+        client.cookies.set("warmpath_refresh_token", refresh1)
+        resp2 = await client.post("/api/v1/auth/refresh")
         refresh2 = _get_refresh_cookie(resp2)
         assert refresh2 is not None
         assert refresh2 != refresh1
@@ -173,10 +167,8 @@ class TestTokenVersioning:
         )
 
         # Old refresh token should be rejected
-        resp2 = await client.post(
-            "/api/v1/auth/refresh",
-            cookies={"warmpath_refresh_token": old_refresh},
-        )
+        client.cookies.set("warmpath_refresh_token", old_refresh)
+        resp2 = await client.post("/api/v1/auth/refresh")
         assert resp2.status_code == 401
 
     async def test_login_after_logout_all_works(self, client: AsyncClient):
