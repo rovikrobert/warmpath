@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
-from app.api import auth, companies, contacts, health, matches, search
+from app.api import auth, companies, contacts, health, jobs, matches, search
 from app.config import settings
 from app.middleware.usage import UsageTrackingMiddleware
 from app.utils.exceptions import AppError
@@ -65,3 +65,4 @@ app.include_router(contacts.router, prefix="/api/v1/contacts", tags=["contacts"]
 app.include_router(companies.router, prefix="/api/v1/companies", tags=["companies"])
 app.include_router(search.router, prefix="/api/v1/search", tags=["search"])
 app.include_router(matches.router, prefix="/api/v1/matches", tags=["matches"])
+app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["jobs"])
