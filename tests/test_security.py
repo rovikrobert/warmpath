@@ -509,7 +509,9 @@ class TestSecurityHeaders:
 
     async def test_csp(self, client: AsyncClient):
         resp = await client.get("/health")
-        assert resp.headers.get("content-security-policy") == "default-src 'self'"
+        csp = resp.headers.get("content-security-policy")
+        assert "default-src 'self'" in csp
+        assert "script-src 'self'" in csp
 
     async def test_referrer_policy(self, client: AsyncClient):
         resp = await client.get("/health")

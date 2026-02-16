@@ -12,7 +12,10 @@ from app.config import settings
 _ALWAYS_HEADERS: list[tuple[bytes, bytes]] = [
     (b"x-content-type-options", b"nosniff"),
     (b"x-frame-options", b"DENY"),
-    (b"content-security-policy", b"default-src 'self'"),
+    (
+        b"content-security-policy",
+        b"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:",
+    ),
     (b"referrer-policy", b"strict-origin-when-cross-origin"),
     (b"permissions-policy", b"camera=(), microphone=(), geolocation=()"),
 ]
