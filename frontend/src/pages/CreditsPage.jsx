@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { credits as creditsApi } from '../api/client';
+import { credits as creditsApi, usage as usageApi } from '../api/client';
 
 const REASON_LABELS = {
   welcome_bonus: 'Welcome bonus',
@@ -27,20 +27,56 @@ function TypeBadge({ type }) {
   );
 }
 
+function UsageBar({ label, count, limit }) {
+  const isBlocked = typeof limit === 'number' && limit === 0;
+  const isUnlimited = limit === 'unlimited';
+  const pct = isUnlimited ? 0 : isBlocked ? 100 : typeof limit === 'number' ? Math.min(100, (count / limit) * 100) : 0;
+  const atLimit = !isUnlimited && typeof limit === 'number' && count >= limit;
+  const nearLimit = !isUnlimited && typeof limit === 'number' && count >= limit * 0.8 && !atLimit;
+
+  const barColor = isBlocked ? 'bg-slate-300' : atLimit ? 'bg-red-500' : nearLimit ? 'bg-amber-500' : 'bg-green-500';
+  const textColor = isBlocked ? 'text-slate-500' : atLimit ? 'text-red-600' : nearLimit ? 'text-amber-600' : 'text-slate-700';
+
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-sm">
+        <span className="text-slate-700">{label}</span>
+        <span className={`font-medium ${textColor}`}>
+          {isBlocked ? 'Upgrade to unlock' : isUnlimited ? `${count} used` : `${count}/${limit}`}
+          {atLimit && !isBlocked && ' (limit reached)'}
+        </span>
+      </div>
+      {!isUnlimited && (
+        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className={`h-full rounded-full transition-all ${barColor}`}
+            style={{ width: `${Math.max(pct, isBlocked ? 0 : 2)}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CreditsPage() {
   const [balance, setBalance] = useState(null);
   const [history, setHistory] = useState([]);
+  const [usageData, setUsageData] = useState(null);
+  const [showActivity, setShowActivity] = useState(false);
+  const [activityLog, setActivityLog] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [balRes, histRes] = await Promise.all([
+        const [balRes, histRes, usageRes] = await Promise.all([
           creditsApi.balance(),
           creditsApi.history().catch(() => ({ data: [] })),
+          usageApi.summary().catch(() => null),
         ]);
         setBalance(balRes.data);
         setHistory(histRes.data || []);
+        if (usageRes) setUsageData(usageRes.data);
       } catch (err) {
         console.error(err);
       } finally {
@@ -84,6 +120,61 @@ export default function CreditsPage() {
           <p className="text-sm text-amber-800">
             <span className="font-semibold">{balance.expiring_soon} credits</span> will expire in the next 30 days. Use them before they're gone!
           </p>
+        </div>
+      )}
+
+      {/* Usage this month */}
+      {usageData && (
+        <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-slate-900">Usage This Month</h2>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+              {usageData.plan_tier === 'free' ? 'Free plan' : usageData.plan_tier}
+            </span>
+          </div>
+          <div className="space-y-3">
+            {[
+              { key: 'smart_search', label: 'Smart searches' },
+              { key: 'intro_draft', label: 'Messages drafted' },
+              { key: 'csv_upload', label: 'CSV uploads' },
+              { key: 'marketplace_search', label: 'Marketplace searches' },
+              { key: 'intro_request', label: 'Intro requests' },
+            ].map(({ key, label }) => (
+              <UsageBar
+                key={key}
+                label={label}
+                count={usageData.counts?.[key] ?? 0}
+                limit={usageData.limits?.[key] ?? 'unlimited'}
+              />
+            ))}
+          </div>
+          <button
+            onClick={async () => {
+              if (!showActivity) {
+                const res = await usageApi.history().catch(() => ({ data: [] }));
+                setActivityLog(res.data || []);
+              }
+              setShowActivity(!showActivity);
+            }}
+            className="mt-4 text-sm font-medium text-amber-600 hover:text-amber-700"
+          >
+            {showActivity ? 'Hide activity' : 'View all activity'}
+          </button>
+          {showActivity && activityLog.length > 0 && (
+            <div className="mt-3 max-h-60 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+              {activityLog.map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between px-3 py-2 text-xs">
+                  <span className="text-slate-700">{entry.action}</span>
+                  <span className="text-slate-400">
+                    {entry.created_at ? new Date(entry.created_at).toLocaleString() : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {showActivity && activityLog.length === 0 && (
+            <p className="mt-3 text-xs text-slate-400">No activity recorded yet.</p>
+          )}
         </div>
       )}
 

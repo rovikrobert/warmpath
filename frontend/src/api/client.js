@@ -6,6 +6,16 @@ export function setTokenGetter(fn) {
   _getToken = fn;
 }
 
+// ---------------------------------------------------------------------------
+// Usage warning interceptor — surfaces X-WarmPath-Usage-Warning headers
+// ---------------------------------------------------------------------------
+let _usageWarningCallback = null;
+const _shownWarnings = new Set();
+
+export function onUsageWarning(cb) {
+  _usageWarningCallback = cb;
+}
+
 export async function api(path, options = {}) {
   const token = _getToken();
   const headers = { ...options.headers };
@@ -20,6 +30,13 @@ export async function api(path, options = {}) {
   }
 
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+
+  // Check for usage warning header on every response
+  const warning = res.headers.get('x-warmpath-usage-warning');
+  if (warning && _usageWarningCallback && !_shownWarnings.has(warning)) {
+    _shownWarnings.add(warning);
+    _usageWarningCallback(warning);
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -118,7 +135,13 @@ export const applications = {
   stats: () => api('/api/v1/applications/stats'),
 };
 
+export const usage = {
+  summary: () => api('/api/v1/usage/me'),
+  history: (page = 1, perPage = 20) =>
+    api(`/api/v1/usage/me/history?page=${page}&per_page=${perPage}`),
+};
+
 export const health = {
   check: () => api('/health'),
-  usage: () => api('/usage/me'),
+  usage: () => api('/api/v1/usage/me'),
 };

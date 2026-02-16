@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { credits as creditsApi } from '../api/client';
+import { credits as creditsApi, onUsageWarning } from '../api/client';
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [balance, setBalance] = useState(null);
   const [mobileNav, setMobileNav] = useState(false);
+  const [usageWarning, setUsageWarning] = useState(null);
 
   useEffect(() => {
     creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
+    onUsageWarning((msg) => setUsageWarning(msg));
   }, []);
 
   const handleLogout = () => {
@@ -104,6 +106,28 @@ export default function Layout() {
           </div>
         )}
       </header>
+
+      {/* Usage warning banner */}
+      {usageWarning && (
+        <div className="border-b border-amber-300 bg-amber-50 px-4 py-2.5">
+          <div className="mx-auto flex max-w-6xl items-center justify-between">
+            <p className="text-sm text-amber-800">
+              {usageWarning}
+              {' '}
+              <Link to="/credits" className="font-medium text-amber-700 underline hover:text-amber-900">
+                Upgrade &rarr;
+              </Link>
+            </p>
+            <button
+              onClick={() => setUsageWarning(null)}
+              className="ml-4 text-amber-600 hover:text-amber-800"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         <Outlet />
       </main>

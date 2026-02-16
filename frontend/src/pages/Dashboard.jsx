@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { contacts as contactsApi, search as searchApi, health as healthApi, credits as creditsApi, marketplace as mpApi } from '../api/client';
+import { contacts as contactsApi, search as searchApi, usage as usageApi, credits as creditsApi, marketplace as mpApi } from '../api/client';
 import UploadModal from '../components/UploadModal';
 
 export default function Dashboard() {
@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [contactCount, setContactCount] = useState(null);
   const [balance, setBalance] = useState(null);
   const [marketplaceStats, setMarketplaceStats] = useState(null);
+  const [usageData, setUsageData] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -24,12 +25,15 @@ export default function Dashboard() {
       const [contactsRes, searchRes, usageRes, balRes] = await Promise.all([
         contactsApi.list(1, 1),
         searchApi.list(),
-        healthApi.usage().catch(() => null),
+        usageApi.summary().catch(() => null),
         creditsApi.balance().catch(() => ({ data: { balance: 0 } })),
       ]);
       setContactCount(contactsRes.meta?.total ?? contactsRes.data?.length ?? 0);
       setSearches(searchRes.data ?? []);
-      if (usageRes) setStats(usageRes.data);
+      if (usageRes) {
+        setStats(usageRes.data);
+        setUsageData(usageRes.data);
+      }
       setBalance(balRes.data?.balance ?? 0);
 
       // Load marketplace stats for holders
@@ -99,6 +103,39 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Usage this month */}
+      {usageData && (
+        <div className="mb-6 rounded-lg bg-white p-4 ring-1 ring-slate-200">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">This Month</h3>
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            {[
+              { key: 'smart_search', label: 'Searches' },
+              { key: 'intro_draft', label: 'Messages drafted' },
+              { key: 'marketplace_search', label: 'Marketplace searches' },
+              { key: 'intro_request', label: 'Intro requests' },
+            ].map(({ key, label }) => {
+              const count = usageData.counts?.[key] ?? 0;
+              const limit = usageData.limits?.[key];
+              const isUnlimited = limit === 'unlimited';
+              const atLimit = !isUnlimited && typeof limit === 'number' && count >= limit;
+              const nearLimit = !isUnlimited && typeof limit === 'number' && count >= limit * 0.8 && !atLimit;
+              return (
+                <span
+                  key={key}
+                  className={
+                    atLimit ? 'font-medium text-red-600' :
+                    nearLimit ? 'font-medium text-amber-600' :
+                    'text-slate-700'
+                  }
+                >
+                  {count}{!isUnlimited && typeof limit === 'number' ? `/${limit}` : ''} {label}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Action buttons */}
       <div className="mb-6 flex flex-wrap gap-3">
