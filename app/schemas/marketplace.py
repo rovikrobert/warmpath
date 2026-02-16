@@ -4,6 +4,34 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
+# ---------------------------------------------------------------------------
+# Marketplace Search
+# ---------------------------------------------------------------------------
+
+
+class MarketplaceSearchBody(BaseModel):
+    company_names: list[str]
+    role_levels: list[str] | None = None
+    departments: list[str] | None = None
+
+
+class MarketplaceSearchResult(BaseModel):
+    listing_id: uuid.UUID
+    company_name: str
+    role_level: str
+    department_category: str
+    warm_score_range: str
+    connection_recency: str
+    network_holder_reputation: dict | None = None
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Marketplace Listings (for holder's own view)
+# ---------------------------------------------------------------------------
+
+
 class MarketplaceListingResponse(BaseModel):
     id: uuid.UUID
     company_id: uuid.UUID
@@ -15,6 +43,30 @@ class MarketplaceListingResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class MarketplaceListingDetailResponse(BaseModel):
+    """Full listing with contact details — only for the network holder."""
+
+    id: uuid.UUID
+    company_id: uuid.UUID
+    role_level: str
+    department_category: str
+    warm_score_range: str
+    connection_recency: str
+    is_available: bool
+    created_at: datetime
+    contact_name: str | None = None
+    contact_title: str | None = None
+    contact_email: str | None = None
+    contact_company: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Sharing Preferences
+# ---------------------------------------------------------------------------
 
 
 class NetworkSharingPreferencesCreate(BaseModel):
@@ -37,9 +89,32 @@ class NetworkSharingPreferencesResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class NetworkSharingPrefsUpdate(BaseModel):
+    opt_in_marketplace: bool
+    category_filters: dict | None = None
+    excluded_contact_ids: list[str] | None = None
+    is_paused: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Intro Facilitation
+# ---------------------------------------------------------------------------
+
+
 class IntroFacilitationCreate(BaseModel):
     marketplace_listing_id: uuid.UUID
     job_seeker_profile_snapshot: dict | None = None
+
+
+class IntroFacilitationRequest(BaseModel):
+    marketplace_listing_id: uuid.UUID
+    message_to_holder: str | None = None
+    profile_visibility: str = "summary"
+
+
+class IntroFacilitationActionBody(BaseModel):
+    action: str  # "approve" or "decline"
+    notes: str | None = None
 
 
 class IntroFacilitationResponse(BaseModel):
@@ -54,5 +129,15 @@ class IntroFacilitationResponse(BaseModel):
     reviewed_at: datetime | None = None
     completed_at: datetime | None = None
     created_at: datetime
+    listing_summary: MarketplaceSearchResult | None = None
 
     model_config = {"from_attributes": True}
+
+
+class IntroFacilitationHolderResponse(IntroFacilitationResponse):
+    """Extended response for network holders — includes their contact details."""
+
+    contact_name: str | None = None
+    contact_title: str | None = None
+    contact_email: str | None = None
+    contact_company: str | None = None

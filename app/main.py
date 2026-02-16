@@ -11,6 +11,7 @@ from app.api import (
     contacts,
     health,
     jobs,
+    marketplace,
     matches,
     preferences,
     search,
@@ -81,4 +82,7 @@ app.include_router(
 )
 app.include_router(
     preferences.router, prefix="/api/v1/preferences", tags=["preferences"]
+)
+app.include_router(
+    marketplace.router, prefix="/api/v1/marketplace", tags=["marketplace"]
 )

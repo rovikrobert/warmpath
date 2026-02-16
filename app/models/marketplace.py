@@ -55,7 +55,7 @@ class MarketplaceListing(Base):
     connection_recency: Mapped[str] = mapped_column(String(10), nullable=False)
 
     is_available: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true"
+        Boolean, nullable=False, default=True, server_default="true"
     )
 
     created_at: Mapped[datetime] = mapped_column(
