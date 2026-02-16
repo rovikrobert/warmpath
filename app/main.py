@@ -17,6 +17,7 @@ from app.api import (
     preferences,
     search,
     usage,
+    webhooks,
 )
 from app.config import settings
 from app.middleware.security_headers import SecurityHeadersMiddleware
@@ -30,12 +31,13 @@ app = FastAPI(title="WarmPath", version="0.1.0")
 # ---------------------------------------------------------------------------
 # CORS
 # ---------------------------------------------------------------------------
+_cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()],
+    allow_origins=["*"] if "*" in _cors_origins else _cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # ---------------------------------------------------------------------------
@@ -96,3 +98,4 @@ app.include_router(
 )
 app.include_router(credits.router, prefix="/api/v1/credits", tags=["credits"])
 app.include_router(usage.router, prefix="/api/v1/usage", tags=["usage"])
+app.include_router(webhooks.router, prefix="/api/v1", tags=["webhooks"])

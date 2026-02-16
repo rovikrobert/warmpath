@@ -349,6 +349,18 @@ async def auth_headers(client: AsyncClient) -> dict:
             "full_name": "Credit Tester",
         },
     )
+    # Verify email so credit purchase (marketplace feature) is accessible
+    from sqlalchemy import select
+
+    from app.models.user import User
+    from tests.conftest import TestSessionLocal
+
+    async with TestSessionLocal() as db:
+        result = await db.execute(select(User).where(User.email == "credits@test.com"))
+        user = result.scalar_one()
+        user.email_verified = True
+        await db.commit()
+
     login = await client.post(
         "/api/v1/auth/login",
         json={"email": "credits@test.com", "password": "testpass123"},

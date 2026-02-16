@@ -140,3 +140,20 @@ async def get_current_user(
             detail="Token has been revoked",
         )
     return user
+
+
+async def requi[RESEND_KEY_REDACTED](
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Dependency that requires the user's email to be verified.
+
+    Use this on marketplace endpoints (search, intro requests, credit
+    purchases). Own-network features (CSV upload, contacts, search) are
+    allowed without verification.
+    """
+    if not current_user.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email to access marketplace features",
+        )
+    return current_user

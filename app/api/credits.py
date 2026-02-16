@@ -21,8 +21,9 @@ from app.schemas.credits import (
     CreditHistoryEntry,
     CreditPurchaseRequest,
 )
+from app.services.audit_logger import log_event
 from app.services.credits import earn_credits, expi[RESEND_KEY_REDACTED], get_credit_summary
-from app.utils.security import get_current_user
+from app.utils.security import get_current_user, requi[RESEND_KEY_REDACTED]
 
 router = APIRouter()
 
@@ -107,7 +108,7 @@ async def credit_history(
 @router.post("/purchase")
 async def purchase_credits(
     body: CreditPurchaseRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(requi[RESEND_KEY_REDACTED]),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Purchase credits (MVP stub — no payment processing).
@@ -120,6 +121,12 @@ async def purchase_credits(
         body.amount,
         "purchase",
         db,
+    )
+    await log_event(
+        db,
+        "credit_purchased",
+        user_id=current_user.id,
+        metadata={"amount": body.amount, "transaction_id": str(txn.id)},
     )
     await db.flush()
 

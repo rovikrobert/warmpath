@@ -34,6 +34,16 @@ async def seeker_auth(client: AsyncClient) -> dict:
             "full_name": "Job Seeker",
         },
     )
+    # Verify email so marketplace features are accessible
+    from app.models.user import User
+    from sqlalchemy import select
+
+    async with TestSessionLocal() as db:
+        result = await db.execute(select(User).where(User.email == "seeker@test.com"))
+        user = result.scalar_one()
+        user.email_verified = True
+        await db.commit()
+
     login = await client.post(
         "/api/v1/auth/login",
         json={"email": "seeker@test.com", "password": "testpass123"},
@@ -55,6 +65,16 @@ async def holder_auth(client: AsyncClient) -> dict:
             "full_name": "Network Holder",
         },
     )
+    # Verify email so marketplace features are accessible
+    from app.models.user import User
+    from sqlalchemy import select
+
+    async with TestSessionLocal() as db:
+        result = await db.execute(select(User).where(User.email == "holder@test.com"))
+        user = result.scalar_one()
+        user.email_verified = True
+        await db.commit()
+
     login = await client.post(
         "/api/v1/auth/login",
         json={"email": "holder@test.com", "password": "testpass123"},
