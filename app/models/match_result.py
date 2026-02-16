@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
@@ -167,6 +168,10 @@ class IntroRequest(Base):
         UUID(as_uuid=True),
         ForeignKey("match_results.id", ondelete="SET NULL"),
     )
+    job_opening_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("job_openings.id", ondelete="SET NULL"),
+    )
 
     context: Mapped[str | None] = mapped_column(Text)
     tone: Mapped[str | None] = mapped_column(String(50), server_default="professional")
@@ -190,6 +195,7 @@ class IntroRequest(Base):
     match_result: Mapped["MatchResult | None"] = relationship(
         back_populates="intro_requests"
     )
+    job_opening: Mapped["JobOpening | None"] = relationship()
     intro_messages: Mapped[list["IntroMessage"]] = relationship(
         back_populates="intro_request"
     )
@@ -211,6 +217,12 @@ class IntroMessage(Base):
     subject_line: Mapped[str | None] = mapped_column(String(500))
     message_body: Mapped[str] = mapped_column(Text, nullable=False)
     variant_label: Mapped[str | None] = mapped_column(String(100))
+
+    # Sequence support for multi-step referral messages
+    sequence_step: Mapped[int | None] = mapped_column(Integer)
+    step_label: Mapped[str | None] = mapped_column(String(100))
+    send_after_days: Mapped[int | None] = mapped_column(Integer, server_default="0")
+    coaching_notes: Mapped[str | None] = mapped_column(Text)
 
     # User interaction
     is_selected: Mapped[bool | None] = mapped_column(Boolean, server_default="false")

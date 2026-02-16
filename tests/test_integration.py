@@ -281,11 +281,16 @@ async def test_full_user_journey(client: AsyncClient):
     assert intro_resp.status_code == 201
     intro_data = intro_resp.json()["data"]
     assert intro_data["status"] == "completed"
-    assert len(intro_data["messages"]) == 3
+    # Message count depends on cultural context:
+    # direct_ask → 3, reconnect+ask → 2, reconnect+explore+ask → 3
+    assert len(intro_data["messages"]) >= 2
 
-    # Check variant labels
-    variants = {m["variant_label"] for m in intro_data["messages"]}
-    assert variants == {"direct", "mutual-interest", "casual"}
+    # New sequence fields present on every message
+    for msg in intro_data["messages"]:
+        assert msg["sequence_step"] is not None
+        assert msg["step_label"] in ("referral_ask", "reconnect", "explore")
+        assert msg["send_after_days"] is not None
+        assert msg["coaching_notes"] is not None
 
     # LinkedIn messages should have no subject line and be under 300 chars
     for msg in intro_data["messages"]:

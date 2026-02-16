@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -8,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.database import get_db
 from app.models.contact import Contact
+from app.models.job import JobOpening
 from app.models.match_result import IntroMessage, IntroRequest, MatchResult
 from app.models.user import ConnectorProfile, User
 from app.schemas.match import (
@@ -16,7 +18,10 @@ from app.schemas.match import (
     IntroRequestCreate,
     IntroRequestResponse,
 )
-from app.services.intro_drafter import CLAUDE_MODEL as INTRO_MODEL, draft_intro
+from app.services.intro_drafter import (
+    CLAUDE_MODEL as INTRO_MODEL,
+    draft_referral_request,
+)
 from app.utils.security import get_current_user
 
 router = APIRouter()
@@ -59,6 +64,19 @@ async def create_intro(
                 detail="Match result not found",
             )
 
+    # Optionally load job opening
+    job_opening = None
+    if body.job_opening_id:
+        jo_result = await db.execute(
+            select(JobOpening).where(JobOpening.id == body.job_opening_id)
+        )
+        job_opening = jo_result.scalar_one_or_none()
+        if job_opening is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Job opening not found",
+            )
+
     # Load connector profile for context
     profile_result = await db.execute(
         select(ConnectorProfile).where(ConnectorProfile.user_id == current_user.id)
@@ -70,6 +88,7 @@ async def create_intro(
         user_id=current_user.id,
         contact_id=body.contact_id,
         match_result_id=body.match_result_id,
+        job_opening_id=body.job_opening_id,
         context=body.context,
         tone=body.tone,
         channel=body.channel,
@@ -79,11 +98,11 @@ async def create_intro(
     await db.flush()
 
     # Generate message drafts
-    drafts = await draft_intro(
+    drafts = await draft_referral_request(
         contact=contact,
-        connector_profile=connector_profile,
+        user_profile=connector_profile,
         match_result=match_result,
-        tone=body.tone,
+        job_opening=job_opening,
         channel=body.channel,
     )
 
@@ -95,6 +114,10 @@ async def create_intro(
             variant_label=draft.variant_label,
             subject_line=draft.subject_line,
             message_body=draft.message_body,
+            sequence_step=draft.sequence_step,
+            step_label=draft.step_label,
+            send_after_days=draft.send_after_days,
+            coaching_notes=draft.coaching_notes,
             is_selected=False,
             ai_model_version=model_version,
         )
@@ -114,6 +137,53 @@ async def create_intro(
     return {
         "data": _intro_to_response(intro_req),
         "meta": {},
+    }
+
+
+@router.get("/intros/pending")
+async def get_pending_intros(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    days_lookahead: int = Query(default=0, ge=0),
+) -> dict:
+    """Return intro messages that are due to be sent.
+
+    A message is "due" when the number of days since the intro_request was
+    created is >= the message's send_after_days.
+    """
+    result = await db.execute(
+        select(IntroRequest)
+        .options(selectinload(IntroRequest.intro_messages))
+        .where(
+            IntroRequest.user_id == current_user.id,
+            IntroRequest.status == "completed",
+        )
+    )
+    intro_reqs = result.scalars().all()
+
+    now = datetime.now(timezone.utc)
+    pending_messages: list[dict] = []
+
+    for req in intro_reqs:
+        for msg in req.intro_messages:
+            send_after = msg.send_after_days or 0
+            created = req.created_at
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            due_date = created + timedelta(days=send_after)
+            lookahead_date = now + timedelta(days=days_lookahead)
+            if due_date <= lookahead_date:
+                msg_resp = IntroMessageResponse.model_validate(msg).model_dump(
+                    mode="json"
+                )
+                msg_resp["intro_request_id"] = str(req.id)
+                msg_resp["contact_id"] = str(req.contact_id)
+                msg_resp["due_date"] = due_date.isoformat()
+                pending_messages.append(msg_resp)
+
+    return {
+        "data": pending_messages,
+        "meta": {"count": len(pending_messages)},
     }
 
 
@@ -204,6 +274,7 @@ def _intro_to_response(intro_req: IntroRequest) -> dict:
         user_id=intro_req.user_id,
         contact_id=intro_req.contact_id,
         match_result_id=intro_req.match_result_id,
+        job_opening_id=intro_req.job_opening_id,
         context=intro_req.context,
         tone=intro_req.tone,
         channel=intro_req.channel,
