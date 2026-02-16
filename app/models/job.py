@@ -146,12 +146,8 @@ class UserJobPreferences(Base):
     )
     target_role: Mapped[str | None] = mapped_column(String(255))
     target_seniority: Mapped[str | None] = mapped_column(String(100))
-    target_industries: Mapped[dict | None] = mapped_column(
-        JSONB, server_default="'[]'"
-    )
-    target_locations: Mapped[dict | None] = mapped_column(
-        JSONB, server_default="'[]'"
-    )
+    target_industries: Mapped[dict | None] = mapped_column(JSONB, server_default="'[]'")
+    target_locations: Mapped[dict | None] = mapped_column(JSONB, server_default="'[]'")
     open_to_remote: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="true"
     )

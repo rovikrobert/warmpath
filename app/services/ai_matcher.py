@@ -63,10 +63,28 @@ class TokenUsage:
 # ---------------------------------------------------------------------------
 
 _DEPT_KEYWORDS: dict[str, list[str]] = {
-    "engineering": ["engineer", "developer", "software", "sre", "devops", "platform", "backend", "frontend", "fullstack", "infrastructure"],
+    "engineering": [
+        "engineer",
+        "developer",
+        "software",
+        "sre",
+        "devops",
+        "platform",
+        "backend",
+        "frontend",
+        "fullstack",
+        "infrastructure",
+    ],
     "product": ["product manager", "product lead", "product owner", "pm"],
     "design": ["designer", "ux", "ui", "design lead"],
-    "data": ["data scientist", "data engineer", "data analyst", "machine learning", "ml", "analytics"],
+    "data": [
+        "data scientist",
+        "data engineer",
+        "data analyst",
+        "machine learning",
+        "ml",
+        "analytics",
+    ],
     "marketing": ["marketing", "growth", "brand", "content", "communications"],
     "sales": ["sales", "account executive", "ae", "business development", "bdr", "sdr"],
     "finance": ["finance", "accounting", "controller", "treasury", "fp&a"],
@@ -76,11 +94,16 @@ _DEPT_KEYWORDS: dict[str, list[str]] = {
 }
 
 _ADJACENT_DEPTS: set[tuple[str, str]] = {
-    ("engineering", "product"), ("product", "engineering"),
-    ("engineering", "data"), ("data", "engineering"),
-    ("product", "design"), ("design", "product"),
-    ("marketing", "product"), ("product", "marketing"),
-    ("sales", "marketing"), ("marketing", "sales"),
+    ("engineering", "product"),
+    ("product", "engineering"),
+    ("engineering", "data"),
+    ("data", "engineering"),
+    ("product", "design"),
+    ("design", "product"),
+    ("marketing", "product"),
+    ("product", "marketing"),
+    ("sales", "marketing"),
+    ("marketing", "sales"),
 }
 
 _CSUITE_PATTERN = re.compile(
@@ -96,17 +119,55 @@ _SENIOR_PATTERN = re.compile(r"\b(senior|sr\.?|staff)\b", re.IGNORECASE)
 
 # Location keywords for cultural context detection
 _ASIA_KEYWORDS = [
-    "japan", "tokyo", "osaka", "korea", "seoul", "china", "beijing",
-    "shanghai", "shenzhen", "singapore", "hong kong", "taipei", "taiwan",
-    "bangkok", "thailand", "vietnam", "indonesia", "jakarta", "manila",
-    "philippines", "malaysia", "kuala lumpur",
+    "japan",
+    "tokyo",
+    "osaka",
+    "korea",
+    "seoul",
+    "china",
+    "beijing",
+    "shanghai",
+    "shenzhen",
+    "singapore",
+    "hong kong",
+    "taipei",
+    "taiwan",
+    "bangkok",
+    "thailand",
+    "vietnam",
+    "indonesia",
+    "jakarta",
+    "manila",
+    "philippines",
+    "malaysia",
+    "kuala lumpur",
 ]
 _US_UK_KEYWORDS = [
-    "united states", "new york", "san francisco", "los angeles", "seattle",
-    "austin", "boston", "chicago", "denver", "portland", "atlanta",
-    "united kingdom", "london", "manchester", "edinburgh",
-    "toronto", "vancouver", "canada",
-    ", ca", ", ny", ", wa", ", tx", ", ma", ", il", ", co",
+    "united states",
+    "new york",
+    "san francisco",
+    "los angeles",
+    "seattle",
+    "austin",
+    "boston",
+    "chicago",
+    "denver",
+    "portland",
+    "atlanta",
+    "united kingdom",
+    "london",
+    "manchester",
+    "edinburgh",
+    "toronto",
+    "vancouver",
+    "canada",
+    ", ca",
+    ", ny",
+    ", wa",
+    ", tx",
+    ", ma",
+    ", il",
+    ", co",
 ]
 
 
@@ -463,7 +524,7 @@ def _build_user_prompt(
 {profile_info}
 
 TARGET:
-Company: {', '.join(target_companies) if target_companies else 'Any'}
+Company: {", ".join(target_companies) if target_companies else "Any"}
 Role: {target_role}
 Seniority: {target_seniority}
 
@@ -564,15 +625,84 @@ def _extract_description_terms(description: str | None) -> list[str]:
     if not description:
         return []
     stop_words = {
-        "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
-        "of", "with", "by", "from", "is", "are", "was", "were", "be", "been",
-        "being", "have", "has", "had", "do", "does", "did", "will", "would",
-        "could", "should", "may", "might", "shall", "can", "need", "must",
-        "that", "this", "these", "those", "i", "we", "you", "they", "it",
-        "who", "what", "which", "where", "when", "how", "not", "no", "nor",
-        "as", "if", "then", "than", "too", "very", "just", "about", "above",
-        "after", "before", "between", "into", "through", "during", "each",
-        "level", "looking", "find", "search", "want", "like",
+        "a",
+        "an",
+        "the",
+        "and",
+        "or",
+        "but",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "of",
+        "with",
+        "by",
+        "from",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "shall",
+        "can",
+        "need",
+        "must",
+        "that",
+        "this",
+        "these",
+        "those",
+        "i",
+        "we",
+        "you",
+        "they",
+        "it",
+        "who",
+        "what",
+        "which",
+        "where",
+        "when",
+        "how",
+        "not",
+        "no",
+        "nor",
+        "as",
+        "if",
+        "then",
+        "than",
+        "too",
+        "very",
+        "just",
+        "about",
+        "above",
+        "after",
+        "before",
+        "between",
+        "into",
+        "through",
+        "during",
+        "each",
+        "level",
+        "looking",
+        "find",
+        "search",
+        "want",
+        "like",
     }
     words = description.lower().split()
     return [
@@ -597,13 +727,15 @@ def _p[RESEND_KEY_REDACTED](
 
     # Include target_role terms for pre-filtering
     target_role = getattr(search, "target_role", None) or ""
-    role_terms = [
-        t.lower() for t in target_role.split() if len(t) > 2
-    ]
+    role_terms = [t.lower() for t in target_role.split() if len(t) > 2]
 
     all_terms = (
-        title_terms + company_terms + industry_terms
-        + keyword_terms + desc_terms + role_terms
+        title_terms
+        + company_terms
+        + industry_terms
+        + keyword_terms
+        + desc_terms
+        + role_terms
     )
     if not all_terms:
         logger.info(
@@ -626,7 +758,9 @@ def _p[RESEND_KEY_REDACTED](
 
     logger.info(
         "Pre-filter: %d total, %d passed, %d skipped",
-        total, len(filtered), total - len(filtered),
+        total,
+        len(filtered),
+        total - len(filtered),
     )
     return filtered if filtered else contacts
 
@@ -653,13 +787,14 @@ async def sco[RESEND_KEY_REDACTED](
 
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_BATCHES)
     batches = [
-        contacts[i : i + BATCH_SIZE]
-        for i in range(0, len(contacts), BATCH_SIZE)
+        contacts[i : i + BATCH_SIZE] for i in range(0, len(contacts), BATCH_SIZE)
     ]
     num_batches = len(batches)
     logger.info(
         "Scoring %d contacts in %d batches (concurrency: %d)",
-        len(contacts), num_batches, MAX_CONCURRENT_BATCHES,
+        len(contacts),
+        num_batches,
+        MAX_CONCURRENT_BATCHES,
     )
 
     async def _process_batch(
@@ -673,20 +808,26 @@ async def sco[RESEND_KEY_REDACTED](
                 logger.info(
                     "Batch %d/%d: scored %d contacts, %d matches "
                     "(tokens: %d in / %d out)",
-                    batch_num, num_batches, len(batch),
+                    batch_num,
+                    num_batches,
+                    len(batch),
                     len(batch_results),
-                    usage.input_tokens, usage.output_tokens,
+                    usage.input_tokens,
+                    usage.output_tokens,
                 )
                 return batch_results, usage.input_tokens, usage.output_tokens
             except anthropic.APIError as exc:
                 logger.error(
                     "Claude API error on batch %d (%d contacts): %s — skipping",
-                    batch_num, len(batch), exc,
+                    batch_num,
+                    len(batch),
+                    exc,
                 )
             except (json.JSONDecodeError, KeyError, ValueError) as exc:
                 logger.error(
                     "Failed to parse Claude response for batch %d: %s — skipping",
-                    batch_num, exc,
+                    batch_num,
+                    exc,
                 )
             return [], 0, 0
 
@@ -773,9 +914,12 @@ async def run_search(
 
     # Score contacts via AI (mock or real)
     matches = await sco[RESEND_KEY_REDACTED](
-        search, contacts,
-        profile=profile, user_name=user_name,
-        user_id=user_id, db=db,
+        search,
+        contacts,
+        profile=profile,
+        user_name=user_name,
+        user_id=user_id,
+        db=db,
     )
 
     # Upsert match results (skip scores below 20)
@@ -830,7 +974,11 @@ async def run_search(
     logger.info(
         "Search complete in %.1fs: %d total contacts, %d sent to scorer, "
         "%d returned score >= 20, %d persisted",
-        elapsed, total_contacts, len(contacts), len(matches), len(match_results),
+        elapsed,
+        total_contacts,
+        len(contacts),
+        len(matches),
+        len(match_results),
     )
 
     await db.flush()

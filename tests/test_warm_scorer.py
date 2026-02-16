@@ -196,21 +196,40 @@ class TestRoleScore:
     # --- With target_role (department-aware scoring) ---
     def test_same_dept_senior_ic(self):
         """Senior IC in same dept is the best referrer."""
-        assert compute_role_score("Senior Software Engineer", target_role="Software Engineer") == 100.0
+        assert (
+            compute_role_score(
+                "Senior Software Engineer", target_role="Software Engineer"
+            )
+            == 100.0
+        )
 
     def test_same_dept_manager(self):
-        assert compute_role_score("Engineering Manager", target_role="Software Engineer") == 100.0
+        assert (
+            compute_role_score("Engineering Manager", target_role="Software Engineer")
+            == 100.0
+        )
 
     def test_same_dept_director(self):
-        assert compute_role_score("Director of Engineering", target_role="Software Engineer") == 95.0
+        assert (
+            compute_role_score(
+                "Director of Engineering", target_role="Software Engineer"
+            )
+            == 95.0
+        )
 
     def test_same_dept_ic(self):
         """Regular IC in same dept still scores well."""
-        assert compute_role_score("Software Developer", target_role="Software Engineer") == 80.0
+        assert (
+            compute_role_score("Software Developer", target_role="Software Engineer")
+            == 80.0
+        )
 
     def test_adjacent_dept(self):
         """Product Manager referring for an eng role."""
-        assert compute_role_score("Product Manager", target_role="Software Engineer") == 70.0
+        assert (
+            compute_role_score("Product Manager", target_role="Software Engineer")
+            == 70.0
+        )
 
     def test_csuite_still_low_with_target(self):
         """CEO doesn't get boosted even with a target role (no dept match)."""
@@ -250,7 +269,9 @@ class TestTenureScore:
 class TestComputeWarmScore:
     def test_weights_sum_to_one(self):
         assert (
-            abs(WEIGHT_RECENCY + WEIGHT_RELATIONSHIP + WEIGHT_ROLE + WEIGHT_TENURE - 1.0)
+            abs(
+                WEIGHT_RECENCY + WEIGHT_RELATIONSHIP + WEIGHT_ROLE + WEIGHT_TENURE - 1.0
+            )
             < 0.001
         )
 
@@ -316,7 +337,9 @@ class TestComputeWarmScore:
         )
         profile = _profile(current_company="MyCompany", location="SF")
 
-        high = compute_warm_score(high_contact, profile, target_role="Software Engineer")
+        high = compute_warm_score(
+            high_contact, profile, target_role="Software Engineer"
+        )
         low = compute_warm_score(low_contact, profile)
         assert high.total_score > low.total_score
 
@@ -363,7 +386,9 @@ class TestReferralScore:
             location="SF",
         )
         profile = _profile(current_company="TargetCo", location="SF")
-        result = compute_referral_score(contact, profile, target_role="Software Engineer")
+        result = compute_referral_score(
+            contact, profile, target_role="Software Engineer"
+        )
         assert result.referral_likelihood == "high"
         assert result.total_score >= 70
 
@@ -413,8 +438,12 @@ class TestReferralPriorities:
         )
         profile = _profile(current_company="TargetCo", location="SF")
 
-        peer_score = compute_warm_score(recent_peer, profile, target_role="Software Engineer")
-        csuite_score = compute_warm_score(old_csuite, profile, target_role="Software Engineer")
+        peer_score = compute_warm_score(
+            recent_peer, profile, target_role="Software Engineer"
+        )
+        csuite_score = compute_warm_score(
+            old_csuite, profile, target_role="Software Engineer"
+        )
 
         assert peer_score.total_score > csuite_score.total_score
 
@@ -466,8 +495,8 @@ class TestReferralPriorities:
     def test_tenu[RESEND_KEY_REDACTED](self):
         """1-3 year tenure is the referral sweet spot."""
         scores = {
-            3: compute_tenu[RESEND_KEY_REDACTED](3),    # new hire
-            9: compute_tenu[RESEND_KEY_REDACTED](9),    # 9 months
+            3: compute_tenu[RESEND_KEY_REDACTED](3),  # new hire
+            9: compute_tenu[RESEND_KEY_REDACTED](9),  # 9 months
             24: compute_tenu[RESEND_KEY_REDACTED](24),  # 2 years (sweet spot)
             48: compute_tenu[RESEND_KEY_REDACTED](48),  # 4 years
             72: compute_tenu[RESEND_KEY_REDACTED](72),  # 6 years

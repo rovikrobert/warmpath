@@ -38,6 +38,8 @@ class CsvUpload(Base):
     status: Mapped[str] = mapped_column(
         String(50), nullable=False, server_default="pending", index=True
     )
+    contacts_created: Mapped[int | None] = mapped_column(Integer, server_default="0")
+    duplicates_skipped: Mapped[int | None] = mapped_column(Integer, server_default="0")
     error_message: Mapped[str | None] = mapped_column(Text)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -132,9 +134,7 @@ class Contact(Base):
     intro_requests: Mapped[list["IntroRequest"]] = relationship(
         back_populates="contact"
     )
-    applications: Mapped[list["Application"]] = relationship(
-        back_populates="contact"
-    )
+    applications: Mapped[list["Application"]] = relationship(back_populates="contact")
 
 
 class ContactCompany(Base):

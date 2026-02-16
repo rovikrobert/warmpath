@@ -5,6 +5,8 @@ from collections.abc import AsyncGenerator
 
 # Force mock mode for tests — must be set before importing app modules
 os.environ["AI_MOCK_MODE"] = "true"
+# Disable async CSV processing so uploads complete inline during tests
+os.environ["CSV_ASYNC_PROCESSING"] = "false"
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient

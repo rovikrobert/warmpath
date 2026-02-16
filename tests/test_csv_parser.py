@@ -192,7 +192,58 @@ async def test_upload_csv_success(client: AsyncClient):
     assert body["data"]["status"] == "completed"
     assert body["data"]["row_count"] == 5
     assert body["data"]["processed_count"] == 5
+    assert body["data"]["contacts_created"] == 5
+    assert body["data"]["duplicates_skipped"] == 0
+    assert body["data"]["completed_at"] is not None
     assert "meta" in body
+
+
+async def test_upload_csv_dedup_tracking(client: AsyncClient):
+    """Second upload of same CSV should track duplicates_skipped."""
+    token = await _signup_and_get_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # First upload
+    await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
+
+    # Second upload — same contacts should be deduped
+    resp = await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["data"]["status"] == "completed"
+    assert body["data"]["duplicates_skipped"] == 5
+    assert body["data"]["contacts_created"] == 0
+
+
+async def test_poll_upload_status(client: AsyncClient):
+    """GET /contacts/uploads/{id} returns upload status."""
+    token = await _signup_and_get_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    upload_resp = await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
+    upload_id = upload_resp.json()["data"]["id"]
+
+    poll_resp = await client.get(
+        f"/api/v1/contacts/uploads/{upload_id}", headers=headers
+    )
+    assert poll_resp.status_code == 200
+    assert poll_resp.json()["data"]["status"] == "completed"
+    assert poll_resp.json()["data"]["contacts_created"] == 5
+
+
+async def test_poll_upload_not_found(client: AsyncClient):
+    token = await _signup_and_get_token(client)
+    resp = await client.get(
+        "/api/v1/contacts/uploads/00000000-0000-0000-0000-000000000000",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 404
 
 
 async def test_upload_deduplication(client: AsyncClient):
