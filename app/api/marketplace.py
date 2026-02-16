@@ -45,8 +45,9 @@ from app.services.credits import (
     refund_credits,
     spend_credits,
 )
+from app.services.audit_logger import log_event
 from app.services.marketplace_indexer import generate_marketplace_listings
-from app.utils.security import get_current_user
+from app.utils.security import get_current_user, require_verified_email
 
 router = APIRouter()
 
@@ -107,7 +108,7 @@ def _build_seeker_profile_snapshot(user: User, visibility: str) -> dict:
 @router.post("/search")
 async def marketplace_search(
     body: MarketplaceSearchBody,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_email),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Search the anonymized marketplace index. Costs 5 credits."""
@@ -188,7 +189,7 @@ async def marketplace_search(
 @router.post("/request-intro", status_code=status.HTTP_201_CREATED)
 async def request_intro(
     body: IntroFacilitationRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_email),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Job seeker requests an intro via a marketplace listing. Costs 20 credits."""
@@ -408,6 +409,12 @@ async def update_facilitation(
             db,
             reference_id=facilitation.id,
         )
+        await log_event(
+            db,
+            "marketplace_approved",
+            user_id=current_user.id,
+            metadata={"facilitation_id": str(facilitation.id)},
+        )
 
     elif body.action == "decline":
         facilitation.status = "declined"
@@ -422,6 +429,12 @@ async def update_facilitation(
             "intro_declined_refund",
             db,
             reference_id=facilitation.id,
+        )
+        await log_event(
+            db,
+            "marketplace_declined",
+            user_id=current_user.id,
+            metadata={"facilitation_id": str(facilitation.id)},
         )
 
     else:

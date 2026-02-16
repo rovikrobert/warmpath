@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,7 +18,9 @@ from app.schemas.user import (
     UserResponse,
     UserTypeUpdate,
 )
+from app.services.audit_logger import log_event
 from app.services.credits import earn_credits
+from app.services.email_service import send_verification_email, verify_token
 from app.utils.security import (
     create_access_token,
     create_refresh_token,
@@ -109,6 +112,9 @@ async def signup(
     # Award welcome bonus credits
     await earn_credits(user.id, 50, "welcome_bonus", db)
 
+    # Send verification email
+    await send_verification_email(user, db)
+
     await db.commit()
     await db.refresh(user)
 
@@ -132,20 +138,76 @@ async def login(
         select(User).where(User.email == body.email, User.deleted_at.is_(None))
     )
     user = result.scalar_one_or_none()
+
+    # Check account lockout
+    if user is not None and user.locked_until is not None:
+        locked_until = user.locked_until
+        if locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
+        if locked_until > datetime.now(timezone.utc):
+            await log_event(
+                db,
+                "login_lockout",
+                user_id=user.id,
+                metadata={"email": body.email},
+            )
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Account temporarily locked. Try again in 15 minutes.",
+            )
+
     if user is None or not verify_password(body.password, user.password_hash):
+        # Track failed login
+        if user is not None:
+            user.failed_login_attempts += 1
+            if user.failed_login_attempts >= 5:
+                user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+                await log_event(
+                    db,
+                    "login_lockout",
+                    user_id=user.id,
+                    metadata={
+                        "email": body.email,
+                        "attempts": user.failed_login_attempts,
+                    },
+                )
+            else:
+                await log_event(
+                    db,
+                    "login_failure",
+                    user_id=user.id,
+                    metadata={"email": body.email},
+                )
+            await db.commit()
+        else:
+            await log_event(
+                db,
+                "login_failure",
+                metadata={"email": body.email},
+            )
+            await db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is deactivated",
         )
 
+    # Successful login — reset lockout counters
+    user.failed_login_attempts = 0
+    user.locked_until = None
+
     access_token = create_access_token(user.id, user.token_version)
     refresh_token = create_refresh_token(user.id, user.token_version)
     _set_refresh_cookie(response, refresh_token)
+
+    await log_event(db, "login_success", user_id=user.id)
+    await db.commit()
 
     return {
         "data": TokenResponse(access_token=access_token).model_dump(),
@@ -202,6 +264,9 @@ async def refresh_token(
     new_refresh = create_refresh_token(user.id, user.token_version)
     _set_refresh_cookie(response, new_refresh)
 
+    await log_event(db, "token_refresh", user_id=user.id)
+    await db.commit()
+
     return {
         "data": TokenResponse(access_token=new_access).model_dump(),
         "meta": {},
@@ -228,6 +293,7 @@ async def logout_all(
 ) -> dict:
     """Increment token_version to invalidate ALL sessions everywhere."""
     current_user.token_version += 1
+    await log_event(db, "logout_all_sessions", user_id=current_user.id)
     await db.commit()
     _clear_refresh_cookie(response)
     return {"data": {"message": "All sessions invalidated"}, "meta": {}}
@@ -254,6 +320,7 @@ async def change_password(
 
     current_user.password_hash = hash_password(body.new_password)
     current_user.token_version += 1
+    await log_event(db, "password_change", user_id=current_user.id)
     await db.commit()
 
     # Issue fresh tokens with new version
@@ -336,3 +403,52 @@ async def upsert_profile(
         ),
         "meta": {},
     }
+
+
+# ---------------------------------------------------------------------------
+# Email verification
+# ---------------------------------------------------------------------------
+
+
+@router.get("/verify-email")
+async def verify_email(
+    token: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Verify a user's email address using the token from the verification email."""
+    try:
+        user = await verify_token(token, db)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    await log_event(db, "email_verified", user_id=user.id)
+    await db.commit()
+    return {"data": {"message": "Email verified successfully"}, "meta": {}}
+
+
+@router.post("/resend-verification")
+async def resend_verification(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Resend the verification email. Rate limited: 1 per 5 minutes."""
+    if current_user.email_verified:
+        return {"data": {"message": "Email already verified"}, "meta": {}}
+
+    # Rate limit: 1 per 5 minutes
+    if current_user.email_verification_sent_at is not None:
+        sent_at = current_user.email_verification_sent_at
+        if sent_at.tzinfo is None:
+            sent_at = sent_at.replace(tzinfo=timezone.utc)
+        elapsed = (datetime.now(timezone.utc) - sent_at).total_seconds()
+        if elapsed < 300:  # 5 minutes
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Please wait 5 minutes before requesting another verification email",
+            )
+
+    await send_verification_email(current_user, db)
+    await db.commit()
+    return {"data": {"message": "Verification email sent"}, "meta": {}}

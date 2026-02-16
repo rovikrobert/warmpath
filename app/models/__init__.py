@@ -26,3 +26,4 @@ from app.models.marketplace import (  # noqa: E402, F401
 )
 from app.models.credits import CreditTransaction  # noqa: E402, F401
 from app.models.privacy import SuppressionList  # noqa: E402, F401
+from app.models.audit import AuditLog  # noqa: E402, F401

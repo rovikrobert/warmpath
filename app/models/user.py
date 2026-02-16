@@ -31,7 +31,7 @@ class User(Base):
         Boolean, nullable=False, server_default="true"
     )
     is_verified: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="false"
+        Boolean, nullable=False, default=False, server_default="false"
     )
     plan_tier: Mapped[str] = mapped_column(
         String(50), nullable=False, server_default="free"
@@ -48,7 +48,7 @@ class User(Base):
     )
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     email_verified: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="false"
+        Boolean, nullable=False, default=False, server_default="false"
     )
     email_verification_token: Mapped[str | None] = mapped_column(String(255))
     email_verification_sent_at: Mapped[datetime | None] = mapped_column(

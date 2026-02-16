@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.contact import Contact
 from app.models.marketplace import IntroFacilitation, MarketplaceListing
 from app.models.privacy import SuppressionList
+from app.services.audit_logger import log_event
 from app.utils.hashing import hash_for_suppression
 
 
@@ -67,6 +68,12 @@ async def add_to_suppression(
     )
     db.add(entry)
     await db.flush()
+
+    await log_event(
+        db,
+        "suppression_added",
+        metadata={"reason": reason, "suppression_id": str(entry.id)},
+    )
 
     # Purge across all vaults
     await purge_suppressed_person(email_hash, name_company_hash, db)

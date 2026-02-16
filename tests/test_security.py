@@ -1,9 +1,16 @@
-"""Tests for S1-S3: JWT refresh tokens, CSV hardening, security headers."""
+"""Tests for S1-S6: JWT refresh, CSV hardening, headers, CORS, email verification,
+lockout, audit log, Stripe webhook verification."""
 
+import hashlib
+import hmac
 import io
+import json
+import time
 
 from httpx import AsyncClient
+from sqlalchemy import select
 
+from app.models.audit import AuditLog
 from app.services.csv_parser import sanitize_cell
 
 
@@ -541,3 +548,443 @@ class TestSecurityHeaders:
             assert "includeSubDomains" in hsts
         finally:
             settings.SECURE_HEADERS = original
+
+
+# ===========================================================================
+# S6a: Account Lockout
+# ===========================================================================
+
+
+class TestAccountLockout:
+    async def test_5_failures_locks_account(self, client: AsyncClient):
+        """After 5 failed logins, the 6th returns 429."""
+        await _signup(client, email="lock@example.com")
+
+        # Fail 5 times
+        for _ in range(5):
+            resp = await _login(client, email="lock@example.com", password="wrong")
+            assert resp.status_code == 401
+
+        # 6th attempt should be locked
+        resp = await _login(client, email="lock@example.com", password="wrong")
+        assert resp.status_code == 429
+        assert "locked" in resp.json()["detail"].lower()
+
+    async def test_lockout_blocks_correct_password(self, client: AsyncClient):
+        """Even the correct password is rejected during lockout."""
+        await _signup(client, email="lock2@example.com")
+
+        for _ in range(5):
+            await _login(client, email="lock2@example.com", password="wrong")
+
+        # Correct password during lockout → still 429
+        resp = await _login(client, email="lock2@example.com", password="secret123")
+        assert resp.status_code == 429
+
+    async def test_lockout_expires(self, client: AsyncClient):
+        """Lockout expires after the window passes — simulate by resetting locked_until."""
+        await _signup(client, email="lock3@example.com")
+
+        for _ in range(5):
+            await _login(client, email="lock3@example.com", password="wrong")
+
+        # Simulate lockout expiry by clearing locked_until via DB
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.user import User
+
+            result = await session.execute(
+                select(User).where(User.email == "lock3@example.com")
+            )
+            user = result.scalar_one()
+            user.locked_until = None
+            user.failed_login_attempts = 0
+            await session.commit()
+
+        # Should be able to log in now
+        resp = await _login(client, email="lock3@example.com", password="secret123")
+        assert resp.status_code == 200
+
+    async def test_successful_login_resets_counter(self, client: AsyncClient):
+        """Successful login after failures resets the counter."""
+        await _signup(client, email="lock4@example.com")
+
+        # Fail 3 times (not enough to lock)
+        for _ in range(3):
+            await _login(client, email="lock4@example.com", password="wrong")
+
+        # Successful login
+        resp = await _login(client, email="lock4@example.com", password="secret123")
+        assert resp.status_code == 200
+
+        # Fail 3 more times (counter was reset, so still under threshold)
+        for _ in range(3):
+            await _login(client, email="lock4@example.com", password="wrong")
+
+        # Should NOT be locked (only 3 since reset, not 5)
+        resp = await _login(client, email="lock4@example.com", password="wrong")
+        assert resp.status_code == 401  # fails but not locked
+
+
+# ===========================================================================
+# S5: Email Verification
+# ===========================================================================
+
+
+class TestEmailVerification:
+    async def test_signup_creates_verification_token(self, client: AsyncClient):
+        """Signup should create a verification token on the user."""
+        await _signup(client, email="verify@example.com")
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.user import User
+
+            result = await session.execute(
+                select(User).where(User.email == "verify@example.com")
+            )
+            user = result.scalar_one()
+            assert user.email_verification_token is not None
+            assert user.email_verification_sent_at is not None
+            assert user.email_verified is False
+
+    async def test_verify_email_endpoint(self, client: AsyncClient):
+        """GET /verify-email with valid token marks email as verified."""
+        await _signup(client, email="verify2@example.com")
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.user import User
+
+            result = await session.execute(
+                select(User).where(User.email == "verify2@example.com")
+            )
+            user = result.scalar_one()
+            token = user.email_verification_token
+
+        resp = await client.get(f"/api/v1/auth/verify-email?token={token}")
+        assert resp.status_code == 200
+        assert "verified" in resp.json()["data"]["message"].lower()
+
+        # Confirm user is now verified in DB
+        async with TestSessionLocal() as session:
+            result = await session.execute(
+                select(User).where(User.email == "verify2@example.com")
+            )
+            user = result.scalar_one()
+            assert user.email_verified is True
+            assert user.email_verification_token is None
+
+    async def test_verify_email_invalid_token(self, client: AsyncClient):
+        """Invalid token returns 400."""
+        resp = await client.get("/api/v1/auth/verify-email?token=bogus-token-xyz")
+        assert resp.status_code == 400
+
+    async def test_verify_email_expired_token(self, client: AsyncClient):
+        """Token older than 24 hours is rejected."""
+        await _signup(client, email="verify3@example.com")
+
+        from datetime import datetime, timedelta, timezone
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.user import User
+
+            result = await session.execute(
+                select(User).where(User.email == "verify3@example.com")
+            )
+            user = result.scalar_one()
+            token = user.email_verification_token
+            # Set sent_at to 25 hours ago
+            user.email_verification_sent_at = datetime.now(timezone.utc) - timedelta(
+                hours=25
+            )
+            await session.commit()
+
+        resp = await client.get(f"/api/v1/auth/verify-email?token={token}")
+        assert resp.status_code == 400
+        assert "expired" in resp.json()["detail"].lower()
+
+    async def test_unverified_blocked_from_marketplace_search(
+        self, client: AsyncClient
+    ):
+        """Unverified user cannot access marketplace search."""
+        resp = await _signup(client, email="unver@example.com")
+        token = resp.json()["data"]["access_token"]
+
+        resp2 = await client.post(
+            "/api/v1/marketplace/search",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"company_names": ["Stripe"]},
+        )
+        assert resp2.status_code == 403
+        assert "verify" in resp2.json()["detail"].lower()
+
+    async def test_unverified_can_upload_csv(self, client: AsyncClient):
+        """Unverified user CAN upload CSV (own-network feature)."""
+        resp = await _signup(client, email="unver2@example.com")
+        token = resp.json()["data"]["access_token"]
+
+        csv_bytes = b"First Name,Last Name,Company,Position,Connected On\nJohn,Doe,Acme,Engineer,01 Jan 2024\n"
+        resp2 = await client.post(
+            "/api/v1/contacts/upload",
+            headers={"Authorization": f"Bearer {token}"},
+            files={"file": ("test.csv", csv_bytes, "text/csv")},
+        )
+        assert resp2.status_code == 201
+
+    async def test_unverified_can_view_own_contacts(self, client: AsyncClient):
+        """Unverified user CAN view their own contacts."""
+        resp = await _signup(client, email="unver3@example.com")
+        token = resp.json()["data"]["access_token"]
+
+        resp2 = await client.get(
+            "/api/v1/contacts",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp2.status_code == 200
+
+    async def test_resend_verification(self, client: AsyncClient):
+        """Resend verification endpoint works and updates token."""
+        resp = await _signup(client, email="resend@example.com")
+        token = resp.json()["data"]["access_token"]
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.user import User
+
+            result = await session.execute(
+                select(User).where(User.email == "resend@example.com")
+            )
+            user = result.scalar_one()
+            old_token = user.email_verification_token
+            # Clear sent_at so rate limit doesn't block
+            user.email_verification_sent_at = None
+            await session.commit()
+
+        resp2 = await client.post(
+            "/api/v1/auth/resend-verification",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp2.status_code == 200
+
+        async with TestSessionLocal() as session:
+            result = await session.execute(
+                select(User).where(User.email == "resend@example.com")
+            )
+            user = result.scalar_one()
+            assert user.email_verification_token is not None
+            assert user.email_verification_token != old_token
+
+    async def test_resend_rate_limited(self, client: AsyncClient):
+        """Resend within 5 minutes returns 429."""
+        resp = await _signup(client, email="resend2@example.com")
+        token = resp.json()["data"]["access_token"]
+
+        # Immediately try to resend (sent_at was just set by signup)
+        resp2 = await client.post(
+            "/api/v1/auth/resend-verification",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp2.status_code == 429
+
+
+# ===========================================================================
+# S6b: Audit Log
+# ===========================================================================
+
+
+class TestAuditLog:
+    async def test_login_creates_audit_entry(self, client: AsyncClient):
+        """Successful login writes to audit_logs."""
+        await _signup(client, email="audit@example.com")
+        await _login(client, email="audit@example.com")
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            result = await session.execute(
+                select(AuditLog).where(AuditLog.action == "login_success")
+            )
+            entries = list(result.scalars())
+            assert len(entries) >= 1
+
+    async def test_failed_login_creates_audit_entry(self, client: AsyncClient):
+        """Failed login writes to audit_logs."""
+        await _signup(client, email="audit2@example.com")
+        await _login(client, email="audit2@example.com", password="wrong")
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            result = await session.execute(
+                select(AuditLog).where(AuditLog.action == "login_failure")
+            )
+            entries = list(result.scalars())
+            assert len(entries) >= 1
+
+    async def test_lockout_creates_audit_entry(self, client: AsyncClient):
+        """Account lockout writes to audit_logs."""
+        await _signup(client, email="audit3@example.com")
+        for _ in range(5):
+            await _login(client, email="audit3@example.com", password="wrong")
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            result = await session.execute(
+                select(AuditLog).where(AuditLog.action == "login_lockout")
+            )
+            entries = list(result.scalars())
+            assert len(entries) >= 1
+
+    async def test_password_change_creates_audit_entry(self, client: AsyncClient):
+        """Password change writes to audit_logs."""
+        resp = await _signup(client, email="audit4@example.com")
+        token = resp.json()["data"]["access_token"]
+
+        await client.post(
+            "/api/v1/auth/change-password",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"old_password": "secret123", "new_password": "newpass456"},
+        )
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            result = await session.execute(
+                select(AuditLog).where(AuditLog.action == "password_change")
+            )
+            entries = list(result.scalars())
+            assert len(entries) >= 1
+
+    async def test_email_verified_creates_audit_entry(self, client: AsyncClient):
+        """Email verification writes to audit_logs."""
+        await _signup(client, email="audit5@example.com")
+
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            from app.models.user import User
+
+            result = await session.execute(
+                select(User).where(User.email == "audit5@example.com")
+            )
+            user = result.scalar_one()
+            token = user.email_verification_token
+
+        await client.get(f"/api/v1/auth/verify-email?token={token}")
+
+        async with TestSessionLocal() as session:
+            result = await session.execute(
+                select(AuditLog).where(AuditLog.action == "email_verified")
+            )
+            entries = list(result.scalars())
+            assert len(entries) >= 1
+
+    async def test_audit_log_append_only(self, client: AsyncClient):
+        """Audit log entries cannot be updated or deleted via SQLAlchemy.
+
+        We verify this by checking the table has no updated_at or deleted_at columns.
+        """
+        from app.models.audit import AuditLog
+
+        column_names = {c.name for c in AuditLog.__table__.columns}
+        assert "updated_at" not in column_names
+        assert "deleted_at" not in column_names
+
+
+# ===========================================================================
+# Stripe Webhook Verification
+# ===========================================================================
+
+
+class TestStripeWebhook:
+    def _make_signature(self, payload: bytes, secret: str) -> str:
+        """Build a valid Stripe-Signature header."""
+        ts = str(int(time.time()))
+        signed_payload = f"{ts}.".encode() + payload
+        sig = hmac.new(secret.encode(), signed_payload, hashlib.sha256).hexdigest()
+        return f"t={ts},v1={sig}"
+
+    async def test_webhook_accepted_without_secret(self, client: AsyncClient):
+        """When STRIPE_WEBHOOK_SECRET is empty, webhooks are accepted."""
+        from app.config import settings
+
+        original = settings.STRIPE_WEBHOOK_SECRET
+        settings.STRIPE_WEBHOOK_SECRET = ""
+        try:
+            resp = await client.post(
+                "/api/v1/webhooks/stripe",
+                content=json.dumps({"type": "checkout.session.completed"}),
+                headers={"content-type": "application/json"},
+            )
+            assert resp.status_code == 200
+            assert resp.json()["data"]["received"] is True
+        finally:
+            settings.STRIPE_WEBHOOK_SECRET = original
+
+    async def test_webhook_valid_signature_accepted(self, client: AsyncClient):
+        """Valid signature is accepted."""
+        from app.config import settings
+
+        secret = "whsec_test_secret_12345"
+        original = settings.STRIPE_WEBHOOK_SECRET
+        settings.STRIPE_WEBHOOK_SECRET = secret
+        try:
+            payload = json.dumps({"type": "invoice.paid"}).encode()
+            sig = self._make_signature(payload, secret)
+            resp = await client.post(
+                "/api/v1/webhooks/stripe",
+                content=payload,
+                headers={
+                    "content-type": "application/json",
+                    "stripe-signature": sig,
+                },
+            )
+            assert resp.status_code == 200
+            assert resp.json()["data"]["type"] == "invoice.paid"
+        finally:
+            settings.STRIPE_WEBHOOK_SECRET = original
+
+    async def test_webhook_invalid_signature_rejected(self, client: AsyncClient):
+        """Invalid signature returns 400."""
+        from app.config import settings
+
+        original = settings.STRIPE_WEBHOOK_SECRET
+        settings.STRIPE_WEBHOOK_SECRET = "whsec_real_secret"
+        try:
+            payload = json.dumps({"type": "checkout.session.completed"}).encode()
+            resp = await client.post(
+                "/api/v1/webhooks/stripe",
+                content=payload,
+                headers={
+                    "content-type": "application/json",
+                    "stripe-signature": "t=123,v1=invalidsignature",
+                },
+            )
+            assert resp.status_code == 400
+        finally:
+            settings.STRIPE_WEBHOOK_SECRET = original
+
+    async def test_webhook_missing_signature_rejected(self, client: AsyncClient):
+        """Missing Stripe-Signature header returns 400 when secret is set."""
+        from app.config import settings
+
+        original = settings.STRIPE_WEBHOOK_SECRET
+        settings.STRIPE_WEBHOOK_SECRET = "whsec_real_secret"
+        try:
+            resp = await client.post(
+                "/api/v1/webhooks/stripe",
+                content=json.dumps({"type": "test"}).encode(),
+                headers={"content-type": "application/json"},
+            )
+            assert resp.status_code == 400
+            assert "Missing" in resp.json()["detail"]
+        finally:
+            settings.STRIPE_WEBHOOK_SECRET = original
