@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [justSignedUp, setJustSignedUp] = useState(false);
 
   const getToken = useCallback(() => token, [token]);
 
@@ -28,11 +29,18 @@ export function AuthProvider({ children }) {
     }
   }, [token, user]);
 
+  const refreshUser = useCallback(async () => {
+    const res = await authApi.me();
+    setUser(res.data);
+    return res.data;
+  }, []);
+
   const login = useCallback(async (credentials) => {
     const res = await authApi.login(credentials);
     setToken(res.data.access_token);
     const me = await authApi.me();
     setUser(me.data);
+    setJustSignedUp(false);
     return me.data;
   }, []);
 
@@ -41,16 +49,18 @@ export function AuthProvider({ children }) {
     setToken(res.data.access_token);
     const me = await authApi.me();
     setUser(me.data);
+    setJustSignedUp(true);
     return me.data;
   }, []);
 
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
+    setJustSignedUp(false);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ token, user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ token, user, loading, login, signup, logout, refreshUser, justSignedUp, setJustSignedUp }}>
       {children}
     </AuthContext.Provider>
   );

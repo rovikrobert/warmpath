@@ -3,9 +3,13 @@ import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
-import NewSearch from './pages/NewSearch';
 import SearchResults from './pages/SearchResults';
 import EditProfile from './pages/EditProfile';
+import OnboardingPage from './pages/OnboardingPage';
+import FindReferrals from './pages/FindReferrals';
+import ReferralResults from './pages/ReferralResults';
+import MarketplaceDashboard from './pages/MarketplaceDashboard';
+import MyRequests from './pages/MyRequests';
 
 function ProtectedRoute({ children }) {
   const { token, loading } = useAuth();
@@ -19,8 +23,15 @@ function ProtectedRoute({ children }) {
   return token ? children : <Navigate to="/" replace />;
 }
 
+function RootRedirect() {
+  const { token, justSignedUp } = useAuth();
+  if (!token) return <AuthPage />;
+  if (justSignedUp) return <Navigate to="/onboarding" replace />;
+  return <Navigate to="/dashboard" replace />;
+}
+
 export default function App() {
-  const { token, loading } = useAuth();
+  const { loading } = useAuth();
 
   if (loading) {
     return (
@@ -32,11 +43,16 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={token ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
+      <Route path="/" element={<RootRedirect />} />
+      <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/search/new" element={<NewSearch />} />
+        <Route path="/search/new" element={<FindReferrals />} />
         <Route path="/search/:id" element={<SearchResults />} />
+        <Route path="/referrals" element={<FindReferrals />} />
+        <Route path="/referrals/:id" element={<ReferralResults />} />
+        <Route path="/marketplace" element={<MarketplaceDashboard />} />
+        <Route path="/my-requests" element={<MyRequests />} />
         <Route path="/profile/edit" element={<EditProfile />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

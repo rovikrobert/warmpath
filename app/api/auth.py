@@ -11,6 +11,7 @@ from app.schemas.user import (
     UserCreate,
     UserLogin,
     UserResponse,
+    UserTypeUpdate,
 )
 from app.services.credits import earn_credits
 from app.utils.security import (
@@ -101,6 +102,27 @@ async def login(body: UserLogin, db: AsyncSession = Depends(get_db)) -> dict:
 async def get_me(current_user: User = Depends(get_current_user)) -> dict:
     return {
         "data": UserResponse.model_validate(current_user).model_dump(mode="json"),
+        "meta": {},
+    }
+
+
+@router.patch("/user-type")
+async def update_user_type(
+    body: UserTypeUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    valid_types = {"job_seeker", "network_holder", "both"}
+    if body.user_type not in valid_types:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"user_type must be one of: {', '.join(sorted(valid_types))}",
+        )
+    current_user.user_type = body.user_type
+    await db.commit()
+    await db.refresh(current_user)
+    return {
+        "data": {"user_type": current_user.user_type},
         "meta": {},
     }
 
