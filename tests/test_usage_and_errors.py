@@ -58,9 +58,9 @@ async def test_usage_stats_empty(client: AsyncClient):
     resp = await client.get("/api/v1/usage/me", headers=headers)
     assert resp.status_code == 200
     body = resp.json()["data"]
-    assert body["csv_uploads"] == 0
-    assert body["searches_run"] == 0
-    assert body["intros_drafted"] == 0
+    assert body["counts"]["csv_upload"] == 0
+    assert body["counts"]["smart_search"] == 0
+    assert body["counts"]["intro_draft"] == 0
 
 
 async def test_usage_stats_tracks_uploads(client: AsyncClient):
@@ -73,8 +73,8 @@ async def test_usage_stats_tracks_uploads(client: AsyncClient):
 
     resp = await client.get("/api/v1/usage/me", headers=headers)
     body = resp.json()["data"]
-    # At minimum, total_api_calls should be > 0 from the middleware
-    assert body["total_api_calls"] >= 1
+    # At minimum, total_metered_calls should be > 0 from the metering middleware
+    assert body["total_metered_calls"] >= 1
 
 
 async def test_usage_stats_requires_auth(client: AsyncClient):

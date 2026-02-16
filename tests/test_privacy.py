@@ -155,10 +155,12 @@ class TestSuppressionCheck:
     async def test_suppressed_by_email(self):
         async with TestSessionLocal() as db:
             email_hash = hash_for_suppression("bad@example.com")
-            db.add(SuppressionList(
-                email_hash=email_hash,
-                reason="self_request",
-            ))
+            db.add(
+                SuppressionList(
+                    email_hash=email_hash,
+                    reason="self_request",
+                )
+            )
             await db.flush()
 
             result = await check_suppression(
@@ -174,10 +176,12 @@ class TestSuppressionCheck:
         async with TestSessionLocal() as db:
             name_company = "JohnDoeAcme Corp"
             name_company_hash = hash_for_suppression(name_company)
-            db.add(SuppressionList(
-                name_company_hash=name_company_hash,
-                reason="legal_request",
-            ))
+            db.add(
+                SuppressionList(
+                    name_company_hash=name_company_hash,
+                    reason="legal_request",
+                )
+            )
             await db.flush()
 
             result = await check_suppression(
@@ -192,10 +196,12 @@ class TestSuppressionCheck:
     async def test_email_check_case_insensitive(self):
         async with TestSessionLocal() as db:
             email_hash = hash_for_suppression("test@example.com")
-            db.add(SuppressionList(
-                email_hash=email_hash,
-                reason="self_request",
-            ))
+            db.add(
+                SuppressionList(
+                    email_hash=email_hash,
+                    reason="self_request",
+                )
+            )
             await db.flush()
 
             result = await check_suppression(
@@ -305,9 +311,7 @@ class TestPurgeCascade:
             from sqlalchemy import select
 
             result = await db.execute(
-                select(Contact).where(
-                    Contact.id == suppressed_contact["id"]
-                )
+                select(Contact).where(Contact.id == suppressed_contact["id"])
             )
             contact = result.scalar_one()
             assert contact.deleted_at is not None
@@ -339,9 +343,7 @@ class TestPurgeCascade:
             from sqlalchemy import select
 
             result = await db.execute(
-                select(MarketplaceListing).where(
-                    MarketplaceListing.id == listing.id
-                )
+                select(MarketplaceListing).where(MarketplaceListing.id == listing.id)
             )
             deleted_listing = result.scalar_one()
             assert deleted_listing.deleted_at is not None
@@ -382,9 +384,7 @@ class TestPurgeCascade:
             from sqlalchemy import select
 
             result = await db.execute(
-                select(IntroFacilitation).where(
-                    IntroFacilitation.id == facilitation.id
-                )
+                select(IntroFacilitation).where(IntroFacilitation.id == facilitation.id)
             )
             updated = result.scalar_one()
             assert updated.status == "expired"
@@ -460,9 +460,7 @@ class TestPurgeCascade:
 
             from sqlalchemy import select
 
-            result = await db.execute(
-                select(Contact).where(Contact.id == contact.id)
-            )
+            result = await db.execute(select(Contact).where(Contact.id == contact.id))
             c = result.scalar_one()
             assert c.deleted_at is not None
 
@@ -495,15 +493,15 @@ class TestSuppressionDuringIndexing:
             db.add(clean)
 
             # Add suppression entry
-            db.add(SuppressionList(
-                email_hash=hash_for_suppression("suppressed@example.com"),
-                reason="self_request",
-            ))
+            db.add(
+                SuppressionList(
+                    email_hash=hash_for_suppression("suppressed@example.com"),
+                    reason="self_request",
+                )
+            )
 
             # Set up sharing preferences
-            db.add(NetworkSharingPreferences(
-                user_id=uid, opt_in_marketplace=True
-            ))
+            db.add(NetworkSharingPreferences(user_id=uid, opt_in_marketplace=True))
             await db.flush()
 
             count = await generate_marketplace_listings(uid, db)
@@ -525,13 +523,15 @@ class TestCsvImportSuppression:
 
         # Add someone to suppression list
         async with TestSessionLocal() as db:
-            db.add(SuppressionList(
-                email_hash=hash_for_suppression("suppressed@example.com"),
-                name_company_hash=hash_for_suppression(
-                    "SuppressedPersonExample Corp"
-                ),
-                reason="self_request",
-            ))
+            db.add(
+                SuppressionList(
+                    email_hash=hash_for_suppression("suppressed@example.com"),
+                    name_company_hash=hash_for_suppression(
+                        "SuppressedPersonExample Corp"
+                    ),
+                    reason="self_request",
+                )
+            )
             await db.commit()
 
         # Build a CSV with one clean and one suppressed contact
@@ -558,9 +558,7 @@ class TestCsvImportSuppression:
         assert resp.status_code in (200, 201, 202)
 
         # Check only 1 contact was created (suppressed one skipped)
-        contacts_resp = await client.get(
-            "/api/v1/contacts", headers=auth_headers
-        )
+        contacts_resp = await client.get("/api/v1/contacts", headers=auth_headers)
         contacts = contacts_resp.json()["data"]
         names = [c["full_name"] for c in contacts]
         assert "Clean Contact" in names

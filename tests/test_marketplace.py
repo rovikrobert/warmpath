@@ -98,36 +98,42 @@ async def company_and_contacts(user_id: str):
         await db.flush()
 
         # Add warm scores
-        db.add(WarmScore(
-            user_id=uid,
-            contact_id=contacts[0].id,
-            total_score=80,
-            recency_score=90,
-            tenure_score=70,
-            context_score=80,
-            role_score=75,
-            referral_likelihood="high",
-        ))
-        db.add(WarmScore(
-            user_id=uid,
-            contact_id=contacts[1].id,
-            total_score=55,
-            recency_score=40,
-            tenure_score=60,
-            context_score=50,
-            role_score=70,
-            referral_likelihood="medium",
-        ))
-        db.add(WarmScore(
-            user_id=uid,
-            contact_id=contacts[2].id,
-            total_score=30,
-            recency_score=20,
-            tenure_score=30,
-            context_score=40,
-            role_score=30,
-            referral_likelihood="low",
-        ))
+        db.add(
+            WarmScore(
+                user_id=uid,
+                contact_id=contacts[0].id,
+                total_score=80,
+                recency_score=90,
+                tenure_score=70,
+                context_score=80,
+                role_score=75,
+                referral_likelihood="high",
+            )
+        )
+        db.add(
+            WarmScore(
+                user_id=uid,
+                contact_id=contacts[1].id,
+                total_score=55,
+                recency_score=40,
+                tenure_score=60,
+                context_score=50,
+                role_score=70,
+                referral_likelihood="medium",
+            )
+        )
+        db.add(
+            WarmScore(
+                user_id=uid,
+                contact_id=contacts[2].id,
+                total_score=30,
+                recency_score=20,
+                tenure_score=30,
+                context_score=40,
+                role_score=30,
+                referral_likelihood="low",
+            )
+        )
         await db.commit()
 
         return {
@@ -248,13 +254,20 @@ class TestClassifyWarmScoreRange:
 
 class TestClassifyConnectionRecency:
     def test_recent(self):
-        assert classify_connection_recency(date.today() - timedelta(days=100)) == "recent"
+        assert (
+            classify_connection_recency(date.today() - timedelta(days=100)) == "recent"
+        )
 
     def test_moderate(self):
-        assert classify_connection_recency(date.today() - timedelta(days=600)) == "moderate"
+        assert (
+            classify_connection_recency(date.today() - timedelta(days=600))
+            == "moderate"
+        )
 
     def test_stale(self):
-        assert classify_connection_recency(date.today() - timedelta(days=1500)) == "stale"
+        assert (
+            classify_connection_recency(date.today() - timedelta(days=1500)) == "stale"
+        )
 
     def test_none(self):
         assert classify_connection_recency(None) == "stale"
@@ -277,9 +290,7 @@ class TestGenerateMarketplaceListings:
         """Opted out of marketplace = no listings generated."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
-            db.add(NetworkSharingPreferences(
-                user_id=uid, opt_in_marketplace=False
-            ))
+            db.add(NetworkSharingPreferences(user_id=uid, opt_in_marketplace=False))
             await db.flush()
             count = await generate_marketplace_listings(uid, db)
             assert count == 0
@@ -288,9 +299,11 @@ class TestGenerateMarketplaceListings:
         """Paused sharing = no listings generated."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
-            db.add(NetworkSharingPreferences(
-                user_id=uid, opt_in_marketplace=True, is_paused=True
-            ))
+            db.add(
+                NetworkSharingPreferences(
+                    user_id=uid, opt_in_marketplace=True, is_paused=True
+                )
+            )
             await db.flush()
             count = await generate_marketplace_listings(uid, db)
             assert count == 0
@@ -299,9 +312,7 @@ class TestGenerateMarketplaceListings:
         """Opted-in network holder gets listings for all contacts."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
-            db.add(NetworkSharingPreferences(
-                user_id=uid, opt_in_marketplace=True
-            ))
+            db.add(NetworkSharingPreferences(user_id=uid, opt_in_marketplace=True))
             await db.flush()
             count = await generate_marketplace_listings(uid, db)
             assert count == 3
@@ -310,9 +321,7 @@ class TestGenerateMarketplaceListings:
         """Listings contain no PII — only anonymized fields."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
-            db.add(NetworkSharingPreferences(
-                user_id=uid, opt_in_marketplace=True
-            ))
+            db.add(NetworkSharingPreferences(user_id=uid, opt_in_marketplace=True))
             await db.flush()
             await generate_marketplace_listings(uid, db)
             await db.flush()
@@ -329,11 +338,25 @@ class TestGenerateMarketplaceListings:
             for row in rows:
                 # Anonymized fields present
                 assert row.role_level in (
-                    "junior", "mid", "senior", "lead", "director", "vp", "c_suite"
+                    "junior",
+                    "mid",
+                    "senior",
+                    "lead",
+                    "director",
+                    "vp",
+                    "c_suite",
                 )
                 assert row.department_category in (
-                    "engineering", "product", "design", "marketing", "sales",
-                    "ops", "finance", "hr", "legal", "other"
+                    "engineering",
+                    "product",
+                    "design",
+                    "marketing",
+                    "sales",
+                    "ops",
+                    "finance",
+                    "hr",
+                    "legal",
+                    "other",
                 )
                 assert row.warm_score_range in ("high", "medium", "low")
                 assert row.connection_recency in ("recent", "moderate", "stale")
@@ -342,18 +365,18 @@ class TestGenerateMarketplaceListings:
         """Role levels match the contact titles."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
-            db.add(NetworkSharingPreferences(
-                user_id=uid, opt_in_marketplace=True
-            ))
+            db.add(NetworkSharingPreferences(user_id=uid, opt_in_marketplace=True))
             await db.flush()
             await generate_marketplace_listings(uid, db)
             await db.flush()
 
             result = await db.execute(
-                MarketplaceListing.__table__.select().where(
+                MarketplaceListing.__table__.select()
+                .where(
                     MarketplaceListing.network_holder_id == uid,
                     MarketplaceListing.deleted_at.is_(None),
-                ).order_by(MarketplaceListing.role_level)
+                )
+                .order_by(MarketplaceListing.role_level)
             )
             rows = result.fetchall()
             role_levels = sorted(r.role_level for r in rows)
@@ -364,18 +387,18 @@ class TestGenerateMarketplaceListings:
         """Warm score ranges derived from actual warm scores."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
-            db.add(NetworkSharingPreferences(
-                user_id=uid, opt_in_marketplace=True
-            ))
+            db.add(NetworkSharingPreferences(user_id=uid, opt_in_marketplace=True))
             await db.flush()
             await generate_marketplace_listings(uid, db)
             await db.flush()
 
             result = await db.execute(
-                MarketplaceListing.__table__.select().where(
+                MarketplaceListing.__table__.select()
+                .where(
                     MarketplaceListing.network_holder_id == uid,
                     MarketplaceListing.deleted_at.is_(None),
-                ).order_by(MarketplaceListing.warm_score_range)
+                )
+                .order_by(MarketplaceListing.warm_score_range)
             )
             rows = result.fetchall()
             ranges = sorted(r.warm_score_range for r in rows)
@@ -389,11 +412,13 @@ class TestGenerateMarketplaceListings:
         excluded_id = str(contact_ids[0])  # Exclude Alice
 
         async with TestSessionLocal() as db:
-            db.add(NetworkSharingPreferences(
-                user_id=uid,
-                opt_in_marketplace=True,
-                excluded_contact_ids=[excluded_id],
-            ))
+            db.add(
+                NetworkSharingPreferences(
+                    user_id=uid,
+                    opt_in_marketplace=True,
+                    excluded_contact_ids=[excluded_id],
+                )
+            )
             await db.flush()
             count = await generate_marketplace_listings(uid, db)
             assert count == 2  # Bob and Charlie only
@@ -402,11 +427,13 @@ class TestGenerateMarketplaceListings:
         """Category filters restrict listings to specific departments."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
-            db.add(NetworkSharingPreferences(
-                user_id=uid,
-                opt_in_marketplace=True,
-                category_filters={"include_departments": ["engineering"]},
-            ))
+            db.add(
+                NetworkSharingPreferences(
+                    user_id=uid,
+                    opt_in_marketplace=True,
+                    category_filters={"include_departments": ["engineering"]},
+                )
+            )
             await db.flush()
             count = await generate_marketplace_listings(uid, db)
             # Alice (Senior Software Engineer) = engineering
@@ -420,9 +447,7 @@ class TestGenerateMarketplaceListings:
         """Re-running indexer soft-deletes old listings and creates new ones."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
-            db.add(NetworkSharingPreferences(
-                user_id=uid, opt_in_marketplace=True
-            ))
+            db.add(NetworkSharingPreferences(user_id=uid, opt_in_marketplace=True))
             await db.flush()
 
             # First run
@@ -450,11 +475,13 @@ class TestGenerateMarketplaceListings:
         company_id = company_and_contacts["company_id"]
 
         async with TestSessionLocal() as db:
-            db.add(NetworkSharingPreferences(
-                user_id=uid,
-                opt_in_marketplace=True,
-                category_filters={"exclude_companies": [str(company_id)]},
-            ))
+            db.add(
+                NetworkSharingPreferences(
+                    user_id=uid,
+                    opt_in_marketplace=True,
+                    category_filters={"exclude_companies": [str(company_id)]},
+                )
+            )
             await db.flush()
             count = await generate_marketplace_listings(uid, db)
             assert count == 0  # All contacts at Stripe, which is excluded

@@ -312,17 +312,13 @@ async def test_full_user_journey(client: AsyncClient):
     assert usage_resp.status_code == 200
     usage = usage_resp.json()["data"]
 
-    # The middleware should have logged:
+    # The metering middleware should have logged:
     #  - csv_upload (1 upload)
-    #  - search_create (1 search created)
-    #  - search_run (1 search run)
-    #  - contacts_list, companies_list, etc.
     #  - intro_draft (1 intro created)
-    # total_api_calls covers all authenticated API requests
-    assert usage["total_api_calls"] >= 5  # at minimum several calls were made
-    assert usage["csv_uploads"] >= 1
-    assert usage["searches_run"] >= 1
-    assert usage["intros_drafted"] >= 1
+    # total_metered_calls covers only the 7 metered actions
+    assert usage["total_metered_calls"] >= 1
+    assert usage["counts"]["csv_upload"] >= 1
+    assert usage["counts"]["intro_draft"] >= 1
 
 
 # ---------------------------------------------------------------------------

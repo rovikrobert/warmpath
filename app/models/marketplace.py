@@ -173,9 +173,7 @@ class IntroFacilitation(Base):
 
 class ConnectorReputation(Base):
     __tablename__ = "connector_reputation"
-    __table_args__ = (
-        UniqueConstraint("user_id", name="uq_connector_reputation_user"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", name="uq_connector_reputation_user"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -194,9 +192,7 @@ class ConnectorReputation(Base):
     response_rate: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="0"
     )
-    avg_rating: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default="0"
-    )
+    avg_rating: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     reputation_score: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="0"
     )

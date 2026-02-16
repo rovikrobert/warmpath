@@ -39,7 +39,12 @@ from app.schemas.marketplace import (
     NetworkSharingPreferencesResponse,
     NetworkSharingPrefsUpdate,
 )
-from app.services.credits import earn_credits, get_balance, refund_credits, spend_credits
+from app.services.credits import (
+    earn_credits,
+    get_balance,
+    refund_credits,
+    spend_credits,
+)
 from app.services.marketplace_indexer import generate_marketplace_listings
 from app.utils.security import get_current_user
 
@@ -75,9 +80,7 @@ def _build_listing_summary(
     )
 
 
-def _build_seeker_profile_snapshot(
-    user: User, visibility: str
-) -> dict:
+def _build_seeker_profile_snapshot(user: User, visibility: str) -> dict:
     """Build a profile snapshot based on visibility level."""
     if visibility == "full":
         return {
@@ -283,7 +286,9 @@ async def my_requests(
         resp = IntroFacilitationResponse.model_validate(f).model_dump(mode="json")
         # Load listing summary for context
         listing_result = await db.execute(
-            select(MarketplaceListing).where(MarketplaceListing.id == f.marketplace_listing_id)
+            select(MarketplaceListing).where(
+                MarketplaceListing.id == f.marketplace_listing_id
+            )
         )
         listing = listing_result.scalar_one_or_none()
         if listing:

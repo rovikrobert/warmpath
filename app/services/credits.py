@@ -111,9 +111,7 @@ async def spend_credits(
     """Deduct credits from a user. Raises ValueError if insufficient balance."""
     balance = await get_balance(user_id, db)
     if balance < amount:
-        raise ValueError(
-            f"Insufficient credits: have {balance}, need {amount}"
-        )
+        raise ValueError(f"Insufficient credits: have {balance}, need {amount}")
     txn = CreditTransaction(
         user_id=user_id,
         amount=-amount,
