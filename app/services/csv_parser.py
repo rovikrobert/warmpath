@@ -68,6 +68,24 @@ _RECRUITER_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Characters that trigger formula injection in spreadsheets
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+MAX_CSV_ROWS = 50_000
+
+
+def sanitize_cell(value: str | None) -> str | None:
+    """Sanitize a CSV cell value to prevent formula injection.
+
+    Any cell starting with =, +, -, @, \\t, or \\r is prefixed with a
+    single quote so spreadsheet applications don't execute it as a formula.
+    """
+    if not value:
+        return value
+    if value.startswith(_FORMULA_PREFIXES):
+        return "'" + value
+    return value
+
 
 def _normalize_header(header: str) -> str | None:
     """Map a raw CSV header to our internal field name, or None if unknown."""
@@ -82,13 +100,13 @@ def _normalize_manual_header(header: str) -> str | None:
 def _title_case(value: str | None) -> str | None:
     if not value or not value.strip():
         return None
-    return value.strip().title()
+    return sanitize_cell(value.strip().title())
 
 
 def _clean(value: str | None) -> str | None:
     if not value or not value.strip():
         return None
-    return value.strip()
+    return sanitize_cell(value.strip())
 
 
 def _parse_connected_on(value: str | None) -> date | None:
@@ -123,14 +141,16 @@ def generate_fingerprint(
 
 
 def _decode_csv_bytes(raw: bytes) -> str:
-    """Decode CSV bytes, trying UTF-8 first then Latin-1 as fallback."""
+    """Decode CSV bytes as UTF-8. Raises ValueError on non-UTF-8 input."""
     # Strip BOM if present
     if raw.startswith(b"\xef\xbb\xbf"):
         raw = raw[3:]
     try:
         return raw.decode("utf-8")
-    except UnicodeDecodeError:
-        return raw.decode("latin-1")
+    except UnicodeDecodeError as exc:
+        raise ValueError(
+            "CSV file is not valid UTF-8. Please re-export your file with UTF-8 encoding."
+        ) from exc
 
 
 def classify_relationship(
@@ -227,7 +247,15 @@ def parse_manual_csv(raw_bytes: bytes) -> list[dict]:
             header_map[raw_header] = internal
 
     contacts: list[dict] = []
+    row_count = 0
     for row in reader:
+        row_count += 1
+        if row_count > MAX_CSV_ROWS:
+            raise ValueError(
+                f"CSV exceeds maximum of {MAX_CSV_ROWS:,} rows. "
+                "Please split the file into smaller batches."
+            )
+
         mapped: dict[str, str | None] = {}
         for raw_header, internal_name in header_map.items():
             mapped[internal_name] = row.get(raw_header)
@@ -329,7 +357,15 @@ def parse_linkedin_csv(raw_bytes: bytes) -> list[dict]:
             header_map[raw_header] = internal
 
     contacts: list[dict] = []
+    row_count = 0
     for row in reader:
+        row_count += 1
+        if row_count > MAX_CSV_ROWS:
+            raise ValueError(
+                f"CSV exceeds maximum of {MAX_CSV_ROWS:,} rows. "
+                "Please split the file into smaller batches."
+            )
+
         # Remap to internal names
         mapped: dict[str, str | None] = {}
         for raw_header, internal_name in header_map.items():

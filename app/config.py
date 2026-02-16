@@ -4,7 +4,11 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     DATABASE_URL: str = "[DATABASE_URL_REDACTED]"
     SECRET_KEY: str = "change-me-to-a-random-secret"
-    ACCESS_TOKEN_EXPIRE_DAYS: int = 7
+    ACCESS_TOKEN_EXPIRE_DAYS: int = 7  # legacy — kept for migration compat
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    SECURE_COOKIES: bool = False  # True in production (requires HTTPS)
+    SECURE_HEADERS: bool = False  # True in production — enables HSTS
     ANTHROPIC_API_KEY: str = ""
     AI_MOCK_MODE: bool = True
     REDIS_URL: str = "redis://localhost:6379/0"

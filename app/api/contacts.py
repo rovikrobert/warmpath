@@ -37,6 +37,10 @@ def _contact_to_response(contact: Contact, warm_sco[RESEND_KEY_REDACTED]: float 
     return resp
 
 
+MAX_CSV_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_CSV_CONTENT_TYPES = {"text/csv", "application/octet-stream"}
+
+
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 async def upload_csv(
     file: UploadFile,
@@ -58,11 +62,32 @@ async def upload_csv(
             detail="Only CSV files are accepted",
         )
 
-    raw_bytes = await file.read()
+    # Content-type validation
+    ct = (file.content_type or "").split(";")[0].strip().lower()
+    if ct and ct not in ALLOWED_CSV_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Content type '{file.content_type}' is not supported. "
+            "Upload a CSV file (text/csv).",
+        )
 
-    # Validate CSV is parseable before queuing
+    # File size limit — read with cap
+    raw_bytes = await file.read()
+    if len(raw_bytes) > MAX_CSV_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"CSV file exceeds the maximum allowed size of "
+            f"{MAX_CSV_FILE_SIZE // (1024 * 1024)} MB.",
+        )
+
+    # Validate CSV is parseable before queuing (also enforces row limit + encoding)
     try:
         parse_linkedin_csv(raw_bytes)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

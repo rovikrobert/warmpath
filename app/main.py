@@ -19,6 +19,7 @@ from app.api import (
     usage,
 )
 from app.config import settings
+from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.middleware.usage import UsageTrackingMiddleware
 from app.utils.exceptions import AppError
 
@@ -36,6 +37,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# Security headers
+# ---------------------------------------------------------------------------
+app.add_middleware(SecurityHeadersMiddleware)
 
 # ---------------------------------------------------------------------------
 # Usage tracking
