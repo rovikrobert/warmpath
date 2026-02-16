@@ -101,6 +101,21 @@ class ConnectorProfileResponse(BaseModel):
 # -- Job Preferences --
 
 
+class LinkedInCallbackRequest(BaseModel):
+    code: str
+    state: str
+
+
+class ResumeParseResponse(BaseModel):
+    headline: str | None = None
+    current_company: str | None = None
+    current_title: str | None = None
+    industry: str | None = None
+    location: str | None = None
+    bio_summary: str | None = None
+    work_history: list[WorkHistoryEntry] | None = None
+
+
 class JobPreferencesCreate(BaseModel):
     target_role: str
     target_seniority: str | None = None

@@ -1,8 +1,19 @@
 import hashlib
+import logging
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Cookie,
+    Depends,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +27,7 @@ from app.schemas.user import (
     ConnectorProfileUpsert,
     DeleteAccountRequest,
     ForgotPasswordRequest,
+    LinkedInCallbackRequest,
     ResetPasswordRequest,
     TokenResponse,
     UserCreate,
@@ -31,6 +43,12 @@ from app.services.email_service import (
     send_verification_email,
     verify_token,
 )
+from app.services.linkedin_oauth import (
+    exchange_code,
+    fetch_profile,
+    get_authorize_url,
+)
+from app.services.resume_parser import ResumeParseError, parse_resume
 from app.utils.security import (
     create_access_token,
     create_refresh_token,
@@ -40,6 +58,8 @@ from app.utils.security import (
     validate_password_strength,
     verify_password,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -184,7 +204,7 @@ async def login(
                 detail="Account temporarily locked. Try again in 15 minutes.",
             )
 
-    if user is None or not verify_password(body.password, user.password_hash):
+    if user is None or user.password_hash is None or not verify_password(body.password, user.password_hash):
         # Track failed login
         if user is not None:
             user.failed_login_attempts += 1
@@ -346,7 +366,12 @@ async def delete_account(
             detail="confirm_deletion must be true",
         )
 
-    # Verify password
+    # Verify password (OAuth-only users must still confirm via password field check)
+    if current_user.password_hash is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please set a password before deleting your account",
+        )
     if not verify_password(body.password, current_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -423,6 +448,11 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Verify old password, hash new one, increment token_version."""
+    if current_user.password_hash is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No password set. Use 'Set Password' to create one.",
+        )
     if not verify_password(body.old_password, current_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -574,6 +604,212 @@ async def resend_verification(
 
 
 # ---------------------------------------------------------------------------
+# LinkedIn OAuth
+# ---------------------------------------------------------------------------
+
+
+@router.get("/linkedin/authorize")
+async def linkedin_authorize() -> dict:
+    """Generate a LinkedIn OAuth2 authorization URL with a signed state token."""
+    nonce = secrets.token_urlsafe(32)
+    # Encode state as a short-lived JWT (10 min) so we can verify it on callback
+    from jose import jwt as jose_jwt
+
+    state_payload = {
+        "nonce": nonce,
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=10),
+        "type": "linkedin_state",
+    }
+    state = jose_jwt.encode(
+        state_payload, settings.SECRET_KEY, algorithm="HS256"
+    )
+    url = get_authorize_url(state)
+    return {"data": {"url": url, "state": state}, "meta": {}}
+
+
+@router.post("/linkedin/callback")
+async def linkedin_callback(
+    body: LinkedInCallbackRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Handle LinkedIn OAuth callback — login existing user or create new one."""
+    # 1. Verify state token
+    from jose import JWTError as JoseJWTError
+    from jose import jwt as jose_jwt
+
+    try:
+        state_data = jose_jwt.decode(
+            body.state, settings.SECRET_KEY, algorithms=["HS256"]
+        )
+    except JoseJWTError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired state token",
+        )
+    if state_data.get("type") != "linkedin_state":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid state token",
+        )
+
+    # 2. Exchange code for access token + fetch profile
+    try:
+        access_token = await exchange_code(body.code)
+        li_profile = await fetch_profile(access_token)
+    except Exception:
+        logger.exception("LinkedIn OAuth exchange failed")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to communicate with LinkedIn",
+        )
+
+    li_sub = li_profile["sub"]
+    li_email = li_profile.get("email", "").lower().strip()
+    li_name = li_profile.get("name", "")
+
+    # 3. Check if user with this LinkedIn identity already exists
+    result = await db.execute(
+        select(User).where(
+            User.oauth_provider == "linkedin",
+            User.oauth_provider_id == li_sub,
+            User.deleted_at.is_(None),
+        )
+    )
+    existing_oauth_user = result.scalar_one_or_none()
+
+    is_new_user = False
+
+    if existing_oauth_user is not None:
+        # Existing LinkedIn user — login
+        user = existing_oauth_user
+    else:
+        # Check if email matches an existing account
+        if li_email:
+            result = await db.execute(
+                select(User).where(
+                    User.email == li_email, User.deleted_at.is_(None)
+                )
+            )
+            existing_email_user = result.scalar_one_or_none()
+        else:
+            existing_email_user = None
+
+        if existing_email_user is not None:
+            # Link LinkedIn identity to existing email/password account
+            existing_email_user.oauth_provider = "linkedin"
+            existing_email_user.oauth_provider_id = li_sub
+            user = existing_email_user
+        else:
+            # Create new user (no password — OAuth only)
+            user = User(
+                email=li_email,
+                password_hash=None,
+                full_name=li_name,
+                email_verified=True,  # LinkedIn already verified email
+                oauth_provider="linkedin",
+                oauth_provider_id=li_sub,
+            )
+            db.add(user)
+            await db.flush()
+
+            # Check suppression list before welcome bonus
+            email_hash = hashlib.sha256(li_email.encode()).hexdigest()
+            suppression_result = await db.execute(
+                select(SuppressionList).where(
+                    SuppressionList.email_hash == email_hash,
+                    SuppressionList.reason == "account_deleted",
+                )
+            )
+            if suppression_result.scalar_one_or_none() is None:
+                await earn_credits(user.id, 50, "welcome_bonus", db)
+
+            is_new_user = True
+
+    # Reset lockout on successful OAuth login
+    user.failed_login_attempts = 0
+    user.locked_until = None
+
+    access_token_jwt = create_access_token(user.id, user.token_version)
+    refresh_token_jwt = create_refresh_token(user.id, user.token_version)
+    _set_refresh_cookie(response, refresh_token_jwt)
+
+    await log_event(
+        db,
+        "login_linkedin" if not is_new_user else "signup_linkedin",
+        user_id=user.id,
+    )
+    await db.commit()
+
+    return {
+        "data": {
+            "access_token": access_token_jwt,
+            "token_type": "bearer",
+            "is_new_user": is_new_user,
+            "profile": {
+                "name": li_name,
+                "email": li_email,
+                "given_name": li_profile.get("given_name", ""),
+                "family_name": li_profile.get("family_name", ""),
+                "picture": li_profile.get("picture"),
+            },
+        },
+        "meta": {},
+    }
+
+
+# ---------------------------------------------------------------------------
+# Resume import
+# ---------------------------------------------------------------------------
+
+
+@router.post("/profile/import-resume")
+async def import_resume(
+    file: UploadFile,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Parse a resume PDF and return structured profile data for preview."""
+    # Validate file type
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only PDF files are accepted",
+        )
+    if file.content_type and file.content_type not in (
+        "application/pdf",
+        "application/octet-stream",
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid content type — expected application/pdf",
+        )
+
+    pdf_bytes = await file.read()
+
+    try:
+        parsed = await parse_resume(pdf_bytes)
+    except ResumeParseError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+    # Log usage
+    from app.models.enrichment import UsageLog
+
+    usage_entry = UsageLog(
+        user_id=current_user.id,
+        action="resume_parse",
+        metadata_={"filename": file.filename},
+    )
+    db.add(usage_entry)
+    await db.commit()
+
+    return {"data": parsed, "meta": {}}
+
+
+# ---------------------------------------------------------------------------
 # Forgot / Reset password
 # ---------------------------------------------------------------------------
 
@@ -590,6 +826,18 @@ async def forgot_password(
     user = result.scalar_one_or_none()
 
     if user is not None:
+        # OAuth-only user with no password — give helpful guidance
+        if user.password_hash is None and user.oauth_provider:
+            return {
+                "data": {
+                    "message": (
+                        "Your account uses LinkedIn login. "
+                        "You can set a password in your profile settings."
+                    )
+                },
+                "meta": {},
+            }
+
         # Rate limit: 1 per 5 minutes
         if user.password_reset_sent_at is not None:
             sent_at = user.password_reset_sent_at

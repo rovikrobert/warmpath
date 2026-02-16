@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "*"
     PORT: int = 8000  # Railway injects via env
     STRIPE_WEBHOOK_SECRET: str = ""
+    LINKEDIN_CLIENT_ID: str = ""
+    LINKEDIN_CLIENT_SECRET: str = ""
+    LINKEDIN_REDIRECT_URI: str = ""
     RESEND_API_KEY: str = ""
     FROM_EMAIL: str = "WarmPath <noreply@majiq.agency>"
     FRONTEND_URL: str = "http://localhost:3000"
