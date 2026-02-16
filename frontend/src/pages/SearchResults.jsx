@@ -1,0 +1,296 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { search as searchApi, matches as matchesApi } from '../api/client';
+
+function ScoreBadge({ score, max = 100 }) {
+  const pct = (score / max) * 100;
+  let color = 'bg-slate-200 text-slate-700';
+  if (pct >= 80) color = 'bg-green-100 text-green-700';
+  else if (pct >= 60) color = 'bg-amber-100 text-amber-700';
+  else if (pct >= 40) color = 'bg-orange-100 text-orange-700';
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>
+      {score}
+    </span>
+  );
+}
+
+function IntroModal({ intro, onClose }) {
+  if (!intro) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-xl rounded-xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">Intro Drafts</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+        </div>
+        <div className="max-h-[70vh] overflow-y-auto px-6 py-4 space-y-4">
+          {intro.messages?.map((msg) => (
+            <div key={msg.id} className="rounded-lg border border-slate-200 p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  {msg.variant_label}
+                </span>
+                <span className="text-xs text-slate-400">{msg.ai_model_version}</span>
+              </div>
+              {msg.subject_line && (
+                <p className="mb-1 text-xs text-slate-500">
+                  Subject: <span className="font-medium text-slate-700">{msg.subject_line}</span>
+                </p>
+              )}
+              <p className="whitespace-pre-wrap text-sm text-slate-700">{msg.message_body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function SearchResults() {
+  const { id } = useParams();
+  const [searchInfo, setSearchInfo] = useState(null);
+  const [results, setResults] = useState([]);
+  const [meta, setMeta] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    min_relevance: 40, min_warm: '', match_type: '', company: '', page: 1, per_page: 20,
+  });
+  const [introLoading, setIntroLoading] = useState(null);
+  const [introModal, setIntroModal] = useState(null);
+
+  const loadResults = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = { ...filters };
+      if (!params.min_warm) delete params.min_warm;
+      if (!params.match_type) delete params.match_type;
+      if (!params.company) delete params.company;
+      const res = await searchApi.results(id, params);
+      setResults(res.data);
+      setMeta(res.meta);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [id, filters]);
+
+  useEffect(() => {
+    searchApi.get(id).then((res) => setSearchInfo(res.data)).catch(console.error);
+  }, [id]);
+
+  useEffect(() => { loadResults(); }, [loadResults]);
+
+  const setFilter = (key, value) => {
+    setFilters((f) => ({ ...f, [key]: value, page: 1 }));
+  };
+
+  const handleDraftIntro = async (contactId) => {
+    setIntroLoading(contactId);
+    try {
+      const res = await matchesApi.createIntro({
+        contact_id: contactId,
+        tone: 'professional',
+        channel: 'linkedin',
+      });
+      setIntroModal(res.data);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setIntroLoading(null);
+    }
+  };
+
+  const dist = meta.score_distribution || {};
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <Link to="/dashboard" className="mb-1 inline-block text-sm text-amber-600 hover:text-amber-700">&larr; Dashboard</Link>
+          <h1 className="text-2xl font-bold text-slate-900">{searchInfo?.name || 'Search Results'}</h1>
+          {searchInfo?.description && (
+            <p className="mt-1 text-sm text-slate-500">{searchInfo.description}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Stats summary */}
+      {meta.total_matches !== undefined && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+            <p className="text-xs text-slate-500">Total Matches</p>
+            <p className="text-lg font-bold text-slate-900">{meta.total_matches}</p>
+          </div>
+          <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+            <p className="text-xs text-slate-500">Avg Relevance</p>
+            <p className="text-lg font-bold text-slate-900">{meta.avg_relevance}</p>
+          </div>
+          <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+            <p className="text-xs text-slate-500">Avg Warm</p>
+            <p className="text-lg font-bold text-slate-900">{meta.avg_warm}</p>
+          </div>
+          <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200 col-span-2">
+            <p className="mb-1 text-xs text-slate-500">Score Distribution</p>
+            <div className="flex items-end gap-1 h-8">
+              {[['90-100', 'bg-green-400'], ['70-89', 'bg-amber-400'], ['50-69', 'bg-orange-400'], ['20-49', 'bg-slate-300']].map(
+                ([range, color]) => {
+                  const count = dist[range] || 0;
+                  const maxCount = Math.max(...Object.values(dist), 1);
+                  const height = Math.max((count / maxCount) * 100, 8);
+                  return (
+                    <div key={range} className="flex flex-1 flex-col items-center gap-0.5">
+                      <span className="text-[10px] text-slate-500">{count}</span>
+                      <div className={`w-full rounded-sm ${color}`} style={{ height: `${height}%` }} />
+                      <span className="text-[9px] text-slate-400">{range}</span>
+                    </div>
+                  );
+                }
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-white p-3 ring-1 ring-slate-200">
+        <div>
+          <label className="mb-1 block text-xs text-slate-500">Min Relevance</label>
+          <input
+            type="range"
+            min="0" max="100" step="5"
+            value={filters.min_relevance}
+            onChange={(e) => setFilter('min_relevance', Number(e.target.value))}
+            className="w-24 accent-amber-500"
+          />
+          <span className="ml-1 text-xs text-slate-600">{filters.min_relevance}</span>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-slate-500">Min Warm</label>
+          <input
+            type="range"
+            min="0" max="100" step="5"
+            value={filters.min_warm || 0}
+            onChange={(e) => setFilter('min_warm', Number(e.target.value) || '')}
+            className="w-24 accent-amber-500"
+          />
+          <span className="ml-1 text-xs text-slate-600">{filters.min_warm || 0}</span>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-slate-500">Match Type</label>
+          <select
+            value={filters.match_type}
+            onChange={(e) => setFilter('match_type', e.target.value)}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+          >
+            <option value="">All</option>
+            <option value="direct">Direct</option>
+            <option value="indirect">Indirect</option>
+            <option value="weak">Weak</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-slate-500">Company</label>
+          <input
+            type="text"
+            value={filters.company}
+            onChange={(e) => setFilter('company', e.target.value)}
+            placeholder="Filter..."
+            className="w-32 rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+          />
+        </div>
+      </div>
+
+      {/* Results table */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-6 w-6 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+        </div>
+      ) : results.length === 0 ? (
+        <div className="rounded-lg bg-white p-8 text-center ring-1 ring-slate-200">
+          <p className="text-sm text-slate-500">No matches found with current filters</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50">
+              <tr>
+                <th className="px-4 py-3 font-medium text-slate-600">Contact</th>
+                <th className="hidden px-4 py-3 font-medium text-slate-600 md:table-cell">Company</th>
+                <th className="px-3 py-3 font-medium text-slate-600 text-center">Relevance</th>
+                <th className="px-3 py-3 font-medium text-slate-600 text-center">Warm</th>
+                <th className="px-3 py-3 font-medium text-slate-600 text-center">Combined</th>
+                <th className="hidden px-3 py-3 font-medium text-slate-600 text-center sm:table-cell">Type</th>
+                <th className="px-4 py-3 font-medium text-slate-600"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {results.map((r) => (
+                <tr key={r.id} className="hover:bg-amber-50/30">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-slate-900">{r.contact_name}</p>
+                    <p className="text-xs text-slate-500">{r.contact_title}</p>
+                    <p className="text-xs text-slate-400 md:hidden">{r.contact_company}</p>
+                  </td>
+                  <td className="hidden px-4 py-3 text-slate-600 md:table-cell">{r.contact_company}</td>
+                  <td className="px-3 py-3 text-center"><ScoreBadge score={r.relevance_score} /></td>
+                  <td className="px-3 py-3 text-center"><ScoreBadge score={r.warm_score ?? 0} /></td>
+                  <td className="px-3 py-3 text-center">
+                    <span className="text-sm font-semibold text-slate-900">{r.combined_score}</span>
+                  </td>
+                  <td className="hidden px-3 py-3 text-center sm:table-cell">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      r.match_type === 'direct' ? 'bg-green-100 text-green-700' :
+                      r.match_type === 'indirect' ? 'bg-amber-100 text-amber-700' :
+                      'bg-slate-100 text-slate-600'
+                    }`}>
+                      {r.match_type}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => handleDraftIntro(r.contact_id)}
+                      disabled={introLoading === r.contact_id}
+                      className="whitespace-nowrap rounded-md bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+                    >
+                      {introLoading === r.contact_id ? '...' : 'Draft Intro'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {meta.total_pages > 1 && (
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-sm text-slate-500">
+            Showing {results.length} of {meta.total_matches} matches (page {meta.page}/{meta.total_pages})
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))}
+              disabled={filters.page <= 1}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50"
+            >
+              Prev
+            </button>
+            <button
+              onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
+              disabled={filters.page >= meta.total_pages}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {introModal && <IntroModal intro={introModal} onClose={() => setIntroModal(null)} />}
+    </div>
+  );
+}
