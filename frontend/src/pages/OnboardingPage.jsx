@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { auth as authApi, contacts as contactsApi, preferences, marketplace } from '../api/client';
@@ -88,6 +88,45 @@ export default function OnboardingPage() {
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
+  const [uploadProgressWidth, setUploadProgressWidth] = useState(0);
+  const [uploadProgressMsg, setUploadProgressMsg] = useState('');
+
+  const UPLOAD_STEPS = [
+    'Reading file...',
+    'Parsing contacts...',
+    'Normalizing names...',
+    'Matching companies...',
+    'Calculating warm scores...',
+    'Almost done...',
+  ];
+
+  useEffect(() => {
+    if (!uploading) { setUploadProgressWidth(0); return; }
+    let frame;
+    const start = Date.now();
+    const tick = () => {
+      const elapsed = (Date.now() - start) / 1000;
+      let w;
+      if (elapsed < 1) w = elapsed * 30;
+      else if (elapsed < 8) w = 30 + (elapsed - 1) * 8.5;
+      else w = 90 + Math.min(elapsed - 8, 10) * 0.5;
+      setUploadProgressWidth(Math.min(w, 95));
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [uploading]);
+
+  useEffect(() => {
+    if (!uploading) return;
+    let idx = 0;
+    setUploadProgressMsg(UPLOAD_STEPS[0]);
+    const interval = setInterval(() => {
+      idx = Math.min(idx + 1, UPLOAD_STEPS.length - 1);
+      setUploadProgressMsg(UPLOAD_STEPS[idx]);
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [uploading]);
 
   // Step 8: Work history
   const [workHistory, setWorkHistory] = useState([]);
@@ -385,9 +424,12 @@ export default function OnboardingPage() {
               {uploading && (
                 <div>
                   <div className="mb-1 h-2 overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full animate-pulse rounded-full bg-amber-500" style={{ width: '60%' }} />
+                    <div
+                      className="h-full rounded-full bg-amber-500 transition-[width] duration-300 ease-out"
+                      style={{ width: `${uploadProgressWidth}%` }}
+                    />
                   </div>
-                  <p className="text-xs text-slate-500">Parsing contacts...</p>
+                  <p className="text-xs text-slate-500">{uploadProgressMsg}</p>
                 </div>
               )}
 
