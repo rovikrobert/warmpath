@@ -49,6 +49,21 @@ class SearchRequestResponse(BaseModel):
         return v
 
 
+class SmartSearchCreate(BaseModel):
+    company_names: list[str]
+
+
+class SmartSearchResponse(BaseModel):
+    id: uuid.UUID
+    status: str
+    companies: list[dict] | None = None
+    summary: dict | None = None
+    error: str | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class MatchResultResponse(BaseModel):
     id: uuid.UUID
     search_request_id: uuid.UUID

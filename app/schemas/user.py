@@ -62,3 +62,33 @@ class ConnectorProfileResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# -- Job Preferences --
+
+
+class JobPreferencesCreate(BaseModel):
+    target_role: str
+    target_seniority: str | None = None
+    target_industries: list[str] | None = None
+    target_locations: list[str] | None = None
+    open_to_remote: bool = True
+    salary_min: int | None = None
+    salary_max: int | None = None
+
+
+class JobPreferencesResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    target_role: str | None = None
+    target_seniority: str | None = None
+    target_industries: list[str] | None = None
+    target_locations: list[str] | None = None
+    open_to_remote: bool = True
+    salary_min: int | None = None
+    salary_max: int | None = None
+    job_search_status: str = "active"
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

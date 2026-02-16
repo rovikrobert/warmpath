@@ -12,6 +12,7 @@ from app.api import (
     health,
     jobs,
     matches,
+    preferences,
     search,
 )
 from app.config import settings
@@ -77,4 +78,7 @@ app.include_router(matches.router, prefix="/api/v1/matches", tags=["matches"])
 app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["jobs"])
 app.include_router(
     applications.router, prefix="/api/v1/applications", tags=["applications"]
+)
+app.include_router(
+    preferences.router, prefix="/api/v1/preferences", tags=["preferences"]
 )
