@@ -105,7 +105,27 @@ def parse_linkedin_csv(raw_bytes: bytes) -> list[dict]:
         connected_on (date|None), linkedin_url, fingerprint, raw_row (original dict)
     """
     text = _decode_csv_bytes(raw_bytes)
-    reader = csv.DictReader(io.StringIO(text))
+
+    # LinkedIn CSV exports may include a "Notes:" preamble section before the
+    # actual header row.  Detect this and skip to the real header.
+    lines = text.splitlines(keepends=True)
+    skip = 0
+    for i, line in enumerate(lines):
+        stripped = line.strip().lower()
+        # Look for the first line that contains at least two known column names
+        if stripped:
+            test_reader = csv.reader(io.StringIO(line))
+            try:
+                cells = next(test_reader)
+            except StopIteration:
+                continue
+            matched = sum(1 for c in cells if _normalize_header(c) is not None)
+            if matched >= 2:
+                skip = i
+                break
+
+    csv_text = "".join(lines[skip:])
+    reader = csv.DictReader(io.StringIO(csv_text))
 
     # Build mapping from raw header -> internal name
     if reader.fieldnames is None:

@@ -207,19 +207,21 @@ async def test_full_user_journey(client: AsyncClient):
     run_resp = await client.post(f"/api/v1/search/{search_id}/run", headers=headers)
     assert run_resp.status_code == 200
     run_data = run_resp.json()["data"]
-    assert run_data["matches_found"] == 19  # all contacts scored
+    # Only contacts scoring >= 20 are persisted (7 of 19 in mock mode)
+    assert run_data["matches_found"] == 7
 
     # -----------------------------------------------------------------------
     # Step 8: Get results sorted by combined score
     # -----------------------------------------------------------------------
+    # Use min_score=0 to get all persisted results (scores >= 20)
     results_resp = await client.get(
         f"/api/v1/search/{search_id}/results",
         headers=headers,
-        params={"per_page": 50},
+        params={"per_page": 50, "min_score": 0},
     )
     assert results_resp.status_code == 200
     results = results_resp.json()["data"]
-    assert len(results) == 19
+    assert len(results) == 7  # only contacts scoring >= 20 were persisted
 
     # Results should be sorted descending by combined_score
     scores = [r["combined_score"] for r in results]
@@ -237,9 +239,9 @@ async def test_full_user_journey(client: AsyncClient):
     assert sarah_result["match_type"] == "direct"
     assert sarah_result["relevance_score"] >= 50  # title + company match
 
-    # Alex Brown (SWE @ Google) should have a low relevance score
-    alex_result = next(r for r in results if r["contact_name"] == "Alex Brown")
-    assert alex_result["relevance_score"] < sarah_result["relevance_score"]
+    # Low-relevance contacts (e.g. Alex Brown, score 5) are not persisted at all
+    alex_names = [r for r in results if r["contact_name"] == "Alex Brown"]
+    assert len(alex_names) == 0
 
     # -----------------------------------------------------------------------
     # Step 9: Request an intro message for the top result
