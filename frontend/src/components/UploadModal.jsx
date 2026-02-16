@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { contacts as contactsApi } from '../api/client';
 
 const LINKEDIN_EXPORT_URL = 'https://www.linkedin.com/mypreferences/d/download-my-data';
@@ -7,11 +7,53 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
   const [step, setStep] = useState(hasContacts ? 2 : 1);
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
+  const [progressWidth, setProgressWidth] = useState(0);
+  const [progressMsg, setProgressMsg] = useState('');
+
+  const PROGRESS_STEPS = [
+    'Reading file...',
+    'Parsing contacts...',
+    'Normalizing names...',
+    'Matching companies...',
+    'Calculating warm scores...',
+    'Almost done...',
+  ];
+
+  useEffect(() => {
+    if (!uploading) {
+      setProgressWidth(0);
+      return;
+    }
+    // Animate width: quick to 30%, slow crawl to 90%, then wait
+    let frame;
+    let start = Date.now();
+    const tick = () => {
+      const elapsed = (Date.now() - start) / 1000;
+      let w;
+      if (elapsed < 1) w = elapsed * 30;           // 0-30% in 1s
+      else if (elapsed < 8) w = 30 + (elapsed - 1) * 8.5; // 30-90% over 7s
+      else w = 90 + Math.min(elapsed - 8, 10) * 0.5;      // crawl to 95%
+      setProgressWidth(Math.min(w, 95));
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [uploading]);
+
+  useEffect(() => {
+    if (!uploading) return;
+    let idx = 0;
+    setProgressMsg(PROGRESS_STEPS[0]);
+    const interval = setInterval(() => {
+      idx = Math.min(idx + 1, PROGRESS_STEPS.length - 1);
+      setProgressMsg(PROGRESS_STEPS[idx]);
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [uploading]);
 
   const handleFile = (f) => {
     if (f && f.name.endsWith('.csv')) {
@@ -34,14 +76,11 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
     setUploading(true);
     setError('');
     try {
-      setProgress('Parsing contacts...');
       const res = await contactsApi.upload(file);
-      setProgress('');
       setResult(res.data);
       setStep(3);
     } catch (err) {
       setError(err.message);
-      setProgress('');
     } finally {
       setUploading(false);
     }
@@ -162,12 +201,15 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
                 <p className="mb-3 text-sm text-red-600">{error}</p>
               )}
 
-              {progress && (
+              {uploading && (
                 <div className="mb-3">
                   <div className="mb-1 h-2 overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full animate-pulse rounded-full bg-amber-500" style={{ width: '60%' }} />
+                    <div
+                      className="h-full rounded-full bg-amber-500 transition-[width] duration-300 ease-out"
+                      style={{ width: `${progressWidth}%` }}
+                    />
                   </div>
-                  <p className="text-xs text-slate-500">{progress}</p>
+                  <p className="text-xs text-slate-500">{progressMsg}</p>
                 </div>
               )}
 
