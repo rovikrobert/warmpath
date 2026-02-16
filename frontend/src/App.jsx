@@ -10,6 +10,9 @@ import FindReferrals from './pages/FindReferrals';
 import ReferralResults from './pages/ReferralResults';
 import MarketplaceDashboard from './pages/MarketplaceDashboard';
 import MyRequests from './pages/MyRequests';
+import CreditsPage from './pages/CreditsPage';
+import SharingSettings from './pages/SharingSettings';
+import ApplicationsPage from './pages/ApplicationsPage';
 
 function ProtectedRoute({ children }) {
   const { token, loading } = useAuth();
@@ -51,9 +54,15 @@ export default function App() {
         <Route path="/search/:id" element={<SearchResults />} />
         <Route path="/referrals" element={<FindReferrals />} />
         <Route path="/referrals/:id" element={<ReferralResults />} />
-        <Route path="/marketplace" element={<MarketplaceDashboard />} />
-        <Route path="/my-requests" element={<MyRequests />} />
+        <Route path="/applications" element={<ApplicationsPage />} />
+        <Route path="/marketplace/dashboard" element={<MarketplaceDashboard />} />
+        <Route path="/marketplace/requests" element={<MyRequests />} />
+        <Route path="/marketplace/settings" element={<SharingSettings />} />
+        <Route path="/credits" element={<CreditsPage />} />
         <Route path="/profile/edit" element={<EditProfile />} />
+        {/* Legacy routes */}
+        <Route path="/marketplace" element={<Navigate to="/marketplace/dashboard" replace />} />
+        <Route path="/my-requests" element={<Navigate to="/marketplace/requests" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -118,7 +118,7 @@ export default function Dashboard() {
         )}
         {isHolder && (
           <Link
-            to="/marketplace"
+            to="/marketplace/dashboard"
             className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
             Marketplace Dashboard
@@ -132,7 +132,7 @@ export default function Dashboard() {
           <p className="text-sm text-amber-800">
             You have <strong>{marketplaceStats.pendingRequests}</strong> pending intro request{marketplaceStats.pendingRequests > 1 ? 's' : ''} waiting for your review.
           </p>
-          <Link to="/marketplace" className="mt-1 inline-block text-sm font-medium text-amber-600 hover:text-amber-700">
+          <Link to="/marketplace/dashboard" className="mt-1 inline-block text-sm font-medium text-amber-600 hover:text-amber-700">
             Review requests &rarr;
           </Link>
         </div>
