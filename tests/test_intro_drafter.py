@@ -1,15 +1,12 @@
 import io
 from datetime import date, timedelta
 
-import pytest
 from httpx import AsyncClient
 
 from app.services.intro_drafter import (
     LINKEDIN_CHAR_LIMIT,
     _mock_drafts,
 )
-
-pytestmark = pytest.mark.asyncio
 
 
 # ---------------------------------------------------------------------------

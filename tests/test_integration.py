@@ -16,10 +16,7 @@ Exercises every major feature in sequence:
 import io
 from datetime import date, timedelta
 
-import pytest
 from httpx import AsyncClient
-
-pytestmark = pytest.mark.asyncio
 
 # ---------------------------------------------------------------------------
 # Realistic 20-row LinkedIn CSV fixture

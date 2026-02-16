@@ -1,7 +1,4 @@
-import pytest
 from httpx import AsyncClient
-
-pytestmark = pytest.mark.asyncio
 
 
 async def test_signup_returns_token(client: AsyncClient):

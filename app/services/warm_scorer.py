@@ -258,8 +258,6 @@ def compute_role_score(title: str | None, target_role: str | None = None) -> flo
     if not title:
         return 30.0  # unknown
 
-    title_lower = title.lower()
-
     # If we have a target role, check department alignment
     if target_role:
         contact_dept = _detect_department(title)

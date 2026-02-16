@@ -1,11 +1,8 @@
 import io
 
-import pytest
 from httpx import AsyncClient
 
 from app.services.csv_parser import generate_fingerprint, parse_linkedin_csv
-
-pytestmark = pytest.mark.asyncio
 
 # ---------------------------------------------------------------------------
 # Sample CSV fixtures
