@@ -1,7 +1,9 @@
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 
 from app.api import (
@@ -99,3 +101,21 @@ app.include_router(
 app.include_router(credits.router, prefix="/api/v1/credits", tags=["credits"])
 app.include_router(usage.router, prefix="/api/v1/usage", tags=["usage"])
 app.include_router(webhooks.router, prefix="/api/v1", tags=["webhooks"])
+
+# ---------------------------------------------------------------------------
+# Frontend static files (SPA)
+# ---------------------------------------------------------------------------
+_frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+
+if _frontend_dist.is_dir():
+    app.mount(
+        "/assets", StaticFiles(directory=_frontend_dist / "assets"), name="assets"
+    )
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str) -> FileResponse:
+        """Serve index.html for all non-API routes (SPA catch-all)."""
+        file_path = _frontend_dist / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(_frontend_dist / "index.html")
