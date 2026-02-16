@@ -43,6 +43,13 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class WorkHistoryEntry(BaseModel):
+    company: str
+    title: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+
+
 class ConnectorProfileUpsert(BaseModel):
     headline: str | None = None
     current_company: str | None = None
@@ -51,6 +58,7 @@ class ConnectorProfileUpsert(BaseModel):
     location: str | None = None
     linkedin_url: str | None = None
     bio_summary: str | None = None
+    work_history: list[WorkHistoryEntry] | None = None
 
 
 class ConnectorProfileResponse(BaseModel):
@@ -63,6 +71,7 @@ class ConnectorProfileResponse(BaseModel):
     location: str | None
     linkedin_url: str | None
     bio_summary: str | None
+    work_history: list | None = None
     created_at: datetime
     updated_at: datetime
 

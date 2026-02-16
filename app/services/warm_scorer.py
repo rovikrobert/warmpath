@@ -87,6 +87,19 @@ def compute_recency_score(connected_on: date | None) -> float:
 # ---------------------------------------------------------------------------
 
 
+_RELATIONSHIP_TYPE_BONUSES: dict[str, float] = {
+    "manager": 20.0,
+    "former_colleague": 15.0,
+    "current_colleague": 10.0,
+    "alumni": 10.0,
+    "mentor": 10.0,
+    "friend": 5.0,
+    "industry_peer": 0.0,
+    "recruiter": -20.0,
+    "other": 0.0,
+}
+
+
 def compute_relationship_score(
     contact: Contact,
     profile: ConnectorProfile | None,
@@ -94,13 +107,21 @@ def compute_relationship_score(
     """Score based on relationship strength between user and contact.
 
     Shared work history is the strongest referral signal.
+    Explicit relationship_type field adds bonuses on top.
     Returns (score, factors_dict) for transparency.
     """
     if profile is None:
-        return 0.0, {"reason": "no connector profile set"}
+        # Even without a profile, relationship_type bonuses still apply
+        rel_type = getattr(contact, "relationship_type", None)
+        bonus = _RELATIONSHIP_TYPE_BONUSES.get(rel_type, 0.0) if rel_type else 0.0
+        return max(0.0, min(bonus, 100.0)), {
+            "reason": "no connector profile set",
+            "relationship_type": rel_type,
+            "relationship_bonus": bonus,
+        }
 
     score = 0.0
-    factors: dict[str, bool] = {}
+    factors: dict = {}
 
     # Previously worked at same company (+40) — strongest referral signal
     # Check enriched_data for work history overlap
@@ -121,6 +142,23 @@ def compute_relationship_score(
         factors["former_colleague"] = True
     else:
         factors["former_colleague"] = False
+
+    # Work history overlap: contact's company in user's work_history (+35)
+    work_history_overlap = False
+    user_work_history = getattr(profile, "work_history", None) or []
+    if isinstance(user_work_history, list) and contact.current_company:
+        contact_co = contact.current_company.strip().lower()
+        for entry in user_work_history:
+            hist_company = (entry.get("company", "") or "").strip().lower()
+            if hist_company and _fuzzy_eq(hist_company, contact_co):
+                work_history_overlap = True
+                break
+
+    if work_history_overlap:
+        score += 35
+        factors["work_history_overlap"] = True
+    else:
+        factors["work_history_overlap"] = False
 
     # Same current company (+35)
     if (
@@ -173,7 +211,14 @@ def compute_relationship_score(
     else:
         factors["same_school"] = False
 
-    return min(score, 100.0), factors
+    # Relationship type bonus/penalty
+    rel_type = getattr(contact, "relationship_type", None)
+    bonus = _RELATIONSHIP_TYPE_BONUSES.get(rel_type, 0.0) if rel_type else 0.0
+    score += bonus
+    factors["relationship_type"] = rel_type
+    factors["relationship_bonus"] = bonus
+
+    return max(0.0, min(score, 100.0)), factors
 
 
 def _fuzzy_eq(a: str, b: str) -> bool:

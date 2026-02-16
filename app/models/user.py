@@ -100,6 +100,7 @@ class ConnectorProfile(Base):
     location: Mapped[str | None] = mapped_column(String(255))
     linkedin_url: Mapped[str | None] = mapped_column(String(500))
     bio_summary: Mapped[str | None] = mapped_column(Text)
+    work_history: Mapped[list | None] = mapped_column(JSONB, server_default="[]")
     raw_profile: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

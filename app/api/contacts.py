@@ -13,8 +13,17 @@ from app.middleware.rate_limit import check_rate_limit
 from app.models.contact import Contact, CsvUpload
 from app.models.match_result import WarmScore
 from app.models.user import User
-from app.schemas.contact import ContactResponse, CsvUploadResponse, PaginationMeta
-from app.services.csv_parser import parse_linkedin_csv
+from app.schemas.contact import (
+    ContactResponse,
+    ContactUpdate,
+    CsvUploadResponse,
+    ManualContactBulkCreate,
+    ManualContactCreate,
+    PaginationMeta,
+)
+from app.services.company_normalizer import link_contact_to_company
+from app.services.csv_parser import generate_fingerprint, parse_linkedin_csv
+from app.services.warm_scorer import batch_compute_scores
 from app.utils.exceptions import RateLimitError
 from app.utils.security import get_current_user
 
@@ -128,8 +137,6 @@ async def compute_scores(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Trigger batch recomputation of warm scores for all contacts."""
-    from app.services.warm_scorer import batch_compute_scores
-
     scores = await batch_compute_scores(current_user.id, db)
     await db.commit()
     return {
@@ -143,6 +150,8 @@ async def list_contacts(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
     search: str | None = Query(None),
+    relationship_type: str | None = Query(None),
+    source: str | None = Query(None),
     sort_by: str = Query(
         "created_at",
         pattern="^(full_name|current_company|connected_on|created_at|warm_score)$",
@@ -173,6 +182,12 @@ async def list_contacts(
             | Contact.current_title.ilike(pattern)
             | Contact.email.ilike(pattern)
         )
+
+    if relationship_type:
+        base_query = base_query.where(Contact.relationship_type == relationship_type)
+
+    if source:
+        base_query = base_query.where(Contact.source == source)
 
     # Count total
     count_query = select(func.count()).select_from(base_query.subquery())
@@ -251,6 +266,41 @@ async def get_contact(
     }
 
 
+@router.patch("/{contact_id}")
+async def update_contact(
+    contact_id: uuid.UUID,
+    body: ContactUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Update a contact's relationship_type, how_you_know, or notes."""
+    result = await db.execute(
+        select(Contact).where(
+            Contact.id == contact_id,
+            Contact.user_id == current_user.id,
+            Contact.deleted_at.is_(None),
+        )
+    )
+    contact = result.scalar_one_or_none()
+    if contact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contact not found",
+        )
+
+    fields = body.model_dump(exclude_unset=True)
+    for key, value in fields.items():
+        setattr(contact, key, value)
+
+    await db.commit()
+    await db.refresh(contact)
+
+    return {
+        "data": ContactResponse.model_validate(contact).model_dump(mode="json"),
+        "meta": {},
+    }
+
+
 @router.delete("/{contact_id}", status_code=status.HTTP_200_OK)
 async def delete_contact(
     contact_id: uuid.UUID,
@@ -274,5 +324,107 @@ async def delete_contact(
     await db.commit()
     return {
         "data": {"id": str(contact.id), "deleted": True},
+        "meta": {},
+    }
+
+
+# ---------------------------------------------------------------------------
+# Manual contacts import
+# ---------------------------------------------------------------------------
+
+
+async def _create_manual_contact(
+    data: ManualContactCreate,
+    user_id: uuid.UUID,
+    db: AsyncSession,
+) -> Contact:
+    """Create a single manual contact and link to company."""
+    full_name = f"{data.first_name.strip()} {data.last_name.strip()}"
+    fingerprint = generate_fingerprint(full_name, data.company, None)
+
+    # Check for duplicate
+    if fingerprint:
+        existing_result = await db.execute(
+            select(Contact).where(
+                Contact.user_id == user_id,
+                Contact.fingerprint == fingerprint,
+                Contact.deleted_at.is_(None),
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Contact '{full_name}' already exists",
+            )
+
+    contact = Contact(
+        user_id=user_id,
+        first_name=data.first_name.strip().title(),
+        last_name=data.last_name.strip().title(),
+        full_name=full_name.strip().title(),
+        email=data.email,
+        current_title=data.position,
+        current_company=data.company,
+        location=data.location,
+        relationship_type=data.relationship_type,
+        how_you_know=data.how_you_know,
+        last_interaction_date=data.last_interaction_date,
+        connected_on=data.last_interaction_date,
+        fingerprint=fingerprint,
+        source="manual",
+    )
+    db.add(contact)
+    await db.flush()
+    await link_contact_to_company(contact, db)
+    return contact
+
+
+@router.post("/manual", status_code=status.HTTP_201_CREATED)
+async def create_manual_contact(
+    body: ManualContactCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Create a single manual contact."""
+    contact = await _create_manual_contact(body, current_user.id, db)
+
+    # Recompute scores to include the new contact
+    await batch_compute_scores(current_user.id, db)
+    await db.commit()
+    await db.refresh(contact)
+
+    return {
+        "data": ContactResponse.model_validate(contact).model_dump(mode="json"),
+        "meta": {},
+    }
+
+
+@router.post("/manual/bulk", status_code=status.HTTP_201_CREATED)
+async def create_manual_contacts_bulk(
+    body: ManualContactBulkCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Bulk create manual contacts (up to 50)."""
+    created = []
+    errors = []
+    for i, item in enumerate(body.contacts):
+        try:
+            contact = await _create_manual_contact(item, current_user.id, db)
+            created.append(contact)
+        except HTTPException as exc:
+            errors.append({"index": i, "detail": exc.detail})
+
+    if created:
+        await batch_compute_scores(current_user.id, db)
+
+    await db.commit()
+
+    return {
+        "data": {
+            "created": len(created),
+            "errors": errors,
+        },
         "meta": {},
     }
