@@ -143,7 +143,10 @@ class JobFetcher:
         Fallback chain: Greenhouse/Lever boards → career page scraper → empty.
         board_ids is a dict like {"greenhouse": "stripe", "lever": "notion"}.
         """
-        from app.services.career_page_fetcher import fetch_career_page, lookup_career_page
+        from app.services.career_page_fetcher import (
+            fetch_career_page,
+            lookup_career_page,
+        )
 
         all_jobs: list[dict] = []
 
