@@ -23,11 +23,16 @@ class UserLogin(BaseModel):
     password: str
 
 
+class UserTypeUpdate(BaseModel):
+    user_type: str
+
+
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
     full_name: str
     plan_tier: str
+    user_type: str
     created_at: datetime
 
     model_config = {"from_attributes": True}

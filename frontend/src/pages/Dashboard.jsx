@@ -1,27 +1,48 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { contacts as contactsApi, search as searchApi, health as healthApi } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import { contacts as contactsApi, search as searchApi, health as healthApi, credits as creditsApi, marketplace as mpApi } from '../api/client';
 import UploadModal from '../components/UploadModal';
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [searches, setSearches] = useState([]);
   const [contactCount, setContactCount] = useState(null);
+  const [balance, setBalance] = useState(null);
+  const [marketplaceStats, setMarketplaceStats] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const isSeeker = !user?.user_type || user.user_type === 'job_seeker' || user.user_type === 'both';
+  const isHolder = user?.user_type === 'network_holder' || user?.user_type === 'both';
 
   const load = async () => {
     setLoading(true);
     try {
-      const [contactsRes, searchRes, usageRes] = await Promise.all([
+      const [contactsRes, searchRes, usageRes, balRes] = await Promise.all([
         contactsApi.list(1, 1),
         searchApi.list(),
         healthApi.usage().catch(() => null),
+        creditsApi.balance().catch(() => ({ data: { balance: 0 } })),
       ]);
       setContactCount(contactsRes.meta?.total ?? contactsRes.data?.length ?? 0);
       setSearches(searchRes.data ?? []);
       if (usageRes) setStats(usageRes.data);
+      setBalance(balRes.data?.balance ?? 0);
+
+      // Load marketplace stats for holders
+      if (isHolder) {
+        const [listingsRes, incomingRes] = await Promise.all([
+          mpApi.myListings().catch(() => ({ data: [] })),
+          mpApi.incomingRequests().catch(() => ({ data: [] })),
+        ]);
+        setMarketplaceStats({
+          listings: listingsRes.data?.length ?? 0,
+          pendingRequests: (incomingRes.data || []).filter((r) => r.status === 'requested').length,
+        });
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -49,18 +70,34 @@ export default function Dashboard() {
           <p className="text-xs text-slate-500">Contacts</p>
           <p className="text-2xl font-bold text-slate-900">{contactCount ?? 0}</p>
         </div>
+        {isSeeker && (
+          <div className="rounded-lg bg-white p-4 ring-1 ring-slate-200">
+            <p className="text-xs text-slate-500">Searches</p>
+            <p className="text-2xl font-bold text-slate-900">{searches.length}</p>
+          </div>
+        )}
+        {isHolder && marketplaceStats && (
+          <div className="rounded-lg bg-white p-4 ring-1 ring-slate-200">
+            <p className="text-xs text-slate-500">Shared Listings</p>
+            <p className="text-2xl font-bold text-slate-900">{marketplaceStats.listings}</p>
+          </div>
+        )}
         <div className="rounded-lg bg-white p-4 ring-1 ring-slate-200">
-          <p className="text-xs text-slate-500">Searches</p>
-          <p className="text-2xl font-bold text-slate-900">{searches.length}</p>
+          <p className="text-xs text-slate-500">Credits</p>
+          <p className="text-2xl font-bold text-amber-600">{balance ?? 0}</p>
         </div>
-        <div className="rounded-lg bg-white p-4 ring-1 ring-slate-200">
-          <p className="text-xs text-slate-500">API Calls Today</p>
-          <p className="text-2xl font-bold text-slate-900">{stats?.today_count ?? '—'}</p>
-        </div>
-        <div className="rounded-lg bg-white p-4 ring-1 ring-slate-200">
-          <p className="text-xs text-slate-500">AI Queries</p>
-          <p className="text-2xl font-bold text-slate-900">{stats?.ai_query_count ?? '—'}</p>
-        </div>
+        {isHolder && marketplaceStats && (
+          <div className="rounded-lg bg-white p-4 ring-1 ring-slate-200">
+            <p className="text-xs text-slate-500">Pending Requests</p>
+            <p className="text-2xl font-bold text-slate-900">{marketplaceStats.pendingRequests}</p>
+          </div>
+        )}
+        {!isHolder && (
+          <div className="rounded-lg bg-white p-4 ring-1 ring-slate-200">
+            <p className="text-xs text-slate-500">API Calls Today</p>
+            <p className="text-2xl font-bold text-slate-900">{stats?.today_count ?? '—'}</p>
+          </div>
+        )}
       </div>
 
       {/* Action buttons */}
@@ -71,15 +108,35 @@ export default function Dashboard() {
         >
           {hasContacts ? 'Upload More Contacts' : 'Upload LinkedIn CSV'}
         </button>
-        {hasContacts && (
+        {isSeeker && hasContacts && (
           <Link
-            to="/search/new"
+            to="/referrals"
             className="rounded-lg border border-amber-500 px-4 py-2.5 text-sm font-medium text-amber-600 hover:bg-amber-50"
           >
-            New Search
+            Find Referrals
+          </Link>
+        )}
+        {isHolder && (
+          <Link
+            to="/marketplace"
+            className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Marketplace Dashboard
           </Link>
         )}
       </div>
+
+      {/* Marketplace activity cards */}
+      {isHolder && marketplaceStats && marketplaceStats.pendingRequests > 0 && (
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm text-amber-800">
+            You have <strong>{marketplaceStats.pendingRequests}</strong> pending intro request{marketplaceStats.pendingRequests > 1 ? 's' : ''} waiting for your review.
+          </p>
+          <Link to="/marketplace" className="mt-1 inline-block text-sm font-medium text-amber-600 hover:text-amber-700">
+            Review requests &rarr;
+          </Link>
+        </div>
+      )}
 
       {/* Empty state */}
       {!hasContacts && (
@@ -89,7 +146,7 @@ export default function Dashboard() {
           </div>
           <h2 className="mb-2 text-lg font-semibold text-slate-900">Get started with WarmPath</h2>
           <p className="mx-auto mb-6 max-w-sm text-sm text-slate-500">
-            Upload your LinkedIn connections CSV to start finding warm paths to your target contacts.
+            Upload your LinkedIn connections CSV to start finding warm referral paths to your target companies.
           </p>
           <button
             onClick={() => setShowUpload(true)}
@@ -104,7 +161,7 @@ export default function Dashboard() {
       {searches.length > 0 && (
         <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
           <div className="border-b border-slate-200 px-4 py-3">
-            <h2 className="text-base font-semibold text-slate-900">Your Searches</h2>
+            <h2 className="text-base font-semibold text-slate-900">Recent Searches</h2>
           </div>
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50">
@@ -143,7 +200,7 @@ export default function Dashboard() {
                   </td>
                   <td className="px-4 py-3">
                     <button
-                      onClick={() => navigate(`/search/${s.id}`)}
+                      onClick={() => navigate(s.name?.startsWith('Smart Search') ? `/referrals/${s.id}` : `/search/${s.id}`)}
                       className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200"
                     >
                       View
@@ -160,13 +217,13 @@ export default function Dashboard() {
       {hasContacts && searches.length === 0 && (
         <div className="rounded-xl bg-white p-8 text-center ring-1 ring-slate-200">
           <p className="mb-3 text-sm text-slate-500">
-            {contactCount} contacts imported. Create your first search to find warm paths.
+            {contactCount} contacts imported. Find referral paths to your target companies.
           </p>
           <Link
-            to="/search/new"
+            to="/referrals"
             className="inline-block rounded-lg bg-amber-500 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-600"
           >
-            Create First Search
+            Find Referrals
           </Link>
         </div>
       )}

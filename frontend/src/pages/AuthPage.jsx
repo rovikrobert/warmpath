@@ -1,14 +1,12 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function AuthPage() {
   const { login, signup } = useAuth();
+  const navigate = useNavigate();
   const [isSignup, setIsSignup] = useState(false);
-  const [form, setForm] = useState({
-    email: '', password: '', full_name: '',
-    headline: '', current_company: '', current_title: '',
-    industry: '', location: '', linkedin_url: '', bio_summary: '',
-  });
+  const [form, setForm] = useState({ email: '', password: '', full_name: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -20,13 +18,11 @@ export default function AuthPage() {
     setError('');
     try {
       if (isSignup) {
-        const body = { email: form.email, password: form.password, full_name: form.full_name };
-        // Include optional profile fields if filled
-        ['headline', 'current_company', 'current_title', 'industry', 'location', 'linkedin_url', 'bio_summary']
-          .forEach((k) => { if (form[k]) body[k] = form[k]; });
-        await signup(body);
+        await signup({ email: form.email, password: form.password, full_name: form.full_name });
+        navigate('/onboarding');
       } else {
         await login({ email: form.email, password: form.password });
+        navigate('/dashboard');
       }
     } catch (err) {
       setError(err.message);
@@ -44,8 +40,12 @@ export default function AuthPage() {
           <h1 className="text-3xl font-bold text-slate-900">
             <span className="text-amber-500">~</span> WarmPath
           </h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Turn your network into your pipeline
+          <p className="mt-2 text-lg font-medium text-slate-700">
+            Get referred to your dream job
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            Employee referrals convert at 40% vs 1% for cold applications.
+            Stop applying into the black hole.
           </p>
         </div>
 
@@ -87,50 +87,6 @@ export default function AuthPage() {
             <label className="mb-1 block text-sm font-medium text-slate-700">Password</label>
             <input type="password" value={form.password} onChange={set('password')} className={inputClass} placeholder="••••••••" required />
           </div>
-
-          {isSignup && (
-            <>
-              <hr className="border-slate-200" />
-              <p className="text-xs text-slate-400">Optional — helps AI draft better intros</p>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Headline</label>
-                <input type="text" value={form.headline} onChange={set('headline')} className={inputClass} placeholder="B2B GTM Leader | Field Marketing..." />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Title</label>
-                  <input type="text" value={form.current_title} onChange={set('current_title')} className={inputClass} placeholder="Managing Director" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Company</label>
-                  <input type="text" value={form.current_company} onChange={set('current_company')} className={inputClass} placeholder="Acme Corp" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Industry</label>
-                  <input type="text" value={form.industry} onChange={set('industry')} className={inputClass} placeholder="Professional Services" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Location</label>
-                  <input type="text" value={form.location} onChange={set('location')} className={inputClass} placeholder="Singapore" />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">LinkedIn URL</label>
-                <input type="url" value={form.linkedin_url} onChange={set('linkedin_url')} className={inputClass} placeholder="https://linkedin.com/in/yourname" />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Bio</label>
-                <textarea value={form.bio_summary} onChange={set('bio_summary')} rows={2} className={inputClass} placeholder="What you do and who you help..." />
-              </div>
-            </>
-          )}
 
           {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
 

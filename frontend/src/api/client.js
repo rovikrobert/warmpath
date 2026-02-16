@@ -37,6 +37,8 @@ export const auth = {
   login: (body) => api('/api/v1/auth/login', { method: 'POST', body }),
   me: () => api('/api/v1/auth/me'),
   upsertProfile: (body) => api('/api/v1/auth/profile', { method: 'POST', body }),
+  updateUserType: (userType) =>
+    api('/api/v1/auth/user-type', { method: 'PATCH', body: { user_type: userType } }),
 };
 
 export const contacts = {
@@ -66,6 +68,7 @@ export const search = {
     });
     return api(`/api/v1/search/${id}/results?${qs}`);
   },
+  smart: (body) => api('/api/v1/search/smart', { method: 'POST', body }),
 };
 
 export const matches = {
@@ -77,6 +80,32 @@ export const matches = {
       method: 'PATCH',
       body,
     }),
+};
+
+export const marketplace = {
+  search: (body) => api('/api/v1/marketplace/search', { method: 'POST', body }),
+  requestIntro: (body) =>
+    api('/api/v1/marketplace/request-intro', { method: 'POST', body }),
+  myRequests: () => api('/api/v1/marketplace/my-requests'),
+  incomingRequests: () => api('/api/v1/marketplace/incoming-requests'),
+  updateRequest: (id, body) =>
+    api(`/api/v1/marketplace/requests/${id}`, { method: 'PATCH', body }),
+  getSharingPrefs: () => api('/api/v1/marketplace/sharing-preferences'),
+  updateSharingPrefs: (body) =>
+    api('/api/v1/marketplace/sharing-preferences', { method: 'PUT', body }),
+  myListings: () => api('/api/v1/marketplace/my-listings'),
+};
+
+export const credits = {
+  balance: () => api('/api/v1/credits/balance'),
+  history: () => api('/api/v1/credits/history'),
+  purchase: (body) => api('/api/v1/credits/purchase', { method: 'POST', body }),
+};
+
+export const preferences = {
+  getJob: () => api('/api/v1/preferences/job'),
+  upsertJob: (body) => api('/api/v1/preferences/job', { method: 'PUT', body }),
+  deleteJob: () => api('/api/v1/preferences/job', { method: 'DELETE' }),
 };
 
 export const health = {
