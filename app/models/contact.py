@@ -132,6 +132,9 @@ class Contact(Base):
     intro_requests: Mapped[list["IntroRequest"]] = relationship(
         back_populates="contact"
     )
+    applications: Mapped[list["Application"]] = relationship(
+        back_populates="contact"
+    )
 
 
 class ContactCompany(Base):
