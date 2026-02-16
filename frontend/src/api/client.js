@@ -64,6 +64,14 @@ export const auth = {
     api('/api/v1/auth/reset-password', { method: 'POST', body }),
   deleteAccount: (body) =>
     api('/api/v1/auth/delete-account', { method: 'POST', body }),
+  linkedinAuthorize: () => api('/api/v1/auth/linkedin/authorize'),
+  linkedinCallback: (body) =>
+    api('/api/v1/auth/linkedin/callback', { method: 'POST', body }),
+  uploadResume: (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api('/api/v1/auth/profile/import-resume', { method: 'POST', body: form });
+  },
 };
 
 export const contacts = {

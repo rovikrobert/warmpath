@@ -57,6 +57,16 @@ export function AuthProvider({ children }) {
     return me.data;
   }, []);
 
+  const loginWithLinkedIn = useCallback(async (tokenData) => {
+    const newToken = tokenData.access_token;
+    setToken(newToken);
+    setTokenGetter(() => newToken);
+    const me = await authApi.me();
+    setUser(me.data);
+    setJustSignedUp(tokenData.is_new_user);
+    return me.data;
+  }, []);
+
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
@@ -64,7 +74,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ token, user, loading, login, signup, logout, refreshUser, justSignedUp, setJustSignedUp }}>
+    <AuthContext.Provider value={{ token, user, loading, login, signup, loginWithLinkedIn, logout, refreshUser, justSignedUp, setJustSignedUp }}>
       {children}
     </AuthContext.Provider>
   );

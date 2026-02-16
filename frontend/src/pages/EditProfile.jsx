@@ -1,9 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth as authApi, contacts as contactsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 const EMPTY_ENTRY = { company: '', title: '', start_date: '', end_date: '', is_current: false };
+
+function ResumePreviewModal({ data, onApply, onClose }) {
+  if (!data) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="mx-4 w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+        <h3 className="text-lg font-bold text-slate-900">Resume Preview</h3>
+        <p className="mt-1 text-sm text-slate-500">Review parsed data before applying to your profile.</p>
+        <div className="mt-4 space-y-3 text-sm">
+          {data.headline && <div><span className="font-medium text-slate-700">Headline:</span> {data.headline}</div>}
+          {data.current_title && <div><span className="font-medium text-slate-700">Title:</span> {data.current_title}</div>}
+          {data.current_company && <div><span className="font-medium text-slate-700">Company:</span> {data.current_company}</div>}
+          {data.industry && <div><span className="font-medium text-slate-700">Industry:</span> {data.industry}</div>}
+          {data.location && <div><span className="font-medium text-slate-700">Location:</span> {data.location}</div>}
+          {data.bio_summary && <div><span className="font-medium text-slate-700">Summary:</span> {data.bio_summary}</div>}
+          {data.work_history?.length > 0 && (
+            <div>
+              <span className="font-medium text-slate-700">Work History:</span>
+              <ul className="mt-1 space-y-1 pl-4">
+                {data.work_history.map((w, i) => (
+                  <li key={i} className="text-slate-600">
+                    {w.title} at {w.company} ({w.start_date || '?'} - {w.end_date || 'Present'})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+        <div className="mt-5 flex gap-3">
+          <button onClick={onClose} className="flex-1 rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            Cancel
+          </button>
+          <button onClick={() => onApply(data)} className="flex-1 rounded-lg bg-amber-500 py-2 text-sm font-medium text-white hover:bg-amber-600">
+            Apply to Profile
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function EditProfile() {
   const { user, logout } = useAuth();
@@ -16,12 +56,84 @@ export default function EditProfile() {
   const [saved, setSaved] = useState(false);
   const [matchFeedback, setMatchFeedback] = useState(null);
   const [error, setError] = useState('');
+  const [resumePreview, setResumePreview] = useState(null);
+  const [importLoading, setImportLoading] = useState('');
+  const resumeRef = useRef(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const navigate = useNavigate();
+
+  // Check for LinkedIn profile data from OAuth flow
+  useEffect(() => {
+    const stored = sessionStorage.getItem('linkedin_profile');
+    if (stored) {
+      try {
+        const li = JSON.parse(stored);
+        setForm((prev) => ({
+          ...prev,
+          headline: prev.headline || li.name || '',
+        }));
+      } catch { /* ignore */ }
+      sessionStorage.removeItem('linkedin_profile');
+    }
+  }, []);
+
+  const handleResumeUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportLoading('resume');
+    setError('');
+    try {
+      const res = await authApi.uploadResume(file);
+      setResumePreview(res.data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setImportLoading('');
+      if (resumeRef.current) resumeRef.current.value = '';
+    }
+  };
+
+  const applyResumeData = (data) => {
+    setForm((prev) => ({
+      headline: data.headline || prev.headline,
+      current_company: data.current_company || prev.current_company,
+      current_title: data.current_title || prev.current_title,
+      industry: data.industry || prev.industry,
+      location: data.location || prev.location,
+      linkedin_url: prev.linkedin_url,
+      bio_summary: data.bio_summary || prev.bio_summary,
+    }));
+    if (data.work_history?.length) {
+      setWorkHistory((prev) => [
+        ...prev,
+        ...data.work_history.map((w) => ({
+          company: w.company || '',
+          title: w.title || '',
+          start_date: w.start_date || '',
+          end_date: w.end_date || '',
+          is_current: !w.end_date,
+        })),
+      ]);
+    }
+    setResumePreview(null);
+    setSaved(false);
+  };
+
+  const handleLinkedInImport = async () => {
+    setImportLoading('linkedin');
+    setError('');
+    try {
+      const res = await authApi.linkedinAuthorize();
+      window.location.href = res.data.url;
+    } catch (err) {
+      setError(err.message);
+      setImportLoading('');
+    }
+  };
 
   useEffect(() => {
     authApi.upsertProfile({}).then((res) => {
@@ -134,6 +246,36 @@ export default function EditProfile() {
           &larr; Back to Dashboard
         </button>
       </div>
+
+      {/* Import Profile Card */}
+      <div className="mb-6 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <h2 className="text-sm font-semibold text-slate-900">Import Profile</h2>
+        <p className="mt-1 text-xs text-slate-500">Pre-fill your profile from a resume or LinkedIn.</p>
+        <div className="mt-3 flex gap-3">
+          <div>
+            <input ref={resumeRef} type="file" accept=".pdf" onChange={handleResumeUpload} className="hidden" />
+            <button
+              type="button"
+              onClick={() => resumeRef.current?.click()}
+              disabled={importLoading === 'resume'}
+              className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-600 hover:bg-amber-50 disabled:opacity-50"
+            >
+              {importLoading === 'resume' ? 'Parsing...' : 'Import from Resume (PDF)'}
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={handleLinkedInImport}
+            disabled={importLoading === 'linkedin'}
+            className="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            style={{ backgroundColor: '#0A66C2' }}
+          >
+            {importLoading === 'linkedin' ? 'Redirecting...' : 'Import from LinkedIn'}
+          </button>
+        </div>
+      </div>
+
+      <ResumePreviewModal data={resumePreview} onApply={applyResumeData} onClose={() => setResumePreview(null)} />
 
       <form onSubmit={handleSubmit} className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
         <p className="text-sm text-slate-500">

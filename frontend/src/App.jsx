@@ -18,6 +18,7 @@ import PrivacyPage from './pages/PrivacyPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import LinkedInCallback from './pages/LinkedInCallback';
 
 function ProtectedRoute({ children }) {
   const { token, loading } = useAuth();
@@ -53,6 +54,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<RootRedirect />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/auth/linkedin/callback" element={<LinkedInCallback />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
