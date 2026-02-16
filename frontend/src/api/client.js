@@ -64,8 +64,18 @@ export const contacts = {
     form.append('file', file);
     return api('/api/v1/contacts/upload', { method: 'POST', body: form });
   },
-  list: (page = 1, perPage = 50) =>
-    api(`/api/v1/contacts?page=${page}&per_page=${perPage}`),
+  list: (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries({ page: 1, per_page: 50, ...params }).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') qs.set(k, v);
+    });
+    return api(`/api/v1/contacts?${qs}`);
+  },
+  get: (id) => api(`/api/v1/contacts/${id}`),
+  patch: (id, body) => api(`/api/v1/contacts/${id}`, { method: 'PATCH', body }),
+  createManual: (body) => api('/api/v1/contacts/manual', { method: 'POST', body }),
+  bulkImport: (contactsList) =>
+    api('/api/v1/contacts/manual/bulk', { method: 'POST', body: { contacts: contactsList } }),
 };
 
 export const companies = {

@@ -13,6 +13,17 @@ function LikelihoodBadge({ level }) {
   return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${map[level] || map.low}`}>{level}</span>;
 }
 
+const REL_LABELS = {
+  current_colleague: 'current colleague',
+  former_colleague: 'former colleague',
+  manager: 'former manager',
+  alumni: 'alumni',
+  industry_peer: 'industry peer',
+  friend: 'friend',
+  mentor: 'mentor',
+  recruiter: 'recruiter',
+};
+
 function CompanyCard({ company, onRequestIntro, navigate }) {
   const ownPaths = company.referral_paths?.filter((p) => p.source === 'own_network') || [];
   const marketPaths = company.referral_paths?.filter((p) => p.source === 'marketplace') || [];
@@ -55,8 +66,12 @@ function CompanyCard({ company, onRequestIntro, navigate }) {
               {ownPaths.map((path, i) => (
                 <div key={i} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
                   <div>
-                    <p className="text-sm font-medium text-slate-900">{path.contact.name}</p>
-                    <p className="text-xs text-slate-500">{path.contact.title} at {path.contact.company}</p>
+                    <p className="text-sm font-medium text-slate-900">
+                      {path.contact.name} — {path.contact.title} at {path.contact.company}
+                      {path.contact.relationship_type && (
+                        <span className="ml-1 text-slate-400">({REL_LABELS[path.contact.relationship_type] || path.contact.relationship_type})</span>
+                      )}
+                    </p>
                     <div className="mt-1 flex gap-2">
                       <WarmBadge score={path.contact.warm_score} />
                       <LikelihoodBadge level={path.contact.referral_likelihood} />

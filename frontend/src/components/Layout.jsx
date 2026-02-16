@@ -28,6 +28,7 @@ export default function Layout() {
 
   const navLinks = [
     { to: '/dashboard', label: 'Dashboard', show: true },
+    { to: '/contacts', label: 'Contacts', show: true },
     { to: '/referrals', label: 'Find Referrals', show: isSeeker },
     { to: '/applications', label: 'My Applications', show: isSeeker },
     { to: '/marketplace/requests', label: 'Marketplace Requests', show: isSeeker },

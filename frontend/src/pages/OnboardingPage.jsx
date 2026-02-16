@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { auth as authApi, contacts as contactsApi, preferences, marketplace } from '../api/client';
 import TagInput from '../components/TagInput';
 
+const EMPTY_WORK = { company: '', title: '', start_date: '', end_date: '', is_current: false };
+
 const SENIORITY_OPTIONS = ['Entry Level', 'Mid Level', 'Senior', 'Staff / Principal', 'Manager', 'Director', 'VP', 'C-Suite'];
 
 export default function OnboardingPage() {
@@ -32,6 +34,9 @@ export default function OnboardingPage() {
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Step 4: Work history
+  const [workHistory, setWorkHistory] = useState([]);
 
   const setPref = (key) => (e) => setPrefs({ ...prefs, [key]: typeof e === 'object' && e.target ? e.target.value : e });
   const setArrayPref = (key) => (val) => setPrefs({ ...prefs, [key]: val });
@@ -128,7 +133,7 @@ export default function OnboardingPage() {
 
         {/* Progress */}
         <div className="mb-6 flex items-center gap-2">
-          {[1, 2, 3].map((s) => (
+          {[1, 2, 3, 4].map((s) => (
             <div key={s} className={`h-1.5 flex-1 rounded-full ${s <= step ? 'bg-amber-500' : 'bg-slate-200'}`} />
           ))}
         </div>
@@ -306,20 +311,166 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 3 done */}
+          {/* Step 3 done — prompt for work history */}
           {step === 3 && uploadResult && (
             <div className="space-y-4 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
                 <span className="text-xl text-green-600">&#10003;</span>
               </div>
-              <h2 className="text-lg font-semibold text-slate-900">You're all set!</h2>
+              <h2 className="text-lg font-semibold text-slate-900">
+                {uploadResult.processed_count ?? uploadResult.row_count ?? 0} contacts imported!
+              </h2>
               <p className="text-sm text-slate-600">
-                {uploadResult.processed_count ?? uploadResult.row_count ?? 0} contacts imported
-                {uploadResult.company_count ? ` across ${uploadResult.company_count} companies` : ''}
+                Add your work history to improve referral matching — contacts at your former companies get boosted scores.
               </p>
-              <button onClick={finish} className="w-full rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600">
-                Go to Dashboard
-              </button>
+              <div className="flex gap-3">
+                <button onClick={finish} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                  Skip for now
+                </button>
+                <button onClick={() => setStep(4)} className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600">
+                  Add Work History
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Work History */}
+          {step === 4 && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Your work history</h2>
+                <p className="mt-1 text-sm text-slate-500">Contacts at your former companies will get boosted referral scores.</p>
+              </div>
+
+              {workHistory.length === 0 && (
+                <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center">
+                  <p className="text-sm text-slate-500">No entries yet.</p>
+                  <button
+                    type="button"
+                    onClick={() => setWorkHistory([{ ...EMPTY_WORK }])}
+                    className="mt-2 text-sm font-medium text-amber-600 hover:text-amber-700"
+                  >
+                    Add your first role
+                  </button>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {workHistory.map((entry, i) => (
+                  <div key={i} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-700">Company</label>
+                        <input
+                          type="text"
+                          value={entry.company}
+                          onChange={(e) => setWorkHistory((wh) => wh.map((en, j) => j === i ? { ...en, company: e.target.value } : en))}
+                          className={inputClass}
+                          placeholder="Company name"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-700">Title / Role</label>
+                        <input
+                          type="text"
+                          value={entry.title}
+                          onChange={(e) => setWorkHistory((wh) => wh.map((en, j) => j === i ? { ...en, title: e.target.value } : en))}
+                          className={inputClass}
+                          placeholder="e.g. Software Engineer"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-700">Start</label>
+                        <input
+                          type="month"
+                          value={entry.start_date}
+                          onChange={(e) => setWorkHistory((wh) => wh.map((en, j) => j === i ? { ...en, start_date: e.target.value } : en))}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-700">End</label>
+                        {entry.is_current ? (
+                          <p className="py-2 text-sm text-slate-500">Present</p>
+                        ) : (
+                          <input
+                            type="month"
+                            value={entry.end_date}
+                            onChange={(e) => setWorkHistory((wh) => wh.map((en, j) => j === i ? { ...en, end_date: e.target.value } : en))}
+                            className={inputClass}
+                          />
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-xs text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={entry.is_current}
+                          onChange={(e) => setWorkHistory((wh) => wh.map((en, j) => j === i ? { ...en, is_current: e.target.checked } : en))}
+                          className="h-3.5 w-3.5 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        I currently work here
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setWorkHistory((wh) => wh.filter((_, j) => j !== i))}
+                        className="text-xs text-red-500 hover:text-red-600"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {workHistory.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setWorkHistory((wh) => [...wh, { ...EMPTY_WORK }])}
+                  className="text-sm font-medium text-amber-600 hover:text-amber-700"
+                >
+                  + Add another role
+                </button>
+              )}
+
+              {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+
+              <div className="flex gap-3">
+                <button onClick={finish} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                  Skip for now
+                </button>
+                <button
+                  onClick={async () => {
+                    setSaving(true);
+                    setError('');
+                    try {
+                      const entries = workHistory
+                        .filter((e) => e.company.trim())
+                        .map((e) => ({
+                          company: e.company,
+                          title: e.title || undefined,
+                          start_date: e.start_date || undefined,
+                          end_date: e.is_current ? undefined : (e.end_date || undefined),
+                        }));
+                      if (entries.length > 0) {
+                        await authApi.upsertProfile({ work_history: entries });
+                      }
+                      finish();
+                    } catch (err) {
+                      setError(err.message);
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  disabled={saving}
+                  className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Save & Continue'}
+                </button>
+              </div>
             </div>
           )}
         </div>
