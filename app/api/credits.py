@@ -52,7 +52,9 @@ async def credit_balance(
 
 @router.get("/history")
 async def credit_history(
-    type: str | None = Query(None, description="Filter by type: earned, spent, expired"),
+    type: str | None = Query(
+        None, description="Filter by type: earned, spent, expired"
+    ),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_user),

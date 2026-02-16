@@ -30,9 +30,7 @@ async def check_suppression(
     if email:
         email_hash = hash_for_suppression(email)
         result = await db.execute(
-            select(SuppressionList.id).where(
-                SuppressionList.email_hash == email_hash
-            )
+            select(SuppressionList.id).where(SuppressionList.email_hash == email_hash)
         )
         if result.scalar_one_or_none() is not None:
             return True

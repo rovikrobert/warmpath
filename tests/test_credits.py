@@ -63,13 +63,15 @@ class TestGetBalance:
     async def test_mixed_expired_and_active(self):
         uid = uuid_mod.uuid4()
         async with TestSessionLocal() as db:
-            db.add(CreditTransaction(
-                user_id=uid,
-                amount=50,
-                type="earned",
-                reason="old",
-                expires_at=datetime.now(timezone.utc) - timedelta(days=1),
-            ))
+            db.add(
+                CreditTransaction(
+                    user_id=uid,
+                    amount=50,
+                    type="earned",
+                    reason="old",
+                    expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+                )
+            )
             await earn_credits(uid, 75, "csv_upload", db)
             balance = await get_balance(uid, db)
             assert balance == 75
@@ -102,21 +104,25 @@ class TestGetCreditSummary:
         uid = uuid_mod.uuid4()
         async with TestSessionLocal() as db:
             # Credits expiring in 15 days (within 30-day window)
-            db.add(CreditTransaction(
-                user_id=uid,
-                amount=50,
-                type="earned",
-                reason="old_upload",
-                expires_at=datetime.now(timezone.utc) + timedelta(days=15),
-            ))
+            db.add(
+                CreditTransaction(
+                    user_id=uid,
+                    amount=50,
+                    type="earned",
+                    reason="old_upload",
+                    expires_at=datetime.now(timezone.utc) + timedelta(days=15),
+                )
+            )
             # Credits expiring in 60 days (outside 30-day window)
-            db.add(CreditTransaction(
-                user_id=uid,
-                amount=75,
-                type="earned",
-                reason="recent_upload",
-                expires_at=datetime.now(timezone.utc) + timedelta(days=60),
-            ))
+            db.add(
+                CreditTransaction(
+                    user_id=uid,
+                    amount=75,
+                    type="earned",
+                    reason="recent_upload",
+                    expires_at=datetime.now(timezone.utc) + timedelta(days=60),
+                )
+            )
             await db.flush()
 
             summary = await get_credit_summary(uid, db)
@@ -147,7 +153,9 @@ class TestEarnCredits:
         uid = uuid_mod.uuid4()
         ref = uuid_mod.uuid4()
         async with TestSessionLocal() as db:
-            txn = await earn_credits(uid, 50, "intro_facilitation", db, reference_id=ref)
+            txn = await earn_credits(
+                uid, 50, "intro_facilitation", db, reference_id=ref
+            )
             assert txn.reference_id == ref
 
     async def test_expiry_is_12_months(self):
@@ -222,13 +230,15 @@ class TestExpireStaleCredits:
         uid = uuid_mod.uuid4()
         async with TestSessionLocal() as db:
             # Add expired credits (past expiry)
-            db.add(CreditTransaction(
-                user_id=uid,
-                amount=100,
-                type="earned",
-                reason="csv_upload",
-                expires_at=datetime.now(timezone.utc) - timedelta(days=1),
-            ))
+            db.add(
+                CreditTransaction(
+                    user_id=uid,
+                    amount=100,
+                    type="earned",
+                    reason="csv_upload",
+                    expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+                )
+            )
             # Add active credits
             await earn_credits(uid, 50, "welcome_bonus", db)
             await db.flush()
@@ -246,13 +256,15 @@ class TestExpireStaleCredits:
     async def test_no_double_expiry(self):
         uid = uuid_mod.uuid4()
         async with TestSessionLocal() as db:
-            db.add(CreditTransaction(
-                user_id=uid,
-                amount=100,
-                type="earned",
-                reason="csv_upload",
-                expires_at=datetime.now(timezone.utc) - timedelta(days=1),
-            ))
+            db.add(
+                CreditTransaction(
+                    user_id=uid,
+                    amount=100,
+                    type="earned",
+                    reason="csv_upload",
+                    expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+                )
+            )
             await earn_credits(uid, 50, "welcome_bonus", db)
             await db.flush()
 
@@ -268,19 +280,23 @@ class TestExpireStaleCredits:
         uid = uuid_mod.uuid4()
         async with TestSessionLocal() as db:
             # Earned 100, spent 80, then 100 expired
-            db.add(CreditTransaction(
-                user_id=uid,
-                amount=100,
-                type="earned",
-                reason="csv_upload",
-                expires_at=datetime.now(timezone.utc) - timedelta(days=1),
-            ))
-            db.add(CreditTransaction(
-                user_id=uid,
-                amount=-80,
-                type="spent",
-                reason="search",
-            ))
+            db.add(
+                CreditTransaction(
+                    user_id=uid,
+                    amount=100,
+                    type="earned",
+                    reason="csv_upload",
+                    expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+                )
+            )
+            db.add(
+                CreditTransaction(
+                    user_id=uid,
+                    amount=-80,
+                    type="spent",
+                    reason="search",
+                )
+            )
             await db.flush()
 
             count = await expi[RESEND_KEY_REDACTED](db)
@@ -302,13 +318,15 @@ class TestExpireStaleCredits:
         async with TestSessionLocal() as db:
             # Both have expired credits + some active
             for uid in [uid1, uid2]:
-                db.add(CreditTransaction(
-                    user_id=uid,
-                    amount=100,
-                    type="earned",
-                    reason="csv_upload",
-                    expires_at=datetime.now(timezone.utc) - timedelta(days=1),
-                ))
+                db.add(
+                    CreditTransaction(
+                        user_id=uid,
+                        amount=100,
+                        type="earned",
+                        reason="csv_upload",
+                        expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+                    )
+                )
                 await earn_credits(uid, 50, "welcome_bonus", db)
             await db.flush()
 
@@ -346,13 +364,9 @@ async def user_id(auth_headers: dict, client: AsyncClient) -> str:
 
 
 class TestBalanceEndpoint:
-    async def test_new_user_has_welcome_bonus(
-        self, client: AsyncClient, auth_headers
-    ):
+    async def test_new_user_has_welcome_bonus(self, client: AsyncClient, auth_headers):
         """New users get 50 welcome credits."""
-        resp = await client.get(
-            "/api/v1/credits/balance", headers=auth_headers
-        )
+        resp = await client.get("/api/v1/credits/balance", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert data["balance"] == 50
@@ -368,9 +382,7 @@ class TestBalanceEndpoint:
             await spend_credits(uid, 20, "search", db)
             await db.commit()
 
-        resp = await client.get(
-            "/api/v1/credits/balance", headers=auth_headers
-        )
+        resp = await client.get("/api/v1/credits/balance", headers=auth_headers)
         data = resp.json()["data"]
         # 50 (welcome) + 100 (csv) - 20 (search) = 130
         assert data["balance"] == 130
@@ -381,9 +393,7 @@ class TestBalanceEndpoint:
 class TestHistoryEndpoint:
     async def test_lists_transactions(self, client: AsyncClient, auth_headers):
         """History shows all transactions."""
-        resp = await client.get(
-            "/api/v1/credits/history", headers=auth_headers
-        )
+        resp = await client.get("/api/v1/credits/history", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()["data"]
         # Should have welcome bonus
@@ -391,9 +401,7 @@ class TestHistoryEndpoint:
         reasons = [t["reason"] for t in data]
         assert "welcome_bonus" in reasons
 
-    async def test_filter_by_type(
-        self, client: AsyncClient, auth_headers, user_id
-    ):
+    async def test_filter_by_type(self, client: AsyncClient, auth_headers, user_id):
         """Can filter history by transaction type."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
@@ -408,9 +416,7 @@ class TestHistoryEndpoint:
         assert len(data) == 1
         assert data[0]["type"] == "spent"
 
-    async def test_pagination(
-        self, client: AsyncClient, auth_headers, user_id
-    ):
+    async def test_pagination(self, client: AsyncClient, auth_headers, user_id):
         """History paginates correctly."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
@@ -437,9 +443,7 @@ class TestHistoryEndpoint:
             await earn_credits(uid, 100, "latest_earn", db)
             await db.commit()
 
-        resp = await client.get(
-            "/api/v1/credits/history", headers=auth_headers
-        )
+        resp = await client.get("/api/v1/credits/history", headers=auth_headers)
         data = resp.json()["data"]
         assert data[0]["reason"] == "latest_earn"
 
@@ -489,27 +493,25 @@ class TestExpireEndpoint:
         """Expire endpoint triggers sweep."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
-            db.add(CreditTransaction(
-                user_id=uid,
-                amount=200,
-                type="earned",
-                reason="old_credits",
-                expires_at=datetime.now(timezone.utc) - timedelta(days=1),
-            ))
+            db.add(
+                CreditTransaction(
+                    user_id=uid,
+                    amount=200,
+                    type="earned",
+                    reason="old_credits",
+                    expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+                )
+            )
             await db.commit()
 
-        resp = await client.post(
-            "/api/v1/credits/expire", headers=auth_headers
-        )
+        resp = await client.post("/api/v1/credits/expire", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert data["users_expired"] >= 1
 
     async def test_expi[RESEND_KEY_REDACTED](self, client: AsyncClient, auth_headers):
         """No expired credits → 0 users expired."""
-        resp = await client.post(
-            "/api/v1/credits/expire", headers=auth_headers
-        )
+        resp = await client.post("/api/v1/credits/expire", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json()["data"]["users_expired"] == 0
 
@@ -551,9 +553,7 @@ class TestCreditTriggers:
             "01 Jan 2024\n"
         )
 
-        befo[RESEND_KEY_REDACTED] = await client.get(
-            "/api/v1/credits/balance", headers=auth_headers
-        )
+        befo[RESEND_KEY_REDACTED] = await client.get("/api/v1/credits/balance", headers=auth_headers)
         befo[RESEND_KEY_REDACTED] = befo[RESEND_KEY_REDACTED].json()["data"]["balance"]
 
         resp = await client.post(
@@ -569,9 +569,7 @@ class TestCreditTriggers:
         )
         assert resp.status_code in (200, 201, 202)
 
-        after_resp = await client.get(
-            "/api/v1/credits/balance", headers=auth_headers
-        )
+        after_resp = await client.get("/api/v1/credits/balance", headers=auth_headers)
         after_balance = after_resp.json()["data"]["balance"]
 
         assert after_balance == befo[RESEND_KEY_REDACTED] + 100

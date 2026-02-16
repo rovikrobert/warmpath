@@ -24,21 +24,11 @@ from app.services.suppression import check_suppression
 # ---------------------------------------------------------------------------
 
 # Role level keywords (checked in priority order)
-_VP_PATTERNS = re.compile(
-    r"\b(vp|vice president)\b", re.IGNORECASE
-)
-_CSUITE_PATTERNS = re.compile(
-    r"\b(ceo|cto|cfo|coo|cmo|cpo|chief)\b", re.IGNORECASE
-)
-_DIRECTOR_PATTERNS = re.compile(
-    r"\b(director)\b", re.IGNORECASE
-)
-_LEAD_PATTERNS = re.compile(
-    r"\b(lead|principal|staff|head of)\b", re.IGNORECASE
-)
-_SENIOR_PATTERNS = re.compile(
-    r"\b(senior|sr\.?)\b", re.IGNORECASE
-)
+_VP_PATTERNS = re.compile(r"\b(vp|vice president)\b", re.IGNORECASE)
+_CSUITE_PATTERNS = re.compile(r"\b(ceo|cto|cfo|coo|cmo|cpo|chief)\b", re.IGNORECASE)
+_DIRECTOR_PATTERNS = re.compile(r"\b(director)\b", re.IGNORECASE)
+_LEAD_PATTERNS = re.compile(r"\b(lead|principal|staff|head of)\b", re.IGNORECASE)
+_SENIOR_PATTERNS = re.compile(r"\b(senior|sr\.?)\b", re.IGNORECASE)
 _JUNIOR_PATTERNS = re.compile(
     r"\b(junior|jr\.?|intern|trainee|associate|entry)\b", re.IGNORECASE
 )
@@ -69,44 +59,71 @@ def classify_role_level(position: str | None) -> str:
 
 # Department classification patterns
 _DEPT_PATTERNS: list[tuple[str, re.Pattern]] = [
-    ("engineering", re.compile(
-        r"\b(engineer\w*|developer|software|sre|devops|backend|frontend|"
-        r"full.?stack|data scientist|machine learning|ml|ai|architect)\b",
-        re.IGNORECASE,
-    )),
-    ("product", re.compile(
-        r"\b(product manager|product lead|product owner|pm)\b",
-        re.IGNORECASE,
-    )),
-    ("design", re.compile(
-        r"\b(design|ux|ui|creative|brand)\b",
-        re.IGNORECASE,
-    )),
-    ("marketing", re.compile(
-        r"\b(marketing|growth|content|seo|sem|brand|communications)\b",
-        re.IGNORECASE,
-    )),
-    ("sales", re.compile(
-        r"\b(sales|account executive|business development|bdr|sdr|"
-        r"account manager|revenue)\b",
-        re.IGNORECASE,
-    )),
-    ("ops", re.compile(
-        r"\b(operations|ops|supply chain|logistics|procurement)\b",
-        re.IGNORECASE,
-    )),
-    ("finance", re.compile(
-        r"\b(finance|accounting|controller|treasury|fp&a|cfo)\b",
-        re.IGNORECASE,
-    )),
-    ("hr", re.compile(
-        r"\b(human resources|hr|people|talent|recruiting|recruiter)\b",
-        re.IGNORECASE,
-    )),
-    ("legal", re.compile(
-        r"\b(legal|counsel|compliance|attorney|lawyer)\b",
-        re.IGNORECASE,
-    )),
+    (
+        "engineering",
+        re.compile(
+            r"\b(engineer\w*|developer|software|sre|devops|backend|frontend|"
+            r"full.?stack|data scientist|machine learning|ml|ai|architect)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "product",
+        re.compile(
+            r"\b(product manager|product lead|product owner|pm)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "design",
+        re.compile(
+            r"\b(design|ux|ui|creative|brand)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "marketing",
+        re.compile(
+            r"\b(marketing|growth|content|seo|sem|brand|communications)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "sales",
+        re.compile(
+            r"\b(sales|account executive|business development|bdr|sdr|"
+            r"account manager|revenue)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "ops",
+        re.compile(
+            r"\b(operations|ops|supply chain|logistics|procurement)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "finance",
+        re.compile(
+            r"\b(finance|accounting|controller|treasury|fp&a|cfo)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "hr",
+        re.compile(
+            r"\b(human resources|hr|people|talent|recruiting|recruiter)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "legal",
+        re.compile(
+            r"\b(legal|counsel|compliance|attorney|lawyer)\b",
+            re.IGNORECASE,
+        ),
+    ),
 ]
 
 
@@ -259,9 +276,7 @@ async def generate_marketplace_listings(
             company_id=contact.company_id,
             role_level=classify_role_level(contact.current_title),
             department_category=dept,
-            warm_sco[RESEND_KEY_REDACTED]=classify_warm_sco[RESEND_KEY_REDACTED](
-                sco[RESEND_KEY_REDACTED].get(contact.id)
-            ),
+            warm_sco[RESEND_KEY_REDACTED]=classify_warm_sco[RESEND_KEY_REDACTED](sco[RESEND_KEY_REDACTED].get(contact.id)),
             connection_recency=classify_connection_recency(contact.connected_on),
         )
         db.add(listing)

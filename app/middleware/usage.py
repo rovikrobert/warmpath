@@ -3,6 +3,11 @@
 Logs every authenticated API request to the usage_logs table.
 For specific actions (csv_upload, search_run, intro_draft), additional
 metadata like processing time is captured.
+
+Also handles **metering** for 7 high-value actions — writes a second
+log entry with resource_type="metered" and adds tier-aware warning
+headers (X-WarmPath-Usage-Warning). Both operations use the same DB
+session to avoid BaseHTTPMiddleware stacking issues.
 """
 
 import time
@@ -12,6 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+from app.middleware.usage_logger import compute_metering_warning, match_metered_action
 from app.models.enrichment import UsageLog
 from app.utils.security import decode_access_token
 
@@ -80,6 +86,7 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
             return response
 
         action, resource_type = _classify_request(request.method, path)
+        metered_action = match_metered_action(request.method, path)
         ip_address = request.client.host if request.client else None
         user_agent = request.headers.get("user-agent", "")[:500]
 
@@ -98,6 +105,7 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
 
             db_dep = _app.dependency_overrides.get(get_db, get_db)
             async for db in db_dep():
+                # ---- broad tracking log ----
                 log = UsageLog(
                     user_id=user_id,
                     action=action,
@@ -107,6 +115,26 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
                     user_agent=user_agent,
                 )
                 db.add(log)
+
+                # ---- metering log + warning header ----
+                if metered_action is not None:
+                    metered_log = UsageLog(
+                        user_id=user_id,
+                        action=metered_action,
+                        resource_type="metered",
+                        metadata_=metadata,
+                        ip_address=str(ip_address) if ip_address else None,
+                        user_agent=user_agent,
+                    )
+                    db.add(metered_log)
+                    await db.flush()
+
+                    warning = await compute_metering_warning(
+                        user_id, metered_action, db
+                    )
+                    if warning:
+                        response.headers["X-WarmPath-Usage-Warning"] = warning
+
                 await db.commit()
                 break
         except Exception:

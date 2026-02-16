@@ -104,31 +104,33 @@ async def marketplace_data(holder_auth: dict):
         await db.flush()
 
         # Add warm scores
-        db.add(WarmScore(
-            user_id=holder_uid,
-            contact_id=contacts[0].id,
-            total_score=80,
-            recency_score=90,
-            tenu[RESEND_KEY_REDACTED]=70,
-            context_score=80,
-            role_score=75,
-            referral_likelihood="high",
-        ))
-        db.add(WarmScore(
-            user_id=holder_uid,
-            contact_id=contacts[1].id,
-            total_score=55,
-            recency_score=40,
-            tenu[RESEND_KEY_REDACTED]=60,
-            context_score=50,
-            role_score=70,
-            referral_likelihood="medium",
-        ))
+        db.add(
+            WarmScore(
+                user_id=holder_uid,
+                contact_id=contacts[0].id,
+                total_score=80,
+                recency_score=90,
+                tenu[RESEND_KEY_REDACTED]=70,
+                context_score=80,
+                role_score=75,
+                referral_likelihood="high",
+            )
+        )
+        db.add(
+            WarmScore(
+                user_id=holder_uid,
+                contact_id=contacts[1].id,
+                total_score=55,
+                recency_score=40,
+                tenu[RESEND_KEY_REDACTED]=60,
+                context_score=50,
+                role_score=70,
+                referral_likelihood="medium",
+            )
+        )
 
         # Opt in to marketplace
-        db.add(NetworkSharingPreferences(
-            user_id=holder_uid, opt_in_marketplace=True
-        ))
+        db.add(NetworkSharingPreferences(user_id=holder_uid, opt_in_marketplace=True))
         await db.flush()
 
         # Create marketplace listings
@@ -157,12 +159,14 @@ async def marketplace_data(holder_auth: dict):
         await db.flush()
 
         # Add reputation for holder
-        db.add(ConnectorReputation(
-            user_id=holder_uid,
-            intros_facilitated=12,
-            response_rate=85,
-            avg_rating=4,
-        ))
+        db.add(
+            ConnectorReputation(
+                user_id=holder_uid,
+                intros_facilitated=12,
+                response_rate=85,
+                avg_rating=4,
+            )
+        )
 
         await db.commit()
 
@@ -626,9 +630,7 @@ class TestApproveDecline:
         )
         assert resp.status_code == 400
 
-    async def test_nonexistent_facilitation(
-        self, client: AsyncClient, holder_auth
-    ):
+    async def test_nonexistent_facilitation(self, client: AsyncClient, holder_auth):
         resp = await client.patch(
             f"/api/v1/marketplace/requests/{uuid_mod.uuid4()}",
             json={"action": "approve"},
@@ -679,6 +681,7 @@ class TestSharingPreferences:
             row = result.first()
             if row:
                 from sqlalchemy import update
+
                 await db.execute(
                     update(NetworkSharingPreferences)
                     .where(NetworkSharingPreferences.user_id == holder_uid)
@@ -710,6 +713,7 @@ class TestSharingPreferences:
         holder_uid = uuid_mod.UUID(holder_auth["user_id"])
         async with TestSessionLocal() as db:
             from sqlalchemy import select
+
             result = await db.execute(
                 select(MarketplaceListing).where(
                     MarketplaceListing.network_holder_id == holder_uid,
@@ -874,9 +878,7 @@ class TestSmartSearchMarketplace:
         )
         assert resp.status_code == 402
 
-    async def test_own_network_scope_is_free(
-        self, client: AsyncClient, seeker_auth
-    ):
+    async def test_own_network_scope_is_free(self, client: AsyncClient, seeker_auth):
         """Own-network scope doesn't require credits."""
         await client.put(
             "/api/v1/preferences/job",

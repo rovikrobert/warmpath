@@ -31,6 +31,7 @@ async def check_rate_limit(
         .where(
             UsageLog.user_id == user_id,
             UsageLog.action == action,
+            UsageLog.resource_type != "metered",
             UsageLog.created_at >= today_start,
         )
     )

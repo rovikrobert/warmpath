@@ -16,6 +16,7 @@ from app.api import (
     matches,
     preferences,
     search,
+    usage,
 )
 from app.config import settings
 from app.middleware.usage import UsageTrackingMiddleware
@@ -88,3 +89,4 @@ app.include_router(
     marketplace.router, prefix="/api/v1/marketplace", tags=["marketplace"]
 )
 app.include_router(credits.router, prefix="/api/v1/credits", tags=["credits"])
+app.include_router(usage.router, prefix="/api/v1/usage", tags=["usage"])
