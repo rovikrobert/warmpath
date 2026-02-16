@@ -104,11 +104,12 @@ class TestParseLinkedinCsv:
         # "10 Jan 2024"
         assert contacts[3]["connected_on"].isoformat() == "2024-01-10"
 
-    def test_latin1_encoding(self):
-        contacts = parse_linkedin_csv(LATIN1_CSV_BYTES)
-        assert len(contacts) == 1
-        assert contacts[0]["first_name"] == "René"
-        assert contacts[0]["last_name"] == "Müller"
+    def test_latin1_encoding_rejected(self):
+        """Non-UTF-8 files are now rejected (S2 hardening)."""
+        import pytest
+
+        with pytest.raises(ValueError, match="UTF-8"):
+            parse_linkedin_csv(LATIN1_CSV_BYTES)
 
     def test_utf8_bom_handling(self):
         contacts = parse_linkedin_csv(BOM_CSV.encode("utf-8-sig"))

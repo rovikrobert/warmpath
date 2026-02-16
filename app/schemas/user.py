@@ -27,6 +27,11 @@ class UserTypeUpdate(BaseModel):
     user_type: str
 
 
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
