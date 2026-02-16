@@ -118,6 +118,9 @@ class WarmScore(Base):
         Numeric(5, 2), server_default="0"
     )
 
+    # Referral classification
+    referral_likelihood: Mapped[str | None] = mapped_column(String(50))
+
     # Breakdown metadata
     sco[RESEND_KEY_REDACTED]: Mapped[dict | None] = mapped_column(JSONB)
     algorithm_version: Mapped[str] = mapped_column(

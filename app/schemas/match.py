@@ -24,6 +24,7 @@ class WarmScoreResponse(BaseModel):
     context_score: float
     role_score: float
     tenu[RESEND_KEY_REDACTED]: float
+    referral_likelihood: str | None = None
     sco[RESEND_KEY_REDACTED]: dict | None = None
     algorithm_version: str
     computed_at: datetime
