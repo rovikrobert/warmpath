@@ -36,9 +36,26 @@ function CompanyCard({ company, onRequestIntro, navigate }) {
 
       <div className="divide-y divide-slate-100 px-5">
         {/* Active Openings */}
-        {company.active_openings?.length > 0 && (
-          <div className="py-4">
-            <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">Active Openings</h4>
+        <div className="py-4">
+          <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">
+            Live Openings
+            {company.job_scan_status === 'matched' && (
+              <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-normal normal-case text-green-700">
+                {company.active_openings.length} found
+              </span>
+            )}
+            {company.job_scan_status === 'no_match' && (
+              <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-normal normal-case text-slate-500">
+                {company.total_jobs_fetched} scanned, 0 match your role
+              </span>
+            )}
+            {company.job_scan_status === 'no_board' && (
+              <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-normal normal-case text-slate-400">
+                job board not indexed
+              </span>
+            )}
+          </h4>
+          {company.active_openings?.length > 0 ? (
             <div className="space-y-2">
               {company.active_openings.map((job, i) => (
                 <div key={i} className="flex items-center justify-between text-sm">
@@ -55,8 +72,12 @@ function CompanyCard({ company, onRequestIntro, navigate }) {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : company.job_scan_status !== 'no_board' ? (
+            <p className="text-sm text-slate-400">No openings matching your target role.</p>
+          ) : (
+            <p className="text-sm text-slate-400">This company's job board isn't in our index yet.</p>
+          )}
+        </div>
 
         {/* Own Network Paths */}
         {ownPaths.length > 0 && (
@@ -127,9 +148,9 @@ function CompanyCard({ company, onRequestIntro, navigate }) {
         )}
 
         {/* No paths */}
-        {ownPaths.length === 0 && marketPaths.length === 0 && !company.active_openings?.length && (
+        {ownPaths.length === 0 && marketPaths.length === 0 && (
           <div className="py-4 text-center text-sm text-slate-400">
-            No referral paths or openings found at {company.name}
+            No referral paths found at {company.name}
           </div>
         )}
       </div>

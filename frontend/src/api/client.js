@@ -1,9 +1,20 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 let _getToken = () => null;
+let _setToken = () => {};
+let _onAuthFailure = () => {};
+let _refreshing = null; // singleton promise to avoid concurrent refreshes
 
 export function setTokenGetter(fn) {
   _getToken = fn;
+}
+
+export function setTokenSetter(fn) {
+  _setToken = fn;
+}
+
+export function setAuthFailureHandler(fn) {
+  _onAuthFailure = fn;
 }
 
 // ---------------------------------------------------------------------------
@@ -16,7 +27,25 @@ export function onUsageWarning(cb) {
   _usageWarningCallback = cb;
 }
 
-export async function api(path, options = {}) {
+// ---------------------------------------------------------------------------
+// Token refresh
+// ---------------------------------------------------------------------------
+
+async function _tryRefresh() {
+  const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data?.data?.access_token || null;
+}
+
+// ---------------------------------------------------------------------------
+// Core API caller with auto-refresh on 401
+// ---------------------------------------------------------------------------
+
+async function _rawFetch(path, options = {}) {
   const token = _getToken();
   const headers = { ...options.headers };
 
@@ -29,13 +58,44 @@ export async function api(path, options = {}) {
     options.body = JSON.stringify(options.body);
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  return fetch(`${BASE_URL}${path}`, { ...options, headers, credentials: 'include' });
+}
+
+export async function api(path, options = {}) {
+  // Clone body for potential retry (can only read a stream once)
+  const origBody = options.body;
+
+  let res = await _rawFetch(path, options);
 
   // Check for usage warning header on every response
   const warning = res.headers.get('x-warmpath-usage-warning');
   if (warning && _usageWarningCallback && !_shownWarnings.has(warning)) {
     _shownWarnings.add(warning);
     _usageWarningCallback(warning);
+  }
+
+  // Auto-refresh on 401 (skip for auth endpoints to avoid loops)
+  if (res.status === 401 && !path.includes('/auth/refresh') && !path.includes('/auth/login')) {
+    // Deduplicate concurrent refresh attempts
+    if (!_refreshing) {
+      _refreshing = _tryRefresh().finally(() => { _refreshing = null; });
+    }
+    const newToken = await _refreshing;
+
+    if (newToken) {
+      _setToken(newToken);
+      // Retry with new token — rebuild options with original body
+      const retryOptions = { ...options, body: origBody };
+      res = await _rawFetch(path, retryOptions);
+    } else {
+      // Refresh failed — session is truly expired
+      _onAuthFailure();
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      const message = err.detail || err.error?.message || 'Session expired';
+      const error = new Error(typeof message === 'string' ? message : JSON.stringify(message));
+      error.status = res.status;
+      throw error;
+    }
   }
 
   if (!res.ok) {

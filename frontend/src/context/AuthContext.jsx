@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { auth as authApi, setTokenGetter } from '../api/client';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { auth as authApi, setAuthFailureHandler, setTokenGetter, setTokenSetter } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -8,13 +8,52 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [justSignedUp, setJustSignedUp] = useState(false);
+  const bootAttempted = useRef(false);
 
+  // Keep the API client's token getter in sync
   const getToken = useCallback(() => token, [token]);
 
   useEffect(() => {
     setTokenGetter(getToken);
   }, [getToken]);
 
+  // Wire up the token setter so the 401 interceptor can update state
+  useEffect(() => {
+    setTokenSetter((newToken) => {
+      setToken(newToken);
+      setTokenGetter(() => newToken);
+    });
+    setAuthFailureHandler(() => {
+      setToken(null);
+      setUser(null);
+      setJustSignedUp(false);
+    });
+  }, []);
+
+  // On boot: try to restore session via refresh token cookie
+  useEffect(() => {
+    if (bootAttempted.current) return;
+    bootAttempted.current = true;
+
+    const base = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+    fetch(`${base}/api/v1/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const newToken = data?.data?.access_token;
+        if (newToken) {
+          setToken(newToken);
+          setTokenGetter(() => newToken);
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  // Fetch user when token changes
   useEffect(() => {
     if (token && !user) {
       authApi.me().then(res => {
