@@ -1,22 +1,24 @@
-"""End-to-end integration test — full user journey.
+"""End-to-end integration tests — full user journey + marketplace + privacy.
 
-Exercises every major feature in sequence:
-  1. Sign up
-  2. Upload a realistic 20-row LinkedIn CSV
-  3. Verify contacts were created and deduplicated
-  4. Verify companies were normalized
-  5. Verify warm scores were computed
-  6. Create a search request ("VP Engineering at fintech companies")
-  7. Run the search (mock AI scorer)
-  8. Get results sorted by combined score
-  9. Request an intro message for the top result
-  10. Check usage stats reflect all actions
+Sections:
+  1. Original journey (signup → CSV → search → intro → usage)
+  2. Enhanced solo journey (+ verify email, prefs, smart search, app pipeline,
+     password change, logout all)
+  3. Marketplace two-user flow (network holder → job seeker → intro → approval)
+  4. Privacy compliance (suppression, anonymization, consent gate, unverified)
+  5. Existing unit-ish helpers (dedup, isolation, scoring)
 """
 
 import io
 from datetime import date, timedelta
 
 from httpx import AsyncClient
+from sqlalchemy import select
+
+from app.models.privacy import SuppressionList
+from app.models.user import User
+from app.utils.hashing import hash_for_suppression
+from tests.conftest import TestSessionLocal
 
 # ---------------------------------------------------------------------------
 # Realistic 20-row LinkedIn CSV fixture
@@ -97,9 +99,38 @@ async def _signup(client: AsyncClient, email: str = "journey@example.com") -> st
     return resp.json()["data"]["access_token"]
 
 
-# ---------------------------------------------------------------------------
-# The big test
-# ---------------------------------------------------------------------------
+async def _get_verification_token(email: str) -> str:
+    """Retrieve the email-verification token directly from the test DB."""
+    async with TestSessionLocal() as session:
+        result = await session.execute(
+            select(User.email_verification_token).where(User.email == email)
+        )
+        return result.scalar_one()
+
+
+async def _signup_verified(
+    client: AsyncClient,
+    email: str,
+    password: str = "Str0ngP@ss!",
+    full_name: str = "Test User",
+) -> str:
+    """Sign up, verify email, return access token."""
+    resp = await client.post(
+        "/api/v1/auth/signup",
+        json={"email": email, "password": password, "full_name": full_name},
+    )
+    assert resp.status_code == 201, resp.text
+    token = resp.json()["data"]["access_token"]
+
+    vtoken = await _get_verification_token(email)
+    verify_resp = await client.get(f"/api/v1/auth/verify-email?token={vtoken}")
+    assert verify_resp.status_code == 200
+    return token
+
+
+# ===========================================================================
+# Section 1 — Original journey (unchanged from earlier sessions)
+# ===========================================================================
 
 
 async def test_full_user_journey(client: AsyncClient):
@@ -321,9 +352,556 @@ async def test_full_user_journey(client: AsyncClient):
     assert usage["counts"]["intro_draft"] >= 1
 
 
-# ---------------------------------------------------------------------------
-# Deduplication-specific test
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# Section 2 — Enhanced solo journey (email verify → prefs → smart search →
+#              application pipeline → stats → password change → logout all)
+# ===========================================================================
+
+
+async def test_complete_solo_journey(client: AsyncClient):
+    """Full job-seeker lifecycle including verification, smart search,
+    application tracking, credential rotation, and session invalidation."""
+
+    email = "solo@example.com"
+    password = "Str0ngP@ss!"
+
+    # -- a) Signup + verify email ----------------------------------------
+    signup_resp = await client.post(
+        "/api/v1/auth/signup",
+        json={"email": email, "password": password, "full_name": "Solo User"},
+    )
+    assert signup_resp.status_code == 201
+    token = signup_resp.json()["data"]["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    vtoken = await _get_verification_token(email)
+    assert vtoken is not None
+    verify_resp = await client.get(f"/api/v1/auth/verify-email?token={vtoken}")
+    assert verify_resp.status_code == 200
+
+    me_resp = await client.get("/api/v1/auth/me", headers=headers)
+    assert me_resp.json()["data"]["email_verified"] is True
+
+    # -- b) Upload CSV ---------------------------------------------------
+    upload_resp = await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file()
+    )
+    assert upload_resp.status_code == 201
+    assert upload_resp.json()["data"]["contacts_created"] == 19
+
+    # -- c) Set job preferences ------------------------------------------
+    prefs_resp = await client.put(
+        "/api/v1/preferences/job",
+        headers=headers,
+        json={
+            "target_role": "VP Engineering",
+            "target_seniority": "VP",
+            "target_industries": ["fintech"],
+            "target_locations": ["San Francisco"],
+            "open_to_remote": True,
+        },
+    )
+    assert prefs_resp.status_code == 200
+    assert prefs_resp.json()["data"]["target_role"] == "VP Engineering"
+
+    get_prefs = await client.get("/api/v1/preferences/job", headers=headers)
+    assert get_prefs.status_code == 200
+    assert get_prefs.json()["data"]["target_role"] == "VP Engineering"
+
+    # -- d) Smart search (own network) -----------------------------------
+    smart_resp = await client.post(
+        "/api/v1/search/smart",
+        headers=headers,
+        json={"company_names": ["Stripe", "Plaid"], "scope": "own_network"},
+    )
+    assert smart_resp.status_code == 201
+    smart_data = smart_resp.json()["data"]
+    assert smart_data["status"] == "completed"
+    assert "companies" in smart_data
+    assert smart_data["summary"]["companies_searched"] == 2
+
+    # -- e) Pick a match, draft referral message -------------------------
+    # Use a manual search+run to guarantee persisted MatchResult rows
+    search_resp = await client.post(
+        "/api/v1/search",
+        headers=headers,
+        json={
+            "name": "Solo VP Eng",
+            "target_titles": ["VP Engineering"],
+            "target_companies": ["Stripe"],
+            "target_role": "VP Engineering",
+        },
+    )
+    search_id = search_resp.json()["data"]["id"]
+    await client.post(f"/api/v1/search/{search_id}/run", headers=headers)
+
+    results_resp = await client.get(
+        f"/api/v1/search/{search_id}/results",
+        headers=headers,
+        params={"min_score": 0},
+    )
+    results = results_resp.json()["data"]
+    assert len(results) > 0
+
+    top = results[0]
+    intro_resp = await client.post(
+        "/api/v1/matches/intros",
+        headers=headers,
+        json={
+            "contact_id": top["contact_id"],
+            "match_result_id": top["id"],
+            "context": "Referral ask",
+            "tone": "professional",
+            "channel": "linkedin",
+        },
+    )
+    assert intro_resp.status_code == 201
+    intro_id = intro_resp.json()["data"]["id"]
+
+    # -- f) Create application from intro → pipeline ---------------------
+    app_resp = await client.post(
+        f"/api/v1/applications/from-intro/{intro_id}", headers=headers
+    )
+    assert app_resp.status_code == 201
+    app_data = app_resp.json()["data"]
+    app_id = app_data["id"]
+    assert app_data["status"] == "draft"
+
+    for next_status in [
+        "message_sent",
+        "responded",
+        "interview_scheduled",
+        "offer_received",
+    ]:
+        patch_resp = await client.patch(
+            f"/api/v1/applications/{app_id}",
+            headers=headers,
+            json={"status": next_status},
+        )
+        assert patch_resp.status_code == 200
+        assert patch_resp.json()["data"]["status"] == next_status
+
+    # Verify auto-set timestamps
+    get_app = await client.get(f"/api/v1/applications/{app_id}", headers=headers)
+    assert get_app.json()["data"]["sent_at"] is not None
+    assert get_app.json()["data"]["responded_at"] is not None
+
+    # -- g) Application stats --------------------------------------------
+    stats_resp = await client.get("/api/v1/applications/stats", headers=headers)
+    assert stats_resp.status_code == 200
+    stats = stats_resp.json()["data"]
+    assert stats["total"] >= 1
+    assert "offer_received" in stats["by_status"]
+
+    # -- h) Usage stats --------------------------------------------------
+    usage_resp = await client.get("/api/v1/usage/me", headers=headers)
+    assert usage_resp.status_code == 200
+    assert usage_resp.json()["data"]["total_metered_calls"] >= 1
+
+    history_resp = await client.get("/api/v1/usage/me/history", headers=headers)
+    assert history_resp.status_code == 200
+    assert history_resp.json()["meta"]["total"] >= 1
+
+    # -- i) Change password → old token rejected -------------------------
+    old_token = token
+    pwd_resp = await client.post(
+        "/api/v1/auth/change-password",
+        headers=headers,
+        json={"old_password": password, "new_password": "NewStr0ng!Pass"},
+    )
+    assert pwd_resp.status_code == 200
+    new_token = pwd_resp.json()["data"]["access_token"]
+
+    old_headers = {"Authorization": f"Bearer {old_token}"}
+    assert (await client.get("/api/v1/auth/me", headers=old_headers)).status_code == 401
+
+    new_headers = {"Authorization": f"Bearer {new_token}"}
+    assert (await client.get("/api/v1/auth/me", headers=new_headers)).status_code == 200
+
+    # -- j) Logout all → token invalidated -------------------------------
+    logout_resp = await client.post("/api/v1/auth/logout-all", headers=new_headers)
+    assert logout_resp.status_code == 200
+    assert (await client.get("/api/v1/auth/me", headers=new_headers)).status_code == 401
+
+
+# ===========================================================================
+# Section 3 — Marketplace two-user flow
+# ===========================================================================
+
+
+async def test_marketplace_two_user_flow(client: AsyncClient):
+    """Network holder uploads → job seeker searches marketplace → intro
+    facilitation → approval → credit settlement."""
+
+    # -- a) User A (network holder) signup + verify ----------------------
+    holder_token = await _signup_verified(
+        client, "holder@example.com", full_name="Network Holder"
+    )
+    holder_headers = {"Authorization": f"Bearer {holder_token}"}
+
+    await client.patch(
+        "/api/v1/auth/user-type",
+        headers=holder_headers,
+        json={"user_type": "network_holder"},
+    )
+
+    # -- b) Upload CSV with Stripe / Google contacts ---------------------
+    upload_resp = await client.post(
+        "/api/v1/contacts/upload", headers=holder_headers, files=_csv_file()
+    )
+    assert upload_resp.status_code == 201
+    assert upload_resp.json()["data"]["contacts_created"] == 19
+
+    # Holder balance: 50 welcome + 100 csv_upload = 150
+    holder_bal = await client.get("/api/v1/credits/balance", headers=holder_headers)
+    assert holder_bal.json()["data"]["balance"] == 150
+
+    # -- c) Opt into marketplace -----------------------------------------
+    share_resp = await client.put(
+        "/api/v1/marketplace/sharing-preferences",
+        headers=holder_headers,
+        json={"opt_in_marketplace": True, "is_paused": False},
+    )
+    assert share_resp.status_code == 200
+
+    # -- d) Verify anonymized listings -----------------------------------
+    listings_resp = await client.get(
+        "/api/v1/marketplace/my-listings", headers=holder_headers
+    )
+    assert listings_resp.status_code == 200
+    listings = listings_resp.json()["data"]
+    assert len(listings) > 0
+
+    # Holder sees their own PII on their listings (their data)
+    assert any(item.get("contact_name") for item in listings)
+
+    # -- e) User B (job seeker) signup + verify --------------------------
+    seeker_token = await _signup_verified(
+        client, "seeker@example.com", full_name="Job Seeker"
+    )
+    seeker_headers = {"Authorization": f"Bearer {seeker_token}"}
+
+    await client.patch(
+        "/api/v1/auth/user-type",
+        headers=seeker_headers,
+        json={"user_type": "job_seeker"},
+    )
+
+    seeker_bal = await client.get("/api/v1/credits/balance", headers=seeker_headers)
+    assert seeker_bal.json()["data"]["balance"] == 50  # welcome bonus only
+
+    # -- f) Search marketplace for Stripe contacts -----------------------
+    search_resp = await client.post(
+        "/api/v1/marketplace/search",
+        headers=seeker_headers,
+        json={"company_names": ["Stripe"]},
+    )
+    assert search_resp.status_code == 200
+    mkt_results = search_resp.json()["data"]
+    assert len(mkt_results) > 0
+
+    # Anonymized: no names or emails leak through
+    for r in mkt_results:
+        assert "contact_name" not in r
+        assert "contact_email" not in r
+        assert r["company_name"]
+        assert r["role_level"]
+
+    # -- g) Request intro (costs 20 credits) -----------------------------
+    listing_id = mkt_results[0]["listing_id"]
+    intro_req_resp = await client.post(
+        "/api/v1/marketplace/request-intro",
+        headers=seeker_headers,
+        json={
+            "marketplace_listing_id": listing_id,
+            "message_to_holder": "Interested in referral for SWE role",
+            "profile_visibility": "summary",
+        },
+    )
+    assert intro_req_resp.status_code == 201
+    facilitation = intro_req_resp.json()["data"]
+    facilitation_id = facilitation["id"]
+    assert facilitation["status"] == "requested"
+
+    # -- h) User A reviews incoming requests -----------------------------
+    incoming_resp = await client.get(
+        "/api/v1/marketplace/incoming-requests", headers=holder_headers
+    )
+    assert incoming_resp.status_code == 200
+    incoming = incoming_resp.json()["data"]
+    assert len(incoming) >= 1
+
+    # Holder sees their own contact details
+    req_item = incoming[0]
+    assert req_item.get("contact_name") is not None
+    assert req_item.get("contact_company") is not None
+
+    # -- i) User A approves → holder earns credits -----------------------
+    approve_resp = await client.patch(
+        f"/api/v1/marketplace/requests/{facilitation_id}",
+        headers=holder_headers,
+        json={"action": "approve", "notes": "Happy to refer!"},
+    )
+    assert approve_resp.status_code == 200
+    assert approve_resp.json()["data"]["status"] == "approved"
+
+    # -- j) User B checks status — sees approved ------------------------
+    my_reqs = await client.get(
+        "/api/v1/marketplace/my-requests", headers=seeker_headers
+    )
+    assert my_reqs.status_code == 200
+    seeker_reqs = my_reqs.json()["data"]
+    assert any(r["status"] == "approved" for r in seeker_reqs)
+
+    # -- k) User B creates + tracks application --------------------------
+    app_resp = await client.post(
+        "/api/v1/applications",
+        headers=seeker_headers,
+        json={
+            "company_name": "Stripe",
+            "role_title": "Software Engineer",
+            "channel": "referral",
+        },
+    )
+    assert app_resp.status_code == 201
+
+    # -- l) Verify User A earned credits (50 for facilitation) -----------
+    holder_bal2 = await client.get("/api/v1/credits/balance", headers=holder_headers)
+    # 50 welcome + 100 csv + 50 facilitation = 200
+    assert holder_bal2.json()["data"]["balance"] == 200
+
+    # -- m) Verify User B credits deducted -------------------------------
+    seeker_bal2 = await client.get("/api/v1/credits/balance", headers=seeker_headers)
+    # 50 welcome − 5 search − 20 intro = 25
+    assert seeker_bal2.json()["data"]["balance"] == 25
+
+
+# ===========================================================================
+# Section 4 — Privacy compliance
+# ===========================================================================
+
+
+async def test_suppression_blocks_csv_import(client: AsyncClient):
+    """A person on the suppression list should be skipped during CSV import."""
+
+    # Add Sarah Chen to the suppression list before upload
+    async with TestSessionLocal() as db:
+        entry = SuppressionList(
+            email_hash=hash_for_suppression("sarah.chen@stripe.com"),
+            name_company_hash=hash_for_suppression("SarahChenStripe"),
+            reason="self_request",
+        )
+        db.add(entry)
+        await db.commit()
+
+    token = await _signup(client, email="supptest@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    upload_resp = await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file()
+    )
+    assert upload_resp.status_code == 201
+    data = upload_resp.json()["data"]
+    # Suppressed contacts reduce the created count
+    assert data["contacts_created"] < 19  # at least Sarah Chen was skipped
+
+    # Verify Sarah Chen was NOT imported
+    contacts_resp = await client.get(
+        "/api/v1/contacts", headers=headers, params={"per_page": 100}
+    )
+    names = [c["full_name"] for c in contacts_resp.json()["data"]]
+    assert "Sarah Chen" not in names
+
+
+async def test_marketplace_anonymization_no_pii(client: AsyncClient):
+    """Marketplace search results must never contain PII (names, emails)."""
+
+    # Holder: upload + opt in
+    holder_token = await _signup_verified(
+        client, "anon_holder@example.com", full_name="Anon Holder"
+    )
+    hh = {"Authorization": f"Bearer {holder_token}"}
+    await client.post("/api/v1/contacts/upload", headers=hh, files=_csv_file())
+    await client.put(
+        "/api/v1/marketplace/sharing-preferences",
+        headers=hh,
+        json={"opt_in_marketplace": True, "is_paused": False},
+    )
+
+    # Seeker: search
+    seeker_token = await _signup_verified(
+        client, "anon_seeker@example.com", full_name="Anon Seeker"
+    )
+    sh = {"Authorization": f"Bearer {seeker_token}"}
+    resp = await client.post(
+        "/api/v1/marketplace/search",
+        headers=sh,
+        json={"company_names": ["Stripe"]},
+    )
+    assert resp.status_code == 200
+    for r in resp.json()["data"]:
+        # MarketplaceSearchResult schema has no PII fields
+        assert "contact_name" not in r
+        assert "contact_email" not in r
+        assert "contact_title" not in r
+        # Only anonymized categorical fields
+        assert r["role_level"] in (
+            "junior",
+            "mid",
+            "senior",
+            "lead",
+            "director",
+            "vp",
+            "c_suite",
+        )
+
+
+async def test_consent_gate_hides_identity_until_approval(client: AsyncClient):
+    """Job seeker should never see contact PII — even after approval,
+    identity is only revealed on the network-holder side."""
+
+    holder_token = await _signup_verified(
+        client, "gate_holder@example.com", full_name="Gate Holder"
+    )
+    hh = {"Authorization": f"Bearer {holder_token}"}
+    await client.post("/api/v1/contacts/upload", headers=hh, files=_csv_file())
+    await client.put(
+        "/api/v1/marketplace/sharing-preferences",
+        headers=hh,
+        json={"opt_in_marketplace": True, "is_paused": False},
+    )
+
+    seeker_token = await _signup_verified(
+        client, "gate_seeker@example.com", full_name="Gate Seeker"
+    )
+    sh = {"Authorization": f"Bearer {seeker_token}"}
+
+    # Search → request intro
+    search_resp = await client.post(
+        "/api/v1/marketplace/search",
+        headers=sh,
+        json={"company_names": ["Stripe"]},
+    )
+    listing_id = search_resp.json()["data"][0]["listing_id"]
+
+    await client.post(
+        "/api/v1/marketplace/request-intro",
+        headers=sh,
+        json={
+            "marketplace_listing_id": listing_id,
+            "profile_visibility": "summary",
+        },
+    )
+
+    # Seeker's my-requests: no contact PII
+    my_reqs = await client.get("/api/v1/marketplace/my-requests", headers=sh)
+    for r in my_reqs.json()["data"]:
+        assert r.get("contact_name") is None
+        assert r.get("contact_email") is None
+
+    # Holder approves
+    inc = await client.get("/api/v1/marketplace/incoming-requests", headers=hh)
+    fid = inc.json()["data"][0]["id"]
+    await client.patch(
+        f"/api/v1/marketplace/requests/{fid}",
+        headers=hh,
+        json={"action": "approve"},
+    )
+
+    # Seeker still sees no contact PII after approval
+    my_reqs2 = await client.get("/api/v1/marketplace/my-requests", headers=sh)
+    for r in my_reqs2.json()["data"]:
+        assert r.get("contact_name") is None
+        assert r.get("contact_email") is None
+
+    # Holder DOES see their own contact info (it's their data)
+    inc2 = await client.get("/api/v1/marketplace/incoming-requests", headers=hh)
+    approved = [r for r in inc2.json()["data"] if r["status"] == "approved"]
+    assert len(approved) >= 1
+    assert approved[0].get("contact_name") is not None
+
+
+async def test_unverified_user_blocked_from_marketplace(client: AsyncClient):
+    """Unverified users should be blocked from marketplace endpoints that
+    require email verification (search, request-intro, credit purchase)."""
+
+    # Signup WITHOUT verifying email
+    token = await _signup(client, email="unverified@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # marketplace/search — requires verified email
+    resp = await client.post(
+        "/api/v1/marketplace/search",
+        headers=headers,
+        json={"company_names": ["Google"]},
+    )
+    assert resp.status_code == 403
+
+    # marketplace/request-intro — requires verified email
+    resp2 = await client.post(
+        "/api/v1/marketplace/request-intro",
+        headers=headers,
+        json={
+            "marketplace_listing_id": "00000000-0000-0000-0000-000000000000",
+            "profile_visibility": "summary",
+        },
+    )
+    assert resp2.status_code == 403
+
+    # credits/purchase — requires verified email
+    resp3 = await client.post(
+        "/api/v1/credits/purchase",
+        headers=headers,
+        json={"amount": 10},
+    )
+    assert resp3.status_code == 403
+
+    # Own-network features should still work (contacts, search, etc.)
+    contacts_resp = await client.get("/api/v1/contacts", headers=headers)
+    assert contacts_resp.status_code == 200
+
+
+async def test_cross_vault_marketplace_isolation(client: AsyncClient):
+    """User B should never see User A's raw contacts via marketplace search.
+    Marketplace only exposes anonymized listings, not vault data."""
+
+    holder_token = await _signup_verified(
+        client, "vault_holder@example.com", full_name="Vault Holder"
+    )
+    hh = {"Authorization": f"Bearer {holder_token}"}
+    await client.post("/api/v1/contacts/upload", headers=hh, files=_csv_file())
+    await client.put(
+        "/api/v1/marketplace/sharing-preferences",
+        headers=hh,
+        json={"opt_in_marketplace": True, "is_paused": False},
+    )
+
+    seeker_token = await _signup_verified(
+        client, "vault_seeker@example.com", full_name="Vault Seeker"
+    )
+    sh = {"Authorization": f"Bearer {seeker_token}"}
+
+    # Seeker can't access holder's contacts directly
+    contacts_resp = await client.get(
+        "/api/v1/contacts", headers=sh, params={"per_page": 100}
+    )
+    assert contacts_resp.json()["meta"]["total"] == 0
+
+    # Marketplace search returns anonymized data only
+    resp = await client.post(
+        "/api/v1/marketplace/search",
+        headers=sh,
+        json={"company_names": ["Stripe"]},
+    )
+    assert resp.status_code == 200
+    for r in resp.json()["data"]:
+        assert "contact_name" not in r
+        assert "contact_email" not in r
+
+
+# ===========================================================================
+# Section 5 — Existing helper tests (dedup, isolation, scoring)
+# ===========================================================================
 
 
 async def test_csv_deduplication_on_reupload(client: AsyncClient):
@@ -346,11 +924,6 @@ async def test_csv_deduplication_on_reupload(client: AsyncClient):
     count_second = resp2.json()["meta"]["total"]
 
     assert count_first == count_second == 19
-
-
-# ---------------------------------------------------------------------------
-# Multi-user isolation test
-# ---------------------------------------------------------------------------
 
 
 async def test_user_data_isolation(client: AsyncClient):
@@ -382,11 +955,6 @@ async def test_user_data_isolation(client: AsyncClient):
     # User B should not see User A's search
     get_resp = await client.get(f"/api/v1/search/{search_id}", headers=headers_b)
     assert get_resp.status_code == 404
-
-
-# ---------------------------------------------------------------------------
-# Search and scoring sanity checks
-# ---------------------------------------------------------------------------
 
 
 async def test_search_results_have_warm_and_relevance_scores(client: AsyncClient):
