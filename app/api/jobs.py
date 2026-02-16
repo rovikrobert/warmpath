@@ -13,6 +13,7 @@ from app.models.job import JobOpening, UserJobPreferences
 from app.models.search_request import SearchRequest
 from app.models.user import User
 from app.services.board_registry import lookup_boards
+from app.services.career_page_fetcher import lookup_career_page
 from app.services.job_fetcher import JobFetcher
 from app.utils.security import get_current_user
 
@@ -79,12 +80,14 @@ async def scan_company_jobs(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Fetch live jobs for a company from Greenhouse/Lever and store them."""
+    """Fetch live jobs for a company from Greenhouse/Lever, with career page fallback."""
     boards = lookup_boards(company_name)
-    if boards is None:
+
+    # If no ATS board and no career page, return 404
+    if boards is None and lookup_career_page(company_name) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No board registry entry for '{company_name}'. "
+            detail=f"No board registry or career page for '{company_name}'. "
             "Use a known company name or register a board first.",
         )
 
@@ -198,7 +201,7 @@ async def scan_target_companies(
 
     for company_name in target_companies:
         boards = lookup_boards(company_name)
-        if boards is None:
+        if boards is None and lookup_career_page(company_name) is None:
             continue
 
         jobs = await fetcher.fetch_jobs_for_company(company_name, boards)
