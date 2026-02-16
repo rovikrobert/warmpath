@@ -49,6 +49,14 @@ class User(Base):
     warm_scores: Mapped[list["WarmScore"]] = relationship(back_populates="user")
     intro_requests: Mapped[list["IntroRequest"]] = relationship(back_populates="user")
     usage_logs: Mapped[list["UsageLog"]] = relationship(back_populates="user")
+    applications: Mapped[list["Application"]] = relationship(back_populates="user")
+    job_preferences: Mapped["UserJobPreferences | None"] = relationship(
+        back_populates="user", uselist=False
+    )
+    applications: Mapped[list["Application"]] = relationship(back_populates="user")
+    job_preferences: Mapped["UserJobPreferences | None"] = relationship(
+        back_populates="user", uselist=False
+    )
 
 
 class ConnectorProfile(Base):

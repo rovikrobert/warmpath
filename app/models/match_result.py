@@ -79,6 +79,9 @@ class MatchResult(Base):
     intro_requests: Mapped[list["IntroRequest"]] = relationship(
         back_populates="match_result"
     )
+    applications: Mapped[list["Application"]] = relationship(
+        back_populates="match_result"
+    )
 
 
 class WarmScore(Base):
