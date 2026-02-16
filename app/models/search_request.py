@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import ARRAY, DateTime, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models import Base
@@ -39,6 +39,8 @@ class SearchRequest(Base):
         String(50), nullable=False, server_default="active"
     )
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    results_data: Mapped[dict | None] = mapped_column(JSONB)
+    error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

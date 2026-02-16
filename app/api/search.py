@@ -1,27 +1,38 @@
+import logging
 import math
 import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_db
 from app.middleware.rate_limit import check_rate_limit
 from app.models.contact import Contact
+from app.models.job import UserJobPreferences
 from app.models.match_result import MatchResult, WarmScore
 from app.models.search_request import SearchRequest
-from app.models.user import User
+from app.models.user import ConnectorProfile, User
 from app.schemas.contact import PaginationMeta
 from app.schemas.search import (
     MatchResultResponse,
     SearchRequestCreate,
     SearchRequestResponse,
+    SmartSearchCreate,
 )
+from app.services.ai_matcher import sco[RESEND_KEY_REDACTED]
 from app.services.ai_matcher import run_search
+from app.services.board_registry import lookup_boards
+from app.services.job_fetcher import JobFetcher
+from app.services.warm_scorer import compute_warm_score
 from app.utils.exceptions import RateLimitError
 from app.utils.security import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -112,8 +123,16 @@ async def get_search(
             detail="Search not found",
         )
 
+    resp = SearchRequestResponse.model_validate(search).model_dump(mode="json")
+
+    # Include smart search results if available
+    if search.results_data:
+        resp["results_data"] = search.results_data
+    if search.error_message:
+        resp["error"] = search.error_message
+
     return {
-        "data": SearchRequestResponse.model_validate(search).model_dump(mode="json"),
+        "data": resp,
         "meta": {},
     }
 
@@ -334,4 +353,257 @@ async def get_search_results(
             "avg_warm": round(sum(all_warm) / len(all_warm), 1) if all_warm else 0,
             "sco[RESEND_KEY_REDACTED]": sco[RESEND_KEY_REDACTED],
         },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Smart Search — combines network analysis + job board scanning
+# ---------------------------------------------------------------------------
+
+
+@router.post("/smart", status_code=status.HTTP_201_CREATED)
+async def smart_search(
+    body: SmartSearchCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """One-shot search: scan job boards + find referral paths for each company.
+
+    Creates a SearchRequest with status 'running', executes the search,
+    then updates to 'completed' with results or 'failed' with error.
+    The client can poll GET /search/{id} for progress.
+    """
+    # Load user's job preferences
+    pref_result = await db.execute(
+        select(UserJobPreferences).where(UserJobPreferences.user_id == current_user.id)
+    )
+    prefs = pref_result.scalar_one_or_none()
+
+    target_role = prefs.target_role if prefs else None
+    target_seniority = prefs.target_seniority if prefs else None
+
+    if not target_role:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Set job preferences first (PUT /preferences/job with target_role)",
+        )
+
+    # Create SearchRequest for history tracking
+    search_req = SearchRequest(
+        user_id=current_user.id,
+        name=f"Smart search: {', '.join(body.company_names[:3])}",
+        target_companies=body.company_names,
+        target_role=target_role,
+        target_seniority=target_seniority,
+        status="running",
+    )
+    db.add(search_req)
+    await db.flush()
+    search_id = search_req.id
+
+    try:
+        results = await _run_smart_search(
+            search_req=search_req,
+            company_names=body.company_names,
+            target_role=target_role,
+            target_seniority=target_seniority,
+            user=current_user,
+            db=db,
+        )
+
+        search_req.status = "completed"
+        search_req.results_data = results
+        search_req.last_run_at = datetime.now(timezone.utc)
+        await db.commit()
+
+        return {
+            "data": {
+                "id": str(search_id),
+                "status": "completed",
+                **results,
+            },
+            "meta": {},
+        }
+
+    except Exception as exc:
+        logger.exception("Smart search failed for %s", body.company_names)
+        search_req.status = "failed"
+        search_req.error_message = str(exc)
+        await db.commit()
+
+        return {
+            "data": {
+                "id": str(search_id),
+                "status": "failed",
+                "error": str(exc),
+            },
+            "meta": {},
+        }
+
+
+async def _run_smart_search(
+    search_req: SearchRequest,
+    company_names: list[str],
+    target_role: str,
+    target_seniority: str | None,
+    user: User,
+    db: AsyncSession,
+) -> dict:
+    """Execute the smart search pipeline for each company."""
+    fetcher = JobFetcher()
+
+    # Load user's contacts with companies eagerly
+    contacts_result = await db.execute(
+        select(Contact)
+        .options(selectinload(Contact.company))
+        .where(
+            Contact.user_id == user.id,
+            Contact.deleted_at.is_(None),
+        )
+    )
+    all_contacts = list(contacts_result.scalars().all())
+
+    # Load connector profile for warm scoring
+    profile_result = await db.execute(
+        select(ConnectorProfile).where(ConnectorProfile.user_id == user.id)
+    )
+    profile = profile_result.scalar_one_or_none()
+
+    companies_results: list[dict] = []
+
+    for company_name in company_names:
+        company_data = await _process_company(
+            company_name=company_name,
+            target_role=target_role,
+            target_seniority=target_seniority,
+            all_contacts=all_contacts,
+            search_req=search_req,
+            profile=profile,
+            user=user,
+            fetcher=fetcher,
+            db=db,
+        )
+        companies_results.append(company_data)
+
+    # Sort: companies with BOTH openings AND referral paths first,
+    # then openings only, then referral paths only, then neither
+    def _sort_key(c: dict) -> tuple:
+        has_both = c["has_openings"] and c["has_referral_paths"]
+        has_openings_only = c["has_openings"] and not c["has_referral_paths"]
+        has_paths_only = c["has_referral_paths"] and not c["has_openings"]
+        return (
+            not has_both,
+            not has_openings_only,
+            not has_paths_only,
+        )
+
+    companies_results.sort(key=_sort_key)
+
+    summary = {
+        "companies_searched": len(company_names),
+        "with_openings": sum(1 for c in companies_results if c["has_openings"]),
+        "with_referral_paths": sum(
+            1 for c in companies_results if c["has_referral_paths"]
+        ),
+        "total_openings": sum(len(c["active_openings"]) for c in companies_results),
+        "total_referral_paths": sum(
+            len(c["referral_paths"]) for c in companies_results
+        ),
+    }
+
+    return {"companies": companies_results, "summary": summary}
+
+
+async def _process_company(
+    company_name: str,
+    target_role: str,
+    target_seniority: str | None,
+    all_contacts: list[Contact],
+    search_req: SearchRequest,
+    profile: ConnectorProfile | None,
+    user: User,
+    fetcher: JobFetcher,
+    db: AsyncSession,
+) -> dict:
+    """Process a single company: fetch openings + find referral paths."""
+    active_openings: list[dict] = []
+    referral_paths: list[dict] = []
+
+    # Step 1: Look up board registry and fetch job openings
+    boards = lookup_boards(company_name)
+    if boards:
+        raw_jobs = await fetcher.fetch_jobs_for_company(company_name, boards)
+        matched_jobs = await fetcher.match_jobs_to_role(
+            raw_jobs, target_role, target_seniority
+        )
+        for job in matched_jobs:
+            active_openings.append(
+                {
+                    "title": job.get("title", ""),
+                    "url": job.get("url", ""),
+                    "department": job.get("department"),
+                    "location": job.get("location"),
+                    "is_remote": job.get("is_remote", False),
+                    "relevance": job.get("role_relevance", 0),
+                    "source": job.get("source", ""),
+                }
+            )
+
+    # Step 2: Find user's contacts who work at this company
+    company_lower = company_name.lower()
+    company_contacts = [
+        c
+        for c in all_contacts
+        if c.current_company and company_lower in c.current_company.lower()
+    ]
+
+    # Step 3: Run AI matcher on those contacts
+    if company_contacts:
+        matches = sco[RESEND_KEY_REDACTED](search_req, company_contacts, profile, user.full_name)
+        # sco[RESEND_KEY_REDACTED] might be a coroutine
+        if hasattr(matches, "__await__"):
+            matches = await matches
+
+        for match in matches:
+            if match.relevance_score < 20:
+                continue
+
+            # Find the contact object for enrichment
+            contact = next(
+                (c for c in company_contacts if c.id == match.contact_id), None
+            )
+            if contact is None:
+                continue
+
+            # Compute warm score
+            warm_result = compute_warm_score(contact, profile, target_role)
+
+            referral_paths.append(
+                {
+                    "contact": {
+                        "id": str(contact.id),
+                        "name": contact.full_name,
+                        "title": contact.current_title,
+                        "company": contact.current_company,
+                        "warm_score": warm_result.total_score,
+                        "referral_likelihood": match.referral_likelihood,
+                    },
+                    "match_type": match.match_type,
+                    "relevance_score": match.relevance_score,
+                    "cultural_context": match.cultural_context,
+                    "recommended_channel": match.recommended_channel,
+                    "source": "own_network",
+                }
+            )
+
+        # Sort referral paths by relevance score descending
+        referral_paths.sort(key=lambda p: p["relevance_score"], reverse=True)
+
+    return {
+        "name": company_name,
+        "active_openings": active_openings,
+        "referral_paths": referral_paths,
+        "has_openings": len(active_openings) > 0,
+        "has_referral_paths": len(referral_paths) > 0,
+        "source": "own_network",
     }
