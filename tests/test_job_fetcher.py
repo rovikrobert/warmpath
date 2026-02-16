@@ -91,7 +91,6 @@ def _mock_response(json_data, status_code=200):
 
 
 class TestGreenhouseFetcher:
-
     async def test_parses_jobs_correctly(self):
         fetcher = JobFetcher()
         with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
@@ -114,7 +113,6 @@ class TestGreenhouseFetcher:
         assert jobs[0]["url"] == "https://boards.greenhouse.io/stripe/jobs/4012345"
         assert jobs[0]["is_remote"] is False
 
-
     async def test_detects_remote(self):
         fetcher = JobFetcher()
         with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
@@ -132,7 +130,6 @@ class TestGreenhouseFetcher:
         assert jobs[1]["is_remote"] is True
         assert jobs[0]["is_remote"] is False
         assert jobs[2]["is_remote"] is False
-
 
     async def test_handles_http_error(self):
         fetcher = JobFetcher()
@@ -156,7 +153,6 @@ class TestGreenhouseFetcher:
 
 
 class TestLeverFetcher:
-
     async def test_parses_jobs_correctly(self):
         fetcher = JobFetcher()
         with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
@@ -176,7 +172,6 @@ class TestLeverFetcher:
         assert jobs[0]["location"] == "San Francisco, CA"
         assert jobs[0]["is_remote"] is False
 
-
     async def test_detects_remote_lever(self):
         fetcher = JobFetcher()
         with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
@@ -191,7 +186,6 @@ class TestLeverFetcher:
         # Job at index 1 has "Remote - Anywhere"
         assert jobs[1]["is_remote"] is True
         assert jobs[0]["is_remote"] is False
-
 
     async def test_handles_http_error(self):
         fetcher = JobFetcher()
@@ -213,7 +207,6 @@ class TestLeverFetcher:
 
 
 class TestRoleMatching:
-
     async def test_mock_match_keyword_overlap(self):
         fetcher = JobFetcher()
         jobs = [
@@ -230,7 +223,6 @@ class TestRoleMatching:
         assert "Sales Development Representative" not in titles
         assert len(matched) >= 1
 
-
     async def test_mock_match_with_seniority(self):
         fetcher = JobFetcher()
         jobs = [
@@ -243,7 +235,6 @@ class TestRoleMatching:
         )
         # Senior match should appear and score higher
         assert any("Senior" in j["title"] for j in matched)
-
 
     async def test_empty_inputs(self):
         fetcher = JobFetcher()
@@ -321,14 +312,12 @@ async def auth_headers(client: AsyncClient) -> dict:
 
 
 class TestJobsAPI:
-
     async def test_scan_unknown_company(self, client: AsyncClient, auth_headers):
         resp = await client.get(
             "/api/v1/jobs/scan/completely_unknown_xyz",
             headers=auth_headers,
         )
         assert resp.status_code == 404
-
 
     async def test_scan_and_dedup(self, client: AsyncClient, auth_headers):
         """Scanning the same company twice should not create duplicate openings."""
@@ -375,7 +364,6 @@ class TestJobsAPI:
         assert resp3.status_code == 200
         assert len(resp3.json()["data"]) == 2
 
-
     async def test_list_openings_filter_by_role(
         self, client: AsyncClient, auth_headers
     ):
@@ -418,7 +406,6 @@ class TestJobsAPI:
         data = resp.json()["data"]
         assert len(data) == 1
         assert "Engineer" in data[0]["title"]
-
 
     async def test_scan_requires_auth(self, client: AsyncClient):
         resp = await client.get("/api/v1/jobs/scan/stripe")

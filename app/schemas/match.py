@@ -38,6 +38,7 @@ class WarmScoreResponse(BaseModel):
 class IntroRequestCreate(BaseModel):
     contact_id: uuid.UUID
     match_result_id: uuid.UUID | None = None
+    job_opening_id: uuid.UUID | None = None
     context: str | None = None
     tone: str = "professional"
     channel: str = "linkedin"
@@ -48,6 +49,10 @@ class IntroMessageResponse(BaseModel):
     variant_label: str | None = None
     subject_line: str | None = None
     message_body: str
+    sequence_step: int | None = None
+    step_label: str | None = None
+    send_after_days: int | None = 0
+    coaching_notes: str | None = None
     is_selected: bool | None = False
     user_edited_body: str | None = None
     ai_model_version: str | None = None
@@ -61,6 +66,7 @@ class IntroRequestResponse(BaseModel):
     user_id: uuid.UUID
     contact_id: uuid.UUID
     match_result_id: uuid.UUID | None = None
+    job_opening_id: uuid.UUID | None = None
     context: str | None = None
     tone: str | None = None
     channel: str | None = None
