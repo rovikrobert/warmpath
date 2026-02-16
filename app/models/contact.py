@@ -105,6 +105,14 @@ class Contact(Base):
     tags: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     notes: Mapped[str | None] = mapped_column(Text)
 
+    # Relationship classification
+    relationship_type: Mapped[str | None] = mapped_column(String(50))
+    source: Mapped[str] = mapped_column(
+        String(50), nullable=False, server_default="linkedin_csv"
+    )
+    how_you_know: Mapped[str | None] = mapped_column(Text)
+    last_interaction_date: Mapped[date | None] = mapped_column(Date)
+
     # Raw and enriched data
     raw_csv_row: Mapped[dict | None] = mapped_column(JSONB)
     enriched_data: Mapped[dict | None] = mapped_column(JSONB)

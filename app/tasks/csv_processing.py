@@ -16,9 +16,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.celery_app import celery_app
 from app.config import settings
 from app.models.contact import Contact, CsvUpload
+from app.models.user import ConnectorProfile
 from app.services.company_normalizer import link_contact_to_company
 from app.services.credits import earn_credits
-from app.services.csv_parser import parse_linkedin_csv
+from app.services.csv_parser import classify_relationship, parse_linkedin_csv
 from app.services.suppression import check_suppression
 from app.services.warm_scorer import batch_compute_scores
 
@@ -53,6 +54,18 @@ async def process_csv_upload_core(
         parsed = parse_linkedin_csv(raw_bytes)
         csv_upload.row_count = len(parsed)
 
+        # Load user's connector profile for relationship classification
+        profile_result = await db.execute(
+            select(ConnectorProfile).where(ConnectorProfile.user_id == user_uuid)
+        )
+        profile = profile_result.scalar_one_or_none()
+        user_company = profile.current_company if profile else None
+        user_work_history = (
+            profile.work_history
+            if profile and hasattr(profile, "work_history")
+            else None
+        )
+
         created = 0
         duplicates = 0
         suppressed_count = 0
@@ -83,6 +96,15 @@ async def process_csv_upload_core(
             else:
                 existing = None
 
+            # Auto-classify relationship (use row-level override if present)
+            rel_type = row.get("relationship_type") or classify_relationship(
+                row.get("current_company"),
+                row.get("current_title"),
+                user_company,
+                user_work_history,
+            )
+            source = row.get("source", "linkedin_csv")
+
             if existing:
                 # Update existing contact with fresh data
                 existing.first_name = row["first_name"]
@@ -99,6 +121,14 @@ async def process_csv_upload_core(
                 existing.connected_on = row.get("connected_on") or existing.connected_on
                 existing.raw_csv_row = row.get("raw_csv_row")
                 existing.csv_upload_id = csv_upload.id
+                if rel_type and not existing.relationship_type:
+                    existing.relationship_type = rel_type
+                if row.get("how_you_know"):
+                    existing.how_you_know = row["how_you_know"]
+                if row.get("last_interaction_date"):
+                    existing.last_interaction_date = row["last_interaction_date"]
+                if row.get("location"):
+                    existing.location = row["location"]
                 await link_contact_to_company(existing, db)
                 duplicates += 1
             else:
@@ -115,6 +145,11 @@ async def process_csv_upload_core(
                     connected_on=row.get("connected_on"),
                     fingerprint=fingerprint,
                     raw_csv_row=row.get("raw_csv_row"),
+                    relationship_type=rel_type,
+                    source=source,
+                    how_you_know=row.get("how_you_know"),
+                    last_interaction_date=row.get("last_interaction_date"),
+                    location=row.get("location") or None,
                 )
                 db.add(contact)
                 await db.flush()

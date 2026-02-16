@@ -139,6 +139,12 @@ async def upsert_profile(
     profile = result.scalar_one_or_none()
 
     fields = body.model_dump(exclude_unset=True)
+    # Convert work_history Pydantic models to plain dicts for JSONB
+    if "work_history" in fields and fields["work_history"] is not None:
+        fields["work_history"] = [
+            entry if isinstance(entry, dict) else entry
+            for entry in fields["work_history"]
+        ]
 
     if profile is None:
         profile = ConnectorProfile(user_id=current_user.id, **fields)
