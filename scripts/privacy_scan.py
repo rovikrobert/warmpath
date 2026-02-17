@@ -322,13 +322,27 @@ def check_marketplace_anonymization() -> None:
 
     # PII fields that should NEVER appear in marketplace response
     pii_fields = ["first_name", "last_name", "email", "linkedin_url", "phone"]
+
+    # Known-intentional patterns (not vault PII leaks):
+    # - _build_seeker_profile_snapshot: job seeker's OWN profile shared with
+    #   network holder post-approval
+    # - contact_email/contact_name in incoming-requests: holder's OWN contact data
+    suppressed_contexts = [
+        "_build_seeker_profile_snapshot",
+        "contact_email",
+        "contact_name",
+    ]
+
     for field in pii_fields:
         # Look for these in response construction
         response_pattern = re.compile(rf'["\']({field})["\'].*?:', re.IGNORECASE)
         for match in response_pattern.finditer(content):
-            context_start = max(0, match.start() - 100)
-            context = content[context_start:match.end() + 100]
+            context_start = max(0, match.start() - 500)
+            context = content[context_start:match.end() + 200]
             if "return" in context or "data" in context:
+                # Skip known-intentional patterns
+                if any(s in context for s in suppressed_contexts):
+                    continue
                 lineno = content[:match.start()].count("\n") + 1
                 _add("CRITICAL", "anonymization",
                      f"PII field '{field}' may appear in marketplace response",

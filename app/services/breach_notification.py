@@ -42,10 +42,15 @@ async def send_breach_notification(
 
     Returns count of notifications sent.
     """
+    # Batch-load all affected users (avoids N+1)
+    users_result = await db.execute(
+        select(User).where(User.id.in_(affected_user_ids))
+    )
+    users_map = {u.id: u for u in users_result.scalars()}
+
     count = 0
     for user_id in affected_user_ids:
-        result = await db.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one_or_none()
+        user = users_map.get(user_id)
         if user is None:
             continue
 

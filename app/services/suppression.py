@@ -141,36 +141,41 @@ async def purge_suppressed_person(
     if not contact_ids:
         return 0
 
-    # Delete marketplace listings for these contacts
-    for cid in contact_ids:
-        listing_result = await db.execute(
-            select(MarketplaceListing).where(
-                MarketplaceListing.contact_id == cid,
-                MarketplaceListing.deleted_at.is_(None),
-            )
+    # Batch-load marketplace listings for all matched contacts
+    listing_result = await db.execute(
+        select(MarketplaceListing).where(
+            MarketplaceListing.contact_id.in_(contact_ids),
+            MarketplaceListing.deleted_at.is_(None),
         )
-        for listing in listing_result.scalars():
-            # Cancel pending intro facilitations for this listing
-            await db.execute(
-                update(IntroFacilitation)
-                .where(
-                    IntroFacilitation.marketplace_listing_id == listing.id,
-                    IntroFacilitation.status.in_(["requested", "reviewing"]),
-                )
-                .values(status="expired")
+    )
+    listings = list(listing_result.scalars())
+
+    # Batch-cancel pending intro facilitations for all affected listings
+    listing_ids = [l.id for l in listings]
+    if listing_ids:
+        await db.execute(
+            update(IntroFacilitation)
+            .where(
+                IntroFacilitation.marketplace_listing_id.in_(listing_ids),
+                IntroFacilitation.status.in_(["requested", "reviewing"]),
             )
-            listing.deleted_at = datetime.now(timezone.utc)
-            affected += 1
+            .values(status="expired")
+        )
 
-    # Collect affected user_ids for notification before soft-deleting
-    affected_holder_ids: set[uuid.UUID] = set()
-
-    # Soft-delete the contacts
     now = datetime.now(timezone.utc)
-    for cid in contact_ids:
-        result = await db.execute(select(Contact).where(Contact.id == cid))
-        contact = result.scalar_one_or_none()
-        if contact and contact.deleted_at is None:
+    for listing in listings:
+        listing.deleted_at = now
+        affected += 1
+
+    # Batch-load contacts for soft-delete
+    contact_result = await db.execute(
+        select(Contact).where(Contact.id.in_(contact_ids))
+    )
+    contacts = list(contact_result.scalars())
+
+    affected_holder_ids: set[uuid.UUID] = set()
+    for contact in contacts:
+        if contact.deleted_at is None:
             affected_holder_ids.add(contact.user_id)
             contact.deleted_at = now
             affected += 1
@@ -193,10 +198,13 @@ async def notify_affected_holders(
     """
     from app.services.email_service import _send_email
 
+    # Batch-load all holder users
+    users_result = await db.execute(select(User).where(User.id.in_(holder_ids)))
+    users_map = {u.id: u for u in users_result.scalars()}
+
     count = 0
     for holder_id in holder_ids:
-        result = await db.execute(select(User).where(User.id == holder_id))
-        user = result.scalar_one_or_none()
+        user = users_map.get(holder_id)
         if user is None:
             continue
 
@@ -281,10 +289,15 @@ async def rectify_contact_data(
     }
     safe_corrections = {k: v for k, v in corrections.items() if k in allowed_fields}
 
+    # Batch-load all contacts for rectification
+    contacts_result = await db.execute(
+        select(Contact).where(Contact.id.in_(contact_ids))
+    )
+    contacts_map = {c.id: c for c in contacts_result.scalars()}
+
     count = 0
     for cid in contact_ids:
-        result = await db.execute(select(Contact).where(Contact.id == cid))
-        contact = result.scalar_one_or_none()
+        contact = contacts_map.get(cid)
         if contact is None:
             continue
         for field, value in safe_corrections.items():

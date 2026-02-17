@@ -544,7 +544,7 @@ async def _call_claude_api(
 
     message = await client.messages.create(
         model=CLAUDE_MODEL,
-        max_tokens=4096,
+        max_tokens=2048,
         system=_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
     )
@@ -926,10 +926,21 @@ async def run_search(
     MIN_PERSIST_SCORE = 20.0
     model_version = "mock-v2-referral" if settings.AI_MOCK_MODE else CLAUDE_MODEL
     match_results: list[MatchResult] = []
-    for m in matches:
-        if m.relevance_score < MIN_PERSIST_SCORE:
-            continue
+    filtered_matches = [m for m in matches if m.relevance_score >= MIN_PERSIST_SCORE]
 
+    # Batch-load existing match results for upsert (avoids N+1)
+    existing_map: dict = {}
+    if filtered_matches:
+        contact_ids = [m.contact_id for m in filtered_matches]
+        er = await db.execute(
+            select(MatchResult).where(
+                MatchResult.search_request_id == search_id,
+                MatchResult.contact_id.in_(contact_ids),
+            )
+        )
+        existing_map = {mr.contact_id: mr for mr in er.scalars()}
+
+    for m in filtered_matches:
         # Build cultural_context blob for storage
         ctx_blob = {
             **m.cultural_context,
@@ -938,13 +949,7 @@ async def run_search(
             "message_sequence": m.message_sequence,
         }
 
-        existing_result = await db.execute(
-            select(MatchResult).where(
-                MatchResult.search_request_id == search_id,
-                MatchResult.contact_id == m.contact_id,
-            )
-        )
-        existing = existing_result.scalar_one_or_none()
+        existing = existing_map.get(m.contact_id)
 
         if existing:
             existing.relevance_score = Decimal(str(m.relevance_score))

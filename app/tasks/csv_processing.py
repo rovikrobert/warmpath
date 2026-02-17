@@ -71,6 +71,21 @@ async def process_csv_upload_core(
         duplicates = 0
         suppressed_count = 0
 
+        # Pre-load existing contacts by fingerprint for dedup (avoids N+1)
+        all_fingerprints = [
+            r.get("fingerprint") for r in parsed if r.get("fingerprint")
+        ]
+        existing_by_fp: dict = {}
+        if all_fingerprints:
+            fp_result = await db.execute(
+                select(Contact).where(
+                    Contact.user_id == user_uuid,
+                    Contact.fingerprint.in_(all_fingerprints),
+                    Contact.deleted_at.is_(None),
+                )
+            )
+            existing_by_fp = {c.fingerprint: c for c in fp_result.scalars()}
+
         for row in parsed:
             # Check suppression list before inserting
             is_suppressed = await check_suppression(
@@ -85,17 +100,7 @@ async def process_csv_upload_core(
                 continue
 
             fingerprint = row.get("fingerprint")
-            if fingerprint:
-                existing_result = await db.execute(
-                    select(Contact).where(
-                        Contact.user_id == user_uuid,
-                        Contact.fingerprint == fingerprint,
-                        Contact.deleted_at.is_(None),
-                    )
-                )
-                existing = existing_result.scalar_one_or_none()
-            else:
-                existing = None
+            existing = existing_by_fp.get(fingerprint) if fingerprint else None
 
             # Auto-classify relationship (use row-level override if present)
             rel_type = row.get("relationship_type") or classify_relationship(
@@ -172,6 +177,9 @@ async def process_csv_upload_core(
                 db.add(contact)
                 await db.flush()
                 await link_contact_to_company(contact, db)
+                # Track in map so duplicate rows within same CSV are caught
+                if fingerprint:
+                    existing_by_fp[fingerprint] = contact
                 created += 1
 
         csv_upload.contacts_created = created

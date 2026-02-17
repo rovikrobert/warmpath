@@ -30,24 +30,24 @@ async def usage_summary(
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    # Count each metered action this month
+    # Count each metered action this month (single GROUP BY query)
     metered_actions = list(FREE_TIER_LIMITS.keys()) + [
         "job_scan",
         "application_create",
     ]
-    counts: dict[str, int] = {}
-    for action in metered_actions:
-        result = await db.execute(
-            select(func.count())
-            .select_from(UsageLog)
-            .where(
-                UsageLog.user_id == current_user.id,
-                UsageLog.action == action,
-                UsageLog.resource_type == "metered",
-                UsageLog.created_at >= month_start,
-            )
+    result = await db.execute(
+        select(UsageLog.action, func.count())
+        .where(
+            UsageLog.user_id == current_user.id,
+            UsageLog.action.in_(metered_actions),
+            UsageLog.resource_type == "metered",
+            UsageLog.created_at >= month_start,
         )
-        counts[action] = result.scalar() or 0
+        .group_by(UsageLog.action)
+    )
+    counts: dict[str, int] = {action: 0 for action in metered_actions}
+    for action, cnt in result.all():
+        counts[action] = cnt
 
     # Total metered calls
     total_result = await db.execute(

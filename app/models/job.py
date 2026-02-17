@@ -97,7 +97,7 @@ class Application(Base):
     company_name: Mapped[str] = mapped_column(String(255), nullable=False)
     role_title: Mapped[str | None] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(
-        String(50), nullable=False, server_default="draft"
+        String(50), nullable=False, server_default="draft", index=True,
     )
     channel: Mapped[str | None] = mapped_column(String(50))
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -142,7 +142,7 @@ class UserJobPreferences(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=False, index=True,
     )
     target_role: Mapped[str | None] = mapped_column(String(255))
     target_seniority: Mapped[str | None] = mapped_column(String(100))

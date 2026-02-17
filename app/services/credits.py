@@ -173,37 +173,51 @@ async def expire_stale_credits(db: AsyncSession) -> int:
     )
     expired_rows = (await db.execute(expired_query)).all()
 
-    # Also need to find if we've already created expiry offsets for these
-    # We'll check by looking for existing 'expired' transactions
+    # Batch-load already-expired sums and effective balances (avoids N+1)
+    user_ids = [uid for uid, _ in expired_rows]
+
+    already_expired_map: dict = {}
+    effective_balance_map: dict = {}
+    if user_ids:
+        ae_result = await db.execute(
+            select(
+                CreditTransaction.user_id,
+                func.coalesce(func.sum(CreditTransaction.amount), 0),
+            )
+            .where(
+                CreditTransaction.user_id.in_(user_ids),
+                CreditTransaction.type == "expired",
+            )
+            .group_by(CreditTransaction.user_id)
+        )
+        already_expired_map = {row[0]: abs(int(row[1])) for row in ae_result.all()}
+
+        eb_result = await db.execute(
+            select(
+                CreditTransaction.user_id,
+                func.coalesce(func.sum(CreditTransaction.amount), 0),
+            )
+            .where(
+                CreditTransaction.user_id.in_(user_ids),
+                (CreditTransaction.expires_at.is_(None))
+                | (CreditTransaction.expires_at > now),
+            )
+            .group_by(CreditTransaction.user_id)
+        )
+        effective_balance_map = {row[0]: int(row[1]) for row in eb_result.all()}
+
     count = 0
     for user_id, expired_amount in expired_rows:
         expired_amount = int(expired_amount)
         if expired_amount <= 0:
             continue
 
-        # Check how much we've already expired for this user
-        already_expired_result = await db.execute(
-            select(func.coalesce(func.sum(CreditTransaction.amount), 0)).where(
-                CreditTransaction.user_id == user_id,
-                CreditTransaction.type == "expired",
-            )
-        )
-        already_expired = abs(int(already_expired_result.scalar()))
-
-        # Net new amount to expire
+        already_expired = already_expired_map.get(user_id, 0)
         to_expire = expired_amount - already_expired
         if to_expire <= 0:
             continue
 
-        # Don't expire more than effective balance (includes expiry offsets)
-        eff_result = await db.execute(
-            select(func.coalesce(func.sum(CreditTransaction.amount), 0)).where(
-                CreditTransaction.user_id == user_id,
-                (CreditTransaction.expires_at.is_(None))
-                | (CreditTransaction.expires_at > now),
-            )
-        )
-        effective_balance = int(eff_result.scalar())
+        effective_balance = effective_balance_map.get(user_id, 0)
         to_expire = min(to_expire, effective_balance)
         if to_expire <= 0:
             continue
