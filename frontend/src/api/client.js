@@ -238,6 +238,11 @@ export const dashboard = {
   insights: () => api('/api/v1/dashboard/insights'),
 };
 
+export const coach = {
+  briefing: () => api('/api/v1/coach/briefing'),
+  chat: (body) => api('/api/v1/coach/chat', { method: 'POST', body }),
+};
+
 export const health = {
   check: () => api('/health'),
   usage: () => api('/api/v1/usage/me'),

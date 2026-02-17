@@ -9,6 +9,7 @@ from starlette.middleware.cors import CORSMiddleware
 from app.api import (
     applications,
     auth,
+    coach,
     companies,
     contacts,
     credits,
@@ -104,6 +105,7 @@ app.include_router(usage.router, prefix="/api/v1/usage", tags=["usage"])
 app.include_router(
     dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"]
 )
+app.include_router(coach.router, prefix="/api/v1/coach", tags=["coach"])
 app.include_router(webhooks.router, prefix="/api/v1", tags=["webhooks"])
 
 # ---------------------------------------------------------------------------
