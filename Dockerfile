@@ -22,9 +22,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY app/ ./app/
-COPY ops_team/ ./ops_team/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
+
+# Copy agent teams
+COPY agents/ ./agents/
+COPY data_team/ ./data_team/
+COPY product_team/ ./product_team/
+COPY finance_team/ ./finance_team/
+COPY gtm_team/ ./gtm_team/
+COPY ops_team/ ./ops_team/
 
 # Copy built frontend
 COPY --from=frontend-build /build/dist ./frontend/dist

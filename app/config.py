@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     DASHBOARD_TRENDS_CACHE_TTL_HOURS: int = 6
     DASHBOARD_NETWORK_CACHE_TTL_HOURS: int = 1
     KEEVS_BRIEFING_CACHE_TTL_HOURS: int = 6
+    AGENT_RUN_SECRET: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
