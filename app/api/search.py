@@ -280,18 +280,14 @@ async def get_search_results(
         )
     )
 
-    # Apply optional filters
+    # Apply optional filters (non-encrypted columns only at SQL level)
     if match_type is not None:
         base_query = base_query.where(MatchResult.match_type == match_type)
-    if company is not None:
-        base_query = base_query.where(Contact.current_company.ilike(f"%{company}%"))
+    # company filter applied in-memory below (current_company is encrypted)
     if min_warm is not None:
         base_query = base_query.where(
             func.coalesce(WarmScore.total_score, 0) >= min_warm
         )
-
-    count_query = select(func.count()).select_from(base_query.subquery())
-    total = (await db.execute(count_query)).scalar() or 0
 
     # Sort by combined score: relevance * 0.5 + warm_score * 0.5
     # Use COALESCE for null warm scores
@@ -299,11 +295,27 @@ async def get_search_results(
         WarmScore.total_score, 0
     ) * Decimal("0.5")
 
-    offset = (page - 1) * per_page
-    result = await db.execute(
-        base_query.order_by(combined_expr.desc()).offset(offset).limit(per_page)
-    )
-    rows = result.all()
+    if company is not None:
+        # Load all matching rows, filter in-memory on decrypted company, then paginate
+        result = await db.execute(base_query.order_by(combined_expr.desc()))
+        all_rows = result.all()
+        company_lower = company.lower()
+        all_rows = [
+            r for r in all_rows
+            if company_lower in (r[3] or "").lower()  # r[3] = contact_company
+        ]
+        total = len(all_rows)
+        offset = (page - 1) * per_page
+        rows = all_rows[offset:offset + per_page]
+    else:
+        count_query = select(func.count()).select_from(base_query.subquery())
+        total = (await db.execute(count_query)).scalar() or 0
+
+        offset = (page - 1) * per_page
+        result = await db.execute(
+            base_query.order_by(combined_expr.desc()).offset(offset).limit(per_page)
+        )
+        rows = result.all()
 
     # Build response data + collect stats
     data = []
@@ -311,36 +323,43 @@ async def get_search_results(
     all_warm: list[float] = []
     score_dist = {"90-100": 0, "70-89": 0, "50-69": 0, "20-49": 0}
 
-    # We need all matching rows for stats, not just the current page.
-    # Run a lightweight stats query over the full filtered set.
-    stats_query = (
-        select(
-            MatchResult.relevance_score,
-            func.coalesce(WarmScore.total_score, 0).label("warm"),
-        )
-        .join(Contact, MatchResult.contact_id == Contact.id)
-        .outerjoin(
-            WarmScore,
-            (WarmScore.contact_id == MatchResult.contact_id)
-            & (WarmScore.user_id == MatchResult.user_id),
-        )
-        .where(
-            MatchResult.search_request_id == search_id,
-            MatchResult.user_id == current_user.id,
-            MatchResult.relevance_score >= effective_min_relevance,
-        )
-    )
-    if match_type is not None:
-        stats_query = stats_query.where(MatchResult.match_type == match_type)
     if company is not None:
-        stats_query = stats_query.where(Contact.current_company.ilike(f"%{company}%"))
-    if min_warm is not None:
-        stats_query = stats_query.where(
-            func.coalesce(WarmScore.total_score, 0) >= min_warm
+        # Stats from already-filtered in-memory rows (includes company filter)
+        stats_pairs = [
+            (float(r[0].relevance_score), float(r[4] or 0))
+            for r in all_rows
+        ]
+    else:
+        # Run a lightweight stats query over the full filtered set
+        stats_query = (
+            select(
+                MatchResult.relevance_score,
+                func.coalesce(WarmScore.total_score, 0).label("warm"),
+            )
+            .join(Contact, MatchResult.contact_id == Contact.id)
+            .outerjoin(
+                WarmScore,
+                (WarmScore.contact_id == MatchResult.contact_id)
+                & (WarmScore.user_id == MatchResult.user_id),
+            )
+            .where(
+                MatchResult.search_request_id == search_id,
+                MatchResult.user_id == current_user.id,
+                MatchResult.relevance_score >= effective_min_relevance,
+            )
         )
+        if match_type is not None:
+            stats_query = stats_query.where(MatchResult.match_type == match_type)
+        if min_warm is not None:
+            stats_query = stats_query.where(
+                func.coalesce(WarmScore.total_score, 0) >= min_warm
+            )
+        stats_pairs = [
+            (float(rel), float(warm_val))
+            for rel, warm_val in (await db.execute(stats_query)).all()
+        ]
 
-    stats_rows = (await db.execute(stats_query)).all()
-    for rel, warm_val in stats_rows:
+    for rel, warm_val in stats_pairs:
         r = float(rel)
         w = float(warm_val)
         all_relevance.append(r)

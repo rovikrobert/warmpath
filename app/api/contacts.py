@@ -24,6 +24,7 @@ from app.schemas.contact import (
 from app.services.company_normalizer import link_contact_to_company
 from app.services.csv_parser import generate_fingerprint, parse_linkedin_csv
 from app.services.warm_scorer import batch_compute_scores
+from app.utils.encryption import compute_blind_index
 from app.utils.exceptions import RateLimitError
 from app.utils.security import get_current_user
 
@@ -171,6 +172,10 @@ async def compute_scores(
     }
 
 
+# Columns that are encrypted and cannot be sorted/searched at SQL level
+_ENCRYPTED_SORT_COLUMNS = {"full_name", "current_company", "connected_on"}
+
+
 @router.get("")
 async def list_contacts(
     page: int = Query(1, ge=1),
@@ -200,46 +205,87 @@ async def list_contacts(
         )
     )
 
-    if search:
-        pattern = f"%{search}%"
-        base_query = base_query.where(
-            Contact.full_name.ilike(pattern)
-            | Contact.current_company.ilike(pattern)
-            | Contact.current_title.ilike(pattern)
-            | Contact.email.ilike(pattern)
-        )
-
+    # Non-PII filters can still be applied at SQL level
     if relationship_type:
         base_query = base_query.where(Contact.relationship_type == relationship_type)
 
     if source:
         base_query = base_query.where(Contact.source == source)
 
-    # Count total
-    count_query = select(func.count()).select_from(base_query.subquery())
-    total = (await db.execute(count_query)).scalar() or 0
+    # Determine whether we need in-memory processing
+    need_in_memory = bool(search) or sort_by in _ENCRYPTED_SORT_COLUMNS
 
-    # Sort
-    if sort_by == "warm_score":
-        sort_col = WarmScore.total_score
-        if sort_order == "desc":
-            # nulls last when sorting desc
-            sort_col = sort_col.desc().nullslast()
+    if need_in_memory:
+        # Load all matching rows (user-scoped, so bounded)
+        result = await db.execute(base_query)
+        all_rows = result.all()
+
+        # In-memory search filter on decrypted values
+        if search:
+            s = search.lower()
+            all_rows = [
+                (c, sc) for c, sc in all_rows
+                if s in (c.full_name or "").lower()
+                or s in (c.current_company or "").lower()
+                or s in (c.current_title or "").lower()
+                or s in (c.email or "").lower()
+            ]
+
+        total = len(all_rows)
+
+        # In-memory sort
+        reverse = sort_order == "desc"
+        if sort_by == "warm_score":
+            all_rows.sort(
+                key=lambda r: (r[1] is not None, r[1] or 0), reverse=reverse
+            )
+        elif sort_by == "connected_on":
+            from datetime import date as _date
+            _min = _date.min
+            all_rows.sort(
+                key=lambda r: (getattr(r[0], "connected_on", None) or _min),
+                reverse=reverse,
+            )
+        elif sort_by == "created_at":
+            from datetime import datetime as _dt
+            _epoch = _dt.min
+            all_rows.sort(
+                key=lambda r: (getattr(r[0], "created_at", None) or _epoch),
+                reverse=reverse,
+            )
         else:
-            sort_col = sort_col.asc().nullsfirst()
-        base_query = base_query.order_by(sort_col)
+            # String PII columns (full_name, current_company)
+            all_rows.sort(
+                key=lambda r: (getattr(r[0], sort_by, None) or "").lower(),
+                reverse=reverse,
+            )
+
+        # In-memory pagination
+        offset = (page - 1) * per_page
+        rows = all_rows[offset:offset + per_page]
     else:
-        sort_column = getattr(Contact, sort_by)
-        if sort_order == "desc":
-            sort_column = sort_column.desc()
-        base_query = base_query.order_by(sort_column)
+        # Pure SQL path — no encrypted columns involved in search/sort
+        count_query = select(func.count()).select_from(base_query.subquery())
+        total = (await db.execute(count_query)).scalar() or 0
 
-    # Paginate
-    offset = (page - 1) * per_page
-    base_query = base_query.offset(offset).limit(per_page)
+        if sort_by == "warm_score":
+            sort_col = WarmScore.total_score
+            if sort_order == "desc":
+                sort_col = sort_col.desc().nullslast()
+            else:
+                sort_col = sort_col.asc().nullsfirst()
+            base_query = base_query.order_by(sort_col)
+        else:
+            sort_column = getattr(Contact, sort_by)
+            if sort_order == "desc":
+                sort_column = sort_column.desc()
+            base_query = base_query.order_by(sort_column)
 
-    result = await db.execute(base_query)
-    rows = result.all()
+        offset = (page - 1) * per_page
+        base_query = base_query.offset(offset).limit(per_page)
+
+        result = await db.execute(base_query)
+        rows = result.all()
 
     data = []
     for contact, score_val in rows:
@@ -384,6 +430,14 @@ async def _create_manual_contact(
                 detail=f"Contact '{full_name}' already exists",
             )
 
+    # Compute blind indexes for suppression/dedup lookups
+    email_bi = compute_blind_index(data.email) if data.email else None
+    name_co_bi = None
+    if data.first_name and data.last_name and data.company:
+        name_co_bi = compute_blind_index(
+            f"{data.first_name.strip()}{data.last_name.strip()}{data.company.strip()}"
+        )
+
     contact = Contact(
         user_id=user_id,
         first_name=data.first_name.strip().title(),
@@ -399,6 +453,8 @@ async def _create_manual_contact(
         connected_on=data.last_interaction_date,
         fingerprint=fingerprint,
         source="manual",
+        email_blind_index=email_bi,
+        name_company_blind_index=name_co_bi,
     )
     db.add(contact)
     await db.flush()
