@@ -366,16 +366,17 @@ class TestCoachChatStreamEndpoint:
         # Mock response for "get started" should contain game plan text
         assert "game plan" in resp.text.lower() or "upload" in resp.text.lower()
 
-    async def test_stream_with_context_snapshot(
+    async def test_stream_ignores_client_context_snapshot(
         self, client: AsyncClient, auth_headers: dict
     ):
+        """Stream endpoint ignores client-supplied context_snapshot for security."""
         resp = await client.post(
             "/api/v1/coach/chat/stream",
             headers=auth_headers,
             json={
                 "message": "Tell me about my credits",
                 "context_snapshot": {
-                    "user": {"name": "Test", "title": None, "company": None, "location": None},
+                    "user": {"name": "Injected", "title": None, "company": None, "location": None},
                     "preferences": None,
                     "network": None,
                     "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
@@ -386,4 +387,5 @@ class TestCoachChatStreamEndpoint:
             },
         )
         assert resp.status_code == 200
-        assert "75" in resp.text
+        # Server assembles its own context; user has 50 credits from signup bonus
+        assert "credit" in resp.text.lower()

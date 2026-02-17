@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # Valid application statuses
@@ -20,18 +20,18 @@ VALID_STATUSES = {
 
 
 class ApplicationCreate(BaseModel):
-    company_name: str
-    role_title: str | None = None
+    company_name: str = Field(..., max_length=500)
+    role_title: str | None = Field(default=None, max_length=500)
     contact_id: uuid.UUID | None = None
     job_opening_id: uuid.UUID | None = None
     match_result_id: uuid.UUID | None = None
-    channel: str | None = None
-    notes: str | None = None
+    channel: str | None = Field(default=None, max_length=100)
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class ApplicationUpdate(BaseModel):
-    status: str | None = None
-    notes: str | None = None
+    status: str | None = Field(default=None, max_length=50)
+    notes: str | None = Field(default=None, max_length=2000)
     follow_up_at: datetime | None = None
     responded_at: datetime | None = None
 

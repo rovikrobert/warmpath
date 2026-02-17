@@ -20,6 +20,7 @@ from app.services.suppression import (
     check_suppression,
     purge_suppressed_person,
 )
+from app.utils.encryption import compute_blind_index
 from app.utils.hashing import hash_for_suppression
 from tests.conftest import TestSessionLocal
 
@@ -100,6 +101,8 @@ async def suppressed_contact(user_id: str, company_id: uuid_mod.UUID):
             current_company="Stripe",
             company_id=company_id,
             connected_on=date.today() - timedelta(days=100),
+            email_blind_index=compute_blind_index("suppressed@example.com"),
+            name_company_blind_index=compute_blind_index("SuppressedPersonStripe"),
         )
         db.add(contact)
         await db.commit()
@@ -302,8 +305,8 @@ class TestPurgeCascade:
     ):
         """Purging a suppressed person soft-deletes their contacts."""
         async with TestSessionLocal() as db:
-            email_hash = hash_for_suppression("suppressed@example.com")
-            affected = await purge_suppressed_person(email_hash, None, db)
+            email_bi = compute_blind_index("suppressed@example.com")
+            affected = await purge_suppressed_person(email_bi, None, db)
             await db.flush()
 
             assert affected >= 1
@@ -335,8 +338,8 @@ class TestPurgeCascade:
             db.add(listing)
             await db.flush()
 
-            email_hash = hash_for_suppression("suppressed@example.com")
-            affected = await purge_suppressed_person(email_hash, None, db)
+            email_bi = compute_blind_index("suppressed@example.com")
+            affected = await purge_suppressed_person(email_bi, None, db)
             await db.flush()
 
             # Listing should be soft-deleted
@@ -377,8 +380,8 @@ class TestPurgeCascade:
             db.add(facilitation)
             await db.flush()
 
-            email_hash = hash_for_suppression("suppressed@example.com")
-            await purge_suppressed_person(email_hash, None, db)
+            email_bi = compute_blind_index("suppressed@example.com")
+            await purge_suppressed_person(email_bi, None, db)
             await db.flush()
 
             from sqlalchemy import select
@@ -396,6 +399,8 @@ class TestPurgeCascade:
         uid1 = uuid_mod.UUID(user_id)
         uid2 = uuid_mod.UUID(second_user_id)
 
+        email_bi = compute_blind_index("shared@example.com")
+
         async with TestSessionLocal() as db:
             # Same person in two different users' contacts
             c1 = Contact(
@@ -407,6 +412,7 @@ class TestPurgeCascade:
                 current_title="Engineer",
                 current_company="Stripe",
                 company_id=company_id,
+                email_blind_index=email_bi,
             )
             c2 = Contact(
                 user_id=uid2,
@@ -417,13 +423,13 @@ class TestPurgeCascade:
                 current_title="Engineer",
                 current_company="Stripe",
                 company_id=company_id,
+                email_blind_index=email_bi,
             )
             db.add(c1)
             db.add(c2)
             await db.flush()
 
-            email_hash = hash_for_suppression("shared@example.com")
-            affected = await purge_suppressed_person(email_hash, None, db)
+            affected = await purge_suppressed_person(email_bi, None, db)
             await db.flush()
 
             assert affected == 2  # Both contacts soft-deleted
@@ -436,8 +442,9 @@ class TestPurgeCascade:
                 assert contact.deleted_at is not None
 
     async def test_purge_by_name_company_hash(self, user_id: str, company_id):
-        """Purge works using name+company hash when no email."""
+        """Purge works using name+company blind index when no email."""
         uid = uuid_mod.UUID(user_id)
+        nc_bi = compute_blind_index("NoEmailPersonStripe")
         async with TestSessionLocal() as db:
             contact = Contact(
                 user_id=uid,
@@ -448,12 +455,12 @@ class TestPurgeCascade:
                 current_title="Designer",
                 current_company="Stripe",
                 company_id=company_id,
+                name_company_blind_index=nc_bi,
             )
             db.add(contact)
             await db.flush()
 
-            name_hash = hash_for_suppression("NoEmailPersonStripe")
-            affected = await purge_suppressed_person(None, name_hash, db)
+            affected = await purge_suppressed_person(None, nc_bi, db)
             await db.flush()
 
             assert affected == 1

@@ -2,19 +2,19 @@ import json
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class SearchRequestCreate(BaseModel):
-    name: str
-    description: str | None = None
+    name: str = Field(..., max_length=200)
+    description: str | None = Field(default=None, max_length=1000)
     target_titles: list[str] | None = None
     target_companies: list[str] | None = None
     target_industries: list[str] | None = None
     target_locations: list[str] | None = None
     target_keywords: list[str] | None = None
-    target_role: str
-    target_seniority: str | None = None
+    target_role: str = Field(..., max_length=200)
+    target_seniority: str | None = Field(default=None, max_length=100)
 
 
 class SearchRequestResponse(BaseModel):

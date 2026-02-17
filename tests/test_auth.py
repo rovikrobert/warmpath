@@ -69,8 +69,8 @@ async def test_login_nonexistent_email(client: AsyncClient):
         "/api/v1/auth/login",
         json={"email": "nobody@example.com", "password": "Secret123"},
     )
-    assert resp.status_code == 404
-    assert "sign up" in resp.json()["detail"].lower()
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "Invalid email or password"
 
 
 async def test_me_with_valid_token(client: AsyncClient):

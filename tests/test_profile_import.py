@@ -381,7 +381,7 @@ class TestLinkedInOAuth:
 
     @pytest.mark.asyncio
     async def test_forgot_password_oauth_user(self, client: AsyncClient):
-        """OAuth-only user gets helpful message instead of reset email."""
+        """OAuth-only user gets generic message (no email enumeration)."""
         # Create user via LinkedIn OAuth
         auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
         state = auth_resp.json()["data"]["state"]
@@ -390,11 +390,11 @@ class TestLinkedInOAuth:
             json={"code": "mock_code", "state": state},
         )
 
-        # Try forgot-password
+        # Try forgot-password — should return same generic message as any other case
         resp = await client.post(
             "/api/v1/auth/forgot-password",
             json={"email": "linkedin.user@example.com"},
         )
         assert resp.status_code == 200
         msg = resp.json()["data"]["message"]
-        assert "LinkedIn" in msg
+        assert "If that email is registered" in msg

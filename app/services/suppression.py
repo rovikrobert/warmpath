@@ -20,6 +20,7 @@ from app.models.marketplace import IntroFacilitation, MarketplaceListing
 from app.models.privacy import SuppressionList
 from app.models.user import User
 from app.services.audit_logger import log_event
+from app.utils.encryption import compute_blind_index
 from app.utils.hashing import hash_for_suppression
 
 logger = logging.getLogger(__name__)
@@ -81,18 +82,24 @@ async def add_to_suppression(
         metadata={"reason": reason, "suppression_id": str(entry.id)},
     )
 
+    # Compute blind indexes from plaintext for indexed lookups
+    email_bi = compute_blind_index(email) if email else None
+    name_company_bi = compute_blind_index(name_company)
+
     # Purge across all vaults
-    await purge_suppressed_person(email_hash, name_company_hash, db)
+    await purge_suppressed_person(email_bi, name_company_bi, db)
 
     return entry.id
 
 
 async def purge_suppressed_person(
-    email_hash: str | None,
-    name_company_hash: str | None,
+    email_blind_index: str | None,
+    name_company_blind_index: str | None,
     db: AsyncSession,
 ) -> int:
     """Remove person from ALL network holders' data.
+
+    Uses blind-index columns for O(1) indexed lookups instead of full-table scans.
 
     - Find matching contacts across all users
     - Delete their marketplace_listings
@@ -103,38 +110,33 @@ async def purge_suppressed_person(
     """
     affected = 0
 
-    # Find matching contacts by email or name+company fingerprint
+    # Find matching contacts via blind indexes (indexed O(1) lookups)
     contact_ids: list[uuid.UUID] = []
+    seen: set[uuid.UUID] = set()
 
-    if email_hash:
-        # We need to find contacts whose email hashes match.
-        # Since contacts store plaintext emails, we load candidates and hash.
+    if email_blind_index:
         result = await db.execute(
-            select(Contact).where(
-                Contact.email.isnot(None),
+            select(Contact.id, Contact.user_id).where(
+                Contact.email_blind_index == email_blind_index,
                 Contact.deleted_at.is_(None),
             )
         )
-        for contact in result.scalars():
-            if hash_for_suppression(contact.email) == email_hash:
-                contact_ids.append(contact.id)
+        for row in result.all():
+            if row[0] not in seen:
+                contact_ids.append(row[0])
+                seen.add(row[0])
 
-    if name_company_hash:
+    if name_company_blind_index:
         result = await db.execute(
-            select(Contact).where(
-                Contact.first_name.isnot(None),
-                Contact.last_name.isnot(None),
-                Contact.current_company.isnot(None),
+            select(Contact.id, Contact.user_id).where(
+                Contact.name_company_blind_index == name_company_blind_index,
                 Contact.deleted_at.is_(None),
             )
         )
-        for contact in result.scalars():
-            name_company = (
-                f"{contact.first_name}{contact.last_name}{contact.current_company}"
-            )
-            if hash_for_suppression(name_company) == name_company_hash:
-                if contact.id not in contact_ids:
-                    contact_ids.append(contact.id)
+        for row in result.all():
+            if row[0] not in seen:
+                contact_ids.append(row[0])
+                seen.add(row[0])
 
     if not contact_ids:
         return 0
@@ -231,43 +233,43 @@ async def rectify_contact_data(
 ) -> int:
     """Propagate data corrections for a person across all vaults.
 
-    Finds matching contacts by email or name+company hash, then applies
+    Uses blind-index columns for O(1) indexed lookups instead of full-table scans.
+    Finds matching contacts by email or name+company blind index, then applies
     the provided corrections dict (e.g. {"current_company": "New Corp"}).
 
     Returns count of contacts updated.
     """
     contact_ids: list[uuid.UUID] = []
+    seen: set[uuid.UUID] = set()
 
-    # Find by email
+    # Find by email blind index
     if email:
-        email_hash = hash_for_suppression(email)
+        email_bi = compute_blind_index(email)
         result = await db.execute(
-            select(Contact).where(
-                Contact.email.isnot(None),
+            select(Contact.id).where(
+                Contact.email_blind_index == email_bi,
                 Contact.deleted_at.is_(None),
             )
         )
-        for contact in result.scalars():
-            if hash_for_suppression(contact.email) == email_hash:
-                contact_ids.append(contact.id)
+        for row in result.all():
+            if row[0] not in seen:
+                contact_ids.append(row[0])
+                seen.add(row[0])
 
-    # Find by name+company
+    # Find by name+company blind index
     if first_name and last_name and company:
         name_company = f"{first_name}{last_name}{company}"
-        name_company_hash = hash_for_suppression(name_company)
+        nc_bi = compute_blind_index(name_company)
         result = await db.execute(
-            select(Contact).where(
-                Contact.first_name.isnot(None),
-                Contact.last_name.isnot(None),
-                Contact.current_company.isnot(None),
+            select(Contact.id).where(
+                Contact.name_company_blind_index == nc_bi,
                 Contact.deleted_at.is_(None),
             )
         )
-        for contact in result.scalars():
-            nc = f"{contact.first_name}{contact.last_name}{contact.current_company}"
-            if hash_for_suppression(nc) == name_company_hash:
-                if contact.id not in contact_ids:
-                    contact_ids.append(contact.id)
+        for row in result.all():
+            if row[0] not in seen:
+                contact_ids.append(row[0])
+                seen.add(row[0])
 
     if not contact_ids:
         return 0

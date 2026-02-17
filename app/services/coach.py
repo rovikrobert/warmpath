@@ -482,10 +482,16 @@ def _build_chat_messages(
     messages.append({"role": "user", "content": context_msg})
     messages.append({"role": "assistant", "content": "Understood. I have your context. How can I help?"})
 
-    # Last 10 messages of history
+    # Last 10 messages of history (validated entries only)
     for entry in (conversation_history or [])[-10:]:
-        role = "assistant" if entry.get("role") == "keevs" else "user"
-        messages.append({"role": role, "content": entry.get("content", "")})
+        if not isinstance(entry, dict):
+            continue
+        role_val = entry.get("role")
+        content_val = entry.get("content")
+        if role_val not in ("user", "keevs") or not isinstance(content_val, str):
+            continue
+        role = "assistant" if role_val == "keevs" else "user"
+        messages.append({"role": role, "content": content_val[:5000]})
 
     # Current message
     messages.append({"role": "user", "content": message})

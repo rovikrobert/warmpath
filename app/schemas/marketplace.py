@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ---------------------------------------------------------------------------
@@ -108,13 +108,13 @@ class IntroFacilitationCreate(BaseModel):
 
 class IntroFacilitationRequest(BaseModel):
     marketplace_listing_id: uuid.UUID
-    message_to_holder: str | None = None
-    profile_visibility: str = "summary"
+    message_to_holder: str | None = Field(default=None, max_length=2000)
+    profile_visibility: str = Field(default="summary", max_length=50)
 
 
 class IntroFacilitationActionBody(BaseModel):
-    action: str  # "approve" or "decline"
-    notes: str | None = None
+    action: str = Field(..., max_length=20)  # "approve" or "decline"
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class IntroFacilitationResponse(BaseModel):

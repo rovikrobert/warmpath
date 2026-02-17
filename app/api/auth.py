@@ -209,8 +209,8 @@ async def login(
         await log_event(db, "login_failure", metadata={"email": body.email})
         await db.commit()
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No account found with this email. Would you like to sign up?",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
         )
 
     if user.password_hash is None or not verify_password(body.password, user.password_hash):
@@ -236,7 +236,7 @@ async def login(
         await db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect password",
+            detail="Invalid email or password",
         )
 
     if not user.is_active:
@@ -848,32 +848,23 @@ async def forgot_password(
     user = result.scalar_one_or_none()
 
     if user is not None:
-        # OAuth-only user with no password — give helpful guidance
-        if user.password_hash is None and user.oauth_provider:
-            return {
-                "data": {
-                    "message": (
-                        "Your account uses LinkedIn login. "
-                        "You can set a password in your profile settings."
+        # Skip sending for OAuth-only users (no password to reset),
+        # but return the same generic message to prevent enumeration.
+        if not (user.password_hash is None and user.oauth_provider):
+            # Rate limit: 1 per 5 minutes
+            if user.password_reset_sent_at is not None:
+                sent_at = user.password_reset_sent_at
+                if sent_at.tzinfo is None:
+                    sent_at = sent_at.replace(tzinfo=timezone.utc)
+                elapsed = (datetime.now(timezone.utc) - sent_at).total_seconds()
+                if elapsed < 300:
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail="Please wait 5 minutes before requesting another reset email",
                     )
-                },
-                "meta": {},
-            }
 
-        # Rate limit: 1 per 5 minutes
-        if user.password_reset_sent_at is not None:
-            sent_at = user.password_reset_sent_at
-            if sent_at.tzinfo is None:
-                sent_at = sent_at.replace(tzinfo=timezone.utc)
-            elapsed = (datetime.now(timezone.utc) - sent_at).total_seconds()
-            if elapsed < 300:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Please wait 5 minutes before requesting another reset email",
-                )
-
-        await send_password_reset_email(user, db)
-        await db.commit()
+            await send_password_reset_email(user, db)
+            await db.commit()
 
     # Always return success to prevent email enumeration
     return {
