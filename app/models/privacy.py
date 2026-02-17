@@ -42,6 +42,7 @@ class ConsentRecord(Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
     activity: Mapped[str] = mapped_column(String(50), nullable=False)
     consented: Mapped[str] = mapped_column(
