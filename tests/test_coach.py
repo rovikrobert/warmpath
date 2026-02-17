@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest_asyncio
 from httpx import AsyncClient
 
-from app.services.coach import (
+from ops_team.keevs.coach_service import (
     _assemble_context,
     _build_chat_messages,
     _mock_briefing,
@@ -124,7 +124,7 @@ class TestCoachBriefingEndpoint:
     async def test_briefing_cached(self, client: AsyncClient, auth_headers: dict):
         """Second call uses cache — _assemble_context called only once."""
         with patch(
-            "app.services.coach._assemble_context",
+            "ops_team.keevs.coach_service._assemble_context",
             new_callable=AsyncMock,
             return_value={
                 "user": {

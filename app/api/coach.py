@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.enrichment import UsageLog
 from app.models.user import User
-from app.services.coach import (
+from ops_team.keevs.coach_service import (
     _assemble_context,
     generate_briefing,
     generate_chat_response,
