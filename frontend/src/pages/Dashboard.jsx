@@ -230,7 +230,7 @@ export default function Dashboard() {
                   </td>
                   <td className="px-4 py-3">
                     <button
-                      onClick={() => navigate(s.name?.startsWith('Smart Search') ? `/referrals/${s.id}` : `/search/${s.id}`)}
+                      onClick={() => navigate(s.name?.toLowerCase().startsWith('smart search') ? `/referrals/${s.id}` : `/search/${s.id}`)}
                       className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200"
                     >
                       View
