@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { search as searchApi, credits as creditsApi } from '../api/client';
+import { search as searchApi, credits as creditsApi, matches as matchesApi } from '../api/client';
 import RequestIntroModal from '../components/RequestIntroModal';
 
 /* ------------------------------------------------------------------ */
@@ -105,6 +105,42 @@ const REL_LABELS = {
 };
 
 /* ------------------------------------------------------------------ */
+/* Intro Draft Modal                                                  */
+/* ------------------------------------------------------------------ */
+
+function IntroModal({ intro, onClose }) {
+  if (!intro) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-xl rounded-xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">Intro Drafts</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+        </div>
+        <div className="max-h-[70vh] overflow-y-auto px-6 py-4 space-y-4">
+          {intro.messages?.map((msg) => (
+            <div key={msg.id} className="rounded-lg border border-slate-200 p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  {msg.variant_label}
+                </span>
+                <span className="text-xs text-slate-400">{msg.ai_model_version}</span>
+              </div>
+              {msg.subject_line && (
+                <p className="mb-1 text-xs text-slate-500">
+                  Subject: <span className="font-medium text-slate-700">{msg.subject_line}</span>
+                </p>
+              )}
+              <p className="whitespace-pre-wrap text-sm text-slate-700">{msg.message_body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Company Card                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -114,7 +150,7 @@ function FitBadge({ score }) {
   return <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${color}`}>{score}</span>;
 }
 
-function CompanyCard({ company, onRequestIntro, navigate }) {
+function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
   const ownPaths = company.referral_paths?.filter((p) => p.source === 'own_network') || [];
   const marketPaths = company.referral_paths?.filter((p) => p.source === 'marketplace') || [];
   const [showAll, setShowAll] = useState(false);
@@ -243,10 +279,11 @@ function CompanyCard({ company, onRequestIntro, navigate }) {
                     </div>
                   </div>
                   <button
-                    onClick={() => navigate(`/search/${path.contact.id}`)}
-                    className="shrink-0 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600"
+                    onClick={() => onDraftIntro(path.contact.id)}
+                    disabled={introLoading === path.contact.id}
+                    className="shrink-0 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
                   >
-                    Draft Intro
+                    {introLoading === path.contact.id ? 'Drafting...' : 'Draft Intro'}
                   </button>
                 </div>
               ))}
@@ -312,6 +349,8 @@ export default function ReferralResults() {
   const [error, setError] = useState('');
   const [balance, setBalance] = useState(0);
   const [introModal, setIntroModal] = useState(null);
+  const [introLoading, setIntroLoading] = useState(null);
+  const [draftModal, setDraftModal] = useState(null);
   const [alsoHiring, setAlsoHiring] = useState([]);
 
   useEffect(() => {
@@ -346,6 +385,22 @@ export default function ReferralResults() {
       .then((r) => setAlsoHiring(r.data?.recommendations ?? []))
       .catch(() => {});
   }, [data]);
+
+  const handleDraftIntro = async (contactId) => {
+    setIntroLoading(contactId);
+    try {
+      const res = await matchesApi.createIntro({
+        contact_id: contactId,
+        tone: 'professional',
+        channel: 'linkedin',
+      });
+      setDraftModal(res.data);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setIntroLoading(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -404,7 +459,8 @@ export default function ReferralResults() {
             <CompanyCard
               key={i}
               company={company}
-              navigate={navigate}
+              onDraftIntro={handleDraftIntro}
+              introLoading={introLoading}
               onRequestIntro={(path) => setIntroModal(path)}
             />
           ))}
@@ -442,6 +498,8 @@ export default function ReferralResults() {
           }}
         />
       )}
+
+      {draftModal && <IntroModal intro={draftModal} onClose={() => setDraftModal(null)} />}
     </div>
   );
 }
