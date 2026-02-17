@@ -241,6 +241,20 @@ export const dashboard = {
 export const coach = {
   briefing: () => api('/api/v1/coach/briefing'),
   chat: (body) => api('/api/v1/coach/chat', { method: 'POST', body }),
+  chatStream: async (body) => {
+    const token = _getToken();
+    const res = await fetch(`${BASE_URL}/api/v1/coach/chat/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Stream failed');
+    return res.body.getReader();
+  },
 };
 
 export const health = {

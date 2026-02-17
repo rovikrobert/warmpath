@@ -93,25 +93,64 @@ export default function Dashboard() {
     setSuggestedPrompts([]);
     setSending(true);
 
+    // Append an empty Keevs bubble that will fill progressively
+    const keevsIdx = messages.length + 1; // index of the new keevs message
+    setMessages((prev) => [...prev, { role: 'keevs', content: '' }]);
+
     try {
-      // Build conversation history for the API (exclude the current message)
       const history = [...messages, userMsg].map((m) => ({
         role: m.role,
         content: m.content,
       }));
 
-      const res = await coachApi.chat({
+      const reader = await coachApi.chatStream({
         message: text.trim(),
         conversation_history: history,
         context_snapshot: contextSnapshot,
       });
 
-      setMessages((prev) => [...prev, { role: 'keevs', content: res.data.response }]);
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        // Parse SSE lines from buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6);
+          if (payload === '[DONE]') continue;
+          try {
+            const { t } = JSON.parse(payload);
+            if (t) {
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[keevsIdx];
+                if (last && last.role === 'keevs') {
+                  updated[keevsIdx] = { ...last, content: last.content + t };
+                }
+                return updated;
+              });
+            }
+          } catch {
+            // skip malformed SSE lines
+          }
+        }
+      }
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'keevs', content: "Sorry, I couldn't process that. Try again in a moment." },
-      ]);
+      setMessages((prev) => {
+        const updated = [...prev];
+        const last = updated[keevsIdx];
+        if (last && last.role === 'keevs' && !last.content) {
+          updated[keevsIdx] = { ...last, content: "Sorry, I couldn't process that. Try again in a moment." };
+        }
+        return updated;
+      });
     } finally {
       setSending(false);
       inputRef.current?.focus();
@@ -187,15 +226,6 @@ export default function Dashboard() {
                 {prompt}
               </button>
             ))}
-          </div>
-        )}
-
-        {/* Typing indicator */}
-        {sending && (
-          <div className="flex justify-start">
-            <div className="rounded-2xl bg-slate-100 px-4 py-3">
-              <p className="animate-pulse text-sm text-slate-500">Keevs is thinking...</p>
-            </div>
           </div>
         )}
 
