@@ -124,6 +124,83 @@ REGIONS: dict[str, list[str]] = {
 }
 
 
+# Reverse lookup: company_key → region name
+_KEY_TO_REGION: dict[str, str] = {}
+for _region, _keys in REGIONS.items():
+    for _key in _keys:
+        _KEY_TO_REGION[_key] = _region
+
+# Location keywords → region names (for user target_locations matching)
+_LOCATION_TO_REGIONS: dict[str, list[str]] = {
+    "singapore": ["Singapore / SEA"],
+    "sea": ["Singapore / SEA"],
+    "southeast asia": ["Singapore / SEA"],
+    "malaysia": ["Singapore / SEA"],
+    "indonesia": ["Singapore / SEA"],
+    "vietnam": ["Singapore / SEA"],
+    "thailand": ["Singapore / SEA"],
+    "philippines": ["Singapore / SEA"],
+    "india": ["India"],
+    "mumbai": ["India"],
+    "bangalore": ["India"],
+    "delhi": ["India"],
+    "australia": ["Australia / NZ"],
+    "new zealand": ["Australia / NZ"],
+    "sydney": ["Australia / NZ"],
+    "melbourne": ["Australia / NZ"],
+    "us": ["US / Global"],
+    "united states": ["US / Global"],
+    "san francisco": ["US / Global"],
+    "new york": ["US / Global"],
+    "remote": ["US / Global", "Singapore / SEA", "India", "Australia / NZ"],
+}
+
+
+def get_display_name(company_key: str) -> str:
+    """Return a human-readable display name for a board registry key.
+
+    Uses the key directly with title-casing as fallback for unknown keys.
+    """
+    return company_key.replace("-", " ").title()
+
+
+def get_region(company_key: str) -> str | None:
+    """Return the region name for a company key, or None if unknown."""
+    return _KEY_TO_REGION.get(company_key)
+
+
+def companies_for_locations(target_locations: list[str] | None) -> list[str]:
+    """Return board registry keys relevant to the user's target locations.
+
+    If no locations specified or none match, returns all companies.
+    Prioritizes matched-region companies first, then appends the rest.
+    """
+    if not target_locations:
+        return list(BOARD_REGISTRY.keys())
+
+    matched_regions: set[str] = set()
+    for loc in target_locations:
+        loc_lower = loc.strip().lower()
+        for keyword, regions in _LOCATION_TO_REGIONS.items():
+            if keyword in loc_lower or loc_lower in keyword:
+                matched_regions.update(regions)
+
+    if not matched_regions:
+        return list(BOARD_REGISTRY.keys())
+
+    # Prioritized list: matched regions first, then others
+    prioritized: list[str] = []
+    rest: list[str] = []
+    for key in BOARD_REGISTRY:
+        region = _KEY_TO_REGION.get(key)
+        if region in matched_regions:
+            prioritized.append(key)
+        else:
+            rest.append(key)
+
+    return prioritized + rest
+
+
 def lookup_boards(company_name: str) -> dict[str, str] | None:
     """Look up board identifiers for a company name (case-insensitive, fuzzy).
 

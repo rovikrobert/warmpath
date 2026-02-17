@@ -172,6 +172,13 @@ export const search = {
     return api(`/api/v1/search/${id}/results?${qs}`);
   },
   smart: (body) => api('/api/v1/search/smart', { method: 'POST', body }),
+  recommendations: (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') qs.set(k, v);
+    });
+    return api(`/api/v1/search/recommendations?${qs}`);
+  },
 };
 
 export const matches = {
