@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth as authApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -11,7 +11,15 @@ export default function AuthPage() {
   const [form, setForm] = useState({ email: '', password: '', full_name: '' });
   const [loading, setLoading] = useState(false);
   const [linkedinLoading, setLinkedinLoading] = useState(false);
+  const [linkedinAvailable, setLinkedinAvailable] = useState(false);
   const [error, setError] = useState('');
+
+  // Check if LinkedIn OAuth is configured on the backend
+  useEffect(() => {
+    authApi.linkedinAuthorize()
+      .then(() => setLinkedinAvailable(true))
+      .catch(() => setLinkedinAvailable(false));
+  }, []);
 
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
 
@@ -80,8 +88,8 @@ export default function AuthPage() {
         </div>
 
         <form onSubmit={handleSubmit} aria-label={isSignup ? 'Sign up form' : 'Log in form'} className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-          {/* Login tab: LinkedIn at top */}
-          {!isSignup && (
+          {/* Login tab: LinkedIn at top (only if backend has LinkedIn configured) */}
+          {!isSignup && linkedinAvailable && (
             <>
               <button
                 type="button"
@@ -159,7 +167,7 @@ export default function AuthPage() {
           </div>
 
           {/* Signup tab: LinkedIn button below fields, requires all fields filled */}
-          {isSignup && (
+          {isSignup && linkedinAvailable && (
             <>
               <button
                 type="button"
