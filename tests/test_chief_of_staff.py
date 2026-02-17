@@ -951,7 +951,11 @@ class TestCosAgent:
         reports_dir.mkdir()
         state_path = tmp_path / "cos_state.json"
 
+        data_reports_dir = tmp_path / "data_reports"
+        data_reports_dir.mkdir()
+
         with patch("agents.chief_of_staff.cos_agent.REPORTS_DIR", reports_dir), \
+             patch("agents.chief_of_staff.cos_agent.DATA_TEAM_REPORTS_DIR", data_reports_dir), \
              patch("agents.chief_of_staff.cos_learning._STATE_PATH", state_path):
             self._reports_dir = reports_dir
             yield
