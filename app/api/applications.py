@@ -165,6 +165,19 @@ async def create_application(
         status="draft",
     )
     db.add(app_record)
+    await db.flush()
+
+    # Track funnel step
+    from app.models.enrichment import UsageLog
+
+    db.add(
+        UsageLog(
+            user_id=current_user.id,
+            action="application_create",
+            resource_id=app_record.id,
+            metadata_={"company": body.company_name, "role": body.role_title},
+        )
+    )
     await db.commit()
     await db.refresh(app_record)
 

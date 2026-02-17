@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models.enrichment import UsageLog
 from app.models.user import User
 from app.services.dashboard_insights import get_dashboard_insights
 from app.utils.security import get_current_user
@@ -15,5 +16,14 @@ async def dashboard_insights(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Return personalized dashboard insights (job trends, network analysis, daily tip)."""
+    # Track funnel step
+    db.add(
+        UsageLog(
+            user_id=current_user.id,
+            action="dashboard_view",
+        )
+    )
+    await db.commit()
+
     data = await get_dashboard_insights(current_user.id, db)
     return {"data": data, "meta": {}}

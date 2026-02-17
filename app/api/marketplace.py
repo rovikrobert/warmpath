@@ -313,6 +313,18 @@ async def request_intro(
     db.add(facilitation)
     await db.flush()
 
+    # Track funnel step
+    from app.models.enrichment import UsageLog
+
+    db.add(
+        UsageLog(
+            user_id=current_user.id,
+            action="intro_request",
+            resource_id=facilitation.id,
+            metadata_={"listing_id": str(listing.id)},
+        )
+    )
+
     return {
         "data": IntroFacilitationResponse.model_validate(facilitation).model_dump(
             mode="json"

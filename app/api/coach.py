@@ -44,6 +44,16 @@ async def coach_briefing(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Return a personalized daily briefing from Keevs."""
+    # Track funnel step
+    db.add(
+        UsageLog(
+            user_id=current_user.id,
+            action="coach_briefing",
+            resource_type="coach",
+        )
+    )
+    await db.commit()
+
     data = await generate_briefing(current_user.id, db)
     return {"data": data, "meta": {}}
 
@@ -55,6 +65,17 @@ async def coach_chat(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Send a message to Keevs and get a response."""
+    # Track funnel step
+    db.add(
+        UsageLog(
+            user_id=current_user.id,
+            action="coach_chat",
+            resource_type="coach",
+            metadata_={"message_length": len(body.message), "streaming": False},
+        )
+    )
+    await db.commit()
+
     data = await generate_chat_response(
         user_id=current_user.id,
         message=body.message,
