@@ -24,10 +24,10 @@ CAREER_PAGES: dict[str, str] = {
     "shopify": "https://www.shopify.com/careers/search",
     # Singapore / SEA
     "grab": "https://grab.careers/jobs/",
-    "sea-group": "https://careers.sea.com/",
+    "sea-group": "https://career.sea.com/",
     "shopee": "https://careers.shopee.sg/jobs",
     "lazada": "https://www.lazada.com/en/careers/",
-    "gojek": "https://www.gojek.com/en-id/careers/",
+    "gojek": "https://www.gojek.io/careers",
     "carousell": "https://careers.carousell.com/",
     "foodpanda": "https://careers.foodpanda.com/",
     "ninja-van": "https://www.ninjavan.co/en-sg/careers",
@@ -35,8 +35,8 @@ CAREER_PAGES: dict[str, str] = {
     "endowus": "https://endowus.com/careers",
     "syfe": "https://www.syfe.com/careers",
     "aspire": "https://aspireapp.com/careers",
-    "funding-societies": "https://fundingsocieties.com/careers",
-    "carro": "https://www.carro.co/careers",
+    "funding-societies": "https://fundingsocieties.com/career",
+    "carro": "https://careers.carro.sg/jobs/Careers",
     # India
     "razorpay": "https://razorpay.com/jobs/",
     "zerodha": "https://zerodha.com/careers/",
