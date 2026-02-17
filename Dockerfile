@@ -33,11 +33,15 @@ COPY finance_team/ ./finance_team/
 COPY gtm_team/ ./gtm_team/
 COPY ops_team/ ./ops_team/
 
+# Copy project docs (agents read CLAUDE.md for strategy context)
+COPY CLAUDE.md ARCHITECTURE.md ./
+
 # Copy built frontend
 COPY --from=frontend-build /build/dist ./frontend/dist
 
-# Non-root user
-RUN useradd --create-home appuser
+# Non-root user — chown so agents can write state/report files
+RUN useradd --create-home appuser \
+    && chown -R appuser:appuser /app
 USER appuser
 
 ENV PORT=8000
