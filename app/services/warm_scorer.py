@@ -499,18 +499,23 @@ async def batch_compute_scores(
     )
     contacts = result.scalars().all()
 
+    # Batch-load existing warm scores for upsert (avoids N+1)
+    contact_ids = [c.id for c in contacts]
+    existing_ws_map: dict = {}
+    if contact_ids:
+        ws_result = await db.execute(
+            select(WarmScore).where(
+                WarmScore.user_id == user_id,
+                WarmScore.contact_id.in_(contact_ids),
+            )
+        )
+        existing_ws_map = {ws.contact_id: ws for ws in ws_result.scalars()}
+
     scores: list[WarmScore] = []
     for contact in contacts:
         ref_result = compute_referral_score(contact, profile, target_role=target_role)
 
-        # Upsert: check for existing score row
-        existing_result = await db.execute(
-            select(WarmScore).where(
-                WarmScore.user_id == user_id,
-                WarmScore.contact_id == contact.id,
-            )
-        )
-        existing = existing_result.scalar_one_or_none()
+        existing = existing_ws_map.get(contact.id)
 
         if existing:
             existing.total_score = Decimal(str(ref_result.total_score))

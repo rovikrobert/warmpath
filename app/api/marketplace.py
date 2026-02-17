@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -129,11 +129,13 @@ async def marketplace_search(
     # Deduct credits
     await spend_credits(current_user.id, 5, "marketplace_search", db)
 
-    # Look up company IDs by name
+    # Look up company IDs by name (single query instead of per-name loop)
     company_map: dict[uuid.UUID, str] = {}
-    for name in body.company_names:
+    if body.company_names:
         result = await db.execute(
-            select(Company).where(Company.name.ilike(f"%{name}%"))
+            select(Company).where(
+                or_(*[Company.name.ilike(f"%{n}%") for n in body.company_names])
+            )
         )
         for c in result.scalars():
             company_map[c.id] = c.name
@@ -337,21 +339,26 @@ async def my_requests(
     )
     facilitations = list(result.scalars())
 
+    # Batch-load listings and companies to avoid N+1
+    listing_ids = [f.marketplace_listing_id for f in facilitations]
+    listings_map: dict = {}
+    companies_map: dict = {}
+    if listing_ids:
+        lr = await db.execute(
+            select(MarketplaceListing).where(MarketplaceListing.id.in_(listing_ids))
+        )
+        listings_map = {l.id: l for l in lr.scalars()}
+        company_ids = {l.company_id for l in listings_map.values() if l.company_id}
+        if company_ids:
+            cr = await db.execute(select(Company).where(Company.id.in_(company_ids)))
+            companies_map = {c.id: c for c in cr.scalars()}
+
     data = []
     for f in facilitations:
         resp = IntroFacilitationResponse.model_validate(f).model_dump(mode="json")
-        # Load listing summary for context
-        listing_result = await db.execute(
-            select(MarketplaceListing).where(
-                MarketplaceListing.id == f.marketplace_listing_id
-            )
-        )
-        listing = listing_result.scalar_one_or_none()
+        listing = listings_map.get(f.marketplace_listing_id)
         if listing:
-            company_result = await db.execute(
-                select(Company).where(Company.id == listing.company_id)
-            )
-            company = company_result.scalar_one_or_none()
+            company = companies_map.get(listing.company_id)
             company_name = company.name if company else "Unknown"
             resp["listing_summary"] = _build_listing_summary(
                 listing, company_name, None
@@ -382,22 +389,29 @@ async def incoming_requests(
     )
     facilitations = list(result.scalars())
 
+    # Batch-load listings (with contacts) and companies to avoid N+1
+    listing_ids = [f.marketplace_listing_id for f in facilitations]
+    listings_map: dict = {}
+    companies_map: dict = {}
+    if listing_ids:
+        lr = await db.execute(
+            select(MarketplaceListing)
+            .where(MarketplaceListing.id.in_(listing_ids))
+            .options(selectinload(MarketplaceListing.contact))
+        )
+        listings_map = {l.id: l for l in lr.scalars()}
+        company_ids = {l.company_id for l in listings_map.values() if l.company_id}
+        if company_ids:
+            cr = await db.execute(select(Company).where(Company.id.in_(company_ids)))
+            companies_map = {c.id: c for c in cr.scalars()}
+
     data = []
     for f in facilitations:
         resp = IntroFacilitationHolderResponse.model_validate(f).model_dump(mode="json")
 
-        # Load listing + contact details (holder's own contact)
-        listing_result = await db.execute(
-            select(MarketplaceListing)
-            .where(MarketplaceListing.id == f.marketplace_listing_id)
-            .options(selectinload(MarketplaceListing.contact))
-        )
-        listing = listing_result.scalar_one_or_none()
+        listing = listings_map.get(f.marketplace_listing_id)
         if listing:
-            company_result = await db.execute(
-                select(Company).where(Company.id == listing.company_id)
-            )
-            company = company_result.scalar_one_or_none()
+            company = companies_map.get(listing.company_id)
             company_name = company.name if company else "Unknown"
             resp["listing_summary"] = _build_listing_summary(
                 listing, company_name, None

@@ -55,7 +55,7 @@ class MatchResult(Base):
 
     relevance_score: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
     match_reasoning: Mapped[str] = mapped_column(Text, nullable=False)
-    match_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    match_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
 
     # User feedback on match quality
     user_feedback: Mapped[str | None] = mapped_column(String(50))

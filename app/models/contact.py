@@ -107,9 +107,9 @@ class Contact(Base):
     notes: Mapped[str | None] = mapped_column(EncryptedText())
 
     # Relationship classification
-    relationship_type: Mapped[str | None] = mapped_column(String(50))
+    relationship_type: Mapped[str | None] = mapped_column(String(50), index=True)
     source: Mapped[str] = mapped_column(
-        String(50), nullable=False, server_default="linkedin_csv"
+        String(50), nullable=False, server_default="linkedin_csv", index=True,
     )
     how_you_know: Mapped[str | None] = mapped_column(EncryptedText())
     last_interaction_date: Mapped[date | None] = mapped_column(Date)

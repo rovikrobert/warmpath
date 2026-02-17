@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -29,19 +29,28 @@ async def _upsert_openings(
     """Insert or update job openings. Dedup by (source, source_job_id)."""
     results: list[JobOpening] = []
 
+    # Batch-load existing openings for dedup (avoids N+1)
+    dedup_pairs = [
+        (jd["source"], jd.get("source_job_id"))
+        for jd in jobs
+        if jd.get("source_job_id")
+    ]
+    existing_map: dict[tuple[str, str], JobOpening] = {}
+    if dedup_pairs:
+        conditions = [
+            and_(JobOpening.source == src, JobOpening.source_job_id == sid)
+            for src, sid in dedup_pairs
+        ]
+        er = await db.execute(select(JobOpening).where(or_(*conditions)))
+        existing_map = {
+            (jo.source, jo.source_job_id): jo for jo in er.scalars()
+        }
+
     for job_data in jobs:
         source = job_data["source"]
         source_job_id = job_data.get("source_job_id")
 
-        existing = None
-        if source_job_id:
-            result = await db.execute(
-                select(JobOpening).where(
-                    JobOpening.source == source,
-                    JobOpening.source_job_id == source_job_id,
-                )
-            )
-            existing = result.scalar_one_or_none()
+        existing = existing_map.get((source, source_job_id)) if source_job_id else None
 
         if existing:
             existing.title = job_data["title"]
@@ -199,6 +208,17 @@ async def scan_target_companies(
     total_openings = 0
     relevant_openings = 0
 
+    # Pre-load company records for all target companies (avoids N+1)
+    company_id_cache: dict[str, uuid.UUID | None] = {}
+    if target_companies:
+        cr = await db.execute(
+            select(Company).where(
+                or_(*[Company.name.ilike(f"%{cn}%") for cn in target_companies])
+            )
+        )
+        for c in cr.scalars():
+            company_id_cache[c.name.lower()] = c.id
+
     for company_name in target_companies:
         boards = lookup_boards(company_name)
         if boards is None and lookup_career_page(company_name) is None:
@@ -208,12 +228,8 @@ async def scan_target_companies(
         companies_scanned += 1
         total_openings += len(jobs)
 
-        # Link to existing company record
-        result = await db.execute(
-            select(Company).where(Company.name.ilike(f"%{company_name}%"))
-        )
-        company = result.scalar_one_or_none()
-        company_id = company.id if company else None
+        # Link to existing company record (from pre-loaded cache)
+        company_id = company_id_cache.get(company_name)
 
         # Upsert all openings
         await _upsert_openings(db, jobs, company_id=company_id)

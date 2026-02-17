@@ -24,7 +24,7 @@ class CreditTransaction(Base):
         nullable=False,
     )
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
-    type: Mapped[str] = mapped_column(String(20), nullable=False)
+    type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     reason: Mapped[str] = mapped_column(String(100), nullable=False)
     reference_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
