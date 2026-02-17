@@ -4,9 +4,49 @@ import { useAuth } from '../context/AuthContext';
 import { auth as authApi, contacts as contactsApi, preferences, marketplace } from '../api/client';
 import TagInput from '../components/TagInput';
 
+function ResumePreviewModal({ data, onApply, onClose }) {
+  if (!data) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="mx-4 w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+        <h3 className="text-lg font-bold text-slate-900">Resume Preview</h3>
+        <p className="mt-1 text-sm text-slate-500">Review parsed data before applying.</p>
+        <div className="mt-4 space-y-3 text-sm">
+          {data.headline && <div><span className="font-medium text-slate-700">Headline:</span> {data.headline}</div>}
+          {data.current_title && <div><span className="font-medium text-slate-700">Title:</span> {data.current_title}</div>}
+          {data.current_company && <div><span className="font-medium text-slate-700">Company:</span> {data.current_company}</div>}
+          {data.industry && <div><span className="font-medium text-slate-700">Industry:</span> {data.industry}</div>}
+          {data.location && <div><span className="font-medium text-slate-700">Location:</span> {data.location}</div>}
+          {data.bio_summary && <div><span className="font-medium text-slate-700">Summary:</span> {data.bio_summary}</div>}
+          {data.work_history?.length > 0 && (
+            <div>
+              <span className="font-medium text-slate-700">Work History:</span>
+              <ul className="mt-1 space-y-1 pl-4">
+                {data.work_history.map((w, i) => (
+                  <li key={i} className="text-slate-600">
+                    {w.title} at {w.company} ({w.start_date || '?'} - {w.end_date || 'Present'})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+        <div className="mt-5 flex gap-3">
+          <button onClick={onClose} className="flex-1 rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            Cancel
+          </button>
+          <button onClick={() => onApply(data)} className="flex-1 rounded-lg bg-amber-500 py-2 text-sm font-medium text-white hover:bg-amber-600">
+            Apply
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const EMPTY_WORK = { company: '', title: '', start_date: '', end_date: '', is_current: false };
 
-const SENIORITY_OPTIONS = ['Entry Level', 'Mid Level', 'Senior', 'Staff / Principal', 'Manager', 'Director', 'VP', 'C-Suite'];
+const SENIORITY_OPTIONS = ['Staff / Principal', 'Manager', 'Director', 'VP', 'C-Suite'];
 
 const TOTAL_STEPS = 8;
 
@@ -128,8 +168,51 @@ export default function OnboardingPage() {
     return () => clearInterval(interval);
   }, [uploading]);
 
-  // Step 8: Work history
+  // Step 8: Work history + resume import
   const [workHistory, setWorkHistory] = useState([]);
+  const [resumePreview, setResumePreview] = useState(null);
+  const [resumeProfileData, setResumeProfileData] = useState(null);
+  const [resumeImporting, setResumeImporting] = useState(false);
+  const resumeInputRef = useRef(null);
+
+  const handleResumeUpload = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setResumeImporting(true);
+    setError('');
+    try {
+      const res = await authApi.uploadResume(f);
+      setResumePreview(res.data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setResumeImporting(false);
+      if (resumeInputRef.current) resumeInputRef.current.value = '';
+    }
+  };
+
+  const applyResumeData = (data) => {
+    // Populate work history from parsed resume
+    if (data.work_history?.length) {
+      setWorkHistory(data.work_history.map((w) => ({
+        company: w.company || '',
+        title: w.title || '',
+        start_date: w.start_date || '',
+        end_date: w.end_date || '',
+        is_current: !w.end_date,
+      })));
+    }
+    // Store profile fields for saving alongside work history
+    setResumeProfileData({
+      headline: data.headline || null,
+      current_company: data.current_company || null,
+      current_title: data.current_title || null,
+      industry: data.industry || null,
+      location: data.location || null,
+      bio_summary: data.bio_summary || null,
+    });
+    setResumePreview(null);
+  };
 
   const setPref = (key) => (e) => setPrefs({ ...prefs, [key]: typeof e === 'object' && e.target ? e.target.value : e });
   const setArrayPref = (key) => (val) => setPrefs({ ...prefs, [key]: val });
@@ -227,10 +310,16 @@ export default function OnboardingPage() {
           </h1>
         </div>
 
-        {/* Progress */}
+        {/* Progress — clickable segments to jump back */}
         <div className="mb-6 flex items-center gap-1">
           {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
-            <div key={s} className={`h-1.5 flex-1 rounded-full ${s <= step ? 'bg-amber-500' : 'bg-slate-200'}`} />
+            <button
+              key={s}
+              type="button"
+              onClick={() => { if (s < step) { setError(''); setStep(s); } }}
+              disabled={s >= step}
+              className={`h-1.5 flex-1 rounded-full transition ${s <= step ? 'bg-amber-500' : 'bg-slate-200'} ${s < step ? 'cursor-pointer hover:bg-amber-400' : ''}`}
+            />
           ))}
         </div>
 
@@ -327,13 +416,18 @@ export default function OnboardingPage() {
 
               {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
 
-              <button
-                onClick={handleUserType}
-                disabled={!userType || saving}
-                className="w-full rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : 'Continue'}
-              </button>
+              <div className="flex gap-3">
+                <button onClick={() => { setError(''); setStep(1); }} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                  Back
+                </button>
+                <button
+                  onClick={handleUserType}
+                  disabled={!userType || saving}
+                  className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Continue'}
+                </button>
+              </div>
             </div>
           )}
 
@@ -362,12 +456,17 @@ export default function OnboardingPage() {
                 </p>
               )}
 
-              <button
-                onClick={() => setStep(step + 1)}
-                className="w-full rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600"
-              >
-                Next
-              </button>
+              <div className="flex gap-3">
+                <button onClick={() => { setError(''); setStep(step - 1); }} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                  Back
+                </button>
+                <button
+                  onClick={() => setStep(step + 1)}
+                  className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
 
@@ -434,6 +533,9 @@ export default function OnboardingPage() {
               )}
 
               <div className="flex gap-3">
+                <button onClick={() => { setError(''); setStep(6); }} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                  Back
+                </button>
                 <button onClick={finish} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
                   Skip for now
                 </button>
@@ -457,6 +559,9 @@ export default function OnboardingPage() {
                 Add your work history to improve referral matching — contacts at your former companies get boosted scores.
               </p>
               <div className="flex gap-3">
+                <button onClick={() => { setError(''); setStep(6); }} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                  Back
+                </button>
                 <button onClick={finish} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
                   Skip for now
                 </button>
@@ -475,16 +580,29 @@ export default function OnboardingPage() {
                 <p className="mt-1 text-sm text-slate-500">Contacts at your former companies will get boosted referral scores.</p>
               </div>
 
+              <input ref={resumeInputRef} type="file" accept=".pdf" onChange={handleResumeUpload} className="hidden" />
+              <ResumePreviewModal data={resumePreview} onApply={applyResumeData} onClose={() => setResumePreview(null)} />
+
               {workHistory.length === 0 && (
                 <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center">
                   <p className="text-sm text-slate-500">No entries yet.</p>
-                  <button
-                    type="button"
-                    onClick={() => setWorkHistory([{ ...EMPTY_WORK }])}
-                    className="mt-2 text-sm font-medium text-amber-600 hover:text-amber-700"
-                  >
-                    Add your first role
-                  </button>
+                  <div className="mt-3 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => resumeInputRef.current?.click()}
+                      disabled={resumeImporting}
+                      className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-600 hover:bg-amber-50 disabled:opacity-50"
+                    >
+                      {resumeImporting ? 'Parsing...' : 'Import from Resume (PDF)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWorkHistory([{ ...EMPTY_WORK }])}
+                      className="text-sm font-medium text-amber-600 hover:text-amber-700"
+                    >
+                      Add manually
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -572,6 +690,9 @@ export default function OnboardingPage() {
               {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
 
               <div className="flex gap-3">
+                <button onClick={() => { setError(''); setStep(7); }} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                  Back
+                </button>
                 <button onClick={finish} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
                   Skip for now
                 </button>
@@ -588,9 +709,14 @@ export default function OnboardingPage() {
                           start_date: e.start_date || undefined,
                           end_date: e.is_current ? undefined : (e.end_date || undefined),
                         }));
-                      if (entries.length > 0) {
-                        await authApi.upsertProfile({ work_history: entries });
+                      const profilePayload = { work_history: entries.length > 0 ? entries : undefined };
+                      // Include resume profile fields if imported from resume
+                      if (resumeProfileData) {
+                        Object.entries(resumeProfileData).forEach(([k, v]) => {
+                          if (v) profilePayload[k] = v;
+                        });
                       }
+                      await authApi.upsertProfile(profilePayload);
                       finish();
                     } catch (err) {
                       setError(err.message);

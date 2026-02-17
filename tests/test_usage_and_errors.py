@@ -2,6 +2,9 @@ import io
 from datetime import date, timedelta
 
 from httpx import AsyncClient
+from sqlalchemy import select, update
+
+from app.models.user import User
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +202,104 @@ async def test_search_run_rate_limit(client: AsyncClient):
         assert resp2.json()["error"]["code"] == "RATE_LIMIT_EXCEEDED"
     finally:
         settings.RATE_LIMIT_SEARCH_RUNS_PER_DAY = original
+
+
+# ---------------------------------------------------------------------------
+# Admin bypasses rate limits
+# ---------------------------------------------------------------------------
+
+
+async def _make_admin(email: str) -> None:
+    """Set is_admin=True for the given user via direct DB update."""
+    from tests.conftest import TestSessionLocal
+
+    async with TestSessionLocal() as session:
+        await session.execute(
+            update(User).where(User.email == email).values(is_admin=True)
+        )
+        await session.commit()
+
+
+async def test_admin_bypasses_csv_upload_rate_limit(client: AsyncClient):
+    """Admin users should never be rate-limited on CSV uploads."""
+    from app.config import settings
+
+    original = settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY
+    settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY = 1  # non-admin would be blocked after 1
+
+    try:
+        token = await _signup_and_get_token(client, email="admin_csv@example.com")
+        await _make_admin("admin_csv@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Upload #1
+        resp1 = await client.post(
+            "/api/v1/contacts/upload", headers=headers, files=_csv_file()
+        )
+        assert resp1.status_code == 201
+
+        # Upload #2 — non-admin would get 429 here
+        resp2 = await client.post(
+            "/api/v1/contacts/upload", headers=headers, files=_csv_file()
+        )
+        assert resp2.status_code == 201
+    finally:
+        settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY = original
+
+
+async def test_admin_bypasses_search_run_rate_limit(client: AsyncClient):
+    """Admin users should never be rate-limited on search runs."""
+    from app.config import settings
+
+    original = settings.RATE_LIMIT_SEARCH_RUNS_PER_DAY
+    settings.RATE_LIMIT_SEARCH_RUNS_PER_DAY = 1
+
+    try:
+        token = await _signup_and_get_token(client, email="admin_search@example.com")
+        await _make_admin("admin_search@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Create a search
+        create_resp = await client.post(
+            "/api/v1/search",
+            headers=headers,
+            json={"name": "Admin test", "target_role": "Engineer"},
+        )
+        search_id = create_resp.json()["data"]["id"]
+
+        # Run #1
+        resp1 = await client.post(f"/api/v1/search/{search_id}/run", headers=headers)
+        assert resp1.status_code == 200
+
+        # Run #2 — non-admin would get 429 here
+        resp2 = await client.post(f"/api/v1/search/{search_id}/run", headers=headers)
+        assert resp2.status_code == 200
+    finally:
+        settings.RATE_LIMIT_SEARCH_RUNS_PER_DAY = original
+
+
+async def test_non_admin_still_rate_limited(client: AsyncClient):
+    """Non-admin users should still hit rate limits as before."""
+    from app.config import settings
+
+    original = settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY
+    settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY = 1
+
+    try:
+        token = await _signup_and_get_token(client, email="nonadmin@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        resp1 = await client.post(
+            "/api/v1/contacts/upload", headers=headers, files=_csv_file()
+        )
+        assert resp1.status_code == 201
+
+        resp2 = await client.post(
+            "/api/v1/contacts/upload", headers=headers, files=_csv_file()
+        )
+        assert resp2.status_code == 429
+    finally:
+        settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY = original
 
 
 # ---------------------------------------------------------------------------

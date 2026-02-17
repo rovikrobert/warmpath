@@ -667,6 +667,20 @@ async def linkedin_callback(
     li_email = li_profile.get("email", "").lower().strip()
     li_name = li_profile.get("name", "")
 
+    # Use frontend-provided values if available, LinkedIn data as fallback
+    account_email = (body.email.lower().strip() if body.email else li_email)
+    account_name = body.full_name or li_name
+    account_password_hash = None
+    if body.password:
+        try:
+            validate_password_strength(body.password)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=str(e),
+            )
+        account_password_hash = hash_password(body.password)
+
     # 3. Check if user with this LinkedIn identity already exists
     result = await db.execute(
         select(User).where(
@@ -684,10 +698,11 @@ async def linkedin_callback(
         user = existing_oauth_user
     else:
         # Check if email matches an existing account
-        if li_email:
+        lookup_email = account_email or li_email
+        if lookup_email:
             result = await db.execute(
                 select(User).where(
-                    User.email == li_email, User.deleted_at.is_(None)
+                    User.email == lookup_email, User.deleted_at.is_(None)
                 )
             )
             existing_email_user = result.scalar_one_or_none()
@@ -700,20 +715,24 @@ async def linkedin_callback(
             existing_email_user.oauth_provider_id = li_sub
             user = existing_email_user
         else:
-            # Create new user (no password — OAuth only)
+            # Create new user — with password if frontend provided one
             user = User(
-                email=li_email,
-                password_hash=None,
-                full_name=li_name,
-                email_verified=True,  # LinkedIn already verified email
+                email=account_email,
+                password_hash=account_password_hash,
+                full_name=account_name,
+                email_verified=not account_password_hash,  # Only auto-verify if no password (pure OAuth)
                 oauth_provider="linkedin",
                 oauth_provider_id=li_sub,
             )
             db.add(user)
             await db.flush()
 
+            # If user provided password, send verification email (they entered their own email)
+            if account_password_hash:
+                await send_verification_email(user, db)
+
             # Check suppression list before welcome bonus
-            email_hash = hashlib.sha256(li_email.encode()).hexdigest()
+            email_hash = hashlib.sha256(account_email.encode()).hexdigest()
             suppression_result = await db.execute(
                 select(SuppressionList).where(
                     SuppressionList.email_hash == email_hash,

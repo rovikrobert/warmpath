@@ -85,26 +85,44 @@ async def _ai_parse(text: str) -> dict:
     """Send extracted resume text to Claude for structured extraction."""
     import anthropic
 
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-    prompt = f"""Extract structured profile information from this resume text.
-Return a JSON object with these fields (use null for any field you cannot determine):
-- headline: a brief professional headline (1 line)
-- current_company: the most recent/current employer
-- current_title: the most recent/current job title
-- industry: the person's industry
-- location: city/region/country
-- bio_summary: a 2-3 sentence professional summary
-- work_history: array of objects with company, title, start_date (YYYY-MM format), end_date (YYYY-MM format or null if current)
+    prompt = f"""You are a resume parser. Extract structured profile information from the resume text below.
 
-Return ONLY valid JSON, no markdown fences or extra text.
+Return a JSON object with exactly these fields (use null for any field you cannot determine):
+
+1. "headline" (string): A concise professional headline, e.g. "Senior Software Engineer | Full-Stack Developer". Derive from the resume's summary/objective or infer from the most recent role.
+
+2. "current_company" (string): The most recent or current employer name exactly as written on the resume.
+
+3. "current_title" (string): The most recent or current job title exactly as written.
+
+4. "industry" (string): The person's primary industry, e.g. "Technology", "Finance", "Healthcare".
+
+5. "location" (string): City, state/region, and/or country as listed on the resume.
+
+6. "bio_summary" (string): A 2-3 sentence professional summary. If the resume has a Summary/Objective section, paraphrase it. Otherwise, synthesize from work experience.
+
+7. "work_history" (array): Each entry has:
+   - "company" (string): employer name
+   - "title" (string): job title
+   - "start_date" (string): format YYYY-MM, e.g. "2019-06". If only a year is given, use YYYY-01.
+   - "end_date" (string or null): format YYYY-MM, or null if this is the current role (indicated by "Present", "Current", "Now", or no end date listed).
+
+   Order work_history by most recent first (descending by start_date).
+   Include ALL roles listed in the Experience/Employment section.
+
+IMPORTANT:
+- Return ONLY valid JSON. No markdown fences, no extra text.
+- Look for sections titled Experience, Employment, Work History, Education, Summary, Objective, Skills.
+- For date parsing: "Jan 2020" = "2020-01", "March 2019" = "2019-03", "2021" = "2021-01", "Present" = null end_date.
 
 Resume text:
 {text[:8000]}"""
 
-    message = client.messages.create(
+    message = await client.messages.create(
         model="claude-sonnet-4-20250514",
-        max_tokens=1024,
+        max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
     )
 

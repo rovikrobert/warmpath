@@ -18,6 +18,10 @@ HTTPX_TIMEOUT = 15.0
 # Known career page URLs for companies not on Greenhouse/Lever.
 # Values are the base careers URL to scrape.
 CAREER_PAGES: dict[str, str] = {
+    # US / Global
+    "google": "https://www.google.com/about/careers/applications/jobs/results",
+    "openai": "https://openai.com/careers/",
+    "shopify": "https://www.shopify.com/careers/search",
     # Singapore / SEA
     "grab": "https://grab.careers/jobs/",
     "sea-group": "https://careers.sea.com/",

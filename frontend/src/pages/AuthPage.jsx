@@ -39,10 +39,20 @@ export default function AuthPage() {
     }
   };
 
+  const signupFieldsFilled = form.full_name.trim() && form.email.trim() && form.password.trim();
+
   const handleLinkedIn = async () => {
     setLinkedinLoading(true);
     setError('');
     try {
+      // On signup, store form data so LinkedInCallback can pass it to the backend
+      if (isSignup && signupFieldsFilled) {
+        sessionStorage.setItem('linkedin_signup_form', JSON.stringify({
+          full_name: form.full_name,
+          email: form.email,
+          password: form.password,
+        }));
+      }
       const res = await authApi.linkedinAuthorize();
       window.location.href = res.data.url;
     } catch (err) {
@@ -70,27 +80,32 @@ export default function AuthPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-          <button
-            type="button"
-            onClick={handleLinkedIn}
-            disabled={linkedinLoading}
-            className="flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium text-white disabled:opacity-50"
-            style={{ backgroundColor: '#0A66C2' }}
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-            </svg>
-            {linkedinLoading ? 'Redirecting...' : 'Continue with LinkedIn'}
-          </button>
+          {/* Login tab: LinkedIn at top */}
+          {!isSignup && (
+            <>
+              <button
+                type="button"
+                onClick={handleLinkedIn}
+                disabled={linkedinLoading}
+                className="flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                style={{ backgroundColor: '#0A66C2' }}
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                </svg>
+                {linkedinLoading ? 'Redirecting...' : 'Continue with LinkedIn'}
+              </button>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-white px-2 text-slate-400">or</span>
-            </div>
-          </div>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-white px-2 text-slate-400">or</span>
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="flex rounded-lg bg-slate-100 p-1">
             <button
@@ -135,6 +150,33 @@ export default function AuthPage() {
               </div>
             )}
           </div>
+
+          {/* Signup tab: LinkedIn button below fields, requires all fields filled */}
+          {isSignup && (
+            <>
+              <button
+                type="button"
+                onClick={handleLinkedIn}
+                disabled={linkedinLoading || !signupFieldsFilled}
+                className="flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                style={{ backgroundColor: '#0A66C2' }}
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                </svg>
+                {linkedinLoading ? 'Redirecting...' : 'Continue with LinkedIn'}
+              </button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-white px-2 text-slate-400">or</span>
+                </div>
+              </div>
+            </>
+          )}
 
           {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
 

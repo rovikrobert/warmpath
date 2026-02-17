@@ -17,11 +17,15 @@ async def check_rate_limit(
     action: str,
     max_per_day: int,
     db: AsyncSession,
+    *,
+    is_admin: bool = False,
 ) -> tuple[bool, int]:
     """Check if the user has exceeded the daily rate limit for an action.
 
-    Returns (allowed, current_count).
+    Returns (allowed, current_count).  Admins always pass.
     """
+    if is_admin:
+        return True, 0
     today_start = datetime.now(timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
