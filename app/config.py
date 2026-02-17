@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     RATE_LIMIT_CSV_UPLOADS_PER_DAY: int = 10
     RATE_LIMIT_SEARCH_RUNS_PER_DAY: int = 50
+    RECOMMENDATION_CACHE_TTL_HOURS: int = 6
+    RECOMMENDATION_MAX_SCAN: int = 15
+    RECOMMENDATION_MAX_RESULTS: int = 8
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

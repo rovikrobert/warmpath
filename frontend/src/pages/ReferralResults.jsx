@@ -166,6 +166,7 @@ export default function ReferralResults() {
   const [error, setError] = useState('');
   const [balance, setBalance] = useState(0);
   const [introModal, setIntroModal] = useState(null);
+  const [alsoHiring, setAlsoHiring] = useState([]);
 
   useEffect(() => {
     const load = async () => {
@@ -184,6 +185,16 @@ export default function ReferralResults() {
     };
     load();
   }, [id]);
+
+  useEffect(() => {
+    if (!data) return;
+    const searched = (data.companies || data.results_data?.companies || [])
+      .map((c) => c.name?.toLowerCase()).filter(Boolean);
+    if (searched.length === 0) return;
+    searchApi.recommendations({ exclude: searched.join(','), limit: 6 })
+      .then((r) => setAlsoHiring(r.data?.recommendations ?? []))
+      .catch(() => {});
+  }, [data]);
 
   if (loading) {
     return (
@@ -237,6 +248,26 @@ export default function ReferralResults() {
               onRequestIntro={(path) => setIntroModal(path)}
             />
           ))}
+        </div>
+      )}
+
+      {alsoHiring.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">
+            Also hiring for your role
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {alsoHiring.map((rec) => (
+              <button
+                key={rec.company}
+                onClick={() => navigate('/referrals')}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:border-amber-300 hover:bg-amber-50"
+              >
+                {rec.display_name}
+                <span className="text-xs text-slate-400">{rec.matching_count} openings</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

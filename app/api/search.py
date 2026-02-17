@@ -34,6 +34,7 @@ from app.services.ai_matcher import run_search
 from app.services.board_registry import lookup_boards
 from app.services.credits import get_balance, spend_credits
 from app.services.job_fetcher import JobFetcher
+from app.services.job_recommendations import get_recommendations
 from app.services.warm_scorer import compute_warm_score
 from app.utils.exceptions import RateLimitError
 from app.utils.security import get_current_user
@@ -106,6 +107,44 @@ async def list_searches(
             total=total,
             total_pages=max(1, math.ceil(total / per_page)),
         ).model_dump(),
+    }
+
+
+@router.get("/recommendations")
+async def get_recommendations_endpoint(
+    exclude: str | None = Query(None, description="Comma-separated company names to exclude"),
+    limit: int = Query(8, ge=1, le=20),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Recommend companies with live openings matching the user's target role."""
+    pref_result = await db.execute(
+        select(UserJobPreferences).where(UserJobPreferences.user_id == current_user.id)
+    )
+    prefs = pref_result.scalar_one_or_none()
+
+    if not prefs or not prefs.target_role:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Set job preferences first (PUT /preferences/job with target_role)",
+        )
+
+    exclude_companies = (
+        [c.strip() for c in exclude.split(",") if c.strip()] if exclude else None
+    )
+
+    result = await get_recommendations(
+        target_role=prefs.target_role,
+        target_seniority=prefs.target_seniority,
+        target_locations=prefs.target_locations,
+        exclude_companies=exclude_companies,
+        limit=limit,
+        db=db,
+    )
+
+    return {
+        "data": result,
+        "meta": {},
     }
 
 

@@ -3,6 +3,50 @@ import { useNavigate } from 'react-router-dom';
 import { search as searchApi, credits as creditsApi, preferences as prefsApi } from '../api/client';
 import TagInput from '../components/TagInput';
 
+function ShimmerCard() {
+  return (
+    <div className="animate-pulse rounded-lg border border-slate-200 bg-white p-4">
+      <div className="mb-2 h-4 w-2/3 rounded bg-slate-200" />
+      <div className="mb-3 h-3 w-1/3 rounded bg-slate-100" />
+      <div className="mb-1 h-3 w-full rounded bg-slate-100" />
+      <div className="h-3 w-3/4 rounded bg-slate-100" />
+    </div>
+  );
+}
+
+function RecommendationCard({ rec, onAdd }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex items-start justify-between">
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-slate-900">{rec.display_name}</p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {rec.region && (
+              <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                {rec.region}
+              </span>
+            )}
+            <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+              {rec.matching_count} matching
+            </span>
+          </div>
+          <div className="mt-2 space-y-0.5">
+            {rec.top_titles?.slice(0, 2).map((title, i) => (
+              <p key={i} className="truncate text-xs text-slate-500">{title}</p>
+            ))}
+          </div>
+        </div>
+        <button
+          onClick={() => onAdd(rec.display_name)}
+          className="ml-3 shrink-0 rounded-md border border-amber-500 px-2.5 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50"
+        >
+          + Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function FindReferrals() {
   const navigate = useNavigate();
   const [companies, setCompanies] = useState([]);
@@ -11,6 +55,8 @@ export default function FindReferrals() {
   const [hasPrefs, setHasPrefs] = useState(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
+  const [recommendations, setRecommendations] = useState([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
 
   useEffect(() => {
     creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
@@ -18,6 +64,21 @@ export default function FindReferrals() {
       setHasPrefs(e.status === 404 ? false : null);
     });
   }, []);
+
+  useEffect(() => {
+    if (hasPrefs !== true) return;
+    setLoadingRecs(true);
+    searchApi.recommendations({ limit: 8 })
+      .then((r) => setRecommendations(r.data?.recommendations ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingRecs(false));
+  }, [hasPrefs]);
+
+  const handleAddRec = (name) => {
+    if (!companies.includes(name)) {
+      setCompanies((prev) => [...prev, name]);
+    }
+  };
 
   const handleSearch = async () => {
     if (companies.length === 0) return;
@@ -97,6 +158,22 @@ export default function FindReferrals() {
           {searching ? 'Searching...' : 'Find Referral Paths'}
         </button>
       </div>
+
+      {/* Recommendations section */}
+      {(loadingRecs || recommendations.length > 0) && (
+        <div className="mt-8">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">
+            Hiring for Your Role
+          </h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {loadingRecs
+              ? Array.from({ length: 4 }).map((_, i) => <ShimmerCard key={i} />)
+              : recommendations.map((rec) => (
+                  <RecommendationCard key={rec.company} rec={rec} onAdd={handleAddRec} />
+                ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
