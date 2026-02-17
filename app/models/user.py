@@ -70,6 +70,13 @@ class User(Base):
     password_reset_sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+    # Privacy / GDPR
+    processing_restricted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    marketing_opt_out: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

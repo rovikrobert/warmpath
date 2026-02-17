@@ -49,6 +49,7 @@ from app.services.credits import (
 from app.services.audit_logger import log_event
 from app.services.marketplace_indexer import generate_marketplace_listings
 from app.utils.hashing import hash_for_suppression
+from app.utils.privacy_checks import requi[RESEND_KEY_REDACTED]
 from app.utils.security import get_current_user, requi[RESEND_KEY_REDACTED]
 
 router = APIRouter()
@@ -114,6 +115,8 @@ async def marketplace_search(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Search the anonymized marketplace index. Costs 5 credits."""
+    requi[RESEND_KEY_REDACTED](current_user)
+
     # Check credits
     balance = await get_balance(current_user.id, db)
     if balance < 5:
