@@ -24,19 +24,19 @@ CAREER_PAGES: dict[str, str] = {
     "shopify": "https://www.shopify.com/careers/search",
     # Singapore / SEA
     "grab": "https://grab.careers/jobs/",
-    "sea-group": "https://career.sea.com/",
+    "sea-group": "https://www.sea.com/careers",
     "shopee": "https://careers.shopee.sg/jobs",
     "lazada": "https://www.lazada.com/en/careers/",
-    "gojek": "https://www.gojek.io/careers",
-    "carousell": "https://careers.carousell.com/",
+    "gojek": "https://www.gojek.com/en-id/careers/",
+    "carousell": "https://about.carousell.com/careers/",
     "foodpanda": "https://careers.foodpanda.com/",
     "ninja-van": "https://www.ninjavan.co/en-sg/careers",
     "patsnap": "https://www.patsnap.com/careers",
     "endowus": "https://endowus.com/careers",
     "syfe": "https://www.syfe.com/careers",
     "aspire": "https://aspireapp.com/careers",
-    "funding-societies": "https://fundingsocieties.com/career",
-    "carro": "https://careers.carro.sg/jobs/Careers",
+    "funding-societies": "https://fundingsocieties.com/careers",
+    "carro": "https://www.carro.co/careers",
     # India
     "razorpay": "https://razorpay.com/jobs/",
     "zerodha": "https://zerodha.com/careers/",
@@ -85,12 +85,15 @@ async def fetch_career_page(url: str) -> list[dict]:
         async with httpx.AsyncClient(
             timeout=HTTPX_TIMEOUT,
             follow_redirects=True,
-            headers={"User-Agent": "WarmPath/1.0 (career page scanner)"},
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; WarmPath/1.0; +https://warmpath.com)",
+                "Accept": "text/html",
+            },
         ) as client:
             resp = await client.get(url)
             resp.raise_for_status()
     except httpx.HTTPError as exc:
-        logger.warning("Career page fetch failed for '%s': %s", url, exc)
+        logger.debug("Career page fetch failed for '%s': %s", url, exc)
         return []
 
     html = resp.text
