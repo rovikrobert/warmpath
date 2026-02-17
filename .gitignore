@@ -24,6 +24,11 @@ agents/reports/*.json
 agents/shared/intel_cache.json
 agents/*/state.json
 
+# CoS runtime artifacts
+agents/chief_of_staff/cos_state.json
+agents/chief_of_staff/notion_state.json
+agents/chief_of_staff/reports/whatsapp/*.txt
+
 # Data team artifacts (auto-generated)
 data_team/reports/*.json
 !data_team/reports/.gitkeep
@@ -47,6 +52,7 @@ finance_team/reports/*.json
 !finance_team/reports/.gitkeep
 finance_team/shared/intel_cache.json
 finance_team/*/state.json
+finance_team/cross_team_requests/*.json
 
 # GTM team artifacts (auto-generated)
 gtm_team/reports/*.json
