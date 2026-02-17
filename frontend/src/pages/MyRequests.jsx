@@ -41,14 +41,14 @@ export default function MyRequests() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+      <div className="flex items-center justify-center py-20" aria-live="polite" aria-busy="true">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading requests" />
       </div>
     );
   }
 
   return (
-    <div>
+    <div role="main">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-bold text-slate-900">Marketplace Requests</h1>
         <Link to="/referrals" className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600">
@@ -58,7 +58,7 @@ export default function MyRequests() {
 
       {/* Filter tabs */}
       {requests.length > 0 && (
-        <div className="mb-4 flex gap-2">
+        <div className="mb-4 flex gap-2" role="group" aria-label="Filter requests by status">
           {[
             { key: 'all', label: 'All' },
             { key: 'requested', label: 'Pending' },
@@ -68,6 +68,7 @@ export default function MyRequests() {
             <button
               key={tab.key}
               onClick={() => setFilter(tab.key)}
+              aria-pressed={filter === tab.key}
               className={`rounded-full px-3 py-1 text-sm font-medium transition ${
                 filter === tab.key
                   ? 'bg-amber-500 text-white'
@@ -82,7 +83,7 @@ export default function MyRequests() {
 
       {requests.length === 0 ? (
         <div className="rounded-xl bg-white p-12 text-center ring-1 ring-slate-200">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100" aria-hidden="true">
             <span className="text-xl text-slate-400">~</span>
           </div>
           <h2 className="mb-2 text-base font-semibold text-slate-900">No intro requests yet</h2>
@@ -135,7 +136,7 @@ export default function MyRequests() {
 
                 {/* Approved: show holder's message and next steps */}
                 {req.status === 'approved' && (
-                  <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
+                  <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4" aria-live="polite">
                     <h4 className="mb-1 text-sm font-semibold text-green-800">Intro Approved!</h4>
                     {req.network_holder_notes && (
                       <p className="mb-3 text-sm text-green-700">
@@ -156,7 +157,7 @@ export default function MyRequests() {
 
                 {/* Declined: show reason if available */}
                 {req.status === 'declined' && (
-                  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
+                  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3" aria-live="polite">
                     <p className="text-sm text-red-700">
                       This request was declined.
                       {req.network_holder_notes && <> Reason: "{req.network_holder_notes}"</>}

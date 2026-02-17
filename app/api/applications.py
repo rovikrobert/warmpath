@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.contact import Contact
@@ -210,6 +211,13 @@ async def list_applications(
 
     query = query.order_by(sort_column.desc().nullslast())
 
+    # Eager-load relationships in one query (avoids N+1)
+    query = query.options(
+        selectinload(Application.contact),
+        selectinload(Application.company),
+        selectinload(Application.job_opening),
+    )
+
     result = await db.execute(query)
     apps = result.scalars().all()
 
@@ -217,9 +225,7 @@ async def list_applications(
     response_list = []
 
     for app_record in apps:
-        # Load relationships
-        loaded = await _load_application(db, app_record.id, current_user.id)
-        enriched = _enrich_response(loaded, now)
+        enriched = _enrich_response(app_record, now)
         response_list.append(enriched)
 
     # Filter by needs_follow_up after enrichment (computed field)
@@ -401,6 +407,15 @@ async def update_application(
     if body.responded_at is not None:
         app_record.responded_at = body.responded_at
 
+    # Track funnel step
+    from app.models.enrichment import UsageLog
+
+    db.add(UsageLog(
+        user_id=current_user.id,
+        action="application_update",
+        metadata_={"application_id": str(application_id), "new_status": body.status},
+    ))
+
     await db.commit()
 
     app_record = await _load_application(db, application_id, current_user.id)
@@ -457,9 +472,12 @@ async def create_from_intro(
             detail="Intro request not found",
         )
 
-    # Load contact for company name
+    # Load contact for company name (scoped to user's vault)
     contact_result = await db.execute(
-        select(Contact).where(Contact.id == intro_req.contact_id)
+        select(Contact).where(
+            Contact.id == intro_req.contact_id,
+            Contact.user_id == current_user.id,
+        )
     )
     contact = contact_result.scalar_one_or_none()
 

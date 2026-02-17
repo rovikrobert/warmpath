@@ -164,6 +164,11 @@ async def signup(
     # Send verification email
     await send_verification_email(user, db)
 
+    # Track funnel step
+    from app.models.enrichment import UsageLog
+
+    db.add(UsageLog(user_id=user.id, action="signup"))
+
     await db.commit()
     await db.refresh(user)
 
@@ -583,6 +588,12 @@ async def verify_email(
             detail=str(e),
         )
     await log_event(db, "email_verified", user_id=user.id)
+
+    # Track funnel step
+    from app.models.enrichment import UsageLog
+
+    db.add(UsageLog(user_id=user.id, action="email_verify"))
+
     await db.commit()
     return {"data": {"message": "Email verified successfully"}, "meta": {}}
 
@@ -856,22 +867,23 @@ async def forgot_password(
         # Skip sending for OAuth-only users (no password to reset),
         # but return the same generic message to prevent enumeration.
         if not (user.password_hash is None and user.oauth_provider):
-            # Rate limit: 1 per 5 minutes
+            # Rate limit: 1 per 5 minutes — silently skip to avoid
+            # leaking account existence via a 429 response.
+            rate_limited = False
             if user.password_reset_sent_at is not None:
                 sent_at = user.password_reset_sent_at
                 if sent_at.tzinfo is None:
                     sent_at = sent_at.replace(tzinfo=timezone.utc)
                 elapsed = (datetime.now(timezone.utc) - sent_at).total_seconds()
                 if elapsed < 300:
-                    raise HTTPException(
-                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                        detail="Please wait 5 minutes before requesting another reset email",
-                    )
+                    rate_limited = True
 
-            await send_password_reset_email(user, db)
-            await db.commit()
+            if not rate_limited:
+                await send_password_reset_email(user, db)
+                await db.commit()
 
-    # Always return success to prevent email enumeration
+    # Always return the same message regardless of whether the email exists,
+    # the user is rate-limited, or the account is OAuth-only.
     return {
         "data": {"message": "If that email is registered, a reset link has been sent"},
         "meta": {},

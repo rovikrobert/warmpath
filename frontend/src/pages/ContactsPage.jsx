@@ -37,7 +37,7 @@ const REL_SCORE_BONUSES = {
 function RelBadge({ type, onClick }) {
   if (!type) {
     return onClick ? (
-      <button onClick={onClick} className="text-xs text-amber-600 hover:text-amber-700">Set type</button>
+      <button onClick={onClick} aria-label="Set relationship type" className="text-xs text-amber-600 hover:text-amber-700">Set type</button>
     ) : null;
   }
   const label = RELATIONSHIP_TYPES.find((r) => r.value === type)?.label || type;
@@ -45,6 +45,10 @@ function RelBadge({ type, onClick }) {
   return (
     <span
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      aria-label={`Relationship type: ${label}. Click to edit`}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(e); }}
       className={`inline-flex cursor-pointer rounded-full px-2 py-0.5 text-xs font-medium ${color}`}
     >
       {label}
@@ -103,26 +107,26 @@ function AddContactModal({ onClose, onSuccess, companies: companyList }) {
   const inputClass = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="add-contact-title">
       <div className="relative mx-4 w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-        <button onClick={onClose} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">&times;</button>
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Add Contact</h2>
+        <button onClick={onClose} aria-label="Close add contact dialog" className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">&times;</button>
+        <h2 id="add-contact-title" className="mb-4 text-lg font-semibold text-slate-900">Add Contact</h2>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">First name *</label>
-              <input type="text" value={form.first_name} onChange={set('first_name')} className={inputClass} />
+              <label htmlFor="add-first-name" className="mb-1 block text-xs font-medium text-slate-700">First name *</label>
+              <input id="add-first-name" type="text" value={form.first_name} onChange={set('first_name')} aria-required="true" className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Last name *</label>
-              <input type="text" value={form.last_name} onChange={set('last_name')} className={inputClass} />
+              <label htmlFor="add-last-name" className="mb-1 block text-xs font-medium text-slate-700">Last name *</label>
+              <input id="add-last-name" type="text" value={form.last_name} onChange={set('last_name')} aria-required="true" className={inputClass} />
             </div>
           </div>
 
           <div className="relative">
-            <label className="mb-1 block text-xs font-medium text-slate-700">Company *</label>
-            <input type="text" value={form.company} onChange={set('company')} className={inputClass} />
+            <label htmlFor="add-company" className="mb-1 block text-xs font-medium text-slate-700">Company *</label>
+            <input id="add-company" type="text" value={form.company} onChange={set('company')} aria-required="true" className={inputClass} />
             {suggestions.length > 0 && (
               <div className="absolute z-10 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-md">
                 {suggestions.map((s) => (
@@ -141,23 +145,23 @@ function AddContactModal({ onClose, onSuccess, companies: companyList }) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Position</label>
-              <input type="text" value={form.position} onChange={set('position')} className={inputClass} />
+              <label htmlFor="add-position" className="mb-1 block text-xs font-medium text-slate-700">Position</label>
+              <input id="add-position" type="text" value={form.position} onChange={set('position')} className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Email</label>
-              <input type="email" value={form.email} onChange={set('email')} className={inputClass} />
+              <label htmlFor="add-email" className="mb-1 block text-xs font-medium text-slate-700">Email</label>
+              <input id="add-email" type="email" value={form.email} onChange={set('email')} className={inputClass} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Location</label>
-              <input type="text" value={form.location} onChange={set('location')} className={inputClass} />
+              <label htmlFor="add-location" className="mb-1 block text-xs font-medium text-slate-700">Location</label>
+              <input id="add-location" type="text" value={form.location} onChange={set('location')} className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Relationship type</label>
-              <select value={form.relationship_type} onChange={set('relationship_type')} className={inputClass}>
+              <label htmlFor="add-relationship-type" className="mb-1 block text-xs font-medium text-slate-700">Relationship type</label>
+              <select id="add-relationship-type" value={form.relationship_type} onChange={set('relationship_type')} className={inputClass}>
                 <option value="">Select...</option>
                 {RELATIONSHIP_TYPES.filter((r) => r.value).map((r) => (
                   <option key={r.value} value={r.value}>{r.label}</option>
@@ -167,16 +171,16 @@ function AddContactModal({ onClose, onSuccess, companies: companyList }) {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-700">How do you know them?</label>
-            <textarea value={form.how_you_know} onChange={set('how_you_know')} rows={2} className={inputClass} placeholder="College roommate, worked together at Google..." />
+            <label htmlFor="add-how-you-know" className="mb-1 block text-xs font-medium text-slate-700">How do you know them?</label>
+            <textarea id="add-how-you-know" value={form.how_you_know} onChange={set('how_you_know')} rows={2} className={inputClass} placeholder="College roommate, worked together at Google..." />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-700">Last interaction date</label>
-            <input type="date" value={form.last_interaction_date} onChange={set('last_interaction_date')} className={inputClass} />
+            <label htmlFor="add-last-interaction" className="mb-1 block text-xs font-medium text-slate-700">Last interaction date</label>
+            <input id="add-last-interaction" type="date" value={form.last_interaction_date} onChange={set('last_interaction_date')} className={inputClass} />
           </div>
 
-          {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+          {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
 
           <button
             type="submit"
@@ -252,15 +256,15 @@ function BulkImportModal({ onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="bulk-import-title">
       <div className="relative mx-4 w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl">
-        <button onClick={onClose} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">&times;</button>
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Bulk Import Contacts</h2>
+        <button onClick={onClose} aria-label="Close bulk import dialog" className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">&times;</button>
+        <h2 id="bulk-import-title" className="mb-4 text-lg font-semibold text-slate-900">Bulk Import Contacts</h2>
 
         {result ? (
-          <div className="space-y-3 text-center">
+          <div className="space-y-3 text-center" aria-live="polite">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-              <span className="text-xl text-green-600">&#10003;</span>
+              <span className="text-xl text-green-600" aria-hidden="true">&#10003;</span>
             </div>
             <p className="text-sm text-slate-700">
               Added <strong>{result.created}</strong> contacts
@@ -275,7 +279,9 @@ function BulkImportModal({ onClose, onSuccess }) {
             <p className="text-sm text-slate-500">
               Paste or upload a CSV with columns: <code className="rounded bg-slate-100 px-1 text-xs">name, company, title, relationship, how_you_know</code>
             </p>
+            <label htmlFor="bulk-csv-text" className="sr-only">CSV data</label>
             <textarea
+              id="bulk-csv-text"
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
               rows={6}
@@ -286,9 +292,9 @@ function BulkImportModal({ onClose, onSuccess }) {
               <button onClick={() => fileRef.current?.click()} className="text-sm text-amber-600 hover:text-amber-700">
                 Or upload a .csv file
               </button>
-              <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
+              <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} aria-label="Upload CSV file" />
             </div>
-            {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+            {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
             <button
               onClick={parsePreview}
               disabled={!csvText.trim()}
@@ -322,7 +328,7 @@ function BulkImportModal({ onClose, onSuccess }) {
                 </tbody>
               </table>
             </div>
-            {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+            {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
             <div className="flex gap-3">
               <button onClick={() => setPreview(null)} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
                 Back
@@ -381,8 +387,9 @@ function ContactDetail({ contact, onUpdate }) {
           <p className="text-slate-900">{contact.warm_score ?? '-'}</p>
         </div>
         <div>
-          <p className="mb-1 text-xs text-slate-500">Relationship Type</p>
+          <label htmlFor={`rel-type-${contact.id}`} className="mb-1 text-xs text-slate-500">Relationship Type</label>
           <select
+            id={`rel-type-${contact.id}`}
             value={relType}
             onChange={handleRelChange}
             disabled={saving}
@@ -470,7 +477,7 @@ export default function ContactsPage() {
   const totalPages = meta.total_pages || Math.ceil((meta.total || contactsList.length) / 50);
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-4xl" role="main">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-slate-900">Contacts</h1>
         <div className="flex gap-2">
@@ -491,9 +498,12 @@ export default function ContactsPage() {
 
       {/* Filter bar */}
       <div className="mb-4 flex items-center gap-3">
+        <label htmlFor="contacts-filter" className="sr-only">Filter by relationship type</label>
         <select
+          id="contacts-filter"
           value={filter}
           onChange={(e) => { setFilter(e.target.value); setPage(1); }}
+          aria-label="Filter contacts by relationship type"
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
         >
           {RELATIONSHIP_TYPES.map((r) => (
@@ -521,8 +531,8 @@ export default function ContactsPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+        <div className="flex items-center justify-center py-20" aria-live="polite" aria-busy="true">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading contacts" />
         </div>
       ) : contactsList.length === 0 ? (
         <div className="rounded-xl bg-white p-12 text-center ring-1 ring-slate-200">
@@ -536,6 +546,11 @@ export default function ContactsPage() {
             <div key={c.id} className="rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
               <div
                 onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpandedId(expandedId === c.id ? null : c.id); }}
+                role="button"
+                tabIndex={0}
+                aria-expanded={expandedId === c.id}
+                aria-label={`${c.full_name}, click to ${expandedId === c.id ? 'collapse' : 'expand'} details`}
                 className="flex cursor-pointer items-center justify-between px-4 py-3 hover:bg-amber-50/30"
               >
                 <div className="flex items-center gap-3">
@@ -571,23 +586,25 @@ export default function ContactsPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-4">
+            <nav className="flex items-center justify-center gap-2 pt-4" role="navigation" aria-label="Contacts pagination">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
+                aria-label="Previous page"
                 className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
               >
                 Prev
               </button>
-              <span className="text-sm text-slate-500">Page {page} of {totalPages}</span>
+              <span className="text-sm text-slate-500" aria-current="page">Page {page} of {totalPages}</span>
               <button
                 onClick={() => setPage((p) => p + 1)}
                 disabled={page >= totalPages}
+                aria-label="Next page"
                 className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
               >
                 Next
               </button>
-            </div>
+            </nav>
           )}
         </div>
       )}

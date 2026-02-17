@@ -280,14 +280,22 @@ class TestClassifyConnectionRecency:
 
 class TestGenerateMarketplaceListings:
     async def test_no_prefs_returns_zero(self, user_id: str):
-        """No sharing preferences = no listings generated."""
+        """No sharing preferences = no listings generated (consent gate enforced)."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
             count = await generate_marketplace_listings(uid, db)
             assert count == 0
 
+            # Verify absolutely no listings were created for this user
+            result = await db.execute(
+                MarketplaceListing.__table__.select().where(
+                    MarketplaceListing.network_holder_id == uid,
+                )
+            )
+            assert len(result.fetchall()) == 0
+
     async def test_opted_out_returns_zero(self, user_id: str):
-        """Opted out of marketplace = no listings generated."""
+        """Opted out of marketplace = no listings generated (consent gate enforced)."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
             db.add(NetworkSharingPreferences(user_id=uid, opt_in_marketplace=False))
@@ -295,8 +303,16 @@ class TestGenerateMarketplaceListings:
             count = await generate_marketplace_listings(uid, db)
             assert count == 0
 
+            # Verify no listings exist — opt_in_marketplace=False must block everything
+            result = await db.execute(
+                MarketplaceListing.__table__.select().where(
+                    MarketplaceListing.network_holder_id == uid,
+                )
+            )
+            assert len(result.fetchall()) == 0
+
     async def test_paused_returns_zero(self, user_id: str, company_and_contacts):
-        """Paused sharing = no listings generated."""
+        """Paused sharing = no listings generated (consent gate enforced even when opted in)."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
             db.add(
@@ -308,14 +324,40 @@ class TestGenerateMarketplaceListings:
             count = await generate_marketplace_listings(uid, db)
             assert count == 0
 
+            # Verify no active listings exist despite opt_in=True
+            result = await db.execute(
+                MarketplaceListing.__table__.select().where(
+                    MarketplaceListing.network_holder_id == uid,
+                    MarketplaceListing.deleted_at.is_(None),
+                )
+            )
+            assert len(result.fetchall()) == 0
+
     async def test_generates_listings(self, user_id: str, company_and_contacts):
-        """Opted-in network holder gets listings for all contacts."""
+        """Opted-in network holder gets listings for all contacts — no PII in listings."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
             db.add(NetworkSharingPreferences(user_id=uid, opt_in_marketplace=True))
             await db.flush()
             count = await generate_marketplace_listings(uid, db)
             assert count == 3
+
+            # Verify generated listings contain no PII
+            await db.flush()
+            result = await db.execute(
+                MarketplaceListing.__table__.select().where(
+                    MarketplaceListing.network_holder_id == uid,
+                    MarketplaceListing.deleted_at.is_(None),
+                )
+            )
+            rows = result.fetchall()
+            for row in rows:
+                row_dict = row._mapping
+                row_str = " ".join(str(v) for v in row_dict.values() if isinstance(v, str))
+                # No contact names or emails should appear in listing data
+                assert "alice" not in row_str.lower()
+                assert "bob" not in row_str.lower()
+                assert "@" not in row_str  # No email addresses
 
     async def test_listings_a[RESEND_KEY_REDACTED](self, user_id: str, company_and_contacts):
         """Listings contain no PII — only anonymized fields."""
@@ -334,6 +376,14 @@ class TestGenerateMarketplaceListings:
             )
             rows = result.fetchall()
             assert len(rows) == 3
+
+            # Verify the MarketplaceListing model has NO PII columns
+            column_names = {c.name for c in MarketplaceListing.__table__.columns}
+            pii_fields = {"full_name", "first_name", "last_name", "email", "phone"}
+            assert pii_fields.isdisjoint(column_names), (
+                f"MarketplaceListing model must not contain PII columns, "
+                f"but found: {pii_fields & column_names}"
+            )
 
             for row in rows:
                 # Anonymized fields present
@@ -361,8 +411,18 @@ class TestGenerateMarketplaceListings:
                 assert row.warm_sco[RESEND_KEY_REDACTED] in ("high", "medium", "low")
                 assert row.connection_recency in ("recent", "moderate", "stale")
 
+                # Verify no PII is present in the row data
+                row_dict = row._mapping
+                row_values_str = " ".join(
+                    str(v) for v in row_dict.values() if isinstance(v, str)
+                )
+                assert "alice" not in row_values_str.lower()
+                assert "bob" not in row_values_str.lower()
+                assert "charlie" not in row_values_str.lower()
+                assert "@stripe.com" not in row_values_str.lower()
+
     async def test_correct_role_levels(self, user_id: str, company_and_contacts):
-        """Role levels match the contact titles."""
+        """Role levels match the contact titles, with no PII leakage."""
         uid = uuid_mod.UUID(user_id)
         async with TestSessionLocal() as db:
             db.add(NetworkSharingPreferences(user_id=uid, opt_in_marketplace=True))
@@ -382,6 +442,15 @@ class TestGenerateMarketplaceListings:
             role_levels = sorted(r.role_level for r in rows)
             # Alice=senior, Bob=vp, Charlie=junior
             assert role_levels == ["junior", "senior", "vp"]
+
+            # Verify the MarketplaceSearchResult schema has no PII fields
+            from app.schemas.marketplace import MarketplaceSearchResult
+            schema_fields = set(MarketplaceSearchResult.model_fields.keys())
+            pii_fields = {"email", "full_name", "first_name", "last_name", "phone"}
+            assert pii_fields.isdisjoint(schema_fields), (
+                f"MarketplaceSearchResult schema must not expose PII, "
+                f"but found: {pii_fields & schema_fields}"
+            )
 
     async def test_correct_warm_sco[RESEND_KEY_REDACTED](self, user_id: str, company_and_contacts):
         """Warm score ranges derived from actual warm scores."""
@@ -423,6 +492,17 @@ class TestGenerateMarketplaceListings:
             count = await generate_marketplace_listings(uid, db)
             assert count == 2  # Bob and Charlie only
 
+            # Verify the excluded contact_id does not appear in any listing
+            await db.flush()
+            result = await db.execute(
+                MarketplaceListing.__table__.select().where(
+                    MarketplaceListing.network_holder_id == uid,
+                    MarketplaceListing.deleted_at.is_(None),
+                )
+            )
+            active_contact_ids = {row.contact_id for row in result.fetchall()}
+            assert contact_ids[0] not in active_contact_ids  # Alice must be excluded
+
     async def test_department_filter(self, user_id: str, company_and_contacts):
         """Category filters restrict listings to specific departments."""
         uid = uuid_mod.UUID(user_id)
@@ -454,6 +534,17 @@ class TestGenerateMarketplaceListings:
             count1 = await generate_marketplace_listings(uid, db)
             assert count1 == 3
 
+            # Capture first-run listing IDs
+            await db.flush()
+            result_first = await db.execute(
+                MarketplaceListing.__table__.select().where(
+                    MarketplaceListing.network_holder_id == uid,
+                    MarketplaceListing.deleted_at.is_(None),
+                )
+            )
+            first_ids = {row.id for row in result_first.fetchall()}
+            assert len(first_ids) == 3
+
             # Second run should soft-delete old and create new
             count2 = await generate_marketplace_listings(uid, db)
             assert count2 == 3
@@ -468,6 +559,24 @@ class TestGenerateMarketplaceListings:
             )
             active = result.fetchall()
             assert len(active) == 3
+
+            # Verify the active listings are NEW (different IDs from first run)
+            active_ids = {row.id for row in active}
+            assert active_ids.isdisjoint(first_ids), (
+                "Regenerated listings should have new IDs; old ones should be soft-deleted"
+            )
+
+            # Verify old listings are soft-deleted (deleted_at is set)
+            result_old = await db.execute(
+                MarketplaceListing.__table__.select().where(
+                    MarketplaceListing.network_holder_id == uid,
+                    MarketplaceListing.deleted_at.isnot(None),
+                )
+            )
+            soft_deleted = result_old.fetchall()
+            assert len(soft_deleted) == 3
+            soft_deleted_ids = {row.id for row in soft_deleted}
+            assert soft_deleted_ids == first_ids
 
     async def test_company_exclusion_filter(self, user_id: str, company_and_contacts):
         """Exclude companies filter prevents listings for that company."""

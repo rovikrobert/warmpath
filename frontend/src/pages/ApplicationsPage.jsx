@@ -77,6 +77,7 @@ function AppCard({ app, onStatusChange, updating }) {
             value=""
             onChange={(e) => onStatusChange(app.id, e.target.value)}
             disabled={updating === app.id}
+            aria-label={`Change status for ${app.company_name}`}
             className="rounded border border-slate-200 px-1 py-0.5 text-xs text-slate-600 focus:border-amber-500 focus:outline-none"
           >
             <option value="" disabled>Move to...</option>
@@ -169,18 +170,20 @@ export default function ApplicationsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+      <div className="flex items-center justify-center py-20" role="main" aria-live="polite" aria-busy="true">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading applications" />
       </div>
     );
   }
 
   return (
-    <div>
+    <div role="main">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-bold text-slate-900">My Applications</h1>
         <button
           onClick={() => setShowCreate(!showCreate)}
+          aria-expanded={showCreate}
+          aria-controls="create-application-form"
           className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600"
         >
           {showCreate ? 'Cancel' : 'Track Application'}
@@ -217,27 +220,34 @@ export default function ApplicationsPage() {
 
       {/* Create form */}
       {showCreate && (
-        <form onSubmit={handleCreate} className="mb-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <form id="create-application-form" onSubmit={handleCreate} aria-label="Track a new application" className="mb-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <h2 className="mb-3 text-base font-semibold text-slate-900">Track a New Application</h2>
           <div className="grid grid-cols-2 gap-3">
             <input
+              id="new-app-company"
               type="text"
               value={newApp.company_name}
               onChange={(e) => setNewApp({ ...newApp, company_name: e.target.value })}
               placeholder="Company name *"
+              aria-label="Company name"
               required
+              aria-required="true"
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
             <input
+              id="new-app-role"
               type="text"
               value={newApp.role_title}
               onChange={(e) => setNewApp({ ...newApp, role_title: e.target.value })}
               placeholder="Role title"
+              aria-label="Role title"
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
             <select
+              id="new-app-channel"
               value={newApp.channel}
               onChange={(e) => setNewApp({ ...newApp, channel: e.target.value })}
+              aria-label="Application channel"
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
             >
               <option value="">Channel</option>
@@ -248,10 +258,12 @@ export default function ApplicationsPage() {
               <option value="recruiter">Recruiter</option>
             </select>
             <input
+              id="new-app-notes"
               type="text"
               value={newApp.notes}
               onChange={(e) => setNewApp({ ...newApp, notes: e.target.value })}
               placeholder="Notes"
+              aria-label="Notes"
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
           </div>

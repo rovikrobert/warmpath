@@ -527,6 +527,16 @@ async def update_facilitation(
     if body.action == "approve":
         reputation.intros_facilitated += 1
 
+    # Track funnel step
+    from app.models.enrichment import UsageLog
+
+    action_name = "intro_approve" if body.action == "approve" else "intro_decline"
+    db.add(UsageLog(
+        user_id=current_user.id,
+        action=action_name,
+        metadata_={"facilitation_id": str(facilitation.id)},
+    ))
+
     await db.flush()
 
     return {

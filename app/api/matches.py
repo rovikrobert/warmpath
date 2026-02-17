@@ -271,7 +271,10 @@ async def update_message(
         )
         ir = ir_result.scalar_one()
         contact_result = await db.execute(
-            select(Contact).where(Contact.id == ir.contact_id)
+            select(Contact).where(
+                Contact.id == ir.contact_id,
+                Contact.user_id == current_user.id,
+            )
         )
         contact = contact_result.scalar_one_or_none()
         meta["suggest_track"] = True

@@ -62,8 +62,8 @@ export default function MarketplaceDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+      <div className="flex items-center justify-center py-20" aria-live="polite" aria-busy="true">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading dashboard" />
       </div>
     );
   }
@@ -75,7 +75,7 @@ export default function MarketplaceDashboard() {
   const responseRate = totalResponded > 0 ? Math.round((approvedCount / totalResponded) * 100) : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-slate-900">Network Holder Dashboard</h1>
         <Link to="/marketplace/settings" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">
@@ -177,6 +177,7 @@ export default function MarketplaceDashboard() {
                     <button
                       onClick={() => handleAction(req.id, 'approve')}
                       disabled={actionLoading === req.id}
+                      aria-label={`Approve intro request from ${req.job_seeker_profile_snapshot?.full_name || 'job seeker'}`}
                       className="rounded-md bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50"
                     >
                       Approve
@@ -184,6 +185,7 @@ export default function MarketplaceDashboard() {
                     <button
                       onClick={() => handleAction(req.id, 'decline')}
                       disabled={actionLoading === req.id}
+                      aria-label={`Decline intro request from ${req.job_seeker_profile_snapshot?.full_name || 'job seeker'}`}
                       className="rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                     >
                       Decline
@@ -212,7 +214,7 @@ export default function MarketplaceDashboard() {
 
                 {/* Coaching text after approval */}
                 {req.status === 'approved' && (req.id === approvedCoaching || !approvedCoaching) && (
-                  <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
+                  <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4" aria-live="polite">
                     <p className="mb-2 text-sm font-semibold text-green-800">
                       Now introduce {req.job_seeker_profile_snapshot?.full_name || 'the job seeker'} to {req.contact_name || 'your contact'}
                     </p>

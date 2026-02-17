@@ -43,7 +43,7 @@ function InfoCard({ icon, title, children }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
       <div className="mb-2 flex items-center gap-2">
-        <span className="text-lg">{icon}</span>
+        <span className="text-lg" aria-hidden="true">{icon}</span>
         <h4 className="font-semibold text-slate-900">{title}</h4>
       </div>
       <div className="text-sm leading-relaxed text-slate-600">{children}</div>
@@ -58,18 +58,18 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-slate-50">
       {/* Minimal nav bar */}
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3 sm:px-6">
-          <Link to="/" className="flex items-center gap-2 text-xl font-bold text-slate-900">
+        <nav className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3 sm:px-6" role="navigation" aria-label="Privacy page navigation">
+          <Link to="/" className="flex items-center gap-2 text-xl font-bold text-slate-900" aria-label="WarmPath home">
             <span className="text-amber-500">~</span>
             <span>WarmPath</span>
           </Link>
           <Link to="/" className="text-sm text-amber-600 hover:text-amber-700">
             Back to app
           </Link>
-        </div>
+        </nav>
       </header>
 
-    <div className="mx-auto max-w-3xl space-y-8 px-4 py-8 pb-16 sm:px-6">
+    <main className="mx-auto max-w-3xl space-y-8 px-4 py-8 pb-16 sm:px-6">
       {/* Header */}
       <div className="space-y-2">
         <h1 className="text-2xl font-bold text-slate-900">Privacy Policy</h1>
@@ -82,7 +82,7 @@ export default function PrivacyPage() {
       </div>
 
       {/* Table of Contents */}
-      <nav className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <nav className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-label="Table of contents">
         <h3 className="mb-3 text-sm font-semibold text-slate-900">Contents</h3>
         <ol className="grid gap-1.5 sm:grid-cols-2">
           {SECTIONS.map((s, i) => (
@@ -337,7 +337,7 @@ export default function PrivacyPage() {
         </Paragraph>
 
         {/* Tabs */}
-        <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
+        <div className="flex gap-1 rounded-lg bg-slate-100 p-1" role="tablist" aria-label="Privacy rights by jurisdiction">
           {[
             { key: 'gdpr', label: 'GDPR (EU/EEA)' },
             { key: 'ccpa', label: 'CCPA (California)' },
@@ -345,6 +345,10 @@ export default function PrivacyPage() {
           ].map((tab) => (
             <button
               key={tab.key}
+              role="tab"
+              aria-selected={rightsTab === tab.key}
+              aria-controls={`tabpanel-${tab.key}`}
+              id={`tab-${tab.key}`}
               onClick={() => setRightsTab(tab.key)}
               className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
                 rightsTab === tab.key
@@ -359,7 +363,7 @@ export default function PrivacyPage() {
 
         {/* Tab content */}
         {rightsTab === 'gdpr' && (
-          <div className="space-y-3">
+          <div className="space-y-3" role="tabpanel" id="tabpanel-gdpr" aria-labelledby="tab-gdpr">
             <Paragraph>
               If you are located in the European Economic Area, you have the following rights under the GDPR:
             </Paragraph>
@@ -380,7 +384,7 @@ export default function PrivacyPage() {
         )}
 
         {rightsTab === 'ccpa' && (
-          <div className="space-y-3">
+          <div className="space-y-3" role="tabpanel" id="tabpanel-ccpa" aria-labelledby="tab-ccpa">
             <Paragraph>
               If you are a California resident, the CCPA provides you with specific rights:
             </Paragraph>
@@ -397,7 +401,7 @@ export default function PrivacyPage() {
         )}
 
         {rightsTab === 'pdpa' && (
-          <div className="space-y-3">
+          <div className="space-y-3" role="tabpanel" id="tabpanel-pdpa" aria-labelledby="tab-pdpa">
             <Paragraph>
               WarmPath is incorporated in Singapore and complies with the Personal Data Protection Act 2012:
             </Paragraph>
@@ -533,11 +537,11 @@ export default function PrivacyPage() {
 
       {/* Back to top */}
       <div className="text-center">
-        <a href="#" className="text-sm text-amber-600 hover:text-amber-700">
+        <a href="#" className="text-sm text-amber-600 hover:text-amber-700" aria-label="Back to top of page">
           Back to top
         </a>
       </div>
-    </div>
+    </main>
     </div>
   );
 }

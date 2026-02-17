@@ -52,7 +52,7 @@ export default function NewSearch() {
   const inputClass = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-2xl" role="main">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">New Search</h1>
         <button
@@ -69,20 +69,23 @@ export default function NewSearch() {
         </p>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Search Name</label>
+          <label htmlFor="search-name" className="mb-1 block text-sm font-medium text-slate-700">Search Name</label>
           <input
+            id="search-name"
             type="text"
             value={form.name}
             onChange={set('name')}
             className={inputClass}
             placeholder="e.g. Series A Founders in Singapore"
             required
+            aria-required="true"
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
+          <label htmlFor="search-description" className="mb-1 block text-sm font-medium text-slate-700">Description</label>
           <textarea
+            id="search-description"
             value={form.description}
             onChange={set('description')}
             rows={2}
@@ -120,16 +123,21 @@ export default function NewSearch() {
         />
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">
+          <label htmlFor="search-min-score" className="mb-1 block text-sm font-medium text-slate-700">
             Minimum Score: {form.min_score}
           </label>
           <input
+            id="search-min-score"
             type="range"
             min="0"
             max="100"
             step="5"
             value={form.min_score}
             onChange={(e) => setForm({ ...form, min_score: Number(e.target.value) })}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={form.min_score}
+            aria-label={`Minimum score: ${form.min_score}`}
             className="w-full accent-amber-500"
           />
           <div className="flex justify-between text-xs text-slate-400">
@@ -138,7 +146,7 @@ export default function NewSearch() {
           </div>
         </div>
 
-        {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+        {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
 
         <button
           type="submit"

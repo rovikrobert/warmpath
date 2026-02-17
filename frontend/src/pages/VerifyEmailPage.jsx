@@ -27,22 +27,22 @@ export default function VerifyEmailPage() {
   }, [token]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4" role="main">
       <div className="w-full max-w-md text-center">
         <h1 className="text-3xl font-bold text-slate-900 mb-2">
           <span className="text-amber-500">~</span> WarmPath
         </h1>
 
         {status === 'loading' && (
-          <div className="mt-8">
-            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+          <div className="mt-8" role="status" aria-live="polite">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="img" aria-label="Loading" />
             <p className="mt-4 text-slate-600">Verifying your email...</p>
           </div>
         )}
 
         {status === 'success' && (
-          <div className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 text-2xl">
+          <div className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200" role="status" aria-live="polite">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 text-2xl" aria-hidden="true">
               {'\u2713'}
             </div>
             <h2 className="text-lg font-semibold text-slate-900">{message}</h2>
@@ -57,8 +57,8 @@ export default function VerifyEmailPage() {
         )}
 
         {status === 'error' && (
-          <div className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600 text-2xl">
+          <div className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200" role="alert" aria-live="assertive">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600 text-2xl" aria-hidden="true">
               !
             </div>
             <h2 className="text-lg font-semibold text-slate-900">Verification Failed</h2>

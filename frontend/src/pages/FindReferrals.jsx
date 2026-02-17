@@ -5,7 +5,7 @@ import TagInput from '../components/TagInput';
 
 function ShimmerCard() {
   return (
-    <div className="animate-pulse rounded-lg border border-slate-200 bg-white p-4">
+    <div className="animate-pulse rounded-lg border border-slate-200 bg-white p-4" aria-hidden="true">
       <div className="mb-2 h-4 w-2/3 rounded bg-slate-200" />
       <div className="mb-3 h-3 w-1/3 rounded bg-slate-100" />
       <div className="mb-1 h-3 w-full rounded bg-slate-100" />
@@ -38,6 +38,7 @@ function RecommendationCard({ rec, onAdd }) {
         </div>
         <button
           onClick={() => onAdd(rec.display_name)}
+          aria-label={`Add ${rec.display_name} to target companies`}
           className="ml-3 shrink-0 rounded-md border border-amber-500 px-2.5 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50"
         >
           + Add
@@ -94,7 +95,7 @@ export default function FindReferrals() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-2xl" role="main">
       <h1 className="mb-1 text-xl font-bold text-slate-900">Find Referral Paths</h1>
       <p className="mb-6 text-sm text-slate-500">
         Search your network and the marketplace for people who can refer you.
@@ -119,10 +120,12 @@ export default function FindReferrals() {
 
         {/* Scope toggle */}
         <div>
-          <label className="mb-2 block text-sm font-medium text-slate-700">Search Scope</label>
-          <div className="grid grid-cols-2 gap-3">
+          <label id="search-scope-label" className="mb-2 block text-sm font-medium text-slate-700">Search Scope</label>
+          <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-labelledby="search-scope-label">
             <button
               type="button"
+              role="radio"
+              aria-checked={scope === 'own_network'}
               onClick={() => setScope('own_network')}
               className={`rounded-lg border-2 p-4 text-left transition ${
                 scope === 'own_network' ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-slate-300'
@@ -134,6 +137,8 @@ export default function FindReferrals() {
             </button>
             <button
               type="button"
+              role="radio"
+              aria-checked={scope === 'marketplace'}
               onClick={() => setScope('marketplace')}
               className={`rounded-lg border-2 p-4 text-left transition ${
                 scope === 'marketplace' ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-slate-300'
@@ -148,7 +153,7 @@ export default function FindReferrals() {
           </div>
         </div>
 
-        {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+        {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
 
         <button
           onClick={handleSearch}
