@@ -1,10 +1,10 @@
 """encrypt contact PII at rest
 
-Add blind index columns and widen VARCHAR PII columns to TEXT
-so Fernet ciphertext (which is longer than plaintext) fits.
+Merge two Alembic heads (add_is_admin + add_oauth) and add blind index
+columns + widen VARCHAR PII columns to TEXT so Fernet ciphertext fits.
 
 Revision ID: c1d2e3f4a5b6
-Revises: a7b8c9d0e1f2
+Revises: a7b8c9d0e1f2, b2c3d4e5f6a7
 Create Date: 2026-02-17
 """
 
@@ -15,7 +15,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "c1d2e3f4a5b6"
-down_revision: Union[str, None] = "a7b8c9d0e1f2"
+down_revision: tuple = ("a7b8c9d0e1f2", "b2c3d4e5f6a7")
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
