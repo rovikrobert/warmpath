@@ -28,7 +28,12 @@ export default function AuthPage() {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.message);
+      if (!isSignup && err.status === 404) {
+        setIsSignup(true);
+        setError('No account found with this email. Sign up below to get started.');
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
