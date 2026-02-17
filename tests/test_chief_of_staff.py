@@ -960,10 +960,18 @@ class TestCosAgent:
         ops_reports_dir = tmp_path / "ops_reports"
         ops_reports_dir.mkdir()
 
+        finance_reports_dir = tmp_path / "finance_reports"
+        finance_reports_dir.mkdir()
+
+        gtm_reports_dir = tmp_path / "gtm_reports"
+        gtm_reports_dir.mkdir()
+
         with patch("agents.chief_of_staff.cos_agent.REPORTS_DIR", reports_dir), \
              patch("agents.chief_of_staff.cos_agent.DATA_TEAM_REPORTS_DIR", data_reports_dir), \
              patch("agents.chief_of_staff.cos_agent.PRODUCT_TEAM_REPORTS_DIR", product_reports_dir), \
              patch("agents.chief_of_staff.cos_agent.OPS_TEAM_REPORTS_DIR", ops_reports_dir), \
+             patch("agents.chief_of_staff.cos_agent.FINANCE_TEAM_REPORTS_DIR", finance_reports_dir), \
+             patch("agents.chief_of_staff.cos_agent.GTM_TEAM_REPORTS_DIR", gtm_reports_dir), \
              patch("agents.chief_of_staff.cos_learning._STATE_PATH", state_path):
             self._reports_dir = reports_dir
             yield
