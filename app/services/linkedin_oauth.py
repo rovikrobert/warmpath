@@ -21,7 +21,7 @@ SCOPES = "openid profile email"
 
 
 def _is_mock_mode() -> bool:
-    return not settings.LINKEDIN_CLIENT_ID
+    return settings.AI_MOCK_MODE or not settings.LINKEDIN_CLIENT_ID
 
 
 def get_authorize_url(state: str) -> str:

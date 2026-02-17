@@ -632,6 +632,11 @@ async def resend_verification(
 @router.get("/linkedin/authorize")
 async def linkedin_authorize() -> dict:
     """Generate a LinkedIn OAuth2 authorization URL with a signed state token."""
+    if not settings.LINKEDIN_CLIENT_ID:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="LinkedIn login is not configured",
+        )
     nonce = secrets.token_urlsafe(32)
     # Encode state as a short-lived JWT (10 min) so we can verify it on callback
     from jose import jwt as jose_jwt
@@ -653,6 +658,11 @@ async def linkedin_callback(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Handle LinkedIn OAuth callback — login existing user or create new one."""
+    if not settings.LINKEDIN_CLIENT_ID:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="LinkedIn login is not configured",
+        )
     # 1. Verify state token
     from jose import JWTError as JoseJWTError
     from jose import jwt as jose_jwt

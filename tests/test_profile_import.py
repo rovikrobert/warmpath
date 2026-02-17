@@ -137,7 +137,35 @@ class TestResumeUpload:
 # ---------------------------------------------------------------------------
 
 
+class TestLinkedInOAuthUnconfigured:
+    """LinkedIn endpoints return 503 when credentials are not configured."""
+
+    @pytest.mark.asyncio
+    async def test_authorize_returns_503_when_unconfigured(self, client: AsyncClient):
+        resp = await client.get("/api/v1/auth/linkedin/authorize")
+        assert resp.status_code == 503
+        assert "not configured" in resp.json()["detail"].lower()
+
+    @pytest.mark.asyncio
+    async def test_callback_returns_503_when_unconfigured(self, client: AsyncClient):
+        resp = await client.post(
+            "/api/v1/auth/linkedin/callback",
+            json={"code": "any_code", "state": "any_state"},
+        )
+        assert resp.status_code == 503
+        assert "not configured" in resp.json()["detail"].lower()
+
+
 class TestLinkedInOAuth:
+    @pytest.fixture(autouse=True)
+    def _enable_linkedin_mock(self, monkeypatch):
+        """Set a test client ID so the endpoint guard passes, but service stays in mock mode."""
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "LINKEDIN_CLIENT_ID", "test_client_id")
+        monkeypatch.setattr(settings, "LINKEDIN_CLIENT_SECRET", "test_client_secret")
+        monkeypatch.setattr(settings, "LINKEDIN_REDIRECT_URI", "http://localhost:3000/auth/linkedin/callback")
+
     @pytest.mark.asyncio
     async def test_linkedin_authorize_returns_url(self, client: AsyncClient):
         resp = await client.get("/api/v1/auth/linkedin/authorize")

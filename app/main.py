@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 
 from app.api import (
+    agents,
     applications,
     auth,
     coach,
@@ -134,6 +135,7 @@ app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboar
 app.include_router(coach.router, prefix="/api/v1/coach", tags=["coach"])
 app.include_router(privacy.router, prefix="/api/v1/privacy", tags=["privacy"])
 app.include_router(webhooks.router, prefix="/api/v1", tags=["webhooks"])
+app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 
 # ---------------------------------------------------------------------------
 # Frontend static files (SPA)
