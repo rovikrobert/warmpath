@@ -187,6 +187,11 @@ export default function AuthPage() {
           >
             {loading ? 'Please wait...' : isSignup ? 'Create Account' : 'Log In'}
           </button>
+
+          <p className="text-center text-xs text-slate-400">
+            By continuing, you agree to our{' '}
+            <Link to="/privacy" className="text-amber-600 hover:text-amber-700">Privacy Policy</Link>.
+          </p>
         </form>
       </div>
     </div>
