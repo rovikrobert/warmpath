@@ -31,7 +31,7 @@ from app.models.marketplace import (
 )
 from app.services.ai_matcher import score_contacts
 from app.services.ai_matcher import run_search
-from app.services.board_registry import lookup_boards
+from app.services.board_registry import lookup_boards, lookup_careers_url, lookup_or_discover_boards
 from app.services.credits import get_balance, spend_credits
 from app.services.job_fetcher import JobFetcher
 from app.services.job_recommendations import get_recommendations
@@ -190,7 +190,8 @@ async def execute_search(
 ) -> dict:
     # Rate limit check
     allowed, count = await check_rate_limit(
-        current_user.id, "search_run", settings.RATE_LIMIT_SEARCH_RUNS_PER_DAY, db
+        current_user.id, "search_run", settings.RATE_LIMIT_SEARCH_RUNS_PER_DAY, db,
+        is_admin=current_user.is_admin,
     )
     if not allowed:
         raise RateLimitError(
@@ -512,6 +513,14 @@ async def _run_smart_search(
     """Execute the smart search pipeline for each company."""
     fetcher = JobFetcher()
 
+    # Load user's job preferences for location/remote filtering
+    pref_result = await db.execute(
+        select(UserJobPreferences).where(UserJobPreferences.user_id == user.id)
+    )
+    prefs = pref_result.scalar_one_or_none()
+    target_locations = prefs.target_locations if prefs else None
+    open_to_remote = prefs.open_to_remote if prefs else True
+
     # Load user's contacts with companies eagerly
     contacts_result = await db.execute(
         select(Contact)
@@ -536,6 +545,8 @@ async def _run_smart_search(
             company_name=company_name,
             target_role=target_role,
             target_seniority=target_seniority,
+            target_locations=target_locations,
+            open_to_remote=open_to_remote,
             all_contacts=all_contacts,
             search_req=search_req,
             profile=profile,
@@ -596,23 +607,43 @@ async def _process_company(
     user: User,
     fetcher: JobFetcher,
     db: AsyncSession,
+    target_locations: list[str] | None = None,
+    open_to_remote: bool = True,
 ) -> dict:
     """Process a single company: fetch openings + find referral paths."""
     active_openings: list[dict] = []
     referral_paths: list[dict] = []
 
-    # Step 1: Look up board registry and fetch job openings
-    boards = lookup_boards(company_name)
+    # Step 1: Look up board registry (with auto-discovery fallback)
+    boards, was_discovered = await lookup_or_discover_boards(company_name, db)
     total_jobs_fetched = 0
     job_scan_status = "no_board"
+    total_matched_openings = 0
     if boards:
         raw_jobs = await fetcher.fetch_jobs_for_company(company_name, boards)
         total_jobs_fetched = len(raw_jobs)
         matched_jobs = await fetcher.match_jobs_to_role(
             raw_jobs, target_role, target_seniority
         )
-        job_scan_status = "matched" if matched_jobs else "no_match"
-        for job in matched_jobs:
+
+        # Apply location/seniority filtering and ranking
+        filtered_jobs = fetcher.filter_and_rank_jobs(
+            matched_jobs,
+            target_role,
+            target_seniority=target_seniority,
+            target_locations=target_locations,
+            open_to_remote=open_to_remote,
+        )
+
+        total_matched_openings = len(filtered_jobs)
+
+        if was_discovered:
+            job_scan_status = "discovered" if filtered_jobs else "no_match"
+        else:
+            job_scan_status = "matched" if filtered_jobs else "no_match"
+
+        # Cap at 10 openings
+        for job in filtered_jobs[:10]:
             active_openings.append(
                 {
                     "title": job.get("title", ""),
@@ -621,6 +652,7 @@ async def _process_company(
                     "location": job.get("location"),
                     "is_remote": job.get("is_remote", False),
                     "relevance": job.get("role_relevance", 0),
+                    "fit_score": job.get("fit_score", 0),
                     "source": job.get("source", ""),
                 }
             )
@@ -683,6 +715,9 @@ async def _process_company(
         "has_referral_paths": len(referral_paths) > 0,
         "job_scan_status": job_scan_status,
         "total_jobs_fetched": total_jobs_fetched,
+        "total_matched_openings": total_matched_openings,
+        "has_more_openings": total_matched_openings > 10,
+        "careers_url": lookup_careers_url(company_name),
         "source": "own_network",
     }
 

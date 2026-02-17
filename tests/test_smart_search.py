@@ -1,7 +1,12 @@
 """Tests for job preferences CRUD and smart search endpoint."""
 
 import uuid as uuid_mod
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+
+def _passthrough_filter(jobs, role, **kwargs):
+    """Mock filter_and_rank_jobs: add fit_score and pass through."""
+    return [{**j, "fit_score": j.get("role_relevance", 50)} for j in jobs]
 
 import pytest_asyncio
 from httpx import AsyncClient
@@ -280,6 +285,9 @@ class TestSmartSearch:
             mock_fetcher.match_jobs_to_role = AsyncMock(
                 side_effect=lambda jobs, role, sen=None: jobs
             )
+            mock_fetcher.filter_and_rank_jobs = MagicMock(
+                side_effect=_passthrough_filter
+            )
 
             resp = await client.post(
                 "/api/v1/search/smart",
@@ -323,6 +331,9 @@ class TestSmartSearch:
             mock_fetcher.match_jobs_to_role = AsyncMock(
                 side_effect=lambda jobs, role, sen=None: jobs
             )
+            mock_fetcher.filter_and_rank_jobs = MagicMock(
+                side_effect=_passthrough_filter
+            )
 
             resp = await client.post(
                 "/api/v1/search/smart",
@@ -359,6 +370,9 @@ class TestSmartSearch:
             mock_fetcher = MockFetcherClass.return_value
             mock_fetcher.fetch_jobs_for_company = AsyncMock(return_value=[])
             mock_fetcher.match_jobs_to_role = AsyncMock(return_value=[])
+            mock_fetcher.filter_and_rank_jobs = MagicMock(
+                side_effect=_passthrough_filter
+            )
 
             resp = await client.post(
                 "/api/v1/search/smart",
@@ -396,6 +410,9 @@ class TestSmartSearch:
             mock_fetcher = MockFetcherClass.return_value
             mock_fetcher.fetch_jobs_for_company = AsyncMock(return_value=[])
             mock_fetcher.match_jobs_to_role = AsyncMock(return_value=[])
+            mock_fetcher.filter_and_rank_jobs = MagicMock(
+                side_effect=_passthrough_filter
+            )
 
             resp = await client.post(
                 "/api/v1/search/smart",
@@ -423,6 +440,9 @@ class TestSmartSearch:
             mock_fetcher = MockFetcherClass.return_value
             mock_fetcher.fetch_jobs_for_company = AsyncMock(return_value=[])
             mock_fetcher.match_jobs_to_role = AsyncMock(return_value=[])
+            mock_fetcher.filter_and_rank_jobs = MagicMock(
+                side_effect=_passthrough_filter
+            )
 
             resp = await client.post(
                 "/api/v1/search/smart",
@@ -463,6 +483,9 @@ class TestSmartSearch:
             mock_fetcher.match_jobs_to_role = AsyncMock(
                 side_effect=lambda jobs, role, sen=None: jobs
             )
+            mock_fetcher.filter_and_rank_jobs = MagicMock(
+                side_effect=_passthrough_filter
+            )
 
             resp = await client.post(
                 "/api/v1/search/smart",
@@ -500,6 +523,9 @@ class TestSmartSearch:
             mock_fetcher = MockFetcherClass.return_value
             mock_fetcher.fetch_jobs_for_company = AsyncMock(return_value=[])
             mock_fetcher.match_jobs_to_role = AsyncMock(return_value=[])
+            mock_fetcher.filter_and_rank_jobs = MagicMock(
+                side_effect=_passthrough_filter
+            )
 
             await client.post(
                 "/api/v1/search/smart",

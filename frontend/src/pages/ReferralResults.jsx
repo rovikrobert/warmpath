@@ -3,14 +3,94 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { search as searchApi, credits as creditsApi } from '../api/client';
 import RequestIntroModal from '../components/RequestIntroModal';
 
+/* ------------------------------------------------------------------ */
+/* Warm Score legend + badge                                          */
+/* ------------------------------------------------------------------ */
+
+const WARM_TIERS = [
+  { min: 70, label: 'Strong', color: 'bg-green-100 text-green-700', desc: 'Recent contact, strong relationship — ideal referral path' },
+  { min: 40, label: 'Moderate', color: 'bg-amber-100 text-amber-700', desc: 'Some connection — may need a warm-up message first' },
+  { min: 0, label: 'Weak', color: 'bg-slate-100 text-slate-600', desc: 'Distant or old connection — consider building rapport before asking' },
+];
+
+function warmTier(score) {
+  return WARM_TIERS.find((t) => score >= t.min) || WARM_TIERS[2];
+}
+
 function WarmBadge({ score }) {
-  const color = score >= 70 ? 'bg-green-100 text-green-700' : score >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600';
-  return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>Warm {score}</span>;
+  const tier = warmTier(score);
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${tier.color}`}>
+      {tier.label} ({score})
+    </span>
+  );
+}
+
+function WarmScoreLegend() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative inline-block">
+      <button
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-500 hover:bg-slate-50"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
+        </svg>
+        What are warm scores?
+      </button>
+      {open && (
+        <div className="absolute right-0 z-10 mt-1 w-72 rounded-lg border border-slate-200 bg-white p-4 shadow-lg">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-700">Warm Score Guide</h4>
+          <p className="mb-3 text-xs text-slate-500">
+            Measures how likely this person is to respond to your referral request, based on recency of contact, relationship strength, role relevance, and tenure.
+          </p>
+          <div className="space-y-2">
+            {WARM_TIERS.map((tier) => (
+              <div key={tier.label} className="flex items-start gap-2">
+                <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${tier.color}`}>
+                  {tier.min}+
+                </span>
+                <div>
+                  <span className="text-xs font-medium text-slate-700">{tier.label}</span>
+                  <p className="text-xs text-slate-400">{tier.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => setOpen(false)} className="mt-3 text-xs text-amber-600 hover:text-amber-700">
+            Got it
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Channel + likelihood labels                                        */
+/* ------------------------------------------------------------------ */
+
+const CHANNEL_LABELS = {
+  linkedin: 'LinkedIn',
+  linkedin_message: 'LinkedIn message',
+  email: 'Email',
+  whatsapp: 'WhatsApp',
+  phone: 'Phone',
+  in_person: 'In person',
+  slack: 'Slack',
+  text: 'Text message',
+};
+
+function channelLabel(raw) {
+  if (!raw) return null;
+  return CHANNEL_LABELS[raw] || raw.replace(/_/g, ' ');
 }
 
 function LikelihoodBadge({ level }) {
   const map = { high: 'bg-green-100 text-green-700', medium: 'bg-amber-100 text-amber-700', low: 'bg-slate-100 text-slate-600' };
-  return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${map[level] || map.low}`}>{level}</span>;
+  const labels = { high: 'High likelihood', medium: 'Medium likelihood', low: 'Low likelihood' };
+  return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${map[level] || map.low}`}>{labels[level] || level}</span>;
 }
 
 const REL_LABELS = {
@@ -24,14 +104,46 @@ const REL_LABELS = {
   recruiter: 'recruiter',
 };
 
+/* ------------------------------------------------------------------ */
+/* Company Card                                                       */
+/* ------------------------------------------------------------------ */
+
+function FitBadge({ score }) {
+  if (score == null) return null;
+  const color = score >= 80 ? 'bg-green-50 text-green-600' : score >= 50 ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-500';
+  return <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${color}`}>{score}</span>;
+}
+
 function CompanyCard({ company, onRequestIntro, navigate }) {
   const ownPaths = company.referral_paths?.filter((p) => p.source === 'own_network') || [];
   const marketPaths = company.referral_paths?.filter((p) => p.source === 'marketplace') || [];
+  const [showAll, setShowAll] = useState(false);
+
+  const openings = company.active_openings || [];
+  const visibleCount = showAll ? openings.length : Math.min(5, openings.length);
+  const visibleOpenings = openings.slice(0, visibleCount);
+  const hasHiddenOnPage = openings.length > 5 && !showAll;
+  const totalMatched = company.total_matched_openings ?? openings.length;
+  const hasMoreBeyondPage = company.has_more_openings;
+
+  // Determine which ATS source link to use for "view all"
+  const atsSource = openings[0]?.source;
+  const atsLabel = atsSource === 'greenhouse' ? 'Greenhouse' : atsSource === 'lever' ? 'Lever' : atsSource === 'ashby' ? 'Ashby' : 'their job board';
 
   return (
     <div className="rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-      <div className="border-b border-slate-200 px-5 py-4">
+      <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
         <h3 className="text-base font-semibold text-slate-900">{company.name}</h3>
+        {company.careers_url && (
+          <a
+            href={company.careers_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-amber-600 hover:text-amber-700"
+          >
+            Careers page &rarr;
+          </a>
+        )}
       </div>
 
       <div className="divide-y divide-slate-100 px-5">
@@ -39,9 +151,14 @@ function CompanyCard({ company, onRequestIntro, navigate }) {
         <div className="py-4">
           <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">
             Live Openings
-            {company.job_scan_status === 'matched' && (
+            {(company.job_scan_status === 'matched' || company.job_scan_status === 'discovered') && (
               <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-normal normal-case text-green-700">
-                {company.active_openings.length} found
+                {totalMatched} found
+              </span>
+            )}
+            {company.job_scan_status === 'discovered' && (
+              <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-normal normal-case text-blue-600">
+                auto-detected
               </span>
             )}
             {company.job_scan_status === 'no_match' && (
@@ -55,23 +172,47 @@ function CompanyCard({ company, onRequestIntro, navigate }) {
               </span>
             )}
           </h4>
-          {company.active_openings?.length > 0 ? (
+          {visibleOpenings.length > 0 ? (
             <div className="space-y-2">
-              {company.active_openings.map((job, i) => (
+              {visibleOpenings.map((job, i) => (
                 <div key={i} className="flex items-center justify-between text-sm">
-                  <div>
+                  <div className="flex items-center gap-2">
+                    <FitBadge score={job.fit_score} />
                     <span className="text-slate-900">{job.title}</span>
-                    {job.location && <span className="ml-2 text-xs text-slate-400">{job.location}</span>}
-                    {job.is_remote && <span className="ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">Remote</span>}
+                    {job.location && <span className="text-xs text-slate-400">{job.location}</span>}
+                    {job.is_remote && <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">Remote</span>}
                   </div>
                   {job.url && (
-                    <a href={job.url} target="_blank" rel="noopener noreferrer" className="text-xs text-amber-600 hover:text-amber-700">
+                    <a href={job.url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-xs text-amber-600 hover:text-amber-700">
                       View &rarr;
                     </a>
                   )}
                 </div>
               ))}
+              {hasHiddenOnPage && (
+                <button
+                  onClick={() => setShowAll(true)}
+                  className="mt-1 text-xs font-medium text-amber-600 hover:text-amber-700"
+                >
+                  Show {openings.length - 5} more
+                </button>
+              )}
+              {showAll && hasMoreBeyondPage && company.careers_url && (
+                <p className="mt-1 text-xs text-slate-500">
+                  View all {totalMatched} openings on{' '}
+                  <a href={company.careers_url} target="_blank" rel="noopener noreferrer" className="text-amber-600 hover:text-amber-700">
+                    {atsLabel} &rarr;
+                  </a>
+                </p>
+              )}
             </div>
+          ) : company.careers_url ? (
+            <p className="text-sm text-slate-400">
+              No openings matching your role found.{' '}
+              <a href={company.careers_url} target="_blank" rel="noopener noreferrer" className="text-amber-600 hover:text-amber-700">
+                Browse all openings &rarr;
+              </a>
+            </p>
           ) : company.job_scan_status !== 'no_board' ? (
             <p className="text-sm text-slate-400">No openings matching your target role.</p>
           ) : (
@@ -93,11 +234,11 @@ function CompanyCard({ company, onRequestIntro, navigate }) {
                         <span className="ml-1 text-slate-400">({REL_LABELS[path.contact.relationship_type] || path.contact.relationship_type})</span>
                       )}
                     </p>
-                    <div className="mt-1 flex gap-2">
+                    <div className="mt-1 flex flex-wrap gap-2">
                       <WarmBadge score={path.contact.warm_score} />
                       <LikelihoodBadge level={path.contact.referral_likelihood} />
                       {path.recommended_channel && (
-                        <span className="text-xs text-slate-400">via {path.recommended_channel}</span>
+                        <span className="text-xs text-slate-400">Reach out via {channelLabel(path.recommended_channel)}</span>
                       )}
                     </div>
                   </div>
@@ -158,10 +299,15 @@ function CompanyCard({ company, onRequestIntro, navigate }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Main Page                                                          */
+/* ------------------------------------------------------------------ */
+
 export default function ReferralResults() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
+  const [searchMeta, setSearchMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [balance, setBalance] = useState(0);
@@ -176,6 +322,11 @@ export default function ReferralResults() {
           creditsApi.balance().catch(() => ({ data: { balance: 0 } })),
         ]);
         setData(searchRes.data);
+        // The search object itself contains target_companies, name, etc.
+        setSearchMeta({
+          name: searchRes.data?.name,
+          target_companies: searchRes.data?.target_companies,
+        });
         setBalance(balRes.data?.balance ?? 0);
       } catch (err) {
         setError(err.message);
@@ -214,24 +365,33 @@ export default function ReferralResults() {
 
   const companies = data?.companies || data?.results_data?.companies || [];
   const summary = data?.summary || data?.results_data?.summary || {};
+  const searchedNames = searchMeta?.target_companies || companies.map((c) => c.name);
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Referral Results</h1>
+          {searchedNames.length > 0 && (
+            <p className="mt-1 text-sm text-slate-600">
+              {searchedNames.join(', ')}
+            </p>
+          )}
           {summary.companies_searched != null && (
-            <p className="text-sm text-slate-500">
-              {summary.companies_searched} companies searched · {summary.total_referral_paths ?? 0} referral paths · {summary.total_openings ?? 0} openings
+            <p className="text-xs text-slate-400">
+              {summary.companies_searched} searched · {summary.total_referral_paths ?? 0} referral paths · {summary.total_openings ?? 0} openings
             </p>
           )}
         </div>
-        <button
-          onClick={() => navigate('/referrals')}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
-        >
-          New Search
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <WarmScoreLegend />
+          <button
+            onClick={() => navigate('/referrals')}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+          >
+            New Search
+          </button>
+        </div>
       </div>
 
       {companies.length === 0 ? (

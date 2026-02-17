@@ -12,7 +12,7 @@ from app.models.company import Company
 from app.models.job import JobOpening, UserJobPreferences
 from app.models.search_request import SearchRequest
 from app.models.user import User
-from app.services.board_registry import lookup_boards
+from app.services.board_registry import lookup_boards, lookup_or_discover_boards
 from app.services.career_page_fetcher import lookup_career_page
 from app.services.job_fetcher import JobFetcher
 from app.utils.security import get_current_user
@@ -80,8 +80,8 @@ async def scan_company_jobs(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Fetch live jobs for a company from Greenhouse/Lever, with career page fallback."""
-    boards = lookup_boards(company_name)
+    """Fetch live jobs for a company from Greenhouse/Lever, with auto-discovery and career page fallback."""
+    boards, was_discovered = await lookup_or_discover_boards(company_name, db)
 
     # If no ATS board and no career page, return 404
     if boards is None and lookup_career_page(company_name) is None:

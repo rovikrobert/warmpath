@@ -135,6 +135,61 @@ class JobFetcher:
         logger.info("Lever: fetched %d jobs for slug '%s'", len(results), company_slug)
         return results
 
+    async def fetch_ashby_jobs(self, org_slug: str) -> list[dict]:
+        """Fetch jobs from Ashby public posting API.
+
+        Endpoint: https://api.ashbyhq.com/posting-api/job-board/{org_slug}
+        """
+        url = f"https://api.ashbyhq.com/posting-api/job-board/{org_slug}"
+        try:
+            async with httpx.AsyncClient(timeout=HTTPX_TIMEOUT) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+        except httpx.HTTPError as exc:
+            logger.warning("Ashby fetch failed for '%s': %s", org_slug, exc)
+            return []
+
+        data = resp.json()
+        jobs = data.get("jobs", [])
+
+        results: list[dict] = []
+        for job in jobs:
+            if not job.get("isListed", True):
+                continue
+
+            location_name = job.get("location", "") or ""
+            department = job.get("department", "") or job.get("team", "") or ""
+            is_remote = job.get("isRemote") or bool(
+                _REMOTE_PATTERNS.search(location_name)
+            )
+
+            posted_at = None
+            published = job.get("publishedAt")
+            if published:
+                try:
+                    posted_at = datetime.fromisoformat(
+                        published.replace("Z", "+00:00")
+                    )
+                except (ValueError, TypeError):
+                    pass
+
+            results.append(
+                {
+                    "title": job.get("title", ""),
+                    "department": department or None,
+                    "location": location_name or None,
+                    "url": job.get("jobUrl", ""),
+                    "source": "ashby",
+                    "source_job_id": str(job.get("id", "")),
+                    "posted_at": posted_at,
+                    "is_remote": bool(is_remote),
+                    "raw_data": job,
+                }
+            )
+
+        logger.info("Ashby: fetched %d jobs for org '%s'", len(results), org_slug)
+        return results
+
     async def fetch_jobs_for_company(
         self, company_name: str, board_ids: dict[str, str] | None = None
     ) -> list[dict]:
@@ -150,7 +205,7 @@ class JobFetcher:
 
         all_jobs: list[dict] = []
 
-        # 1. Try ATS boards (Greenhouse / Lever)
+        # 1. Try ATS boards (Greenhouse / Lever / Ashby)
         if board_ids:
             if "greenhouse" in board_ids:
                 jobs = await self.fetch_greenhouse_jobs(board_ids["greenhouse"])
@@ -159,6 +214,13 @@ class JobFetcher:
             if "lever" in board_ids:
                 jobs = await self.fetch_lever_jobs(board_ids["lever"])
                 all_jobs.extend(jobs)
+
+            if "ashby" in board_ids:
+                jobs = await self.fetch_ashby_jobs(board_ids["ashby"])
+                all_jobs.extend(jobs)
+
+            if "career_page" in board_ids:
+                all_jobs = await fetch_career_page(board_ids["career_page"])
 
         # 2. If ATS boards returned nothing, try career page scraper
         if not all_jobs:
@@ -292,3 +354,79 @@ Only include jobs scoring >= 50. Return ONLY the JSON array."""
         except Exception as exc:
             logger.error("AI role matching failed: %s — falling back to mock", exc)
             return self._mock_match_jobs(jobs, target_role, target_seniority)
+
+    def filter_and_rank_jobs(
+        self,
+        jobs: list[dict],
+        target_role: str,
+        target_seniority: str | None = None,
+        target_locations: list[str] | None = None,
+        open_to_remote: bool = True,
+    ) -> list[dict]:
+        """Filter by location/seniority and rank jobs by composite fit score.
+
+        Each job should already have 'role_relevance' from match_jobs_to_role().
+        Returns all scored jobs sorted by fit_score descending.
+        """
+        if not jobs:
+            return []
+
+        # Seniority keywords in rough order
+        _SENIORITY_LEVELS = {
+            "intern", "junior", "mid", "senior", "staff", "principal",
+            "lead", "manager", "director", "vp", "c-level",
+        }
+
+        # Pre-compute location terms for matching
+        loc_terms = (
+            [loc.strip().lower() for loc in target_locations if loc.strip()]
+            if target_locations
+            else []
+        )
+        seniority_lower = target_seniority.strip().lower() if target_seniority else None
+
+        scored: list[dict] = []
+        for job in jobs:
+            title_lower = job.get("title", "").lower()
+            job_location = (job.get("location") or "").lower()
+            is_remote = job.get("is_remote", False)
+            role_relevance = job.get("role_relevance", 0)
+
+            # --- Location filter ---
+            if loc_terms:
+                location_match = False
+                if not job_location:
+                    # Unknown location — don't filter out
+                    location_match = True
+                elif any(term in job_location for term in loc_terms):
+                    location_match = True
+                elif is_remote and open_to_remote:
+                    location_match = True
+
+                if not location_match:
+                    continue
+
+            # --- Location bonus ---
+            location_bonus = 0
+            if loc_terms and job_location and any(term in job_location for term in loc_terms):
+                location_bonus = 10
+            elif is_remote and open_to_remote:
+                location_bonus = 5
+
+            # --- Seniority bonus ---
+            seniority_bonus = 0
+            if seniority_lower:
+                if seniority_lower in title_lower:
+                    seniority_bonus = 30
+                elif any(
+                    level in title_lower
+                    for level in _SENIORITY_LEVELS
+                    if level != seniority_lower
+                ):
+                    seniority_bonus = -20
+
+            fit_score = role_relevance + location_bonus + seniority_bonus
+            scored.append({**job, "fit_score": max(0, fit_score)})
+
+        scored.sort(key=lambda x: x["fit_score"], reverse=True)
+        return scored
