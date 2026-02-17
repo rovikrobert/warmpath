@@ -23,6 +23,12 @@ build/
 agents/reports/*.json
 agents/shared/intel_cache.json
 agents/*/state.json
+
+# Data team artifacts (auto-generated)
+data_team/reports/*.json
+!data_team/reports/.gitkeep
+data_team/shared/intel_cache.json
+data_team/*/state.json
 coverage.json
 .coverage
 junit.xml
