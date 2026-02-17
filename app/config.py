@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     RECOMMENDATION_CACHE_TTL_HOURS: int = 6
     RECOMMENDATION_MAX_SCAN: int = 15
     RECOMMENDATION_MAX_RESULTS: int = 8
+    DASHBOARD_TRENDS_CACHE_TTL_HOURS: int = 6
+    DASHBOARD_NETWORK_CACHE_TTL_HOURS: int = 1
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { contacts as contactsApi, search as searchApi, usage as usageApi, marketplace as mpApi } from '../api/client';
+import { contacts as contactsApi, search as searchApi, usage as usageApi, marketplace as mpApi, dashboard as dashboardApi } from '../api/client';
 import UploadModal from '../components/UploadModal';
+
+const CATEGORY_COLORS = {
+  networking: 'bg-blue-100 text-blue-700',
+  resume: 'bg-purple-100 text-purple-700',
+  interviewing: 'bg-green-100 text-green-700',
+  mindset: 'bg-rose-100 text-rose-700',
+  strategy: 'bg-amber-100 text-amber-700',
+};
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -14,6 +22,8 @@ export default function Dashboard() {
   const [usageData, setUsageData] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [insights, setInsights] = useState(null);
+  const [insightsLoading, setInsightsLoading] = useState(true);
 
   const isSeeker = !user?.user_type || user.user_type === 'job_seeker' || user.user_type === 'both';
   const isHolder = user?.user_type === 'network_holder' || user?.user_type === 'both';
@@ -49,11 +59,19 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
+
+    // Non-blocking: fetch insights separately so dashboard loads instantly
+    setInsightsLoading(true);
+    dashboardApi.insights()
+      .then((res) => setInsights(res.data))
+      .catch(() => setInsights(null))
+      .finally(() => setInsightsLoading(false));
   };
 
   useEffect(() => { load(); }, []);
 
   const hasContacts = contactCount > 0;
+  const firstName = user?.full_name?.split(' ')[0] || 'there';
 
   if (loading) {
     return (
@@ -65,6 +83,84 @@ export default function Dashboard() {
 
   return (
     <div>
+      {/* Insights welcome card */}
+      {insightsLoading ? (
+        <div className="mb-6 animate-pulse rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 p-6 ring-1 ring-amber-200/50">
+          <div className="h-5 w-48 rounded bg-amber-200/50 mb-4" />
+          <div className="space-y-2">
+            <div className="h-3 w-full rounded bg-amber-200/30" />
+            <div className="h-3 w-3/4 rounded bg-amber-200/30" />
+          </div>
+        </div>
+      ) : insights && (
+        <div className="mb-6 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 p-6 ring-1 ring-amber-200/50">
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">
+            Welcome back, {firstName}
+          </h2>
+
+          <div className="space-y-4">
+            {/* Market Pulse */}
+            {insights.job_market_trends && (
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Market Pulse</h3>
+                <p className="text-sm text-slate-700">{insights.job_market_trends.summary}</p>
+                {insights.job_market_trends.searched_and_hiring?.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {insights.job_market_trends.searched_and_hiring.map((name) => (
+                      <span key={name} className="inline-flex rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                        {name} is hiring
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {insights.job_market_trends.trending_titles?.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {insights.job_market_trends.trending_titles.map((title) => (
+                      <span key={title} className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                        {title}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Your Network */}
+            {insights.network_analysis && (
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Your Network</h3>
+                <p className="text-sm text-slate-700">{insights.network_analysis.summary}</p>
+                {insights.network_analysis.network_gaps?.length > 0 && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Network gaps: {insights.network_analysis.network_gaps.join(', ')}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Nudge if no trends and no network */}
+            {!insights.job_market_trends && !insights.network_analysis && (
+              <p className="text-sm text-slate-500">
+                Set your <Link to="/preferences" className="font-medium text-amber-600 hover:text-amber-700">job preferences</Link> and upload contacts to see market trends and network insights here.
+              </p>
+            )}
+
+            {/* Tip of the Day */}
+            {insights.daily_tip && (
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Tip of the Day</h3>
+                <div className="flex items-start gap-2">
+                  <p className="text-sm text-slate-700">{insights.daily_tip.tip}</p>
+                  <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_COLORS[insights.daily_tip.category] || 'bg-slate-100 text-slate-600'}`}>
+                    {insights.daily_tip.category}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Stats bar */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg bg-white p-4 ring-1 ring-slate-200">
@@ -92,7 +188,7 @@ export default function Dashboard() {
         {!isHolder && (
           <div className="rounded-lg bg-white p-4 ring-1 ring-slate-200">
             <p className="text-xs text-slate-500">API Calls Today</p>
-            <p className="text-2xl font-bold text-slate-900">{stats?.today_count ?? '—'}</p>
+            <p className="text-2xl font-bold text-slate-900">{stats?.today_count ?? '\u2014'}</p>
           </div>
         )}
       </div>
@@ -223,7 +319,7 @@ export default function Dashboard() {
                     </span>
                   </td>
                   <td className="hidden px-4 py-3 text-slate-600 md:table-cell">
-                    {s.match_count ?? '—'}
+                    {s.match_count ?? '\u2014'}
                   </td>
                   <td className="px-4 py-3 text-slate-500">
                     {new Date(s.created_at).toLocaleDateString()}

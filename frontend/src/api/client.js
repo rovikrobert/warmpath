@@ -234,6 +234,10 @@ export const usage = {
     api(`/api/v1/usage/me/history?page=${page}&per_page=${perPage}`),
 };
 
+export const dashboard = {
+  insights: () => api('/api/v1/dashboard/insights'),
+};
+
 export const health = {
   check: () => api('/health'),
   usage: () => api('/api/v1/usage/me'),
