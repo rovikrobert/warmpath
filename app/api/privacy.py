@@ -24,6 +24,7 @@ from app.database import get_db
 from app.models.audit import AuditLog
 from app.models.privacy import ConsentRecord
 from app.models.user import User
+from app.services.account_deletion import delete_user_data
 from app.services.audit_logger import log_event
 from app.services.breach_notification import create_data_request
 from app.services.data_export import export_user_data
@@ -88,6 +89,34 @@ class RectificationBody(BaseModel):
     last_name: str | None = Field(default=None, max_length=255)
     company: str | None = Field(default=None, max_length=500)
     corrections: dict = Field(..., min_length=1)
+
+
+# ---------------------------------------------------------------------------
+# Account deletion (GDPR Article 17)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/delete-account")
+async def delete_account(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Permanently delete all user data (GDPR Article 17 right to erasure).
+
+    Archives credit transactions for 24-month audit trail, adds email to
+    suppression list, purges all user-owned data, anonymizes user record.
+    """
+    counts = await delete_user_data(
+        current_user.id, db, requester_email=current_user.email
+    )
+    await db.commit()
+    return {
+        "data": {
+            "message": "Your account and all personal data have been deleted.",
+            "records_deleted": counts,
+        },
+        "meta": {},
+    }
 
 
 # ---------------------------------------------------------------------------

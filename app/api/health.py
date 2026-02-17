@@ -9,6 +9,7 @@ router = APIRouter()
 
 @router.get("/health")
 def health_check() -> dict:
+    """Application health check — verifies API + Celery connectivity."""
     celery_status = "unavailable"
     try:
         from app.celery_app import celery_app

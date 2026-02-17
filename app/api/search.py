@@ -52,6 +52,7 @@ async def create_search(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Create a new search request with target filters."""
     search = SearchRequest(
         user_id=current_user.id,
         name=body.name,
@@ -158,6 +159,7 @@ async def get_search(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Get a search request by ID, including smart search results if available."""
     result = await db.execute(
         select(SearchRequest).where(
             SearchRequest.id == search_id,
@@ -192,6 +194,7 @@ async def execute_search(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Run AI matching for a search request. Rate-limited per user per day."""
     requi[RESEND_KEY_REDACTED](current_user)
 
     # Rate limit check
@@ -249,6 +252,7 @@ async def get_search_results(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Get paginated match results for a search, with score and type filters."""
     # min_relevance takes precedence over min_score for backwards compat
     effective_min_relevance = min_relevance if min_relevance is not None else min_score
 
