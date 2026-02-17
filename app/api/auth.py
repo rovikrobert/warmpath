@@ -204,39 +204,38 @@ async def login(
                 detail="Account temporarily locked. Try again in 15 minutes.",
             )
 
-    if user is None or user.password_hash is None or not verify_password(body.password, user.password_hash):
-        # Track failed login
-        if user is not None:
-            user.failed_login_attempts += 1
-            if user.failed_login_attempts >= 5:
-                user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
-                await log_event(
-                    db,
-                    "login_lockout",
-                    user_id=user.id,
-                    metadata={
-                        "email": body.email,
-                        "attempts": user.failed_login_attempts,
-                    },
-                )
-            else:
-                await log_event(
-                    db,
-                    "login_failure",
-                    user_id=user.id,
-                    metadata={"email": body.email},
-                )
-            await db.commit()
+    if user is None:
+        await log_event(db, "login_failure", metadata={"email": body.email})
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No account found with this email. Would you like to sign up?",
+        )
+
+    if user.password_hash is None or not verify_password(body.password, user.password_hash):
+        user.failed_login_attempts += 1
+        if user.failed_login_attempts >= 5:
+            user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+            await log_event(
+                db,
+                "login_lockout",
+                user_id=user.id,
+                metadata={
+                    "email": body.email,
+                    "attempts": user.failed_login_attempts,
+                },
+            )
         else:
             await log_event(
                 db,
                 "login_failure",
+                user_id=user.id,
                 metadata={"email": body.email},
             )
-            await db.commit()
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+            detail="Incorrect password",
         )
 
     if not user.is_active:
