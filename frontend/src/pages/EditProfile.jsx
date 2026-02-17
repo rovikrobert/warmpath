@@ -8,9 +8,9 @@ const EMPTY_ENTRY = { company: '', title: '', start_date: '', end_date: '', is_c
 function ResumePreviewModal({ data, onApply, onClose }) {
   if (!data) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="resume-preview-title">
       <div className="mx-4 w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
-        <h3 className="text-lg font-bold text-slate-900">Resume Preview</h3>
+        <h3 id="resume-preview-title" className="text-lg font-bold text-slate-900">Resume Preview</h3>
         <p className="mt-1 text-sm text-slate-500">Review parsed data before applying to your profile.</p>
         <div className="mt-4 space-y-3 text-sm">
           {data.headline && <div><span className="font-medium text-slate-700">Headline:</span> {data.headline}</div>}
@@ -236,7 +236,7 @@ export default function EditProfile() {
   const inputClass = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-2xl" role="main">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Edit Profile</h1>
         <button
@@ -253,7 +253,7 @@ export default function EditProfile() {
         <p className="mt-1 text-xs text-slate-500">Pre-fill your profile from a resume or LinkedIn.</p>
         <div className="mt-3 flex gap-3">
           <div>
-            <input ref={resumeRef} type="file" accept=".pdf" onChange={handleResumeUpload} className="hidden" />
+            <input ref={resumeRef} type="file" accept=".pdf" onChange={handleResumeUpload} className="hidden" aria-label="Upload resume PDF" />
             <button
               type="button"
               onClick={() => resumeRef.current?.click()}
@@ -283,40 +283,40 @@ export default function EditProfile() {
         </p>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Headline</label>
-          <input type="text" value={form.headline} onChange={set('headline')} className={inputClass} placeholder="B2B GTM Leader | Field Marketing..." />
+          <label htmlFor="profile-headline" className="mb-1 block text-sm font-medium text-slate-700">Headline</label>
+          <input id="profile-headline" type="text" value={form.headline} onChange={set('headline')} className={inputClass} placeholder="B2B GTM Leader | Field Marketing..." />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Title</label>
-            <input type="text" value={form.current_title} onChange={set('current_title')} className={inputClass} placeholder="Managing Director" />
+            <label htmlFor="profile-title" className="mb-1 block text-sm font-medium text-slate-700">Title</label>
+            <input id="profile-title" type="text" value={form.current_title} onChange={set('current_title')} className={inputClass} placeholder="Managing Director" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Company</label>
-            <input type="text" value={form.current_company} onChange={set('current_company')} className={inputClass} placeholder="Acme Corp" />
+            <label htmlFor="profile-company" className="mb-1 block text-sm font-medium text-slate-700">Company</label>
+            <input id="profile-company" type="text" value={form.current_company} onChange={set('current_company')} className={inputClass} placeholder="Acme Corp" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Industry</label>
-            <input type="text" value={form.industry} onChange={set('industry')} className={inputClass} placeholder="Professional Services" />
+            <label htmlFor="profile-industry" className="mb-1 block text-sm font-medium text-slate-700">Industry</label>
+            <input id="profile-industry" type="text" value={form.industry} onChange={set('industry')} className={inputClass} placeholder="Professional Services" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Location</label>
-            <input type="text" value={form.location} onChange={set('location')} className={inputClass} placeholder="Singapore" />
+            <label htmlFor="profile-location" className="mb-1 block text-sm font-medium text-slate-700">Location</label>
+            <input id="profile-location" type="text" value={form.location} onChange={set('location')} className={inputClass} placeholder="Singapore" />
           </div>
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">LinkedIn URL</label>
-          <input type="url" value={form.linkedin_url} onChange={set('linkedin_url')} className={inputClass} placeholder="https://linkedin.com/in/yourname" />
+          <label htmlFor="profile-linkedin-url" className="mb-1 block text-sm font-medium text-slate-700">LinkedIn URL</label>
+          <input id="profile-linkedin-url" type="url" value={form.linkedin_url} onChange={set('linkedin_url')} className={inputClass} placeholder="https://linkedin.com/in/yourname" />
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Bio summary</label>
-          <textarea value={form.bio_summary} onChange={set('bio_summary')} rows={3} className={inputClass} placeholder="What you do and who you help..." />
+          <label htmlFor="profile-bio" className="mb-1 block text-sm font-medium text-slate-700">Bio summary</label>
+          <textarea id="profile-bio" value={form.bio_summary} onChange={set('bio_summary')} rows={3} className={inputClass} placeholder="What you do and who you help..." />
         </div>
 
         {/* Work History */}
@@ -349,8 +349,9 @@ export default function EditProfile() {
               <div key={i} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-700">Company</label>
+                    <label htmlFor={`work-company-${i}`} className="mb-1 block text-xs font-medium text-slate-700">Company</label>
                     <input
+                      id={`work-company-${i}`}
                       type="text"
                       value={entry.company}
                       onChange={(e) => updateWorkEntry(i, 'company', e.target.value)}
@@ -359,8 +360,9 @@ export default function EditProfile() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-700">Title / Role</label>
+                    <label htmlFor={`work-title-${i}`} className="mb-1 block text-xs font-medium text-slate-700">Title / Role</label>
                     <input
+                      id={`work-title-${i}`}
                       type="text"
                       value={entry.title}
                       onChange={(e) => updateWorkEntry(i, 'title', e.target.value)}
@@ -371,8 +373,9 @@ export default function EditProfile() {
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-700">Start date</label>
+                    <label htmlFor={`work-start-${i}`} className="mb-1 block text-xs font-medium text-slate-700">Start date</label>
                     <input
+                      id={`work-start-${i}`}
                       type="month"
                       value={entry.start_date}
                       onChange={(e) => updateWorkEntry(i, 'start_date', e.target.value)}
@@ -380,11 +383,12 @@ export default function EditProfile() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-700">End date</label>
+                    <label htmlFor={`work-end-${i}`} className="mb-1 block text-xs font-medium text-slate-700">End date</label>
                     {entry.is_current ? (
                       <p className="py-2 text-sm text-slate-500">Present</p>
                     ) : (
                       <input
+                        id={`work-end-${i}`}
                         type="month"
                         value={entry.end_date}
                         onChange={(e) => updateWorkEntry(i, 'end_date', e.target.value)}
@@ -407,6 +411,7 @@ export default function EditProfile() {
                     type="button"
                     onClick={() => removeWorkEntry(i)}
                     className="text-xs text-red-500 hover:text-red-600"
+                    aria-label={`Remove work history entry ${i + 1}`}
                   >
                     Remove
                   </button>
@@ -416,9 +421,9 @@ export default function EditProfile() {
           </div>
         </div>
 
-        {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
-        {saved && <p className="rounded-md bg-green-50 p-2 text-sm text-green-600">Profile saved!</p>}
-        {matchFeedback && <p className="rounded-md bg-blue-50 p-2 text-sm text-blue-700">{matchFeedback}</p>}
+        {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600" role="alert" aria-live="assertive">{error}</p>}
+        {saved && <p className="rounded-md bg-green-50 p-2 text-sm text-green-600" role="status" aria-live="polite">Profile saved!</p>}
+        {matchFeedback && <p className="rounded-md bg-blue-50 p-2 text-sm text-blue-700" role="status" aria-live="polite">{matchFeedback}</p>}
 
         <button
           type="submit"
@@ -452,9 +457,9 @@ export default function EditProfile() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
           <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-bold text-red-700">Delete Account</h3>
+            <h3 id="delete-modal-title" className="text-lg font-bold text-red-700">Delete Account</h3>
             <p className="mt-2 text-sm text-slate-600">
               This will permanently delete your account, all contacts, search history, applications,
               and credits. This cannot be undone.
@@ -471,20 +476,22 @@ export default function EditProfile() {
             </label>
 
             <div className="mt-4">
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="delete-confirm-password" className="mb-1 block text-sm font-medium text-slate-700">
                 Enter your password to confirm
               </label>
               <input
+                id="delete-confirm-password"
                 type="password"
                 value={deletePassword}
                 onChange={(e) => setDeletePassword(e.target.value)}
                 className={inputClass}
                 placeholder="Your current password"
+                aria-required="true"
               />
             </div>
 
             {deleteError && (
-              <p className="mt-3 rounded-md bg-red-50 p-2 text-sm text-red-600">{deleteError}</p>
+              <p className="mt-3 rounded-md bg-red-50 p-2 text-sm text-red-600" role="alert" aria-live="assertive">{deleteError}</p>
             )}
 
             <div className="mt-5 flex gap-3">

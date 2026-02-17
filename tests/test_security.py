@@ -70,8 +70,18 @@ class TestLoginTokens:
         assert resp.status_code == 200
         body = resp.json()
         assert body["data"]["access_token"]
+        assert body["data"]["token_type"] == "bearer"
         refresh = _get_refresh_cookie(resp)
         assert refresh is not None
+
+        # Decode the access token and verify JWT claims
+        from jose import jwt
+        from app.config import settings
+        payload = jwt.decode(body["data"]["access_token"], settings.SECRET_KEY, algorithms=["HS256"])
+        assert payload["type"] == "access"
+        assert "sub" in payload  # user ID
+        assert "ver" in payload  # token version
+        assert "exp" in payload  # expiration
 
     async def test_refresh_cookie_is_httponly(self, client: AsyncClient):
         resp = await _signup(client)
@@ -109,6 +119,10 @@ class TestRefreshToken:
     async def test_refresh_without_cookie_returns_401(self, client: AsyncClient):
         resp = await client.post("/api/v1/auth/refresh")
         assert resp.status_code == 401
+        body = resp.json()
+        assert "detail" in body
+        # Should not leak any internal info about the expected cookie name
+        assert "warmpath_refresh_token" not in body.get("detail", "").lower()
 
     async def test_refresh_with_access_token_rejects(self, client: AsyncClient):
         """An access token should not work as a refresh token."""
@@ -118,6 +132,9 @@ class TestRefreshToken:
         client.cookies.set("warmpath_refresh_token", access)
         resp2 = await client.post("/api/v1/auth/refresh")
         assert resp2.status_code == 401
+        # Verify the rejection is due to token type mismatch
+        detail = resp2.json().get("detail", "")
+        assert "refresh" in detail.lower() or "token" in detail.lower()
 
     async def test_refresh_rotates_token(self, client: AsyncClient):
         """Each refresh should issue a new, different refresh token."""
@@ -177,12 +194,20 @@ class TestTokenVersioning:
         client.cookies.set("warmpath_refresh_token", old_refresh)
         resp2 = await client.post("/api/v1/auth/refresh")
         assert resp2.status_code == 401
+        detail = resp2.json().get("detail", "")
+        assert "revoked" in detail.lower() or "invalid" in detail.lower() or "token" in detail.lower()
 
     async def test_login_after_logout_all_works(self, client: AsyncClient):
         """After logout-all, user can still log in and get valid tokens."""
         await _signup(client)
         resp = await _login(client)
         access = resp.json()["data"]["access_token"]
+
+        # Decode old token to get its version
+        from jose import jwt
+        from app.config import settings
+        old_payload = jwt.decode(access, settings.SECRET_KEY, algorithms=["HS256"])
+        old_ver = old_payload["ver"]
 
         # logout-all
         await client.post(
@@ -194,6 +219,10 @@ class TestTokenVersioning:
         resp2 = await _login(client)
         assert resp2.status_code == 200
         new_token = resp2.json()["data"]["access_token"]
+
+        # New token should have incremented token_version
+        new_payload = jwt.decode(new_token, settings.SECRET_KEY, algorithms=["HS256"])
+        assert new_payload["ver"] == old_ver + 1
 
         resp3 = await client.get(
             "/api/v1/auth/me",
@@ -240,6 +269,15 @@ class TestChangePassword:
         new_token = resp2.json()["data"]["access_token"]
         assert new_token != token  # Fresh token with new version
 
+        # Decode both tokens and verify the new token has incremented version
+        from jose import jwt
+        from app.config import settings
+        old_payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        new_payload = jwt.decode(new_token, settings.SECRET_KEY, algorithms=["HS256"])
+        assert new_payload["ver"] == old_payload["ver"] + 1
+        assert new_payload["sub"] == old_payload["sub"]  # Same user
+        assert new_payload["type"] == "access"
+
     async def test_change_password_wrong_old_password(self, client: AsyncClient):
         resp = await _signup(client)
         token = resp.json()["data"]["access_token"]
@@ -250,6 +288,8 @@ class TestChangePassword:
             json={"old_password": "wrongpassword", "new_password": "Newsecret456"},
         )
         assert resp2.status_code == 401
+        detail = resp2.json().get("detail", "")
+        assert "password" in detail.lower()  # Error mentions password issue
 
     async def test_change_password_invalidates_old_tokens(self, client: AsyncClient):
         resp = await _signup(client)
@@ -268,6 +308,21 @@ class TestChangePassword:
             headers={"Authorization": f"Bearer {old_token}"},
         )
         assert resp3.status_code == 401
+        assert "revoked" in resp3.json()["detail"].lower()
+
+        # Verify token_version was incremented in DB
+        import uuid as uuid_mod
+        from tests.conftest import TestSessionLocal
+        from app.models.user import User
+        from jose import jwt
+        from app.config import settings
+        old_payload = jwt.decode(old_token, settings.SECRET_KEY, algorithms=["HS256"])
+        async with TestSessionLocal() as session:
+            result = await session.execute(
+                select(User).where(User.id == uuid_mod.UUID(old_payload["sub"]))
+            )
+            user = result.scalar_one()
+            assert user.token_version == old_payload["ver"] + 1
 
     async def test_change_password_can_login_with_new(self, client: AsyncClient):
         resp = await _signup(client)
@@ -309,11 +364,19 @@ class TestTokenTypeEnforcement:
         resp = await _signup(client)
         refresh = _get_refresh_cookie(resp)
 
+        # Verify the refresh token actually is a refresh type
+        from jose import jwt
+        from app.config import settings
+        refresh_payload = jwt.decode(refresh, settings.SECRET_KEY, algorithms=["HS256"])
+        assert refresh_payload["type"] == "refresh"
+
         resp2 = await client.get(
             "/api/v1/auth/me",
             headers={"Authorization": f"Bearer {refresh}"},
         )
         assert resp2.status_code == 401
+        detail = resp2.json().get("detail", "")
+        assert "access" in detail.lower() or "token" in detail.lower()
 
 
 # ===========================================================================
@@ -413,6 +476,8 @@ class TestCSVFileSizeLimit:
             files={"file": ("big.csv", big_csv, "text/csv")},
         )
         assert resp.status_code == 413
+        detail = resp.json().get("detail", "")
+        assert "10" in detail or "size" in detail.lower()  # Mentions the limit
 
 
 class TestCSVRowLimit:
@@ -447,6 +512,8 @@ class TestCSVContentType:
             files={"file": ("test.csv", csv_bytes, "application/json")},
         )
         assert resp.status_code == 415
+        detail = resp.json().get("detail", "")
+        assert "csv" in detail.lower() or "content" in detail.lower()  # Explains the rejection
 
     async def test_text_csv_accepted(self, client: AsyncClient):
         token = await _get_auth_token(client)
@@ -525,11 +592,15 @@ class TestSecurityHeaders:
         )
 
     async def test_headers_on_api_endpoints(self, client: AsyncClient):
-        """Security headers should be on ALL responses, not just health."""
+        """Security headers should be on ALL responses, not just health — including error responses."""
         resp = await client.get("/api/v1/auth/me")
         # Even though this returns 403/401, headers should still be present
         assert resp.headers.get("x-content-type-options") == "nosniff"
         assert resp.headers.get("x-frame-options") == "DENY"
+        # Also verify CSP, referrer-policy, and permissions-policy on error responses
+        assert "default-src 'self'" in resp.headers.get("content-security-policy", "")
+        assert resp.headers.get("referrer-policy") == "strict-origin-when-cross-origin"
+        assert resp.headers.get("permissions-policy") == "camera=(), microphone=(), geolocation=()"
 
     async def test_no_hsts_by_default(self, client: AsyncClient):
         """HSTS should NOT be present when SECURE_HEADERS is false (default)."""
@@ -582,6 +653,9 @@ class TestAccountLockout:
         # Correct password during lockout → still 429
         resp = await _login(client, email="lock2@example.com", password="Secret123")
         assert resp.status_code == 429
+        assert "locked" in resp.json()["detail"].lower()
+        # Verify no token is returned during lockout
+        assert "access_token" not in resp.json().get("data", {})
 
     async def test_lockout_expires(self, client: AsyncClient):
         """Lockout expires after the window passes — simulate by resetting locked_until."""
@@ -681,9 +755,11 @@ class TestEmailVerification:
             assert user.email_verification_token is None
 
     async def test_verify_email_invalid_token(self, client: AsyncClient):
-        """Invalid token returns 400."""
+        """Invalid token returns 400 with descriptive error."""
         resp = await client.get("/api/v1/auth/verify-email?token=bogus-token-xyz")
         assert resp.status_code == 400
+        detail = resp.json().get("detail", "")
+        assert "token" in detail.lower() or "invalid" in detail.lower()
 
     async def test_verify_email_expired_token(self, client: AsyncClient):
         """Token older than 24 hours is rejected."""
@@ -803,7 +879,7 @@ class TestEmailVerification:
 
 class TestAuditLog:
     async def test_login_creates_audit_entry(self, client: AsyncClient):
-        """Successful login writes to audit_logs."""
+        """Successful login writes to audit_logs with user_id and timestamp."""
         await _signup(client, email="audit@example.com")
         await _login(client, email="audit@example.com")
 
@@ -815,9 +891,12 @@ class TestAuditLog:
             )
             entries = list(result.scalars())
             assert len(entries) >= 1
+            entry = entries[-1]
+            assert entry.user_id is not None  # Must be tied to a user
+            assert entry.created_at is not None
 
     async def test_failed_login_creates_audit_entry(self, client: AsyncClient):
-        """Failed login writes to audit_logs."""
+        """Failed login writes to audit_logs with user_id."""
         await _signup(client, email="audit2@example.com")
         await _login(client, email="audit2@example.com", password="wrong")
 
@@ -829,9 +908,12 @@ class TestAuditLog:
             )
             entries = list(result.scalars())
             assert len(entries) >= 1
+            entry = entries[-1]
+            assert entry.user_id is not None  # Must reference the failed user
+            assert entry.created_at is not None
 
     async def test_lockout_creates_audit_entry(self, client: AsyncClient):
-        """Account lockout writes to audit_logs."""
+        """Account lockout writes to audit_logs with user_id."""
         await _signup(client, email="audit3@example.com")
         for _ in range(5):
             await _login(client, email="audit3@example.com", password="wrong")
@@ -844,6 +926,9 @@ class TestAuditLog:
             )
             entries = list(result.scalars())
             assert len(entries) >= 1
+            entry = entries[-1]
+            assert entry.user_id is not None  # Lockout must be tied to a user
+            assert entry.created_at is not None
 
     async def test_password_change_creates_audit_entry(self, client: AsyncClient):
         """Password change writes to audit_logs."""
@@ -955,7 +1040,7 @@ class TestStripeWebhook:
             settings.STRIPE_WEBHOOK_SECRET = original
 
     async def test_webhook_invalid_signature_rejected(self, client: AsyncClient):
-        """Invalid signature returns 400."""
+        """Invalid signature returns 400 with an error detail."""
         from app.config import settings
 
         original = settings.STRIPE_WEBHOOK_SECRET
@@ -971,6 +1056,8 @@ class TestStripeWebhook:
                 },
             )
             assert resp.status_code == 400
+            detail = resp.json().get("detail", "")
+            assert "signature" in detail.lower() or "invalid" in detail.lower()
         finally:
             settings.STRIPE_WEBHOOK_SECRET = original
 
@@ -1095,7 +1182,8 @@ class TestForgotPassword:
         )
         assert resp.status_code == 200
 
-    async def test_rate_limited(self, client: AsyncClient):
+    async def test_rate_limited_no_enumeration(self, client: AsyncClient):
+        """Rate-limited requests return 200 to prevent email enumeration."""
         await _signup(client, email="ratelimit@test.com")
 
         resp1 = await client.post(
@@ -1104,11 +1192,14 @@ class TestForgotPassword:
         )
         assert resp1.status_code == 200
 
+        # Second request within rate window still returns 200
+        # (silently skips sending to prevent leaking account existence)
         resp2 = await client.post(
             "/api/v1/auth/forgot-password",
             json={"email": "ratelimit@test.com"},
         )
-        assert resp2.status_code == 429
+        assert resp2.status_code == 200
+        assert "If that email" in resp2.json()["data"]["message"]
 
 
 class TestResetPassword:
@@ -1257,7 +1348,7 @@ class TestDeleteAccount:
             assert result.scalar_one_or_none() is None
 
     async def test_delete_account_wrong_password(self, client: AsyncClient):
-        """Wrong password returns 401."""
+        """Wrong password returns 401 and does not delete the account."""
         token = await _signup_and_get_token(client, "del2@example.com")
 
         resp = await client.post(
@@ -1267,8 +1358,16 @@ class TestDeleteAccount:
         )
         assert resp.status_code == 401
 
+        # Verify account still exists after failed deletion attempt
+        resp2 = await client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp2.status_code == 200
+        assert resp2.json()["data"]["email"] == "del2@example.com"
+
     async def test_delete_account_without_confirmation(self, client: AsyncClient):
-        """confirm_deletion=false returns 422."""
+        """confirm_deletion=false returns 422 and does not delete the account."""
         token = await _signup_and_get_token(client, "del3@example.com")
 
         resp = await client.post(
@@ -1277,6 +1376,13 @@ class TestDeleteAccount:
             json={"password": "Secret123", "confirm_deletion": False},
         )
         assert resp.status_code == 422
+
+        # Verify account still exists
+        resp2 = await client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp2.status_code == 200
 
     async def test_delete_account_creates_audit_entry(self, client: AsyncClient):
         """audit_logs has action='account_deleted' after deletion."""

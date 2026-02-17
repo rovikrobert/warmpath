@@ -7,9 +7,9 @@ import TagInput from '../components/TagInput';
 function ResumePreviewModal({ data, onApply, onClose }) {
   if (!data) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="resume-preview-title">
       <div className="mx-4 w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
-        <h3 className="text-lg font-bold text-slate-900">Resume Preview</h3>
+        <h3 id="resume-preview-title" className="text-lg font-bold text-slate-900">Resume Preview</h3>
         <p className="mt-1 text-sm text-slate-500">Review parsed data before applying.</p>
         <div className="mt-4 space-y-3 text-sm">
           {data.headline && <div><span className="font-medium text-slate-700">Headline:</span> {data.headline}</div>}
@@ -57,7 +57,7 @@ const PRIVACY_STEPS = [
     title: 'Your Data Stays Private',
     text: 'Everything you upload lives in your Private Vault \u2014 encrypted and visible only to you. Your full contact data is never shared with other users.',
     icon: (
-      <svg className="h-10 w-10 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+      <svg className="h-10 w-10 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
       </svg>
     ),
@@ -69,7 +69,7 @@ const PRIVACY_STEPS = [
     title: 'Contacts Are Protected',
     text: 'If you share contacts on the marketplace, only anonymised info is shown (company + role level). Names and emails are never revealed without your explicit approval.',
     icon: (
-      <svg className="h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+      <svg className="h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
       </svg>
     ),
@@ -81,7 +81,7 @@ const PRIVACY_STEPS = [
     title: "Your Employer Can't See You",
     text: 'Your job search activity is completely invisible. No employer \u2014 including yours \u2014 can discover you\'re looking for new opportunities.',
     icon: (
-      <svg className="h-10 w-10 text-purple-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+      <svg className="h-10 w-10 text-purple-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
       </svg>
     ),
@@ -93,7 +93,7 @@ const PRIVACY_STEPS = [
     title: 'Anyone Can Opt Out',
     text: 'Any person can request removal from WarmPath at any time, even if they don\'t have an account. We maintain a permanent suppression list.',
     icon: (
-      <svg className="h-10 w-10 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+      <svg className="h-10 w-10 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
       </svg>
     ),
@@ -301,7 +301,7 @@ export default function OnboardingPage() {
   const privacyStep = PRIVACY_STEPS.find((ps) => ps.step === step);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12" role="main">
       <div className="w-full max-w-lg">
         {/* Logo */}
         <div className="mb-6 text-center">
@@ -311,11 +311,12 @@ export default function OnboardingPage() {
         </div>
 
         {/* Progress — clickable segments to jump back */}
-        <div className="mb-6 flex items-center gap-1">
+        <div className="mb-6 flex items-center gap-1" role="progressbar" aria-valuenow={step} aria-valuemin={1} aria-valuemax={TOTAL_STEPS} aria-label={`Onboarding step ${step} of ${TOTAL_STEPS}`}>
           {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
             <button
               key={s}
               type="button"
+              aria-label={`Go to step ${s}`}
               onClick={() => { if (s < step) { setError(''); setStep(s); } }}
               disabled={s >= step}
               className={`h-1.5 flex-1 rounded-full transition ${s <= step ? 'bg-amber-500' : 'bg-slate-200'} ${s < step ? 'cursor-pointer hover:bg-amber-400' : ''}`}
@@ -333,13 +334,13 @@ export default function OnboardingPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Target Role</label>
-                <input type="text" value={prefs.target_role} onChange={setPref('target_role')} className={inputClass} placeholder="e.g. Software Engineer, Product Manager" />
+                <label htmlFor="onboard-target-role" className="mb-1 block text-sm font-medium text-slate-700">Target Role</label>
+                <input id="onboard-target-role" type="text" value={prefs.target_role} onChange={setPref('target_role')} className={inputClass} placeholder="e.g. Software Engineer, Product Manager" />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Seniority Level</label>
-                <select value={prefs.target_seniority} onChange={setPref('target_seniority')} className={inputClass}>
+                <label htmlFor="onboard-seniority" className="mb-1 block text-sm font-medium text-slate-700">Seniority Level</label>
+                <select id="onboard-seniority" value={prefs.target_seniority} onChange={setPref('target_seniority')} className={inputClass}>
                   <option value="">Select level</option>
                   {SENIORITY_OPTIONS.map((s) => (
                     <option key={s} value={s}>{s}</option>
@@ -371,7 +372,7 @@ export default function OnboardingPage() {
                 Open to remote roles
               </label>
 
-              {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+              {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
 
               <div className="flex gap-3">
                 <button onClick={() => setStep(2)} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
@@ -414,7 +415,7 @@ export default function OnboardingPage() {
                 ))}
               </div>
 
-              {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+              {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
 
               <div className="flex gap-3">
                 <button onClick={() => { setError(''); setStep(1); }} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
@@ -481,6 +482,10 @@ export default function OnboardingPage() {
               </div>
 
               <div
+                role="button"
+                tabIndex={0}
+                aria-label="Upload CSV file - drag and drop or click to browse"
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
@@ -489,7 +494,7 @@ export default function OnboardingPage() {
                   dragOver ? 'border-amber-500 bg-amber-50' : 'border-slate-300 hover:border-amber-400 hover:bg-amber-50/50'
                 }`}
               >
-                <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={(e) => handleFile(e.target.files[0])} />
+                <input ref={fileInputRef} type="file" accept=".csv" aria-label="Select CSV file" className="hidden" onChange={(e) => handleFile(e.target.files[0])} />
                 {file ? (
                   <div>
                     <p className="text-sm font-medium text-slate-900">{file.name}</p>
@@ -518,11 +523,11 @@ export default function OnboardingPage() {
                 </label>
               )}
 
-              {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+              {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
 
               {uploading && (
-                <div>
-                  <div className="mb-1 h-2 overflow-hidden rounded-full bg-slate-200">
+                <div aria-live="polite">
+                  <div className="mb-1 h-2 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-valuenow={Math.round(uploadProgressWidth)} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress">
                     <div
                       className="h-full rounded-full bg-amber-500 transition-[width] duration-300 ease-out"
                       style={{ width: `${uploadProgressWidth}%` }}
@@ -580,7 +585,7 @@ export default function OnboardingPage() {
                 <p className="mt-1 text-sm text-slate-500">Contacts at your former companies will get boosted referral scores.</p>
               </div>
 
-              <input ref={resumeInputRef} type="file" accept=".pdf" onChange={handleResumeUpload} className="hidden" />
+              <input ref={resumeInputRef} type="file" accept=".pdf" aria-label="Upload resume PDF" onChange={handleResumeUpload} className="hidden" />
               <ResumePreviewModal data={resumePreview} onApply={applyResumeData} onClose={() => setResumePreview(null)} />
 
               {workHistory.length === 0 && (
@@ -611,8 +616,9 @@ export default function OnboardingPage() {
                   <div key={i} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-700">Company</label>
+                        <label htmlFor={`wh-company-${i}`} className="mb-1 block text-xs font-medium text-slate-700">Company</label>
                         <input
+                          id={`wh-company-${i}`}
                           type="text"
                           value={entry.company}
                           onChange={(e) => setWorkHistory((wh) => wh.map((en, j) => j === i ? { ...en, company: e.target.value } : en))}
@@ -621,8 +627,9 @@ export default function OnboardingPage() {
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-700">Title / Role</label>
+                        <label htmlFor={`wh-title-${i}`} className="mb-1 block text-xs font-medium text-slate-700">Title / Role</label>
                         <input
+                          id={`wh-title-${i}`}
                           type="text"
                           value={entry.title}
                           onChange={(e) => setWorkHistory((wh) => wh.map((en, j) => j === i ? { ...en, title: e.target.value } : en))}
@@ -633,8 +640,9 @@ export default function OnboardingPage() {
                     </div>
                     <div className="mt-2 grid grid-cols-2 gap-3">
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-700">Start</label>
+                        <label htmlFor={`wh-start-${i}`} className="mb-1 block text-xs font-medium text-slate-700">Start</label>
                         <input
+                          id={`wh-start-${i}`}
                           type="month"
                           value={entry.start_date}
                           onChange={(e) => setWorkHistory((wh) => wh.map((en, j) => j === i ? { ...en, start_date: e.target.value } : en))}
@@ -642,11 +650,12 @@ export default function OnboardingPage() {
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-700">End</label>
+                        <label htmlFor={`wh-end-${i}`} className="mb-1 block text-xs font-medium text-slate-700">End</label>
                         {entry.is_current ? (
                           <p className="py-2 text-sm text-slate-500">Present</p>
                         ) : (
                           <input
+                            id={`wh-end-${i}`}
                             type="month"
                             value={entry.end_date}
                             onChange={(e) => setWorkHistory((wh) => wh.map((en, j) => j === i ? { ...en, end_date: e.target.value } : en))}
@@ -667,6 +676,7 @@ export default function OnboardingPage() {
                       </label>
                       <button
                         type="button"
+                        aria-label={`Remove work history entry ${i + 1}`}
                         onClick={() => setWorkHistory((wh) => wh.filter((_, j) => j !== i))}
                         className="text-xs text-red-500 hover:text-red-600"
                       >
@@ -687,7 +697,7 @@ export default function OnboardingPage() {
                 </button>
               )}
 
-              {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+              {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
 
               <div className="flex gap-3">
                 <button onClick={() => { setError(''); setStep(7); }} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">

@@ -410,21 +410,25 @@ async def generate_briefing(user_id: uuid.UUID, db: AsyncSession) -> dict:
 
 async def _generate_briefing_via_claude(context: dict) -> str:
     """Call Claude API for briefing generation."""
-    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    try:
+        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-    user_prompt = (
-        "Generate my daily career briefing based on this data:\n\n"
-        f"{json.dumps(context, default=str, indent=2)}"
-    )
+        user_prompt = (
+            "Generate my daily career briefing based on this data:\n\n"
+            f"{json.dumps(context, default=str, indent=2)}"
+        )
 
-    message = await client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=512,
-        system=_KEEVS_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
+        message = await client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=512,
+            system=_KEEVS_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
 
-    return message.content[0].text.strip()
+        return message.content[0].text.strip()
+    except Exception as exc:
+        logger.error("Claude briefing API failed: %s — falling back to mock", exc)
+        return _mock_briefing(context)
 
 
 # ---------------------------------------------------------------------------
@@ -508,17 +512,21 @@ async def _generate_chat_via_claude(
     context: dict,
 ) -> str:
     """Call Claude API for chat response."""
-    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-    messages = _build_chat_messages(message, conversation_history, context)
+    try:
+        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        messages = _build_chat_messages(message, conversation_history, context)
 
-    response = await client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=1024,
-        system=_KEEVS_SYSTEM_PROMPT,
-        messages=messages,
-    )
+        response = await client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=1024,
+            system=_KEEVS_SYSTEM_PROMPT,
+            messages=messages,
+        )
 
-    return response.content[0].text.strip()
+        return response.content[0].text.strip()
+    except Exception as exc:
+        logger.error("Claude chat API failed: %s — falling back to mock", exc)
+        return _mock_chat_response(message, context)
 
 
 async def generate_chat_response_stream(
@@ -531,14 +539,18 @@ async def generate_chat_response_stream(
         yield _mock_chat_response(message, context)
         return
 
-    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-    messages = _build_chat_messages(message, conversation_history, context)
+    try:
+        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        messages = _build_chat_messages(message, conversation_history, context)
 
-    async with client.messages.stream(
-        model=CLAUDE_MODEL,
-        max_tokens=1024,
-        system=_KEEVS_SYSTEM_PROMPT,
-        messages=messages,
-    ) as stream:
-        async for text in stream.text_stream:
-            yield text
+        async with client.messages.stream(
+            model=CLAUDE_MODEL,
+            max_tokens=1024,
+            system=_KEEVS_SYSTEM_PROMPT,
+            messages=messages,
+        ) as stream:
+            async for text in stream.text_stream:
+                yield text
+    except Exception as exc:
+        logger.error("Claude stream API failed: %s — falling back to mock", exc)
+        yield _mock_chat_response(message, context)

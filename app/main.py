@@ -37,16 +37,28 @@ app = FastAPI(title="WarmPath", version="0.1.0")
 # Startup configuration validation
 # ---------------------------------------------------------------------------
 if settings.SECURE_HEADERS:
+    _boot_errors: list[str] = []
     if settings.SECRET_KEY == "change-me-to-a-random-secret":
-        logger.critical(
-            "SECURE_HEADERS is enabled but SECRET_KEY is the default value. "
-            "Set a random SECRET_KEY before deploying to production."
+        _boot_errors.append(
+            "SECRET_KEY is the default value — set a random secret."
         )
     if not settings.ENCRYPTION_KEY:
-        logger.critical(
-            "SECURE_HEADERS is enabled but ENCRYPTION_KEY is empty. "
-            "PII will be stored as plaintext. Set ENCRYPTION_KEY for production."
+        _boot_errors.append(
+            "ENCRYPTION_KEY is empty — PII will be stored as plaintext."
         )
+    if _boot_errors:
+        for _err in _boot_errors:
+            logger.critical("BOOT BLOCKED: %s", _err)
+        raise RuntimeError(
+            "Production boot blocked — fix these config issues: "
+            + "; ".join(_boot_errors)
+        )
+
+if not settings.AI_MOCK_MODE and not settings.ANTHROPIC_API_KEY.strip():
+    raise RuntimeError(
+        "AI_MOCK_MODE is disabled but ANTHROPIC_API_KEY is not set. "
+        "Either set AI_MOCK_MODE=true or provide a valid API key."
+    )
 
 # ---------------------------------------------------------------------------
 # CORS

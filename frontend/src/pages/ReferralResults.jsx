@@ -32,15 +32,17 @@ function WarmScoreLegend() {
     <div className="relative inline-block">
       <button
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-label="What are warm scores? Toggle explanation"
         className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-500 hover:bg-slate-50"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
         </svg>
         What are warm scores?
       </button>
       {open && (
-        <div className="absolute right-0 z-10 mt-1 w-72 rounded-lg border border-slate-200 bg-white p-4 shadow-lg">
+        <div className="absolute right-0 z-10 mt-1 w-72 rounded-lg border border-slate-200 bg-white p-4 shadow-lg" role="tooltip">
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-700">Warm Score Guide</h4>
           <p className="mb-3 text-xs text-slate-500">
             Measures how likely this person is to respond to your referral request, based on recency of contact, relationship strength, role relevance, and tenure.
@@ -58,7 +60,7 @@ function WarmScoreLegend() {
               </div>
             ))}
           </div>
-          <button onClick={() => setOpen(false)} className="mt-3 text-xs text-amber-600 hover:text-amber-700">
+          <button onClick={() => setOpen(false)} aria-label="Close warm score guide" className="mt-3 text-xs text-amber-600 hover:text-amber-700">
             Got it
           </button>
         </div>
@@ -111,11 +113,11 @@ const REL_LABELS = {
 function IntroModal({ intro, onClose }) {
   if (!intro) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="referral-intro-modal-title">
       <div className="w-full max-w-xl rounded-xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-slate-900">Intro Drafts</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+          <h2 id="referral-intro-modal-title" className="text-lg font-semibold text-slate-900">Intro Drafts</h2>
+          <button onClick={onClose} aria-label="Close intro drafts" className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
         <div className="max-h-[70vh] overflow-y-auto px-6 py-4 space-y-4">
           {intro.messages?.map((msg) => (
@@ -228,6 +230,7 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
               {hasHiddenOnPage && (
                 <button
                   onClick={() => setShowAll(true)}
+                  aria-label={`Show ${openings.length - 5} more openings`}
                   className="mt-1 text-xs font-medium text-amber-600 hover:text-amber-700"
                 >
                   Show {openings.length - 5} more
@@ -404,15 +407,15 @@ export default function ReferralResults() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+      <div className="flex items-center justify-center py-20" role="main" aria-live="polite" aria-busy="true">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading referral results" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="mx-auto max-w-2xl rounded-xl bg-red-50 p-6 text-center text-sm text-red-600">
+      <div className="mx-auto max-w-2xl rounded-xl bg-red-50 p-6 text-center text-sm text-red-600" role="alert" aria-live="polite">
         {error}
       </div>
     );
@@ -423,7 +426,7 @@ export default function ReferralResults() {
   const searchedNames = searchMeta?.target_companies || companies.map((c) => c.name);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-3xl" role="main">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Referral Results</h1>

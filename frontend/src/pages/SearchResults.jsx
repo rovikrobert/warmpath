@@ -18,11 +18,11 @@ function ScoreBadge({ score, max = 100 }) {
 function IntroModal({ intro, onClose }) {
   if (!intro) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="search-intro-modal-title">
       <div className="w-full max-w-xl rounded-xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-slate-900">Intro Drafts</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+          <h2 id="search-intro-modal-title" className="text-lg font-semibold text-slate-900">Intro Drafts</h2>
+          <button onClick={onClose} aria-label="Close intro drafts" className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
         <div className="max-h-[70vh] overflow-y-auto px-6 py-4 space-y-4">
           {intro.messages?.map((msg) => (
@@ -105,7 +105,7 @@ export default function SearchResults() {
   const dist = meta.score_distribution || {};
 
   return (
-    <div>
+    <div role="main">
       {/* Header */}
       <div className="mb-4 flex items-start justify-between">
         <div>
@@ -155,32 +155,41 @@ export default function SearchResults() {
       )}
 
       {/* Filters */}
-      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-white p-3 ring-1 ring-slate-200">
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-white p-3 ring-1 ring-slate-200" role="search" aria-label="Filter search results">
         <div>
-          <label className="mb-1 block text-xs text-slate-500">Min Relevance</label>
+          <label htmlFor="filter-min-relevance" className="mb-1 block text-xs text-slate-500">Min Relevance</label>
           <input
+            id="filter-min-relevance"
             type="range"
             min="0" max="100" step="5"
             value={filters.min_relevance}
             onChange={(e) => setFilter('min_relevance', Number(e.target.value))}
+            aria-valuenow={filters.min_relevance}
+            aria-valuemin={0}
+            aria-valuemax={100}
             className="w-24 accent-amber-500"
           />
-          <span className="ml-1 text-xs text-slate-600">{filters.min_relevance}</span>
+          <span className="ml-1 text-xs text-slate-600" aria-hidden="true">{filters.min_relevance}</span>
         </div>
         <div>
-          <label className="mb-1 block text-xs text-slate-500">Min Warm</label>
+          <label htmlFor="filter-min-warm" className="mb-1 block text-xs text-slate-500">Min Warm</label>
           <input
+            id="filter-min-warm"
             type="range"
             min="0" max="100" step="5"
             value={filters.min_warm || 0}
             onChange={(e) => setFilter('min_warm', Number(e.target.value) || '')}
+            aria-valuenow={filters.min_warm || 0}
+            aria-valuemin={0}
+            aria-valuemax={100}
             className="w-24 accent-amber-500"
           />
-          <span className="ml-1 text-xs text-slate-600">{filters.min_warm || 0}</span>
+          <span className="ml-1 text-xs text-slate-600" aria-hidden="true">{filters.min_warm || 0}</span>
         </div>
         <div>
-          <label className="mb-1 block text-xs text-slate-500">Match Type</label>
+          <label htmlFor="filter-match-type" className="mb-1 block text-xs text-slate-500">Match Type</label>
           <select
+            id="filter-match-type"
             value={filters.match_type}
             onChange={(e) => setFilter('match_type', e.target.value)}
             className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
@@ -192,8 +201,9 @@ export default function SearchResults() {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs text-slate-500">Company</label>
+          <label htmlFor="filter-company" className="mb-1 block text-xs text-slate-500">Company</label>
           <input
+            id="filter-company"
             type="text"
             value={filters.company}
             onChange={(e) => setFilter('company', e.target.value)}
@@ -205,11 +215,11 @@ export default function SearchResults() {
 
       {/* Results table */}
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="h-6 w-6 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+        <div className="flex items-center justify-center py-12" aria-live="polite">
+          <div className="h-6 w-6 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading results" />
         </div>
       ) : results.length === 0 ? (
-        <div className="rounded-lg bg-white p-8 text-center ring-1 ring-slate-200">
+        <div className="rounded-lg bg-white p-8 text-center ring-1 ring-slate-200" aria-live="polite">
           <p className="text-sm text-slate-500">No matches found with current filters</p>
         </div>
       ) : (
@@ -267,7 +277,7 @@ export default function SearchResults() {
 
       {/* Pagination */}
       {meta.total_pages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
+        <nav className="mt-4 flex items-center justify-between" aria-label="Search results pagination">
           <p className="text-sm text-slate-500">
             Showing {results.length} of {meta.total_matches} matches (page {meta.page}/{meta.total_pages})
           </p>
@@ -275,6 +285,7 @@ export default function SearchResults() {
             <button
               onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))}
               disabled={filters.page <= 1}
+              aria-label="Previous page"
               className="rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50"
             >
               Prev
@@ -282,12 +293,13 @@ export default function SearchResults() {
             <button
               onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
               disabled={filters.page >= meta.total_pages}
+              aria-label="Next page"
               className="rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50"
             >
               Next
             </button>
           </div>
-        </div>
+        </nav>
       )}
 
       {introModal && <IntroModal intro={introModal} onClose={() => setIntroModal(null)} />}

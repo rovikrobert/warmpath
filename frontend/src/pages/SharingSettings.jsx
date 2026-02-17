@@ -84,14 +84,14 @@ export default function SharingSettings() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+      <div className="flex items-center justify-center py-20" aria-live="polite" aria-busy="true">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading sharing settings" />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6" role="main">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-slate-900">Sharing Settings</h1>
         <Link to="/marketplace/dashboard" className="text-sm text-amber-600 hover:text-amber-700">
@@ -122,11 +122,14 @@ export default function SharingSettings() {
           </div>
           <button
             onClick={() => setPrefs({ ...prefs, opt_in_marketplace: !prefs.opt_in_marketplace })}
+            role="switch"
+            aria-checked={!!prefs?.opt_in_marketplace}
+            aria-label="Share my network on the marketplace"
             className={`relative h-6 w-11 rounded-full transition ${
               prefs?.opt_in_marketplace ? 'bg-amber-500' : 'bg-slate-300'
             }`}
           >
-            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+            <span aria-hidden="true" className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
               prefs?.opt_in_marketplace ? 'left-5.5' : 'left-0.5'
             }`} style={{ left: prefs?.opt_in_marketplace ? '22px' : '2px' }} />
           </button>
@@ -144,11 +147,14 @@ export default function SharingSettings() {
           </div>
           <button
             onClick={() => setPrefs({ ...prefs, is_paused: !prefs.is_paused })}
+            role="switch"
+            aria-checked={!!prefs?.is_paused}
+            aria-label="Temporarily hide all my listings"
             className={`relative h-6 w-11 rounded-full transition ${
               prefs?.is_paused ? 'bg-amber-500' : 'bg-slate-300'
             }`}
           >
-            <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition"
+            <span aria-hidden="true" className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition"
               style={{ left: prefs?.is_paused ? '22px' : '2px' }} />
           </button>
         </div>
@@ -182,11 +188,14 @@ export default function SharingSettings() {
           Search and select specific contacts to exclude from the marketplace.
         </p>
 
+        <label htmlFor="exclude-search" className="sr-only">Search contacts to exclude</label>
         <input
+          id="exclude-search"
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search contacts by name, company, or title..."
+          aria-label="Search contacts to exclude from marketplace"
           className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
         />
 
@@ -227,7 +236,7 @@ export default function SharingSettings() {
           {saving ? 'Saving...' : 'Save Settings'}
         </button>
         {saved && (
-          <span className="text-sm text-green-600">Settings saved!</span>
+          <span className="text-sm text-green-600" role="status" aria-live="polite">Settings saved!</span>
         )}
       </div>
     </div>

@@ -47,7 +47,7 @@ function UsageBar({ label, count, limit }) {
         </span>
       </div>
       {!isUnlimited && (
-        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={count} aria-valuemin={0} aria-valuemax={typeof limit === 'number' ? limit : 100} aria-label={`${label} usage`}>
           <div
             className={`h-full rounded-full transition-all ${barColor}`}
             style={{ width: `${Math.max(pct, isBlocked ? 0 : 2)}%` }}
@@ -88,14 +88,14 @@ export default function CreditsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+      <div className="flex items-center justify-center py-20" aria-live="polite" aria-busy="true">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading credits" />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6" role="main">
       <h1 className="text-xl font-bold text-slate-900">Credits</h1>
 
       {/* Balance card */}
@@ -116,7 +116,7 @@ export default function CreditsPage() {
 
       {/* Expiring soon warning */}
       {balance?.expiring_soon > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4" role="alert" aria-live="polite">
           <p className="text-sm text-amber-800">
             <span className="font-semibold">{balance.expiring_soon} credits</span> will expire in the next 30 days. Use them before they're gone!
           </p>
@@ -227,6 +227,7 @@ export default function CreditsPage() {
           </div>
           <button
             disabled
+            aria-disabled="true"
             className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white opacity-50"
           >
             Coming Soon

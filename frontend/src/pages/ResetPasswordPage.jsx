@@ -34,12 +34,12 @@ export default function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4" role="main">
         <div className="w-full max-w-md text-center">
           <h1 className="text-3xl font-bold text-slate-900 mb-4">
             <span className="text-amber-500">~</span> WarmPath
           </h1>
-          <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+          <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200" role="alert">
             <p className="text-slate-600">Invalid reset link. Missing token.</p>
             <Link to="/forgot-password" className="mt-4 inline-block text-sm font-medium text-amber-600 hover:text-amber-700">
               Request a new link
@@ -51,7 +51,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4" role="main">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-slate-900">
@@ -60,8 +60,8 @@ export default function ResetPasswordPage() {
         </div>
 
         {success ? (
-          <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 text-2xl">
+          <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200 text-center" role="status" aria-live="polite">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 text-2xl" aria-hidden="true">
               {'\u2713'}
             </div>
             <h2 className="text-lg font-semibold text-slate-900">Password Reset</h2>
@@ -78,31 +78,35 @@ export default function ResetPasswordPage() {
             <h2 className="text-lg font-semibold text-slate-900">Set new password</h2>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">New Password</label>
+              <label htmlFor="reset-new-password" className="mb-1 block text-sm font-medium text-slate-700">New Password</label>
               <input
+                id="reset-new-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={inputClass}
                 placeholder="Enter new password"
                 required
+                aria-required="true"
               />
               <PasswordStrength password={password} />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Confirm Password</label>
+              <label htmlFor="reset-confirm-password" className="mb-1 block text-sm font-medium text-slate-700">Confirm Password</label>
               <input
+                id="reset-confirm-password"
                 type="password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 className={inputClass}
                 placeholder="Confirm new password"
                 required
+                aria-required="true"
               />
             </div>
 
-            {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+            {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600" role="alert" aria-live="assertive">{error}</p>}
 
             <button
               type="submit"

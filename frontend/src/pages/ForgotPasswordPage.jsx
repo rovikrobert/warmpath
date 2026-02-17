@@ -25,7 +25,7 @@ export default function ForgotPasswordPage() {
   const inputClass = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4" role="main">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-slate-900">
@@ -34,8 +34,8 @@ export default function ForgotPasswordPage() {
         </div>
 
         {submitted ? (
-          <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-600 text-2xl">
+          <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200 text-center" role="status" aria-live="polite">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-600 text-2xl" aria-hidden="true">
               {'\u2709'}
             </div>
             <h2 className="text-lg font-semibold text-slate-900">Check your email</h2>
@@ -58,18 +58,20 @@ export default function ForgotPasswordPage() {
             </p>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>
+              <label htmlFor="forgot-email" className="mb-1 block text-sm font-medium text-slate-700">Email</label>
               <input
+                id="forgot-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={inputClass}
                 placeholder="you@company.com"
                 required
+                aria-required="true"
               />
             </div>
 
-            {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+            {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600" role="alert" aria-live="assertive">{error}</p>}
 
             <button
               type="submit"
