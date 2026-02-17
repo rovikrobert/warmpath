@@ -110,7 +110,9 @@ async def coach_chat_stream(
                     break
                 yield f"data: {json.dumps({'t': chunk})}\n\n"
         except asyncio.CancelledError:
-            logger.info("SSE stream cancelled (client disconnect) for user %s", user_key)
+            logger.info(
+                "SSE stream cancelled (client disconnect) for user %s", user_key
+            )
         finally:
             _active_streams[user_key] -= 1
             if _active_streams[user_key] <= 0:

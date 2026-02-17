@@ -167,9 +167,7 @@ class JobFetcher:
             published = job.get("publishedAt")
             if published:
                 try:
-                    posted_at = datetime.fromisoformat(
-                        published.replace("Z", "+00:00")
-                    )
+                    posted_at = datetime.fromisoformat(published.replace("Z", "+00:00"))
                 except (ValueError, TypeError):
                     pass
 
@@ -373,8 +371,17 @@ Only include jobs scoring >= 50. Return ONLY the JSON array."""
 
         # Seniority keywords in rough order
         _SENIORITY_LEVELS = {
-            "intern", "junior", "mid", "senior", "staff", "principal",
-            "lead", "manager", "director", "vp", "c-level",
+            "intern",
+            "junior",
+            "mid",
+            "senior",
+            "staff",
+            "principal",
+            "lead",
+            "manager",
+            "director",
+            "vp",
+            "c-level",
         }
 
         # Pre-compute location terms for matching
@@ -408,7 +415,11 @@ Only include jobs scoring >= 50. Return ONLY the JSON array."""
 
             # --- Location bonus ---
             location_bonus = 0
-            if loc_terms and job_location and any(term in job_location for term in loc_terms):
+            if (
+                loc_terms
+                and job_location
+                and any(term in job_location for term in loc_terms)
+            ):
                 location_bonus = 10
             elif is_remote and open_to_remote:
                 location_bonus = 5

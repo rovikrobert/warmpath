@@ -42,9 +42,7 @@ async def _upsert_openings(
             for src, sid in dedup_pairs
         ]
         er = await db.execute(select(JobOpening).where(or_(*conditions)))
-        existing_map = {
-            (jo.source, jo.source_job_id): jo for jo in er.scalars()
-        }
+        existing_map = {(jo.source, jo.source_job_id): jo for jo in er.scalars()}
 
     for job_data in jobs:
         source = job_data["source"]

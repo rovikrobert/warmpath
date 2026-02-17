@@ -3,11 +3,9 @@
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
-import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from app.models.contact import Contact
 from app.models.enrichment import EnrichmentCache
 from app.services.dashboard_insights import TIPS, _get_daily_tip
 from tests.conftest import TestSessionLocal
@@ -55,13 +53,55 @@ async def prefs_set(auth_headers: dict, client: AsyncClient) -> None:
 async def user_with_contacts(auth_headers: dict, client: AsyncClient) -> dict:
     """Create several manual contacts and return auth headers."""
     contacts_data = [
-        {"first_name": "Alice", "last_name": "Eng", "company": "Google", "position": "SWE", "relationship_type": "current_colleague"},
-        {"first_name": "Bob", "last_name": "Eng", "company": "Google", "position": "SRE", "relationship_type": "current_colleague"},
-        {"first_name": "Carol", "last_name": "PM", "company": "Stripe", "position": "PM", "relationship_type": "friend"},
-        {"first_name": "Dave", "last_name": "DS", "company": "Stripe", "position": "Data Scientist", "relationship_type": "current_colleague"},
-        {"first_name": "Eve", "last_name": "Mgr", "company": "Stripe", "position": "Eng Manager", "relationship_type": "manager"},
-        {"first_name": "Frank", "last_name": "Dev", "company": "Airbnb", "position": "SWE", "relationship_type": "current_colleague"},
-        {"first_name": "Grace", "last_name": "Rec", "company": "Meta", "position": "Recruiter", "relationship_type": "recruiter"},
+        {
+            "first_name": "Alice",
+            "last_name": "Eng",
+            "company": "Google",
+            "position": "SWE",
+            "relationship_type": "current_colleague",
+        },
+        {
+            "first_name": "Bob",
+            "last_name": "Eng",
+            "company": "Google",
+            "position": "SRE",
+            "relationship_type": "current_colleague",
+        },
+        {
+            "first_name": "Carol",
+            "last_name": "PM",
+            "company": "Stripe",
+            "position": "PM",
+            "relationship_type": "friend",
+        },
+        {
+            "first_name": "Dave",
+            "last_name": "DS",
+            "company": "Stripe",
+            "position": "Data Scientist",
+            "relationship_type": "current_colleague",
+        },
+        {
+            "first_name": "Eve",
+            "last_name": "Mgr",
+            "company": "Stripe",
+            "position": "Eng Manager",
+            "relationship_type": "manager",
+        },
+        {
+            "first_name": "Frank",
+            "last_name": "Dev",
+            "company": "Airbnb",
+            "position": "SWE",
+            "relationship_type": "current_colleague",
+        },
+        {
+            "first_name": "Grace",
+            "last_name": "Rec",
+            "company": "Meta",
+            "position": "Recruiter",
+            "relationship_type": "recruiter",
+        },
     ]
     await client.post(
         "/api/v1/contacts/manual/bulk",
@@ -78,7 +118,15 @@ MOCK_RECS = {
             "company": "stripe",
             "display_name": "Stripe",
             "region": "US / Global",
-            "matching_openings": [{"title": "Senior SWE", "url": "", "location": "SG", "is_remote": False, "relevance": 90}],
+            "matching_openings": [
+                {
+                    "title": "Senior SWE",
+                    "url": "",
+                    "location": "SG",
+                    "is_remote": False,
+                    "relevance": 90,
+                }
+            ],
             "matching_count": 3,
             "total_openings": 10,
             "top_titles": ["Senior SWE", "Staff SWE"],
@@ -89,7 +137,15 @@ MOCK_RECS = {
             "company": "grab",
             "display_name": "Grab",
             "region": "Singapore / SEA",
-            "matching_openings": [{"title": "Software Engineer", "url": "", "location": "SG", "is_remote": False, "relevance": 85}],
+            "matching_openings": [
+                {
+                    "title": "Software Engineer",
+                    "url": "",
+                    "location": "SG",
+                    "is_remote": False,
+                    "relevance": 85,
+                }
+            ],
             "matching_count": 2,
             "total_openings": 8,
             "top_titles": ["Software Engineer", "Backend Engineer"],
@@ -119,9 +175,7 @@ class TestDashboardInsightsEndpoint:
         self, client: AsyncClient, auth_headers: dict
     ):
         """With no preferences and no contacts, only daily tip is populated."""
-        resp = await client.get(
-            "/api/v1/dashboard/insights", headers=auth_headers
-        )
+        resp = await client.get("/api/v1/dashboard/insights", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert data["job_market_trends"] is None
@@ -139,9 +193,7 @@ class TestDashboardInsightsEndpoint:
             new_callable=AsyncMock,
             return_value=MOCK_RECS,
         ):
-            resp = await client.get(
-                "/api/v1/dashboard/insights", headers=auth_headers
-            )
+            resp = await client.get("/api/v1/dashboard/insights", headers=auth_headers)
 
         assert resp.status_code == 200
         trends = resp.json()["data"]["job_market_trends"]
@@ -168,13 +220,9 @@ class TestDashboardInsightsEndpoint:
         assert top[1]["company"] == "Google"
         assert top[1]["count"] == 2
 
-    async def test_response_envelope(
-        self, client: AsyncClient, auth_headers: dict
-    ):
+    async def test_response_envelope(self, client: AsyncClient, auth_headers: dict):
         """Verify standard {data, meta} envelope."""
-        resp = await client.get(
-            "/api/v1/dashboard/insights", headers=auth_headers
-        )
+        resp = await client.get("/api/v1/dashboard/insights", headers=auth_headers)
         body = resp.json()
         assert "data" in body
         assert "meta" in body
@@ -200,9 +248,7 @@ class TestDashboardInsightsEndpoint:
             new_callable=AsyncMock,
             return_value=MOCK_RECS,
         ):
-            resp = await client.get(
-                "/api/v1/dashboard/insights", headers=auth_headers
-            )
+            resp = await client.get("/api/v1/dashboard/insights", headers=auth_headers)
 
         trends = resp.json()["data"]["job_market_trends"]
         assert trends is not None
@@ -256,16 +302,12 @@ class TestInsightsCache:
             mock_rec,
         ):
             # First call — populates cache
-            resp1 = await client.get(
-                "/api/v1/dashboard/insights", headers=auth_headers
-            )
+            resp1 = await client.get("/api/v1/dashboard/insights", headers=auth_headers)
             assert resp1.status_code == 200
             assert resp1.json()["data"]["job_market_trends"] is not None
 
             # Second call — should hit cache
-            resp2 = await client.get(
-                "/api/v1/dashboard/insights", headers=auth_headers
-            )
+            resp2 = await client.get("/api/v1/dashboard/insights", headers=auth_headers)
             assert resp2.status_code == 200
             assert resp2.json()["data"]["job_market_trends"] is not None
 
@@ -302,9 +344,7 @@ class TestNetworkAnalysis:
         self, client: AsyncClient, auth_headers: dict
     ):
         """No contacts means network_analysis is None."""
-        resp = await client.get(
-            "/api/v1/dashboard/insights", headers=auth_headers
-        )
+        resp = await client.get("/api/v1/dashboard/insights", headers=auth_headers)
         assert resp.json()["data"]["network_analysis"] is None
 
     async def test_relationship_breakdown(

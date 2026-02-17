@@ -59,19 +59,19 @@ class UserResponse(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    access_token: str
+    access_token: str = Field(..., max_length=2000)
     token_type: str = "bearer"
 
 
 class WorkHistoryEntry(BaseModel):
-    company: str
-    title: str | None = None
-    start_date: str | None = None
-    end_date: str | None = None
+    company: str = Field(..., max_length=255)
+    title: str | None = Field(default=None, max_length=255)
+    start_date: str | None = Field(default=None, max_length=30)
+    end_date: str | None = Field(default=None, max_length=30)
 
 
 class ConnectorProfileUpsert(BaseModel):
-    headline: str | None = None
+    headline: str | None = Field(default=None, max_length=500)
     current_company: str | None = None
     current_title: str | None = None
     industry: str | None = None

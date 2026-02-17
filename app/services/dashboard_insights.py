@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 # Cache helpers (same pattern as job_recommendations.py)
 # ---------------------------------------------------------------------------
 
+
 async def _read_cache(cache_key: str, db: AsyncSession) -> dict | None:
     """Read from EnrichmentCache if not expired."""
     now = datetime.now(timezone.utc)
@@ -71,6 +72,7 @@ async def _write_cache(
 # Tier 1 — Job Market Trends
 # ---------------------------------------------------------------------------
 
+
 async def _get_recently_searched_companies(
     user_id: uuid.UUID, db: AsyncSession
 ) -> list[str]:
@@ -92,6 +94,7 @@ async def _get_recently_searched_companies(
         elif isinstance(companies, str):
             # SQLite stores JSON-encoded arrays
             import json as _json
+
             try:
                 parsed = _json.loads(companies)
                 if isinstance(parsed, list):
@@ -210,6 +213,7 @@ async def _get_job_market_trends(
 # Tier 2 — Network Analysis
 # ---------------------------------------------------------------------------
 
+
 async def _get_network_analysis(
     user_id: uuid.UUID, db: AsyncSession, prefs: UserJobPreferences | None = None
 ) -> dict | None:
@@ -241,12 +245,12 @@ async def _get_network_analysis(
     )
     all_contacts = list(contacts_result.scalars())
     company_counts = Counter(
-        c.current_company for c in all_contacts
+        c.current_company
+        for c in all_contacts
         if c.current_company and c.current_company.strip()
     )
     top_companies = [
-        {"company": co, "count": n}
-        for co, n in company_counts.most_common(10)
+        {"company": co, "count": n} for co, n in company_counts.most_common(10)
     ]
 
     # Relationship type breakdown
@@ -263,16 +267,17 @@ async def _get_network_analysis(
         .order_by(func.count(Contact.id).desc())
     )
     relationship_breakdown = {
-        (row[0] or "unclassified"): row[1]
-        for row in rel_result.all()
+        (row[0] or "unclassified"): row[1] for row in rel_result.all()
     }
 
     # Build summary
-    top_names = ", ".join(
-        f"{c['company']} ({c['count']})" for c in top_companies[:3]
-    )
+    top_names = ", ".join(f"{c['company']} ({c['count']})" for c in top_companies[:3])
     # Find the most common relationship type
-    top_rel = max(relationship_breakdown, key=relationship_breakdown.get) if relationship_breakdown else None
+    top_rel = (
+        max(relationship_breakdown, key=relationship_breakdown.get)
+        if relationship_breakdown
+        else None
+    )
     top_rel_count = relationship_breakdown.get(top_rel, 0) if top_rel else 0
 
     parts = [f"You have {total_contacts} contacts."]
@@ -286,15 +291,23 @@ async def _get_network_analysis(
     # Network gaps: if user has target locations, check coverage
     network_gaps = None
     if prefs and prefs.target_locations:
-        from app.services.board_registry import companies_for_locations, get_display_name
+        from app.services.board_registry import (
+            companies_for_locations,
+            get_display_name,
+        )
 
         target_companies = companies_for_locations(prefs.target_locations)[:15]
-        user_company_names = {c["company"].lower() for c in top_companies if c["company"]}
+        user_company_names = {
+            c["company"].lower() for c in top_companies if c["company"]
+        }
 
         missing = []
         for key in target_companies:
             display = get_display_name(key)
-            if display.lower() not in user_company_names and key not in user_company_names:
+            if (
+                display.lower() not in user_company_names
+                and key not in user_company_names
+            ):
                 missing.append(display)
 
         if missing:
@@ -320,40 +333,130 @@ async def _get_network_analysis(
 
 TIPS = [
     # Networking
-    {"tip": "When requesting a referral, always include a 2-sentence summary of why you're a strong fit for the specific role.", "category": "networking"},
-    {"tip": "Reach out to former colleagues before current ones \u2014 they've already seen your work and are more likely to vouch for you.", "category": "networking"},
-    {"tip": "Before contacting someone for a referral, check if they've been at their company for at least 6 months. Newer employees rarely have enough capital to refer.", "category": "networking"},
-    {"tip": "Don't ask 'Can you refer me?' \u2014 ask 'Would you be comfortable referring me for this role?' It gives them an easy out and builds trust.", "category": "networking"},
-    {"tip": "Follow up on referral requests after 3-5 business days. People are busy, not uninterested.", "category": "networking"},
-    {"tip": "When reaching out to a former manager, reference a specific project you worked on together. It triggers positive recall.", "category": "networking"},
+    {
+        "tip": "When requesting a referral, always include a 2-sentence summary of why you're a strong fit for the specific role.",
+        "category": "networking",
+    },
+    {
+        "tip": "Reach out to former colleagues before current ones \u2014 they've already seen your work and are more likely to vouch for you.",
+        "category": "networking",
+    },
+    {
+        "tip": "Before contacting someone for a referral, check if they've been at their company for at least 6 months. Newer employees rarely have enough capital to refer.",
+        "category": "networking",
+    },
+    {
+        "tip": "Don't ask 'Can you refer me?' \u2014 ask 'Would you be comfortable referring me for this role?' It gives them an easy out and builds trust.",
+        "category": "networking",
+    },
+    {
+        "tip": "Follow up on referral requests after 3-5 business days. People are busy, not uninterested.",
+        "category": "networking",
+    },
+    {
+        "tip": "When reaching out to a former manager, reference a specific project you worked on together. It triggers positive recall.",
+        "category": "networking",
+    },
     # Resume
-    {"tip": "Tailor your resume for each referral. The person referring you will often forward it directly \u2014 make it easy for them to advocate.", "category": "resume"},
-    {"tip": "Lead every bullet point with a measurable impact: revenue generated, time saved, users served, or systems built.", "category": "resume"},
-    {"tip": "Keep your resume to one page if you have under 10 years of experience. Recruiters spend 6-8 seconds on initial scan.", "category": "resume"},
-    {"tip": "Remove objective statements. Replace with a 2-line professional summary that matches the role's requirements.", "category": "resume"},
-    {"tip": "Include the exact job title you're targeting in your resume header. ATS systems match on this.", "category": "resume"},
-    {"tip": "If you've been promoted, show it clearly with dates. Internal promotions signal that previous employers valued your work.", "category": "resume"},
+    {
+        "tip": "Tailor your resume for each referral. The person referring you will often forward it directly \u2014 make it easy for them to advocate.",
+        "category": "resume",
+    },
+    {
+        "tip": "Lead every bullet point with a measurable impact: revenue generated, time saved, users served, or systems built.",
+        "category": "resume",
+    },
+    {
+        "tip": "Keep your resume to one page if you have under 10 years of experience. Recruiters spend 6-8 seconds on initial scan.",
+        "category": "resume",
+    },
+    {
+        "tip": "Remove objective statements. Replace with a 2-line professional summary that matches the role's requirements.",
+        "category": "resume",
+    },
+    {
+        "tip": "Include the exact job title you're targeting in your resume header. ATS systems match on this.",
+        "category": "resume",
+    },
+    {
+        "tip": "If you've been promoted, show it clearly with dates. Internal promotions signal that previous employers valued your work.",
+        "category": "resume",
+    },
     # Interviewing
-    {"tip": "Prepare 3-5 STAR stories that cover: a technical challenge, cross-team collaboration, handling ambiguity, and driving impact.", "category": "interviewing"},
-    {"tip": "Research your interviewer on LinkedIn before the call. Mention shared interests or background to build rapport.", "category": "interviewing"},
-    {"tip": "Always ask 'What does success look like in this role in the first 90 days?' It shows you're already thinking about contribution.", "category": "interviewing"},
-    {"tip": "After each interview, send a thank-you email within 24 hours that references something specific you discussed.", "category": "interviewing"},
-    {"tip": "When you don't know an answer, say so honestly, then walk through how you'd approach finding it. Interviewers value intellectual honesty.", "category": "interviewing"},
-    {"tip": "Practice your introduction until it's under 90 seconds. Cover: who you are, your strongest relevant experience, and why this role.", "category": "interviewing"},
+    {
+        "tip": "Prepare 3-5 STAR stories that cover: a technical challenge, cross-team collaboration, handling ambiguity, and driving impact.",
+        "category": "interviewing",
+    },
+    {
+        "tip": "Research your interviewer on LinkedIn before the call. Mention shared interests or background to build rapport.",
+        "category": "interviewing",
+    },
+    {
+        "tip": "Always ask 'What does success look like in this role in the first 90 days?' It shows you're already thinking about contribution.",
+        "category": "interviewing",
+    },
+    {
+        "tip": "After each interview, send a thank-you email within 24 hours that references something specific you discussed.",
+        "category": "interviewing",
+    },
+    {
+        "tip": "When you don't know an answer, say so honestly, then walk through how you'd approach finding it. Interviewers value intellectual honesty.",
+        "category": "interviewing",
+    },
+    {
+        "tip": "Practice your introduction until it's under 90 seconds. Cover: who you are, your strongest relevant experience, and why this role.",
+        "category": "interviewing",
+    },
     # Mindset
-    {"tip": "Job searching is a numbers game with skill. Track your conversion rates: applications \u2192 screens \u2192 interviews \u2192 offers.", "category": "mindset"},
-    {"tip": "Rejections are data, not verdicts. After each one, note what you'd do differently and move on.", "category": "mindset"},
-    {"tip": "Block 2 hours per day for job search activities. Treat it like a meeting \u2014 consistent effort beats sporadic bursts.", "category": "mindset"},
-    {"tip": "Celebrate small wins: a response, an interview invite, positive feedback. Job searching is a marathon.", "category": "mindset"},
-    {"tip": "Take at least one full day off per week from job searching. Burnout reduces the quality of every interaction.", "category": "mindset"},
-    {"tip": "Join communities of other job seekers. Shared experiences reduce isolation and often surface hidden opportunities.", "category": "mindset"},
+    {
+        "tip": "Job searching is a numbers game with skill. Track your conversion rates: applications \u2192 screens \u2192 interviews \u2192 offers.",
+        "category": "mindset",
+    },
+    {
+        "tip": "Rejections are data, not verdicts. After each one, note what you'd do differently and move on.",
+        "category": "mindset",
+    },
+    {
+        "tip": "Block 2 hours per day for job search activities. Treat it like a meeting \u2014 consistent effort beats sporadic bursts.",
+        "category": "mindset",
+    },
+    {
+        "tip": "Celebrate small wins: a response, an interview invite, positive feedback. Job searching is a marathon.",
+        "category": "mindset",
+    },
+    {
+        "tip": "Take at least one full day off per week from job searching. Burnout reduces the quality of every interaction.",
+        "category": "mindset",
+    },
+    {
+        "tip": "Join communities of other job seekers. Shared experiences reduce isolation and often surface hidden opportunities.",
+        "category": "mindset",
+    },
     # Strategy
-    {"tip": "Target 5-10 companies deeply rather than applying to 50 superficially. Warm intros beat cold applications 10:1.", "category": "strategy"},
-    {"tip": "Map your network by company before you start searching. You often have more connections than you think.", "category": "strategy"},
-    {"tip": "Apply to roles posted within the last 2 weeks. Older listings often have candidates already in pipeline.", "category": "strategy"},
-    {"tip": "If a company doesn't have an open role that fits, connect with a team lead anyway. Roles open faster than they're posted.", "category": "strategy"},
-    {"tip": "Negotiate salary after you have a written offer, not before. Your leverage is highest when they've committed.", "category": "strategy"},
-    {"tip": "Always have at least 2-3 active opportunities in parallel. It reduces desperation and improves your negotiating position.", "category": "strategy"},
+    {
+        "tip": "Target 5-10 companies deeply rather than applying to 50 superficially. Warm intros beat cold applications 10:1.",
+        "category": "strategy",
+    },
+    {
+        "tip": "Map your network by company before you start searching. You often have more connections than you think.",
+        "category": "strategy",
+    },
+    {
+        "tip": "Apply to roles posted within the last 2 weeks. Older listings often have candidates already in pipeline.",
+        "category": "strategy",
+    },
+    {
+        "tip": "If a company doesn't have an open role that fits, connect with a team lead anyway. Roles open faster than they're posted.",
+        "category": "strategy",
+    },
+    {
+        "tip": "Negotiate salary after you have a written offer, not before. Your leverage is highest when they've committed.",
+        "category": "strategy",
+    },
+    {
+        "tip": "Always have at least 2-3 active opportunities in parallel. It reduces desperation and improves your negotiating position.",
+        "category": "strategy",
+    },
 ]
 
 
@@ -373,6 +476,7 @@ def _get_daily_tip(day_of_year: int | None = None) -> dict:
 # ---------------------------------------------------------------------------
 # Main orchestrator
 # ---------------------------------------------------------------------------
+
 
 async def get_dashboard_insights(user_id: uuid.UUID, db: AsyncSession) -> dict:
     """Return all three tiers of dashboard insights."""

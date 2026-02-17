@@ -7,8 +7,6 @@ Covers:
 - Conversation history sanitization
 """
 
-import uuid
-
 from httpx import AsyncClient
 
 from app.api.coach import _sanitize_conversation_history
@@ -51,7 +49,9 @@ class TestLoginEmailEnumeration:
 
     async def test_wrong_password_returns_generic_error(self, client: AsyncClient):
         await _signup(client, email="login_enum@example.com")
-        resp = await _login(client, email="login_enum@example.com", password="WrongPass1")
+        resp = await _login(
+            client, email="login_enum@example.com", password="WrongPass1"
+        )
         assert resp.status_code == 401
         assert resp.json()["detail"] == "Invalid email or password"
 
@@ -59,8 +59,12 @@ class TestLoginEmailEnumeration:
         """Both wrong-email and wrong-password return the exact same message."""
         await _signup(client, email="same_msg@example.com")
 
-        wrong_email = await _login(client, email="fake@example.com", password="Secret123")
-        wrong_pass = await _login(client, email="same_msg@example.com", password="Bad12345")
+        wrong_email = await _login(
+            client, email="fake@example.com", password="Secret123"
+        )
+        wrong_pass = await _login(
+            client, email="same_msg@example.com", password="Bad12345"
+        )
 
         assert wrong_email.json()["detail"] == wrong_pass.json()["detail"]
 
@@ -98,7 +102,10 @@ class TestForgotPasswordEnumeration:
             "/api/v1/auth/forgot-password",
             json={"email": "missing@example.com"},
         )
-        assert resp_exists.json()["data"]["message"] == resp_missing.json()["data"]["message"]
+        assert (
+            resp_exists.json()["data"]["message"]
+            == resp_missing.json()["data"]["message"]
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +121,7 @@ class TestSuppressionRateLimit:
                 "/api/v1/privacy/suppression-request",
                 json={"email": f"suppress{i}@example.com"},
             )
-            assert resp.status_code == 200, f"Request {i+1} should succeed"
+            assert resp.status_code == 200, f"Request {i + 1} should succeed"
 
         # 6th request should be rate limited
         resp = await client.post(
@@ -135,7 +142,7 @@ class TestRectificationRateLimit:
                     "corrections": {"first_name": "New Name"},
                 },
             )
-            assert resp.status_code == 200, f"Request {i+1} should succeed"
+            assert resp.status_code == 200, f"Request {i + 1} should succeed"
 
         # 6th request should be rate limited
         resp = await client.post(
@@ -259,6 +266,10 @@ class TestSchemaMaxLength:
     async def test_suppression_name_max_length(self, client: AsyncClient):
         resp = await client.post(
             "/api/v1/privacy/suppression-request",
-            json={"first_name": "A" * 300, "last_name": "B" * 300, "company": "C" * 600},
+            json={
+                "first_name": "A" * 300,
+                "last_name": "B" * 300,
+                "company": "C" * 600,
+            },
         )
         assert resp.status_code == 422

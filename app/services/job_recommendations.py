@@ -41,9 +41,7 @@ async def get_cached_jobs(company_key: str, db: AsyncSession) -> list[dict] | No
     return entry.data.get("jobs", [])
 
 
-async def set_cached_jobs(
-    company_key: str, jobs: list[dict], db: AsyncSession
-) -> None:
+async def set_cached_jobs(company_key: str, jobs: list[dict], db: AsyncSession) -> None:
     """Upsert cached job listings with TTL."""
     cache_key = f"job_scan:{company_key}"
     ttl = timedelta(hours=settings.RECOMMENDATION_CACHE_TTL_HOURS)

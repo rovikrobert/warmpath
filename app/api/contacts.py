@@ -48,9 +48,13 @@ async def upload_csv(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Upload a LinkedIn CSV file to import contacts."""
     # Rate limit check
     allowed, count = await check_rate_limit(
-        current_user.id, "csv_upload", settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY, db,
+        current_user.id,
+        "csv_upload",
+        settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY,
+        db,
         is_admin=current_user.is_admin,
     )
     if not allowed:
@@ -191,6 +195,7 @@ async def list_contacts(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """List the current user's contacts with pagination, search, and sorting."""
     # Join contacts with warm_scores to include score in response
     base_query = (
         select(Contact, WarmScore.total_score)
@@ -224,7 +229,8 @@ async def list_contacts(
         if search:
             s = search.lower()
             all_rows = [
-                (c, sc) for c, sc in all_rows
+                (c, sc)
+                for c, sc in all_rows
                 if s in (c.full_name or "").lower()
                 or s in (c.current_company or "").lower()
                 or s in (c.current_title or "").lower()
@@ -236,21 +242,21 @@ async def list_contacts(
         # In-memory sort
         reverse = sort_order == "desc"
         if sort_by == "warm_score":
-            all_rows.sort(
-                key=lambda r: (r[1] is not None, r[1] or 0), reverse=reverse
-            )
+            all_rows.sort(key=lambda r: (r[1] is not None, r[1] or 0), reverse=reverse)
         elif sort_by == "connected_on":
             from datetime import date as _date
+
             _min = _date.min
             all_rows.sort(
-                key=lambda r: (getattr(r[0], "connected_on", None) or _min),
+                key=lambda r: getattr(r[0], "connected_on", None) or _min,
                 reverse=reverse,
             )
         elif sort_by == "created_at":
             from datetime import datetime as _dt
+
             _epoch = _dt.min
             all_rows.sort(
-                key=lambda r: (getattr(r[0], "created_at", None) or _epoch),
+                key=lambda r: getattr(r[0], "created_at", None) or _epoch,
                 reverse=reverse,
             )
         else:
@@ -262,7 +268,7 @@ async def list_contacts(
 
         # In-memory pagination
         offset = (page - 1) * per_page
-        rows = all_rows[offset:offset + per_page]
+        rows = all_rows[offset : offset + per_page]
     else:
         # Pure SQL path — no encrypted columns involved in search/sort
         count_query = select(func.count()).select_from(base_query.subquery())
@@ -310,6 +316,7 @@ async def get_contact(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Retrieve a single contact by ID with its warm score."""
     result = await db.execute(
         select(Contact, WarmScore.total_score)
         .outerjoin(
@@ -379,6 +386,7 @@ async def delete_contact(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Soft-delete a contact."""
     result = await db.execute(
         select(Contact).where(
             Contact.id == contact_id,

@@ -13,7 +13,6 @@ from sqlalchemy.orm import selectinload
 
 from app.models.contact import Contact, CsvUpload
 from app.models.credits import CreditTransaction
-from app.models.enrichment import UsageLog
 from app.models.job import Application, UserJobPreferences
 from app.models.marketplace import (
     IntroFacilitation,
@@ -21,7 +20,7 @@ from app.models.marketplace import (
     NetworkSharingPreferences,
 )
 from app.models.search_request import SearchRequest
-from app.models.user import ConnectorProfile, User
+from app.models.user import User
 
 
 async def export_user_data(user_id: uuid.UUID, db: AsyncSession) -> dict:
@@ -73,16 +72,18 @@ async def export_user_data(user_id: uuid.UUID, db: AsyncSession) -> dict:
     )
     contacts_data = []
     for c in contacts_result.scalars():
-        contacts_data.append({
-            "first_name": c.first_name,
-            "last_name": c.last_name,
-            "email": c.email,
-            "current_company": c.current_company,
-            "current_title": c.current_title,
-            "location": c.location,
-            "relationship_type": c.relationship_type,
-            "created_at": _dt(c.created_at),
-        })
+        contacts_data.append(
+            {
+                "first_name": c.first_name,
+                "last_name": c.last_name,
+                "email": c.email,
+                "current_company": c.current_company,
+                "current_title": c.current_title,
+                "location": c.location,
+                "relationship_type": c.relationship_type,
+                "created_at": _dt(c.created_at),
+            }
+        )
 
     # 3. Job preferences
     prefs_result = await db.execute(
@@ -109,12 +110,14 @@ async def export_user_data(user_id: uuid.UUID, db: AsyncSession) -> dict:
     )
     apps_data = []
     for a in apps_result.scalars():
-        apps_data.append({
-            "company_name": a.company_name,
-            "role_title": a.role_title,
-            "status": a.status,
-            "created_at": _dt(a.created_at),
-        })
+        apps_data.append(
+            {
+                "company_name": a.company_name,
+                "role_title": a.role_title,
+                "status": a.status,
+                "created_at": _dt(a.created_at),
+            }
+        )
 
     # 5. Search history
     searches_result = await db.execute(
@@ -125,11 +128,13 @@ async def export_user_data(user_id: uuid.UUID, db: AsyncSession) -> dict:
     )
     searches_data = []
     for s in searches_result.scalars():
-        searches_data.append({
-            "name": s.name,
-            "status": s.status,
-            "created_at": _dt(s.created_at),
-        })
+        searches_data.append(
+            {
+                "name": s.name,
+                "status": s.status,
+                "created_at": _dt(s.created_at),
+            }
+        )
 
     # 6. Credit transactions
     credits_result = await db.execute(
@@ -137,25 +142,27 @@ async def export_user_data(user_id: uuid.UUID, db: AsyncSession) -> dict:
     )
     credits_data = []
     for t in credits_result.scalars():
-        credits_data.append({
-            "amount": t.amount,
-            "type": t.type,
-            "reason": t.reason,
-            "created_at": _dt(t.created_at),
-        })
+        credits_data.append(
+            {
+                "amount": t.amount,
+                "type": t.type,
+                "reason": t.reason,
+                "created_at": _dt(t.created_at),
+            }
+        )
 
     # 7. CSV uploads metadata
-    csv_result = await db.execute(
-        select(CsvUpload).where(CsvUpload.user_id == user_id)
-    )
+    csv_result = await db.execute(select(CsvUpload).where(CsvUpload.user_id == user_id))
     csv_data = []
     for cu in csv_result.scalars():
-        csv_data.append({
-            "filename": cu.filename,
-            "row_count": cu.row_count,
-            "status": cu.status,
-            "created_at": _dt(cu.created_at),
-        })
+        csv_data.append(
+            {
+                "filename": cu.filename,
+                "row_count": cu.row_count,
+                "status": cu.status,
+                "created_at": _dt(cu.created_at),
+            }
+        )
 
     # 8. Marketplace listings
     listings_result = await db.execute(
@@ -166,13 +173,15 @@ async def export_user_data(user_id: uuid.UUID, db: AsyncSession) -> dict:
     )
     listings_data = []
     for ml in listings_result.scalars():
-        listings_data.append({
-            "role_level": ml.role_level,
-            "department_category": ml.department_category,
-            "warm_sco[RESEND_KEY_REDACTED]": ml.warm_sco[RESEND_KEY_REDACTED],
-            "is_available": ml.is_available,
-            "created_at": _dt(ml.created_at),
-        })
+        listings_data.append(
+            {
+                "role_level": ml.role_level,
+                "department_category": ml.department_category,
+                "warm_sco[RESEND_KEY_REDACTED]": ml.warm_sco[RESEND_KEY_REDACTED],
+                "is_available": ml.is_available,
+                "created_at": _dt(ml.created_at),
+            }
+        )
 
     # 9. Intro facilitations (as seeker and holder)
     intros_seeker_result = await db.execute(
@@ -182,12 +191,16 @@ async def export_user_data(user_id: uuid.UUID, db: AsyncSession) -> dict:
         select(IntroFacilitation).where(IntroFacilitation.network_holder_id == user_id)
     )
     intros_data = []
-    for i in list(intros_seeker_result.scalars()) + list(intros_holder_result.scalars()):
-        intros_data.append({
-            "status": i.status,
-            "role": "seeker" if i.job_seeker_id == user_id else "holder",
-            "created_at": _dt(i.created_at),
-        })
+    for i in list(intros_seeker_result.scalars()) + list(
+        intros_holder_result.scalars()
+    ):
+        intros_data.append(
+            {
+                "status": i.status,
+                "role": "seeker" if i.job_seeker_id == user_id else "holder",
+                "created_at": _dt(i.created_at),
+            }
+        )
 
     # 10. Sharing preferences
     sharing_result = await db.execute(
@@ -201,7 +214,9 @@ async def export_user_data(user_id: uuid.UUID, db: AsyncSession) -> dict:
         sharing_data = {
             "opt_in_marketplace": sharing.opt_in_marketplace,
             "category_filters": sharing.category_filters,
-            "excluded_contact_ids": [str(c) for c in (sharing.excluded_contact_ids or [])],
+            "excluded_contact_ids": [
+                str(c) for c in (sharing.excluded_contact_ids or [])
+            ],
         }
 
     return {

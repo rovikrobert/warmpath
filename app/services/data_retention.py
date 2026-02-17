@@ -53,9 +53,7 @@ async def archive_credit_history(user_id: uuid.UUID, db: AsyncSession) -> int:
 async def purge_old_usage_logs(db: AsyncSession) -> int:
     """Delete usage_logs older than 12 months (identifiable data retention limit)."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=365)
-    result = await db.execute(
-        delete(UsageLog).where(UsageLog.created_at < cutoff)
-    )
+    result = await db.execute(delete(UsageLog).where(UsageLog.created_at < cutoff))
     await db.flush()
     return result.rowcount
 

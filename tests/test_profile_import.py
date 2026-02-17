@@ -64,7 +64,13 @@ class TestResumeUpload:
         resp = await client.post(
             "/api/v1/auth/profile/import-resume",
             headers=_auth(token),
-            files={"file": ("resume.docx", io.BytesIO(b"not a pdf"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+            files={
+                "file": (
+                    "resume.docx",
+                    io.BytesIO(b"not a pdf"),
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
         )
         assert resp.status_code == 400
         assert "PDF" in resp.json()["detail"]
@@ -87,7 +93,9 @@ class TestResumeUpload:
         resp = await client.post(
             "/api/v1/auth/profile/import-resume",
             headers=_auth(token),
-            files={"file": ("resume.pdf", io.BytesIO(b"NOT_A_PDF_FILE"), "application/pdf")},
+            files={
+                "file": ("resume.pdf", io.BytesIO(b"NOT_A_PDF_FILE"), "application/pdf")
+            },
         )
         assert resp.status_code == 400
         assert "not a valid PDF" in resp.json()["detail"]
@@ -178,7 +186,9 @@ class TestLinkedInOAuth:
         assert resp.json()["data"]["is_new_user"] is False
 
     @pytest.mark.asyncio
-    async def test_linkedin_callback_links_existing_email_account(self, client: AsyncClient):
+    async def test_linkedin_callback_links_existing_email_account(
+        self, client: AsyncClient
+    ):
         # Create user with email/password first (using the mock LinkedIn email)
         signup_resp = await client.post(
             "/api/v1/auth/signup",
@@ -334,10 +344,14 @@ class TestLinkedInOAuth:
             assert user.full_name == "Custom Name"
             assert user.password_hash is not None  # Password was stored
             assert user.oauth_provider == "linkedin"
-            assert user.email_verified is False  # Not auto-verified when password provided
+            assert (
+                user.email_verified is False
+            )  # Not auto-verified when password provided
 
     @pytest.mark.asyncio
-    async def test_linkedin_callback_with_credentials_can_login(self, client: AsyncClient):
+    async def test_linkedin_callback_with_credentials_can_login(
+        self, client: AsyncClient
+    ):
         """User created via LinkedIn+credentials can also log in with email/password."""
         auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
         state = auth_resp.json()["data"]["state"]

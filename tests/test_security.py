@@ -6,7 +6,6 @@ import hmac
 import io
 import json
 import time
-import uuid
 
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -1372,9 +1371,7 @@ class TestDeleteAccount:
         async with TestSessionLocal() as session:
             from app.models.privacy import SuppressionList
 
-            email_hash = hashlib.sha256(
-                "del6@example.com".encode()
-            ).hexdigest()
+            email_hash = hashlib.sha256("del6@example.com".encode()).hexdigest()
             result = await session.execute(
                 select(SuppressionList).where(
                     SuppressionList.email_hash == email_hash,

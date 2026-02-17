@@ -106,6 +106,7 @@ async def signup(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Register a new user account and return access tokens."""
     try:
         validate_password_strength(body.password)
     except ValueError as e:
@@ -182,6 +183,7 @@ async def login(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Authenticate a user and return access tokens."""
     result = await db.execute(
         select(User).where(User.email == body.email, User.deleted_at.is_(None))
     )
@@ -213,7 +215,9 @@ async def login(
             detail="Invalid email or password",
         )
 
-    if user.password_hash is None or not verify_password(body.password, user.password_hash):
+    if user.password_hash is None or not verify_password(
+        body.password, user.password_hash
+    ):
         user.failed_login_attempts += 1
         if user.failed_login_attempts >= 5:
             user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
@@ -493,6 +497,7 @@ async def change_password(
 
 @router.get("/me")
 async def get_me(current_user: User = Depends(get_current_user)) -> dict:
+    """Return the authenticated user's profile."""
     return {
         "data": UserResponse.model_validate(current_user).model_dump(mode="json"),
         "meta": {},
@@ -505,6 +510,7 @@ async def update_user_type(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Update the user's role type (job seeker, network holder, or both)."""
     valid_types = {"job_seeker", "network_holder", "both"}
     if body.user_type not in valid_types:
         raise HTTPException(
@@ -526,6 +532,7 @@ async def upsert_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Create or update the user's connector profile."""
     result = await db.execute(
         select(ConnectorProfile).where(ConnectorProfile.user_id == current_user.id)
     )
@@ -623,9 +630,7 @@ async def linkedin_authorize() -> dict:
         "exp": datetime.now(timezone.utc) + timedelta(minutes=10),
         "type": "linkedin_state",
     }
-    state = jose_jwt.encode(
-        state_payload, settings.SECRET_KEY, algorithm="HS256"
-    )
+    state = jose_jwt.encode(state_payload, settings.SECRET_KEY, algorithm="HS256")
     url = get_authorize_url(state)
     return {"data": {"url": url, "state": state}, "meta": {}}
 
@@ -672,7 +677,7 @@ async def linkedin_callback(
     li_name = li_profile.get("name", "")
 
     # Use frontend-provided values if available, LinkedIn data as fallback
-    account_email = (body.email.lower().strip() if body.email else li_email)
+    account_email = body.email.lower().strip() if body.email else li_email
     account_name = body.full_name or li_name
     account_password_hash = None
     if body.password:

@@ -25,8 +25,6 @@ from sqlalchemy import select
 from app.models.enrichment import UsageLog
 from app.models.privacy import (
     ArchivedCreditTransaction,
-    ConsentRecord,
-    DataRequest,
 )
 from app.services.breach_notification import (
     create_data_request,
@@ -39,7 +37,6 @@ from app.services.data_retention import (
     purge_expired_archives,
     purge_old_usage_logs,
 )
-from app.services.suppression import rectify_contact_data
 from tests.conftest import TestSessionLocal
 
 
@@ -108,7 +105,6 @@ class TestDataRetention:
         self, client: AsyncClient, auth_headers: dict, user_id: uuid_mod.UUID
     ):
         """Credit history is archived via the service function."""
-        from app.models.credits import CreditTransaction
         from app.services.credits import earn_credits
 
         # Create a credit transaction in the test session
@@ -287,22 +283,16 @@ class TestDataRectification:
 
 
 class TestRestrictProcessing:
-    async def test_restrict_processing(
-        self, client: AsyncClient, auth_headers: dict
-    ):
+    async def test_restrict_processing(self, client: AsyncClient, auth_headers: dict):
         resp = await client.post(
             "/api/v1/privacy/restrict-processing", headers=auth_headers
         )
         assert resp.status_code == 200
         assert "restricted" in resp.json()["data"]["message"].lower()
 
-    async def test_unrestrict_processing(
-        self, client: AsyncClient, auth_headers: dict
-    ):
+    async def test_unrestrict_processing(self, client: AsyncClient, auth_headers: dict):
         # First restrict
-        await client.post(
-            "/api/v1/privacy/restrict-processing", headers=auth_headers
-        )
+        await client.post("/api/v1/privacy/restrict-processing", headers=auth_headers)
         # Then unrestrict
         resp = await client.post(
             "/api/v1/privacy/unrestrict-processing", headers=auth_headers
@@ -324,9 +314,7 @@ class TestRestrictProcessing:
             await db.commit()
 
         # Restrict processing
-        await client.post(
-            "/api/v1/privacy/restrict-processing", headers=auth_headers
-        )
+        await client.post("/api/v1/privacy/restrict-processing", headers=auth_headers)
         # Attempt marketplace search
         resp = await client.post(
             "/api/v1/marketplace/search",
@@ -350,18 +338,14 @@ class TestMarketingOptOut:
         assert resp.status_code == 200
 
     async def test_opt_in(self, client: AsyncClient, auth_headers: dict):
-        await client.post(
-            "/api/v1/privacy/marketing-opt-out", headers=auth_headers
-        )
+        await client.post("/api/v1/privacy/marketing-opt-out", headers=auth_headers)
         resp = await client.post(
             "/api/v1/privacy/marketing-opt-in", headers=auth_headers
         )
         assert resp.status_code == 200
 
     async def test_opt_out_persists(self, client: AsyncClient, auth_headers: dict):
-        await client.post(
-            "/api/v1/privacy/marketing-opt-out", headers=auth_headers
-        )
+        await client.post("/api/v1/privacy/marketing-opt-out", headers=auth_headers)
         me = await client.get("/api/v1/auth/me", headers=auth_headers)
         # marketing_opt_out flag should be in the user response
         # (depends on schema — verified via DB check below)
@@ -391,9 +375,7 @@ class TestConsentTracking:
         assert resp.status_code == 200
         assert resp.json()["data"]["activity"] == "marketplace_participation"
 
-    async def test_withdraw_consent(
-        self, client: AsyncClient, auth_headers: dict
-    ):
+    async def test_withdraw_consent(self, client: AsyncClient, auth_headers: dict):
         resp = await client.post(
             "/api/v1/privacy/consent",
             headers=auth_headers,
@@ -402,9 +384,7 @@ class TestConsentTracking:
         assert resp.status_code == 200
         assert resp.json()["data"]["action"] == "withdrawn"
 
-    async def test_list_consent_records(
-        self, client: AsyncClient, auth_headers: dict
-    ):
+    async def test_list_consent_records(self, client: AsyncClient, auth_headers: dict):
         # Record two consents
         await client.post(
             "/api/v1/privacy/consent",
@@ -485,9 +465,7 @@ class TestSuppressionNotification:
 
 
 class TestDSARTracking:
-    async def test_create_data_request(
-        self, client: AsyncClient, auth_headers: dict
-    ):
+    async def test_create_data_request(self, client: AsyncClient, auth_headers: dict):
         resp = await client.post(
             "/api/v1/privacy/data-request",
             headers=auth_headers,

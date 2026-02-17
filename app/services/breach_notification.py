@@ -43,9 +43,7 @@ async def send_breach_notification(
     Returns count of notifications sent.
     """
     # Batch-load all affected users (avoids N+1)
-    users_result = await db.execute(
-        select(User).where(User.id.in_(affected_user_ids))
-    )
+    users_result = await db.execute(select(User).where(User.id.in_(affected_user_ids)))
     users_map = {u.id: u for u in users_result.scalars()}
 
     count = 0
@@ -155,9 +153,7 @@ async def resolve_data_request(
     db: AsyncSession,
 ) -> DataRequest:
     """Mark a DSAR as resolved."""
-    result = await db.execute(
-        select(DataRequest).where(DataRequest.id == request_id)
-    )
+    result = await db.execute(select(DataRequest).where(DataRequest.id == request_id))
     request = result.scalar_one_or_none()
     if request is None:
         raise ValueError("Data request not found")
