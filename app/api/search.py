@@ -33,6 +33,7 @@ from app.services.ai_matcher import sco[RESEND_KEY_REDACTED]
 from app.services.ai_matcher import run_search
 from app.services.board_registry import lookup_boards, lookup_careers_url, lookup_or_discover_boards
 from app.services.credits import get_balance, spend_credits
+from app.api.jobs import _upsert_openings
 from app.services.job_fetcher import JobFetcher
 from app.services.job_recommendations import get_recommendations
 from app.services.warm_scorer import compute_warm_score
@@ -622,6 +623,17 @@ async def _process_company(
     if boards:
         raw_jobs = await fetcher.fetch_jobs_for_company(company_name, boards)
         total_jobs_fetched = len(raw_jobs)
+
+        # Persist fetched jobs to job_openings table (refresh on every search)
+        if raw_jobs:
+            company_result = await db.execute(
+                select(Company).where(Company.name.ilike(f"%{company_name}%"))
+            )
+            company_record = company_result.scalar_one_or_none()
+            await _upsert_openings(
+                db, raw_jobs, company_id=company_record.id if company_record else None
+            )
+
         matched_jobs = await fetcher.match_jobs_to_role(
             raw_jobs, target_role, target_seniority
         )
