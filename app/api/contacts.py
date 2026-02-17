@@ -130,9 +130,20 @@ async def upload_csv(
     await db.commit()
     await db.refresh(csv_upload)
 
+    # Detect first upload for celebration UX
+    prior_uploads = await db.execute(
+        select(func.count()).select_from(
+            select(CsvUpload.id).where(
+                CsvUpload.user_id == current_user.id,
+                CsvUpload.id != csv_upload.id,
+            ).subquery()
+        )
+    )
+    is_first_upload = (prior_uploads.scalar() or 0) == 0
+
     return {
         "data": CsvUploadResponse.model_validate(csv_upload).model_dump(mode="json"),
-        "meta": {},
+        "meta": {"is_first_upload": is_first_upload},
     }
 
 

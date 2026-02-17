@@ -15,7 +15,7 @@ from app.models.match_result import (  # noqa: E402, F401
     MatchResult,
     WarmScore,
 )
-from app.models.enrichment import EnrichmentCache, UsageLog  # noqa: E402, F401
+from app.models.enrichment import EnrichmentCache, UserFeedback, UsageLog  # noqa: E402, F401
 from app.models.job import Application, JobOpening, UserJobPreferences  # noqa: E402, F401
 from app.models.marketplace import (  # noqa: E402, F401
     ConnectorReputation,

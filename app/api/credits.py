@@ -13,7 +13,9 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
+from app.middleware.rate_limit import check_rate_limit
 from app.models.credits import CreditTransaction
 from app.models.user import User
 from app.schemas.credits import (
@@ -23,6 +25,7 @@ from app.schemas.credits import (
 )
 from app.services.audit_logger import log_event
 from app.services.credits import earn_credits, expire_stale_credits, get_credit_summary
+from app.utils.exceptions import RateLimitError
 from app.utils.security import get_current_user, require_verified_email
 
 router = APIRouter()
@@ -116,6 +119,18 @@ async def purchase_credits(
     In production, this would integrate with Stripe. For now, it directly
     creates a credit transaction. Useful for testing and admin grants.
     """
+    allowed, _count = await check_rate_limit(
+        current_user.id,
+        "credit_purchase",
+        settings.RATE_LIMIT_CREDIT_PURCHASES_PER_DAY,
+        db,
+        is_admin=current_user.is_admin,
+    )
+    if not allowed:
+        raise RateLimitError(
+            f"Credit purchase limit reached ({settings.RATE_LIMIT_CREDIT_PURCHASES_PER_DAY}/day)"
+        )
+
     txn = await earn_credits(
         current_user.id,
         body.amount,
@@ -155,6 +170,18 @@ async def trigger_expiry(
     For MVP, any authenticated user can trigger it. In production,
     this would be a Celery periodic task or admin-gated endpoint.
     """
+    allowed, _count = await check_rate_limit(
+        current_user.id,
+        "credit_expire",
+        settings.RATE_LIMIT_CREDIT_EXPIRE_PER_DAY,
+        db,
+        is_admin=current_user.is_admin,
+    )
+    if not allowed:
+        raise RateLimitError(
+            f"Credit expiry limit reached ({settings.RATE_LIMIT_CREDIT_EXPIRE_PER_DAY}/day)"
+        )
+
     count = await expire_stale_credits(db)
     await db.flush()
 

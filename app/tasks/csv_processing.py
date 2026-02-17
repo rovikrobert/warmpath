@@ -198,6 +198,23 @@ async def process_csv_upload_core(
                 user_uuid, 100, "csv_upload", db, reference_id=upload_uuid
             )
 
+        # Data freshness bonus: 10 credits if re-uploading (not first upload)
+        from sqlalchemy import func as sa_func
+
+        upload_count_result = await db.execute(
+            select(sa_func.count()).select_from(
+                select(CsvUpload.id).where(
+                    CsvUpload.user_id == user_uuid,
+                    CsvUpload.status == "completed",
+                ).subquery()
+            )
+        )
+        upload_count = upload_count_result.scalar() or 0
+        if upload_count > 1 and created > 0:
+            await earn_credits(
+                user_uuid, 10, "data_freshness", db, reference_id=upload_uuid
+            )
+
         # Clear raw CSV data after processing — matches privacy policy:
         # "CSV files deleted after processing"
         clear_result = await db.execute(
