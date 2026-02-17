@@ -156,7 +156,7 @@ async def signup(
             SuppressionList.reason == "account_deleted",
         )
     )
-    if suppression_result.scalar_one_or_none() is None:
+    if suppression_result.scalars().first() is None:
         await earn_credits(user.id, 50, "welcome_bonus", db)
 
     # Send verification email
@@ -721,7 +721,7 @@ async def linkedin_callback(
                     SuppressionList.reason == "account_deleted",
                 )
             )
-            if suppression_result.scalar_one_or_none() is None:
+            if suppression_result.scalars().first() is None:
                 await earn_credits(user.id, 50, "welcome_bonus", db)
 
             is_new_user = True
