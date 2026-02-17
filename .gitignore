@@ -41,6 +41,19 @@ ops_team/reports/*.json
 !ops_team/reports/.gitkeep
 ops_team/shared/intel_cache.json
 ops_team/*/state.json
+
+# Finance team artifacts (auto-generated)
+finance_team/reports/*.json
+!finance_team/reports/.gitkeep
+finance_team/shared/intel_cache.json
+finance_team/*/state.json
+
+# GTM team artifacts (auto-generated)
+gtm_team/reports/*.json
+!gtm_team/reports/.gitkeep
+gtm_team/shared/intel_cache.json
+gtm_team/*/state.json
+gtm_team/cross_team_requests/*.json
 coverage.json
 .coverage
 junit.xml
