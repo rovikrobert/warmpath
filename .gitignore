@@ -18,3 +18,11 @@ build/
 .vscode/
 *.swp
 *.swo
+
+# Agent system artifacts (auto-generated)
+agents/reports/*.json
+agents/shared/intel_cache.json
+agents/*/state.json
+coverage.json
+.coverage
+junit.xml
