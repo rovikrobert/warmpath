@@ -22,6 +22,7 @@ from app.services.credits import earn_credits
 from app.services.csv_parser import classify_relationship, parse_linkedin_csv
 from app.services.suppression import check_suppression
 from app.services.warm_scorer import batch_compute_scores
+from app.utils.encryption import compute_blind_index
 
 
 async def process_csv_upload_core(
@@ -105,6 +106,16 @@ async def process_csv_upload_core(
             )
             source = row.get("source", "linkedin_csv")
 
+            # Pre-compute blind indexes for this row
+            row_email = row.get("email")
+            email_bi = compute_blind_index(row_email) if row_email else None
+            name_co_bi = None
+            fn = row.get("first_name", "")
+            ln = row.get("last_name", "")
+            co = row.get("current_company", "")
+            if fn and ln and co:
+                name_co_bi = compute_blind_index(f"{fn}{ln}{co}")
+
             if existing:
                 # Update existing contact with fresh data
                 existing.first_name = row["first_name"]
@@ -129,6 +140,11 @@ async def process_csv_upload_core(
                     existing.last_interaction_date = row["last_interaction_date"]
                 if row.get("location"):
                     existing.location = row["location"]
+                # Update blind indexes
+                if email_bi:
+                    existing.email_blind_index = email_bi
+                if name_co_bi:
+                    existing.name_company_blind_index = name_co_bi
                 await link_contact_to_company(existing, db)
                 duplicates += 1
             else:
@@ -150,6 +166,8 @@ async def process_csv_upload_core(
                     how_you_know=row.get("how_you_know"),
                     last_interaction_date=row.get("last_interaction_date"),
                     location=row.get("location") or None,
+                    email_blind_index=email_bi,
+                    name_company_blind_index=name_co_bi,
                 )
                 db.add(contact)
                 await db.flush()
@@ -171,6 +189,14 @@ async def process_csv_upload_core(
             await earn_credits(
                 user_uuid, 100, "csv_upload", db, reference_id=upload_uuid
             )
+
+        # Clear raw CSV data after processing — matches privacy policy:
+        # "CSV files deleted after processing"
+        clear_result = await db.execute(
+            select(Contact).where(Contact.csv_upload_id == csv_upload.id)
+        )
+        for c in clear_result.scalars():
+            c.raw_csv_row = None
 
         await db.flush()
 

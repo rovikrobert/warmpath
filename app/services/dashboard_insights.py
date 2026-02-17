@@ -7,6 +7,7 @@ Tier 3 — Daily Tip: static curated list, rotates by day of year
 
 import logging
 import uuid
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
@@ -230,25 +231,22 @@ async def _get_network_analysis(
     if total_contacts == 0:
         return None
 
-    # Top 10 companies by contact count
-    top_companies_result = await db.execute(
-        select(
-            Contact.current_company,
-            func.count(Contact.id).label("cnt"),
-        )
-        .where(
+    # Top 10 companies by contact count — in-memory because current_company
+    # is encrypted and cannot be grouped/compared at SQL level
+    contacts_result = await db.execute(
+        select(Contact).where(
             Contact.user_id == user_id,
             Contact.deleted_at.is_(None),
-            Contact.current_company.isnot(None),
-            Contact.current_company != "",
         )
-        .group_by(Contact.current_company)
-        .order_by(func.count(Contact.id).desc())
-        .limit(10)
+    )
+    all_contacts = list(contacts_result.scalars())
+    company_counts = Counter(
+        c.current_company for c in all_contacts
+        if c.current_company and c.current_company.strip()
     )
     top_companies = [
-        {"company": row[0], "count": row[1]}
-        for row in top_companies_result.all()
+        {"company": co, "count": n}
+        for co, n in company_counts.most_common(10)
     ]
 
     # Relationship type breakdown

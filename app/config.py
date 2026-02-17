@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     FROM_EMAIL: str = "WarmPath <noreply@majiq.agency>"
     FRONTEND_URL: str = "http://localhost:3000"
+    ENCRYPTION_KEY: str = ""       # Fernet key (44-char base64). Empty = passthrough.
+    BLIND_INDEX_KEY: str = ""      # HMAC key (hex). Empty = SHA-256 fallback.
     RATE_LIMIT_CSV_UPLOADS_PER_DAY: int = 10
     RATE_LIMIT_SEARCH_RUNS_PER_DAY: int = 50
     RECOMMENDATION_CACHE_TTL_HOURS: int = 6

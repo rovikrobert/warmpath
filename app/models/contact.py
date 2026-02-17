@@ -16,6 +16,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models import Base
+from app.utils.encryption import EncryptedString, EncryptedText
 
 
 class CsvUpload(Base):
@@ -83,34 +84,34 @@ class Contact(Base):
         UUID(as_uuid=True), ForeignKey("csv_uploads.id", ondelete="SET NULL")
     )
 
-    # Core identity fields (from LinkedIn CSV)
-    first_name: Mapped[str | None] = mapped_column(String(255))
-    last_name: Mapped[str | None] = mapped_column(String(255))
-    full_name: Mapped[str] = mapped_column(String(500), nullable=False)
-    email: Mapped[str | None] = mapped_column(String(255))
-    linkedin_url: Mapped[str | None] = mapped_column(String(500))
+    # Core identity fields (from LinkedIn CSV) — encrypted at rest
+    first_name: Mapped[str | None] = mapped_column(EncryptedString())
+    last_name: Mapped[str | None] = mapped_column(EncryptedString())
+    full_name: Mapped[str] = mapped_column(EncryptedString(), nullable=False)
+    email: Mapped[str | None] = mapped_column(EncryptedString())
+    linkedin_url: Mapped[str | None] = mapped_column(EncryptedString())
 
-    # Current position (from CSV or enrichment)
-    current_title: Mapped[str | None] = mapped_column(String(500))
-    current_company: Mapped[str | None] = mapped_column(String(500))
+    # Current position (from CSV or enrichment) — encrypted at rest
+    current_title: Mapped[str | None] = mapped_column(EncryptedString())
+    current_company: Mapped[str | None] = mapped_column(EncryptedString())
     company_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("companies.id", ondelete="SET NULL"),
         index=True,
     )
 
-    # Additional context
-    location: Mapped[str | None] = mapped_column(String(255))
+    # Additional context — encrypted at rest
+    location: Mapped[str | None] = mapped_column(EncryptedString())
     connected_on: Mapped[date | None] = mapped_column(Date)
     tags: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
-    notes: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(EncryptedText())
 
     # Relationship classification
     relationship_type: Mapped[str | None] = mapped_column(String(50))
     source: Mapped[str] = mapped_column(
         String(50), nullable=False, server_default="linkedin_csv"
     )
-    how_you_know: Mapped[str | None] = mapped_column(Text)
+    how_you_know: Mapped[str | None] = mapped_column(EncryptedText())
     last_interaction_date: Mapped[date | None] = mapped_column(Date)
 
     # Raw and enriched data
@@ -119,6 +120,10 @@ class Contact(Base):
 
     # Deduplication
     fingerprint: Mapped[str | None] = mapped_column(String(255))
+
+    # Blind indexes for exact-match lookups on encrypted columns
+    email_blind_index: Mapped[str | None] = mapped_column(String(64), index=True)
+    name_company_blind_index: Mapped[str | None] = mapped_column(String(64), index=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

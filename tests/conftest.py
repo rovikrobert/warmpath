@@ -1,5 +1,6 @@
 import json
 import os
+import secrets
 import sqlite3
 from collections.abc import AsyncGenerator
 
@@ -7,6 +8,12 @@ from collections.abc import AsyncGenerator
 os.environ["AI_MOCK_MODE"] = "true"
 # Disable async CSV processing so uploads complete inline during tests
 os.environ["CSV_ASYNC_PROCESSING"] = "false"
+
+# Enable encryption in tests — validates the full encrypt/decrypt cycle
+from cryptography.fernet import Fernet
+
+os.environ["ENCRYPTION_KEY"] = Fernet.generate_key().decode()
+os.environ["BLIND_INDEX_KEY"] = secrets.token_hex(32)
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
