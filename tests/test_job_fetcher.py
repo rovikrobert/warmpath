@@ -202,6 +202,152 @@ class TestLeverFetcher:
 
 
 # ---------------------------------------------------------------------------
+# Test Ashby Parsing
+# ---------------------------------------------------------------------------
+
+ASHBY_RESPONSE = {
+    "jobs": [
+        {
+            "id": "240d459b-aaaa-bbbb-cccc-fab3e56ecd9b",
+            "title": "Research Engineer",
+            "department": "Research",
+            "team": "Research",
+            "employmentType": "FullTime",
+            "location": "San Francisco",
+            "publishedAt": "2025-04-05T00:03:20.653+00:00",
+            "isListed": True,
+            "isRemote": None,
+            "jobUrl": "https://jobs.ashbyhq.com/openai/240d459b",
+        },
+        {
+            "id": "340e560c-dddd-eeee-ffff-123456789abc",
+            "title": "Senior Software Engineer, Platform",
+            "department": "Engineering",
+            "team": "Platform",
+            "employmentType": "FullTime",
+            "location": "Remote",
+            "publishedAt": "2025-05-10T12:00:00.000+00:00",
+            "isListed": True,
+            "isRemote": True,
+            "jobUrl": "https://jobs.ashbyhq.com/openai/340e560c",
+        },
+        {
+            "id": "unlisted-job-id",
+            "title": "Secret Internal Role",
+            "department": "Ops",
+            "team": "Ops",
+            "location": "NYC",
+            "isListed": False,
+            "isRemote": False,
+            "jobUrl": "https://jobs.ashbyhq.com/openai/unlisted",
+        },
+    ]
+}
+
+
+class TestAshbyFetcher:
+    async def test_parses_jobs_correctly(self):
+        fetcher = JobFetcher()
+        with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=_mock_response(ASHBY_RESPONSE))
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            MockClient.return_value = mock_client
+
+            jobs = await fetcher.fetch_ashby_jobs("openai")
+
+        # Unlisted job should be filtered out
+        assert len(jobs) == 2
+        assert jobs[0]["title"] == "Research Engineer"
+        assert jobs[0]["source"] == "ashby"
+        assert jobs[0]["department"] == "Research"
+        assert jobs[0]["location"] == "San Francisco"
+        assert jobs[0]["url"] == "https://jobs.ashbyhq.com/openai/240d459b"
+
+    async def test_detects_remote(self):
+        fetcher = JobFetcher()
+        with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=_mock_response(ASHBY_RESPONSE))
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            MockClient.return_value = mock_client
+
+            jobs = await fetcher.fetch_ashby_jobs("openai")
+
+        assert jobs[0]["is_remote"] is False
+        assert jobs[1]["is_remote"] is True
+
+    async def test_handles_http_error(self):
+        fetcher = JobFetcher()
+        with patch("app.services.job_fetcher.httpx.AsyncClient") as MockClient:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(
+                side_effect=httpx.HTTPError("Connection failed")
+            )
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            MockClient.return_value = mock_client
+
+            jobs = await fetcher.fetch_ashby_jobs("nonexistent")
+
+        assert jobs == []
+
+
+# ---------------------------------------------------------------------------
+# Test Board Registry — updated platform entries
+# ---------------------------------------------------------------------------
+
+
+class TestBoardRegistryPlatforms:
+    def test_openai_uses_ashby(self):
+        boards = lookup_boards("openai")
+        assert boards is not None
+        assert "ashby" in boards
+        assert boards["ashby"] == "openai"
+
+    def test_notion_uses_ashby(self):
+        boards = lookup_boards("notion")
+        assert boards is not None
+        assert "ashby" in boards
+
+    def test_ramp_uses_ashby(self):
+        boards = lookup_boards("ramp")
+        assert boards is not None
+        assert "ashby" in boards
+
+    def test_grab_uses_career_page(self):
+        boards = lookup_boards("grab")
+        assert boards is not None
+        assert "career_page" in boards
+
+    def test_google_uses_career_page(self):
+        boards = lookup_boards("google")
+        assert boards is not None
+        assert "career_page" in boards
+
+
+# ---------------------------------------------------------------------------
+# Test Careers URL lookup
+# ---------------------------------------------------------------------------
+
+
+class TestCareersUrl:
+    def test_known_company(self):
+        from app.services.board_registry import lookup_careers_url
+
+        url = lookup_careers_url("openai")
+        assert url is not None
+        assert "openai.com" in url
+
+    def test_unknown_company(self):
+        from app.services.board_registry import lookup_careers_url
+
+        assert lookup_careers_url("unknown_company_xyz") is None
+
+
+# ---------------------------------------------------------------------------
 # Test Role Matching (mock mode)
 # ---------------------------------------------------------------------------
 

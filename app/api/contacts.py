@@ -49,7 +49,8 @@ async def upload_csv(
 ) -> dict:
     # Rate limit check
     allowed, count = await check_rate_limit(
-        current_user.id, "csv_upload", settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY, db
+        current_user.id, "csv_upload", settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY, db,
+        is_admin=current_user.is_admin,
     )
     if not allowed:
         raise RateLimitError(

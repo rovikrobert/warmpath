@@ -64,7 +64,7 @@ class TestSEABoardRegistry:
     def test_lookup_grab(self):
         boards = lookup_boards("grab")
         assert boards is not None
-        assert "greenhouse" in boards
+        assert "career_page" in boards
 
     def test_lookup_razorpay(self):
         boards = lookup_boards("razorpay")
@@ -77,7 +77,7 @@ class TestSEABoardRegistry:
         assert "greenhouse" in boards
 
     def test_all_entries_have_valid_source(self):
-        valid_sources = {"greenhouse", "lever"}
+        valid_sources = {"greenhouse", "lever", "ashby", "career_page"}
         for name, entry in BOARD_REGISTRY.items():
             for source in entry:
                 assert source in valid_sources, f"{name} has invalid source '{source}'"

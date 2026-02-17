@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { auth as authApi, credits as creditsApi, onUsageWarning } from '../api/client';
@@ -8,6 +8,8 @@ export default function Layout() {
   const navigate = useNavigate();
   const [balance, setBalance] = useState(null);
   const [mobileNav, setMobileNav] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef(null);
   const [usageWarning, setUsageWarning] = useState(null);
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState('');
@@ -38,6 +40,16 @@ export default function Layout() {
     }
   };
 
+  // Close "More" dropdown on outside click
+  useEffect(() => {
+    if (!moreOpen) return;
+    const handleClick = (e) => {
+      if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [moreOpen]);
+
   const isSeeker = !user?.user_type || user.user_type === 'job_seeker' || user.user_type === 'both';
   const isHolder = user?.user_type === 'network_holder' || user?.user_type === 'both';
   const isUnverified = user && !user.email_verified;
@@ -45,16 +57,24 @@ export default function Layout() {
   const navLinkClass = ({ isActive }) =>
     `text-sm ${isActive ? 'font-medium text-amber-600' : 'text-slate-600 hover:text-slate-900'}`;
 
-  const navLinks = [
+  // Primary links always visible in desktop nav
+  const primaryLinks = [
     { to: '/dashboard', label: 'Dashboard', show: true },
     { to: '/contacts', label: 'Contacts', show: true },
     { to: '/referrals', label: 'Find Referrals', show: isSeeker },
+  ];
+
+  // Secondary links collapsed under "More" dropdown
+  const moreLinks = [
     { to: '/applications', label: 'My Applications', show: isSeeker },
     { to: '/marketplace/requests', label: 'Marketplace Requests', show: isSeeker },
     { to: '/marketplace/dashboard', label: 'Network Dashboard', show: isHolder },
     { to: '/marketplace/settings', label: 'Sharing Settings', show: isHolder },
     { to: '/credits', label: 'Credits', show: true },
   ];
+
+  // All links for mobile nav
+  const allLinks = [...primaryLinks, ...moreLinks];
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
@@ -66,22 +86,47 @@ export default function Layout() {
               <span>WarmPath</span>
             </Link>
             <nav className="hidden items-center gap-4 lg:flex">
-              {navLinks.filter((l) => l.show).map((link) => (
+              {primaryLinks.filter((l) => l.show).map((link) => (
                 <NavLink key={link.to} to={link.to} className={navLinkClass}>
                   {link.label}
                 </NavLink>
               ))}
+              {/* More dropdown */}
+              <div ref={moreRef} className="relative">
+                <button
+                  onClick={() => setMoreOpen(!moreOpen)}
+                  className={`flex items-center gap-1 text-sm ${moreOpen ? 'font-medium text-amber-600' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                  More
+                  <svg className={`h-3.5 w-3.5 transition ${moreOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </button>
+                {moreOpen && (
+                  <div className="absolute left-0 top-full z-40 mt-2 w-52 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                    {moreLinks.filter((l) => l.show).map((link) => (
+                      <NavLink
+                        key={link.to}
+                        to={link.to}
+                        onClick={() => setMoreOpen(false)}
+                        className={({ isActive }) =>
+                          `block px-4 py-2 text-sm ${isActive ? 'bg-amber-50 font-medium text-amber-600' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`
+                        }
+                      >
+                        {link.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
             </nav>
           </div>
           <div className="flex items-center gap-3">
             <Link to="/credits" className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-200">
               {balance ?? '—'} credits
             </Link>
-            <span className="hidden text-sm text-slate-600 sm:inline">
-              {user?.full_name}
-            </span>
             <Link to="/profile/edit" className="hidden text-sm text-amber-600 hover:text-amber-700 sm:inline">
-              Profile
+              {user?.full_name}
             </Link>
             {/* Mobile menu toggle */}
             <button
@@ -103,7 +148,7 @@ export default function Layout() {
         {mobileNav && (
           <div className="border-t border-slate-200 px-4 py-3 lg:hidden">
             <nav className="flex flex-col gap-2">
-              {navLinks.filter((l) => l.show).map((link) => (
+              {allLinks.filter((l) => l.show).map((link) => (
                 <NavLink
                   key={link.to}
                   to={link.to}

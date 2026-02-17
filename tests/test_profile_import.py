@@ -303,6 +303,83 @@ class TestLinkedInOAuth:
         assert resp.status_code == 400
 
     @pytest.mark.asyncio
+    async def test_linkedin_callback_with_credentials(self, client: AsyncClient):
+        """Signup via LinkedIn with name/email/password creates account with password."""
+        auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
+        state = auth_resp.json()["data"]["state"]
+
+        resp = await client.post(
+            "/api/v1/auth/linkedin/callback",
+            json={
+                "code": "mock_code",
+                "state": state,
+                "full_name": "Custom Name",
+                "email": "custom@test.com",
+                "password": "StrongPass1",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert data["is_new_user"] is True
+        assert data["access_token"]
+
+        # Verify the user has the custom email, password, and LinkedIn linked
+        from tests.conftest import TestSessionLocal
+
+        async with TestSessionLocal() as session:
+            result = await session.execute(
+                select(User).where(User.email == "custom@test.com")
+            )
+            user = result.scalar_one()
+            assert user.full_name == "Custom Name"
+            assert user.password_hash is not None  # Password was stored
+            assert user.oauth_provider == "linkedin"
+            assert user.email_verified is False  # Not auto-verified when password provided
+
+    @pytest.mark.asyncio
+    async def test_linkedin_callback_with_credentials_can_login(self, client: AsyncClient):
+        """User created via LinkedIn+credentials can also log in with email/password."""
+        auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
+        state = auth_resp.json()["data"]["state"]
+
+        await client.post(
+            "/api/v1/auth/linkedin/callback",
+            json={
+                "code": "mock_code",
+                "state": state,
+                "full_name": "Login Test",
+                "email": "logintest@test.com",
+                "password": "StrongPass1",
+            },
+        )
+
+        # Should be able to login with email/password
+        login_resp = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "logintest@test.com", "password": "StrongPass1"},
+        )
+        assert login_resp.status_code == 200
+        assert login_resp.json()["data"]["access_token"]
+
+    @pytest.mark.asyncio
+    async def test_linkedin_callback_weak_password_rejected(self, client: AsyncClient):
+        """Weak password in LinkedIn signup should be rejected."""
+        auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
+        state = auth_resp.json()["data"]["state"]
+
+        resp = await client.post(
+            "/api/v1/auth/linkedin/callback",
+            json={
+                "code": "mock_code",
+                "state": state,
+                "full_name": "Weak Pass",
+                "email": "weak@test.com",
+                "password": "123",
+            },
+        )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
     async def test_forgot_password_oauth_user(self, client: AsyncClient):
         """OAuth-only user gets helpful message instead of reset email."""
         # Create user via LinkedIn OAuth

@@ -104,6 +104,9 @@ class ConnectorProfileResponse(BaseModel):
 class LinkedInCallbackRequest(BaseModel):
     code: str
     state: str
+    full_name: str | None = None
+    email: EmailStr | None = None
+    password: str | None = None
 
 
 class ResumeParseResponse(BaseModel):

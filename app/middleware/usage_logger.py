@@ -64,11 +64,17 @@ async def compute_metering_warning(
     """
     from app.models.user import User
 
-    # Check plan tier
-    user_result = await db.execute(select(User.plan_tier).where(User.id == user_id))
-    plan_tier = user_result.scalar_one_or_none() or "free"
+    # Check plan tier and admin status
+    user_result = await db.execute(
+        select(User.plan_tier, User.is_admin).where(User.id == user_id)
+    )
+    row = user_result.one_or_none()
+    if row is None:
+        return None
+    plan_tier, is_admin = row
+    plan_tier = plan_tier or "free"
 
-    if plan_tier != "free" or action not in FREE_TIER_LIMITS:
+    if is_admin or plan_tier != "free" or action not in FREE_TIER_LIMITS:
         return None
 
     limit = FREE_TIER_LIMITS[action]

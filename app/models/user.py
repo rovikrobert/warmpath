@@ -56,6 +56,9 @@ class User(Base):
         Integer, nullable=False, server_default="0"
     )
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     email_verified: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )

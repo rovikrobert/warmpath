@@ -18,7 +18,18 @@ export default function LinkedInCallback() {
       return;
     }
 
-    authApi.linkedinCallback({ code, state })
+    // Retrieve signup form data if user came from signup flow
+    const signupForm = sessionStorage.getItem('linkedin_signup_form');
+    let callbackBody = { code, state };
+    if (signupForm) {
+      try {
+        const parsed = JSON.parse(signupForm);
+        callbackBody = { ...callbackBody, ...parsed };
+      } catch { /* ignore */ }
+      sessionStorage.removeItem('linkedin_signup_form');
+    }
+
+    authApi.linkedinCallback(callbackBody)
       .then((res) => {
         const data = res.data;
         // Store LinkedIn profile data for EditProfile pre-fill
