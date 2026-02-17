@@ -5,6 +5,7 @@ breach notifications. Also tracks DSAR (data subject access requests)
 with regulatory deadlines.
 """
 
+import html
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -48,6 +49,9 @@ async def send_breach_notification(
         if user is None:
             continue
 
+        safe_summary = html.escape(breach_summary)
+        safe_data_affected = html.escape(data_affected)
+
         _send_email(
             to=user.email,
             subject="Important: WarmPath Data Security Notice",
@@ -56,9 +60,9 @@ async def send_breach_notification(
                 "'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; "
                 'padding: 40px 20px;">'
                 '<h2 style="color: #1e293b;">Security Notice</h2>'
-                f'<p style="color: #475569;">{breach_summary}</p>'
+                f'<p style="color: #475569;">{safe_summary}</p>'
                 f'<p style="color: #475569;"><strong>Data affected:</strong> '
-                f"{data_affected}</p>"
+                f"{safe_data_affected}</p>"
                 '<p style="color: #475569;">We are taking the following steps:</p>'
                 "<ul>"
                 "<li>Investigating the root cause</li>"

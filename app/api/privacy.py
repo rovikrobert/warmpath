@@ -13,14 +13,15 @@ Endpoints:
   POST   /privacy/rectification         — request data correction across vaults
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models.audit import AuditLog
 from app.models.privacy import ConsentRecord
 from app.models.user import User
 from app.services.audit_logger import log_event
@@ -31,6 +32,30 @@ from app.utils.security import get_current_user
 
 router = APIRouter()
 
+# Max requests per IP per hour for public endpoints
+_PUBLIC_RATE_LIMIT = 5
+
+
+async def _check_ip_rate_limit(
+    action: str, request: Request, db: AsyncSession
+) -> None:
+    """Reject if the same IP has exceeded _PUBLIC_RATE_LIMIT in the last hour."""
+    ip = request.client.host if request.client else "unknown"
+    one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+    result = await db.execute(
+        select(func.count(AuditLog.id)).where(
+            AuditLog.action == action,
+            AuditLog.ip_address == ip,
+            AuditLog.created_at >= one_hour_ago,
+        )
+    )
+    count = result.scalar() or 0
+    if count >= _PUBLIC_RATE_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests. Please try again later.",
+        )
+
 
 # ---------------------------------------------------------------------------
 # Schemas
@@ -39,9 +64,9 @@ router = APIRouter()
 
 class SuppressionRequestBody(BaseModel):
     email: EmailStr | None = None
-    first_name: str | None = None
-    last_name: str | None = None
-    company: str | None = None
+    first_name: str | None = Field(default=None, max_length=255)
+    last_name: str | None = Field(default=None, max_length=255)
+    company: str | None = Field(default=None, max_length=500)
 
 
 class ConsentBody(BaseModel):
@@ -51,17 +76,17 @@ class ConsentBody(BaseModel):
 
 class DataRequestBody(BaseModel):
     request_type: str = Field(
-        ..., pattern="^(access|deletion|rectification|restriction|portability|objection)$"
+        ..., max_length=30, pattern="^(access|deletion|rectification|restriction|portability|objection)$"
     )
-    details: str | None = None
+    details: str | None = Field(default=None, max_length=1000)
     regulation: str = Field(default="general", pattern="^(gdpr|ccpa|pdpa|general)$")
 
 
 class RectificationBody(BaseModel):
     email: EmailStr | None = None
-    first_name: str | None = None
-    last_name: str | None = None
-    company: str | None = None
+    first_name: str | None = Field(default=None, max_length=255)
+    last_name: str | None = Field(default=None, max_length=255)
+    company: str | None = Field(default=None, max_length=500)
     corrections: dict = Field(..., min_length=1)
 
 
@@ -209,19 +234,24 @@ async def list_consent(
 @router.post("/suppression-request")
 async def suppression_request(
     body: SuppressionRequestBody,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Public endpoint: request removal of personal data from all vaults.
 
     Does not require authentication (non-users need to submit removal requests).
     Requires at least email or (first_name + last_name + company).
+    Rate-limited: 5 requests per IP per hour.
     """
+    await _check_ip_rate_limit("suppression_request", request, db)
+
     if not body.email and not (body.first_name and body.last_name and body.company):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Provide email and/or full name + company for identification",
         )
 
+    ip = request.client.host if request.client else None
     await add_to_suppression(
         email=body.email,
         first_name=body.first_name or "",
@@ -230,6 +260,7 @@ async def suppression_request(
         reason="self_request",
         db=db,
     )
+    await log_event(db, "suppression_request", ip_address=ip)
     await db.commit()
 
     return {
@@ -251,18 +282,23 @@ async def suppression_request(
 @router.post("/rectification")
 async def request_rectification(
     body: RectificationBody,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Public endpoint: request correction of personal data across all vaults.
 
     Requires identification (email or name+company) plus corrections dict.
+    Rate-limited: 5 requests per IP per hour.
     """
+    await _check_ip_rate_limit("rectification_request", request, db)
+
     if not body.email and not (body.first_name and body.last_name and body.company):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Provide email and/or full name + company for identification",
         )
 
+    ip = request.client.host if request.client else None
     count = await rectify_contact_data(
         email=body.email,
         first_name=body.first_name,
@@ -271,6 +307,7 @@ async def request_rectification(
         corrections=body.corrections,
         db=db,
     )
+    await log_event(db, "rectification_request", ip_address=ip)
     await db.commit()
 
     return {

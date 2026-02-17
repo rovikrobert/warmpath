@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 VALID_RELATIONSHIP_TYPES = {
@@ -60,9 +60,9 @@ class ContactResponse(BaseModel):
 
 
 class ContactUpdate(BaseModel):
-    relationship_type: str | None = None
-    how_you_know: str | None = None
-    notes: str | None = None
+    relationship_type: str | None = Field(default=None, max_length=50)
+    how_you_know: str | None = Field(default=None, max_length=1000)
+    notes: str | None = Field(default=None, max_length=2000)
 
     @field_validator("relationship_type")
     @classmethod
@@ -75,15 +75,15 @@ class ContactUpdate(BaseModel):
 
 
 class ManualContactCreate(BaseModel):
-    first_name: str
-    last_name: str
-    company: str | None = None
-    position: str | None = None
-    email: str | None = None
-    phone: str | None = None
-    location: str | None = None
-    relationship_type: str | None = None
-    how_you_know: str | None = None
+    first_name: str = Field(..., max_length=200)
+    last_name: str = Field(..., max_length=200)
+    company: str | None = Field(default=None, max_length=500)
+    position: str | None = Field(default=None, max_length=500)
+    email: str | None = Field(default=None, max_length=320)
+    phone: str | None = Field(default=None, max_length=50)
+    location: str | None = Field(default=None, max_length=200)
+    relationship_type: str | None = Field(default=None, max_length=50)
+    how_you_know: str | None = Field(default=None, max_length=1000)
     last_interaction_date: date | None = None
 
     @field_validator("relationship_type")

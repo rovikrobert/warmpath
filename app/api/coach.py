@@ -1,9 +1,12 @@
 """Keevs AI Job Coach endpoints — briefing, chat, and streaming chat."""
 
+import asyncio
 import json
+import logging
+from collections import defaultdict
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +22,14 @@ from app.services.coach import (
 )
 from app.utils.security import get_current_user
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+# Per-user concurrent SSE connection tracking
+_active_streams: dict[str, int] = defaultdict(int)
+_MAX_CONCURRENT_STREAMS = 3
+_SSE_TIMEOUT_SECONDS = 120
 
 
 class ChatRequest(BaseModel):
@@ -62,8 +72,20 @@ async def coach_chat_stream(
     db: AsyncSession = Depends(get_db),
 ):
     """Stream a chat response from Keevs via Server-Sent Events."""
-    # Resolve context before streaming (needs DB session)
-    context = body.context_snapshot or await _assemble_context(current_user.id, db)
+    user_key = str(current_user.id)
+
+    # Enforce per-user concurrent stream limit
+    if _active_streams[user_key] >= _MAX_CONCURRENT_STREAMS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many concurrent streams. Please wait for an existing stream to finish.",
+        )
+
+    # Always use server-assembled context (ignore client-supplied context_snapshot)
+    context = await _assemble_context(current_user.id, db)
+
+    # Sanitize conversation history
+    history = _sanitize_conversation_history(body.conversation_history)
 
     # Log usage eagerly (captured even if client disconnects mid-stream)
     db.add(
@@ -77,10 +99,40 @@ async def coach_chat_stream(
     await db.commit()
 
     async def event_stream():
-        async for chunk in generate_chat_response_stream(
-            body.message, body.conversation_history or [], context
-        ):
-            yield f"data: {json.dumps({'t': chunk})}\n\n"
+        _active_streams[user_key] += 1
+        deadline = asyncio.get_event_loop().time() + _SSE_TIMEOUT_SECONDS
+        try:
+            async for chunk in generate_chat_response_stream(
+                body.message, history, context
+            ):
+                if asyncio.get_event_loop().time() > deadline:
+                    logger.warning("SSE stream timed out for user %s", user_key)
+                    break
+                yield f"data: {json.dumps({'t': chunk})}\n\n"
+        except asyncio.CancelledError:
+            logger.info("SSE stream cancelled (client disconnect) for user %s", user_key)
+        finally:
+            _active_streams[user_key] -= 1
+            if _active_streams[user_key] <= 0:
+                _active_streams.pop(user_key, None)
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+def _sanitize_conversation_history(
+    history: list[dict[str, Any]] | None,
+) -> list[dict]:
+    """Validate and sanitize conversation history entries."""
+    if not history:
+        return []
+    sanitized: list[dict] = []
+    for entry in history[-10:]:  # Cap at 10 entries
+        if not isinstance(entry, dict):
+            continue
+        role = entry.get("role")
+        content = entry.get("content")
+        if role not in ("user", "keevs") or not isinstance(content, str):
+            continue
+        sanitized.append({"role": role, "content": content[:5000]})
+    return sanitized

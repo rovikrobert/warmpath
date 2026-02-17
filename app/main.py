@@ -34,6 +34,21 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="WarmPath", version="0.1.0")
 
 # ---------------------------------------------------------------------------
+# Startup configuration validation
+# ---------------------------------------------------------------------------
+if settings.SECURE_HEADERS:
+    if settings.SECRET_KEY == "change-me-to-a-random-secret":
+        logger.critical(
+            "SECURE_HEADERS is enabled but SECRET_KEY is the default value. "
+            "Set a random SECRET_KEY before deploying to production."
+        )
+    if not settings.ENCRYPTION_KEY:
+        logger.critical(
+            "SECURE_HEADERS is enabled but ENCRYPTION_KEY is empty. "
+            "PII will be stored as plaintext. Set ENCRYPTION_KEY for production."
+        )
+
+# ---------------------------------------------------------------------------
 # CORS
 # ---------------------------------------------------------------------------
 _cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
@@ -120,10 +135,15 @@ if _frontend_dist.is_dir():
         "/assets", StaticFiles(directory=_frontend_dist / "assets"), name="assets"
     )
 
+    _frontend_dist_resolved = _frontend_dist.resolve()
+
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str) -> FileResponse:
         """Serve index.html for all non-API routes (SPA catch-all)."""
-        file_path = _frontend_dist / full_path
+        file_path = (_frontend_dist / full_path).resolve()
+        # Path containment: block traversal outside frontend/dist
+        if not file_path.is_relative_to(_frontend_dist_resolved):
+            return FileResponse(_frontend_dist / "index.html")
         if file_path.is_file():
             return FileResponse(file_path)
         return FileResponse(_frontend_dist / "index.html")

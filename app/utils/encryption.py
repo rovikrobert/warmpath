@@ -10,6 +10,7 @@ lookups on encrypted columns (suppression system, dedup).
 
 import hashlib
 import hmac
+import logging
 
 from cryptography.fernet import Fernet
 from sqlalchemy import Text
@@ -17,6 +18,29 @@ from sqlalchemy.types import TypeDecorator
 
 from app.config import settings
 from app.utils.hashing import hash_for_suppression
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Cached Fernet singleton — avoids creating a new instance per value
+# ---------------------------------------------------------------------------
+
+_fernet: Fernet | None = None
+_fernet_checked = False
+
+
+def _get_fernet() -> Fernet | None:
+    """Return the cached Fernet instance, or None if ENCRYPTION_KEY is empty."""
+    global _fernet, _fernet_checked
+    if not _fernet_checked:
+        key = settings.ENCRYPTION_KEY
+        if not key:
+            logger.warning("ENCRYPTION_KEY not set — PII stored as plaintext")
+            _fernet = None
+        else:
+            _fernet = Fernet(key.encode())
+        _fernet_checked = True
+    return _fernet
 
 
 class EncryptedString(TypeDecorator):
@@ -32,19 +56,19 @@ class EncryptedString(TypeDecorator):
     def process_bind_param(self, value, dialect):
         if value is None:
             return None
-        key = settings.ENCRYPTION_KEY
-        if not key:
+        f = _get_fernet()
+        if f is None:
             return value
-        return Fernet(key.encode()).encrypt(value.encode()).decode()
+        return f.encrypt(value.encode()).decode()
 
     def process_result_value(self, value, dialect):
         if value is None:
             return None
-        key = settings.ENCRYPTION_KEY
-        if not key:
+        f = _get_fernet()
+        if f is None:
             return value
         try:
-            return Fernet(key.encode()).decrypt(value.encode()).decode()
+            return f.decrypt(value.encode()).decode()
         except Exception:
             # Graceful fallback: pre-encryption plaintext rows survive migration.
             # Fernet tokens always start with "gAAAAA" so real plaintext will
@@ -61,19 +85,19 @@ class EncryptedText(TypeDecorator):
     def process_bind_param(self, value, dialect):
         if value is None:
             return None
-        key = settings.ENCRYPTION_KEY
-        if not key:
+        f = _get_fernet()
+        if f is None:
             return value
-        return Fernet(key.encode()).encrypt(value.encode()).decode()
+        return f.encrypt(value.encode()).decode()
 
     def process_result_value(self, value, dialect):
         if value is None:
             return None
-        key = settings.ENCRYPTION_KEY
-        if not key:
+        f = _get_fernet()
+        if f is None:
             return value
         try:
-            return Fernet(key.encode()).decrypt(value.encode()).decode()
+            return f.decrypt(value.encode()).decode()
         except Exception:
             return value
 
