@@ -27,7 +27,8 @@ def _is_mock_mode() -> bool:
 def get_authorize_url(state: str) -> str:
     """Build LinkedIn OAuth2 authorization URL with openid+profile+email scopes."""
     if _is_mock_mode():
-        return f"http://localhost:3000/auth/linkedin/callback?code=mock_code&state={state}"
+        base = settings.FRONTEND_URL.rstrip("/")
+        return f"{base}/auth/linkedin/callback?code=mock_code&state={state}"
 
     params = {
         "response_type": "code",
