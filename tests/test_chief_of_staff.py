@@ -381,7 +381,7 @@ class TestCosConfig:
         from agents.chief_of_staff.cos_config import DECISION_PRINCIPLES
 
         assert DECISION_PRINCIPLES[0] == "safety_privacy"
-        assert len(DECISION_PRINCIPLES) == 5
+        assert len(DECISION_PRINCIPLES) == 6
 
 
 # ---------------------------------------------------------------------------
