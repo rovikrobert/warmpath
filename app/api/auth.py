@@ -37,6 +37,7 @@ from app.schemas.user import (
 )
 from app.services.audit_logger import log_event
 from app.services.credits import earn_credits
+from app.services.data_retention import archive_credit_history
 from app.services.email_service import (
     _send_email,
     send_password_reset_email,
@@ -404,19 +405,22 @@ async def delete_account(
     )
     db.add(suppression_entry)
 
-    # 3. Commit audit + suppression before deleting user
+    # 3. Archive credit history before deletion (24-month audit retention)
+    await archive_credit_history(user_id, db)
+
+    # 4. Commit audit + suppression + archive before deleting user
     await db.flush()
 
-    # 4. Hard-delete user row — CASCADE removes all child records
+    # 5. Hard-delete user row — CASCADE removes all child records
     #    Use SQL DELETE (not ORM session.delete) so the DB-level CASCADE fires
     #    reliably regardless of ORM session state.
     await db.execute(delete(User).where(User.id == user_id))
     await db.commit()
 
-    # 5. Clear refresh cookie
+    # 6. Clear refresh cookie
     _clear_refresh_cookie(response)
 
-    # 6. Send deletion confirmation email (best-effort, outside transaction)
+    # 7. Send deletion confirmation email (best-effort, outside transaction)
     _send_email(
         to=user_email,
         subject="Your WarmPath account has been deleted",

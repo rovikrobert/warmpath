@@ -19,6 +19,7 @@ from app.api import (
     marketplace,
     matches,
     preferences,
+    privacy,
     search,
     usage,
     webhooks,
@@ -106,6 +107,7 @@ app.include_router(
     dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"]
 )
 app.include_router(coach.router, prefix="/api/v1/coach", tags=["coach"])
+app.include_router(privacy.router, prefix="/api/v1/privacy", tags=["privacy"])
 app.include_router(webhooks.router, prefix="/api/v1", tags=["webhooks"])
 
 # ---------------------------------------------------------------------------

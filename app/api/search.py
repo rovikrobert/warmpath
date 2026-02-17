@@ -31,6 +31,7 @@ from app.models.marketplace import (
 )
 from app.services.ai_matcher import score_contacts
 from app.services.ai_matcher import run_search
+from app.utils.privacy_checks import require_not_restricted
 from app.services.board_registry import lookup_boards, lookup_careers_url, lookup_or_discover_boards
 from app.services.credits import get_balance, spend_credits
 from app.api.jobs import _upsert_openings
@@ -189,6 +190,8 @@ async def execute_search(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    require_not_restricted(current_user)
+
     # Rate limit check
     allowed, count = await check_rate_limit(
         current_user.id, "search_run", settings.RATE_LIMIT_SEARCH_RUNS_PER_DAY, db,
