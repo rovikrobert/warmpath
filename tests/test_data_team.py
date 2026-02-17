@@ -484,3 +484,362 @@ class TestCosIntegration:
         from agents.chief_of_staff.cos_config import COS_CONFIG
         budget = COS_CONFIG["cost_budget"]
         assert "data_team_daily_max_tokens" in budget
+
+
+# ---------------------------------------------------------------------------
+# TestDataLearningState — full self-learning system
+# ---------------------------------------------------------------------------
+
+
+class TestDataLearningState:
+    """DataLearningState with advanced analytics."""
+
+    def _make_ls(self, tmp_path, agent="test_agent"):
+        """Create a DataLearningState with state stored in tmp_path."""
+        import data_team.shared.learning as learning_mod
+        original_dir = learning_mod.DATA_TEAM_DIR
+        learning_mod.DATA_TEAM_DIR = tmp_path
+        ls = learning_mod.DataLearningState(agent)
+        # Restore after creation (state path already resolved)
+        learning_mod.DATA_TEAM_DIR = original_dir
+        # Patch state path to use tmp
+        ls._tmp_path = tmp_path
+        # Override save/load to use tmp
+        import functools
+        state_path = tmp_path / agent / "state.json"
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+
+        original_save = ls.save
+        def patched_save():
+            state_path.write_text(json.dumps(ls.state, indent=2, default=str))
+        ls.save = patched_save
+        return ls
+
+    def test_record_finding_updates_history(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        ls.record_finding({"id": "f1", "severity": "medium", "category": "test_cat", "title": "Test"})
+        assert len(ls.state["finding_history"]) == 1
+        assert ls.state["finding_history"][0]["id"] == "f1"
+
+    def test_recurring_pattern_detection(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        for i in range(6):
+            ls.record_finding({"id": f"f{i}", "severity": "medium", "category": "test_cat", "title": "Repeat"})
+        pattern = ls.detect_recurring_pattern("test_cat")
+        assert pattern["count"] == 6
+        assert pattern["auto_escalated"] is True
+
+    def test_systemic_pattern_at_10(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        for i in range(11):
+            ls.record_finding({"id": f"f{i}", "severity": "low", "category": "systemic_cat", "title": "Repeat"})
+        pattern = ls.detect_recurring_pattern("systemic_cat")
+        assert pattern["systemic"] is True
+
+    def test_record_resolution_and_effectiveness(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        ls.record_finding({"id": "fix-001", "severity": "high", "category": "bug", "title": "Bug"})
+        ls.record_resolution("fix-001", "fixed")
+        assert "fix-001" in ls.state["resolutions"]
+        rec = ls.check_fix_effectiveness("fix-001")
+        assert rec is not None
+        assert rec.effective is True
+        assert rec.resolution_type == "fixed"
+
+    def test_resolution_with_enum(self, tmp_path):
+        from data_team.shared.learning import ResolutionType
+        ls = self._make_ls(tmp_path)
+        ls.record_finding({"id": "f-enum", "severity": "low", "category": "test", "title": "T"})
+        ls.record_resolution("f-enum", ResolutionType.DEFERRED)
+        assert ls.state["resolutions"]["f-enum"]["type"] == "deferred"
+
+    def test_attention_weights(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        ls.update_attention_weights({"file_a.py": 3, "file_b.py": 1})
+        hot = ls.get_hot_spots(top_n=2)
+        assert len(hot) == 2
+        assert hot[0].file == "file_a.py"  # higher weight
+        assert hot[0].weight > hot[1].weight
+
+    def test_stable_areas(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        ls.state["attention_weights"] = {
+            "stable.py": {"weight": 0.5, "last_updated": "2026-01-01", "reason": ""},
+            "hot.py": {"weight": 2.0, "last_updated": "2026-01-01", "reason": ""},
+        }
+        stable = ls.get_stable_areas(threshold=1.0)
+        assert "stable.py" in stable
+        assert "hot.py" not in stable
+
+    def test_severity_calibration(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        ls.record_severity_calibration("medium")
+        ls.record_severity_calibration("medium", was_overridden=True)
+        ls.record_severity_calibration("high")
+        cal = ls.get_severity_calibration()
+        assert cal["medium"]["total"] == 2
+        assert cal["medium"]["overridden"] == 1
+        assert cal["high"]["total"] == 1
+
+    def test_tool_accuracy(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        ls.record_tool_accuracy("ast_parser", "f1", confirmed=True)
+        ls.record_tool_accuracy("ast_parser", "f2", confirmed=True)
+        ls.record_tool_accuracy("ast_parser", "f3", confirmed=False)
+        reliability = ls.get_tool_reliability()
+        assert "ast_parser" in reliability
+        assert abs(reliability["ast_parser"] - 0.667) < 0.01
+
+    def test_methodology_recording(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        ls.record_methodology("k-anonymity check", "privacy_guard.py", effectiveness=0.95)
+        assert len(ls.state["methodologies"]) == 1
+        assert ls.state["methodologies"][0]["name"] == "k-anonymity check"
+
+    def test_health_snapshot_and_trajectory(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        # Record improving health
+        ls.record_health_snapshot(60.0, {"medium": 3})
+        ls.record_health_snapshot(70.0, {"medium": 2})
+        ls.record_health_snapshot(80.0, {"medium": 1})
+        trajectory = ls.get_health_trajectory()
+        assert trajectory == "improving"
+
+    def test_health_trajectory_degrading(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        ls.record_health_snapshot(90.0, {"low": 1})
+        ls.record_health_snapshot(70.0, {"medium": 2})
+        ls.record_health_snapshot(50.0, {"high": 3})
+        trajectory = ls.get_health_trajectory()
+        assert trajectory == "degrading"
+
+    def test_kpi_tracking_and_trends(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        ls.track_kpi("coverage", 0.5)
+        ls.track_kpi("coverage", 0.6)
+        ls.track_kpi("coverage", 0.7)
+        ls.track_kpi("coverage", 0.8)
+        trend = ls.get_kpi_trend("coverage")
+        assert trend == "improving"
+
+    def test_kpi_trend_insufficient_data(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        trend = ls.get_kpi_trend("nonexistent")
+        assert trend == "insufficient_data"
+
+    def test_prediction_recording(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        ls.record_prediction({"metric": "coverage", "predicted": 0.9, "actual": None})
+        assert len(ls.state["predictions"]) == 1
+
+    def test_insight_recording(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        ls.record_insight({"id": "i1", "category": "funnel", "title": "Test insight", "confidence": 0.85})
+        assert len(ls.state["insight_history"]) == 1
+        assert ls.state["insight_history"][0]["confidence"] == 0.85
+
+    def test_meta_learning_report(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        ls.record_finding({"id": "f1", "severity": "medium", "category": "test", "title": "T"})
+        ls.record_health_snapshot(85.0, {"medium": 1})
+        ls.track_kpi("coverage", 0.8)
+        report = ls.generate_meta_learning_report()
+        assert report["agent"] == "test_agent"
+        assert report["total_findings_tracked"] == 1
+        assert "health_trajectory" in report
+        assert "kpi_trends" in report
+        assert "coverage" in report["kpi_trends"]
+
+    def test_recurrence_count(self, tmp_path):
+        ls = self._make_ls(tmp_path)
+        ls.record_finding({"id": "f1", "severity": "low", "category": "cat_a", "title": "A"})
+        ls.record_finding({"id": "f2", "severity": "low", "category": "cat_a", "title": "A2"})
+        ls.record_finding({"id": "f3", "severity": "low", "category": "cat_b", "title": "B"})
+        assert ls.get_recurrence_count("cat_a") == 2
+        assert ls.get_recurrence_count("cat_b") == 1
+        assert ls.get_recurrence_count("cat_c") == 0
+
+
+# ---------------------------------------------------------------------------
+# TestDataIntelligence — expanded intelligence system
+# ---------------------------------------------------------------------------
+
+
+class TestDataIntelligence:
+    """DataIntelligence with 10 categories, urgency, adoption."""
+
+    def test_10_categories(self):
+        from data_team.shared.intelligence import DATA_INTEL_CATEGORIES
+        assert len(DATA_INTEL_CATEGORIES) == 10
+
+    def test_new_categories_exist(self):
+        from data_team.shared.intelligence import DATA_INTEL_CATEGORIES
+        assert "referral_science" in DATA_INTEL_CATEGORIES
+        assert "data_infrastructure" in DATA_INTEL_CATEGORIES
+        assert "ab_testing_methods" in DATA_INTEL_CATEGORIES
+        assert "matching_algorithms" in DATA_INTEL_CATEGORIES
+        assert "analytics_patterns" in DATA_INTEL_CATEGORIES
+
+    def test_add_and_get_items(self):
+        from data_team.shared.intelligence import DataIntelItem, DataIntelligence
+        di = DataIntelligence()
+        di.cache[di._items_key] = []  # Start clean
+        item = DataIntelItem(
+            category="ml_research",
+            title="New embedding model",
+            summary="BERT for job matching",
+            source="arXiv",
+            severity="medium",
+            relevant_agents=["model_engineer"],
+        )
+        di.add_item(item)
+        items = di.get_for_agent("model_engineer")
+        assert len(items) >= 1
+        assert items[-1].title == "New embedding model"
+
+    def test_get_urgent(self):
+        from data_team.shared.intelligence import DataIntelItem, DataIntelligence
+        di = DataIntelligence()
+        di.cache[di._items_key] = []
+        di.add_item(DataIntelItem(title="Low", severity="low"))
+        di.add_item(DataIntelItem(title="Critical", severity="critical"))
+        di.add_item(DataIntelItem(title="High", severity="high"))
+        urgent = di.get_urgent()
+        assert len(urgent) == 2
+        titles = {u.title for u in urgent}
+        assert "Critical" in titles
+        assert "High" in titles
+
+    def test_mark_adopted(self):
+        from data_team.shared.intelligence import DataIntelItem, DataIntelligence
+        di = DataIntelligence()
+        di.cache[di._items_key] = []
+        item = DataIntelItem(id="test-adopt", title="To adopt")
+        di.add_item(item)
+        assert di.mark_adopted("test-adopt", "analyst") is True
+        unadopted = di.get_unadopted()
+        assert not any(u.id == "test-adopt" for u in unadopted)
+
+    def test_check_freshness_all_stale(self):
+        from data_team.shared.intelligence import DataIntelligence
+        di = DataIntelligence()
+        di.cache = {di._items_key: []}  # Empty cache = all stale
+        freshness = di.check_freshness()
+        assert all(not v for v in freshness.values())
+
+    def test_generate_research_agenda(self):
+        from data_team.shared.intelligence import DataIntelligence
+        di = DataIntelligence()
+        di.cache = {di._items_key: []}
+        agenda = di.generate_research_agenda()
+        assert len(agenda) == 10  # All categories stale
+
+    def test_generate_intel_report(self):
+        from data_team.shared.intelligence import DataIntelItem, DataIntelligence
+        di = DataIntelligence()
+        di.cache[di._items_key] = []
+        di.add_item(DataIntelItem(title="Item", severity="high"))
+        report = di.generate_intel_report()
+        assert report["total_items"] >= 1
+        assert report["urgent_items"] >= 1
+        assert "categories_total" in report
+        assert report["categories_total"] == 10
+
+    def test_fetch_category(self):
+        from data_team.shared.intelligence import DataIntelItem, DataIntelligence
+        di = DataIntelligence()
+        di.cache[di._items_key] = []
+        di.add_item(DataIntelItem(category="ml_research", title="ML paper"))
+        di.add_item(DataIntelItem(category="competitor_intel", title="Competitor"))
+        ml = di.fetch_category("ml_research")
+        assert len(ml) == 1
+        assert ml[0].title == "ML paper"
+
+    def test_fetch_all_grouped(self):
+        from data_team.shared.intelligence import DataIntelItem, DataIntelligence
+        di = DataIntelligence()
+        di.cache[di._items_key] = []
+        di.add_item(DataIntelItem(category="ml_research", title="A"))
+        di.add_item(DataIntelItem(category="ml_research", title="B"))
+        di.add_item(DataIntelItem(category="competitor_intel", title="C"))
+        grouped = di.fetch_all()
+        assert len(grouped["ml_research"]) == 2
+        assert len(grouped["competitor_intel"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# TestLearningConfig
+# ---------------------------------------------------------------------------
+
+
+class TestLearningConfig:
+    """Learning constants are properly configured."""
+
+    def test_config_has_learning_constants(self):
+        from data_team.shared.config import (
+            ATTENTION_WEIGHT_DECAY,
+            FIX_EFFECTIVENESS_WINDOW_DAYS,
+            RECURRING_PATTERN_THRESHOLD,
+            SYSTEMIC_PATTERN_THRESHOLD,
+        )
+        assert RECURRING_PATTERN_THRESHOLD == 5
+        assert SYSTEMIC_PATTERN_THRESHOLD == 10
+        assert ATTENTION_WEIGHT_DECAY == 0.05
+        assert FIX_EFFECTIVENESS_WINDOW_DAYS == 30
+
+    def test_config_has_health_weights(self):
+        from data_team.shared.config import HEALTH_WEIGHTS
+        assert "pipeline" in HEALTH_WEIGHTS
+        assert "analyst" in HEALTH_WEIGHTS
+        assert sum(HEALTH_WEIGHTS.values()) == 100
+
+    def test_config_has_intel_cache_ttl(self):
+        from data_team.shared.config import INTEL_CACHE_TTL_HOURS
+        assert INTEL_CACHE_TTL_HOURS == 24
+
+
+# ---------------------------------------------------------------------------
+# TestLearningDataclasses
+# ---------------------------------------------------------------------------
+
+
+class TestLearningDataclasses:
+    """Learning data structures work correctly."""
+
+    def test_resolution_type_enum(self):
+        from data_team.shared.learning import ResolutionType
+        assert ResolutionType.FIXED.value == "fixed"
+        assert ResolutionType.FALSE_POSITIVE.value == "false_positive"
+
+    def test_finding_severity_enum(self):
+        from data_team.shared.learning import FindingSeverity
+        assert FindingSeverity.CRITICAL.value == "critical"
+        assert FindingSeverity.INFO.value == "info"
+
+    def test_attention_weight_dataclass(self):
+        from data_team.shared.learning import AttentionWeight
+        aw = AttentionWeight(file="test.py", weight=1.5, reason="3 findings")
+        assert aw.file == "test.py"
+        assert aw.weight == 1.5
+        assert aw.last_updated != ""
+
+    def test_methodology_record_dataclass(self):
+        from data_team.shared.learning import MethodologyRecord
+        mr = MethodologyRecord(name="test", source="paper.pdf", effectiveness=0.8)
+        assert mr.name == "test"
+        assert mr.adopted_at != ""
+
+    def test_fix_effectiveness_record(self):
+        from data_team.shared.learning import FixEffectivenessRecord
+        fer = FixEffectivenessRecord(
+            finding_id="f1", resolution_type="fixed",
+            resolved_at="2026-01-01", effective=True
+        )
+        assert fer.effective is True
+        assert fer.recurred is False
+
+    def test_health_snapshot_dataclass(self):
+        from data_team.shared.learning import HealthSnapshot
+        hs = HealthSnapshot(score=85.0, finding_counts={"medium": 2})
+        assert hs.score == 85.0
+        assert hs.timestamp != ""
