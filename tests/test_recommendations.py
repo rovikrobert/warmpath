@@ -1,10 +1,8 @@
 """Tests for job recommendations endpoint and supporting helpers."""
 
-import uuid as uuid_mod
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
-import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
@@ -119,10 +117,23 @@ class TestBoardRegistryHelpers:
     def test_companies_for_locations_sea(self):
         result = companies_for_locations(["Singapore"])
         # SEA companies should appear first
-        sea_companies = {"grab", "sea-group", "shopee", "lazada", "gojek",
-                         "carousell", "foodpanda", "ninja-van", "patsnap",
-                         "endowus", "syfe", "aspire", "funding-societies", "carro"}
-        first_batch = set(result[:len(sea_companies)])
+        sea_companies = {
+            "grab",
+            "sea-group",
+            "shopee",
+            "lazada",
+            "gojek",
+            "carousell",
+            "foodpanda",
+            "ninja-van",
+            "patsnap",
+            "endowus",
+            "syfe",
+            "aspire",
+            "funding-societies",
+            "carro",
+        }
+        first_batch = set(result[: len(sea_companies)])
         assert sea_companies == first_batch
 
     def test_companies_for_locations_all(self):
@@ -154,9 +165,7 @@ class TestRecommendationsEndpoint:
         self, client: AsyncClient, auth_headers: dict
     ):
         """Returns 400 if user has no target_role set."""
-        resp = await client.get(
-            "/api/v1/search/recommendations", headers=auth_headers
-        )
+        resp = await client.get("/api/v1/search/recommendations", headers=auth_headers)
         assert resp.status_code == 400
         assert "preferences" in resp.json()["detail"].lower()
 

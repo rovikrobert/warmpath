@@ -33,9 +33,7 @@ class ConsentRecord(Base):
     """Tracks per-activity consent with timestamps for GDPR/PDPA compliance."""
 
     __tablename__ = "consent_records"
-    __table_args__ = (
-        Index("idx_consent_user_activity", "user_id", "activity"),
-    )
+    __table_args__ = (Index("idx_consent_user_activity", "user_id", "activity"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

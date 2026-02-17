@@ -11,26 +11,22 @@ Validates:
 
 import io
 import uuid
-from datetime import datetime, timezone
 
 import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select, text
+from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
-from app.main import app
 from app.models.contact import Contact
-from app.models.match_result import WarmScore
 from app.models.user import User
-from app.utils.encryption import EncryptedString, compute_blind_index
+from app.utils.encryption import compute_blind_index
 from tests.conftest import TestSessionLocal
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 async def _create_user(db: AsyncSession, email: str = "enc@test.com") -> User:
     user = User(
@@ -113,7 +109,8 @@ async def test_round_trip_encrypt_decrypt():
     async with TestSessionLocal() as db:
         user = await _create_user(db)
         contact = await _create_contact(
-            db, user.id,
+            db,
+            user.id,
             first_name="Bob",
             last_name="Jones",
             email="bob@corp.com",
@@ -329,9 +326,9 @@ async def test_csv_upload_clears_raw_csv_row(client: AsyncClient):
     async with TestSessionLocal() as db:
         result = await db.execute(select(Contact))
         all_contacts = list(result.scalars())
-        csv_contacts = [
-            c for c in all_contacts if c.email == "test.csv@example.com"
-        ]
+        csv_contacts = [c for c in all_contacts if c.email == "test.csv@example.com"]
         assert len(csv_contacts) >= 1
         for c in csv_contacts:
-            assert c.raw_csv_row is None, "raw_csv_row should be cleared after processing"
+            assert c.raw_csv_row is None, (
+                "raw_csv_row should be cleared after processing"
+            )

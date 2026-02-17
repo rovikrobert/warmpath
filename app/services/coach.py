@@ -16,7 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
-from app.models.contact import Contact
 from app.models.enrichment import UsageLog
 from app.models.job import Application, UserJobPreferences
 from app.models.search_request import SearchRequest
@@ -64,7 +63,9 @@ async def _assemble_context(user_id: uuid.UUID, db: AsyncSession) -> dict:
 
     # 1. User + ConnectorProfile
     result = await db.execute(
-        select(User).options(selectinload(User.connector_profile)).where(User.id == user_id)
+        select(User)
+        .options(selectinload(User.connector_profile))
+        .where(User.id == user_id)
     )
     user = result.scalar_one_or_none()
 
@@ -302,9 +303,7 @@ def _mock_chat_response(message: str, context: dict) -> str:
         if network:
             total = network.get("total_contacts", 0)
             top = network.get("top_companies", [])
-            top_str = ", ".join(
-                f"{c['company']} ({c['count']})" for c in top[:3]
-            )
+            top_str = ", ".join(f"{c['company']} ({c['count']})" for c in top[:3])
             return (
                 f"Your network has {total} contacts. Strongest at: {top_str}. "
                 "To find referral paths at specific companies, head to "
@@ -480,7 +479,12 @@ def _build_chat_messages(
         "Acknowledge this context silently — do not repeat it back."
     )
     messages.append({"role": "user", "content": context_msg})
-    messages.append({"role": "assistant", "content": "Understood. I have your context. How can I help?"})
+    messages.append(
+        {
+            "role": "assistant",
+            "content": "Understood. I have your context. How can I help?",
+        }
+    )
 
     # Last 10 messages of history (validated entries only)
     for entry in (conversation_history or [])[-10:]:

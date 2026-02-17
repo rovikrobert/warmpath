@@ -32,7 +32,7 @@ from app.models.marketplace import (
 from app.services.ai_matcher import score_contacts
 from app.services.ai_matcher import run_search
 from app.utils.privacy_checks import require_not_restricted
-from app.services.board_registry import lookup_boards, lookup_careers_url, lookup_or_discover_boards
+from app.services.board_registry import lookup_careers_url, lookup_or_discover_boards
 from app.services.credits import get_balance, spend_credits
 from app.api.jobs import _upsert_openings
 from app.services.job_fetcher import JobFetcher
@@ -114,7 +114,9 @@ async def list_searches(
 
 @router.get("/recommendations")
 async def get_recommendations_endpoint(
-    exclude: str | None = Query(None, description="Comma-separated company names to exclude"),
+    exclude: str | None = Query(
+        None, description="Comma-separated company names to exclude"
+    ),
     limit: int = Query(8, ge=1, le=20),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -194,7 +196,10 @@ async def execute_search(
 
     # Rate limit check
     allowed, count = await check_rate_limit(
-        current_user.id, "search_run", settings.RATE_LIMIT_SEARCH_RUNS_PER_DAY, db,
+        current_user.id,
+        "search_run",
+        settings.RATE_LIMIT_SEARCH_RUNS_PER_DAY,
+        db,
         is_admin=current_user.is_admin,
     )
     if not allowed:
@@ -304,12 +309,13 @@ async def get_search_results(
         all_rows = result.all()
         company_lower = company.lower()
         all_rows = [
-            r for r in all_rows
+            r
+            for r in all_rows
             if company_lower in (r[3] or "").lower()  # r[3] = contact_company
         ]
         total = len(all_rows)
         offset = (page - 1) * per_page
-        rows = all_rows[offset:offset + per_page]
+        rows = all_rows[offset : offset + per_page]
     else:
         count_query = select(func.count()).select_from(base_query.subquery())
         total = (await db.execute(count_query)).scalar() or 0
@@ -329,8 +335,7 @@ async def get_search_results(
     if company is not None:
         # Stats from already-filtered in-memory rows (includes company filter)
         stats_pairs = [
-            (float(r[0].relevance_score), float(r[4] or 0))
-            for r in all_rows
+            (float(r[0].relevance_score), float(r[4] or 0)) for r in all_rows
         ]
     else:
         # Run a lightweight stats query over the full filtered set

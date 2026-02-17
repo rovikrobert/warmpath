@@ -33,6 +33,7 @@ async def create_intro(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Create an intro request and generate referral message drafts."""
     # Verify contact belongs to user
     contact_result = await db.execute(
         select(Contact).where(
@@ -193,6 +194,7 @@ async def get_intro(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Retrieve an intro request with its generated messages."""
     result = await db.execute(
         select(IntroRequest)
         .options(selectinload(IntroRequest.intro_messages))
@@ -222,6 +224,7 @@ async def update_message(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Update an intro message's selection state or edited body."""
     # Verify intro request belongs to user
     intro_result = await db.execute(
         select(IntroRequest).where(

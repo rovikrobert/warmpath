@@ -81,7 +81,7 @@ class Contact(Base):
         index=True,
     )
     csv_upload_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("csv_uploads.id", ondelete="SET NULL")
+        UUID(as_uuid=True), ForeignKey("csv_uploads.id", ondelete="SET NULL"), index=True,
     )
 
     # Core identity fields (from LinkedIn CSV) — encrypted at rest
@@ -109,7 +109,10 @@ class Contact(Base):
     # Relationship classification
     relationship_type: Mapped[str | None] = mapped_column(String(50), index=True)
     source: Mapped[str] = mapped_column(
-        String(50), nullable=False, server_default="linkedin_csv", index=True,
+        String(50),
+        nullable=False,
+        server_default="linkedin_csv",
+        index=True,
     )
     how_you_know: Mapped[str | None] = mapped_column(EncryptedText())
     last_interaction_date: Mapped[date | None] = mapped_column(Date)

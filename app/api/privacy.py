@@ -36,9 +36,7 @@ router = APIRouter()
 _PUBLIC_RATE_LIMIT = 5
 
 
-async def _check_ip_rate_limit(
-    action: str, request: Request, db: AsyncSession
-) -> None:
+async def _check_ip_rate_limit(action: str, request: Request, db: AsyncSession) -> None:
     """Reject if the same IP has exceeded _PUBLIC_RATE_LIMIT in the last hour."""
     ip = request.client.host if request.client else "unknown"
     one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -76,7 +74,9 @@ class ConsentBody(BaseModel):
 
 class DataRequestBody(BaseModel):
     request_type: str = Field(
-        ..., max_length=30, pattern="^(access|deletion|rectification|restriction|portability|objection)$"
+        ...,
+        max_length=30,
+        pattern="^(access|deletion|rectification|restriction|portability|objection)$",
     )
     details: str | None = Field(default=None, max_length=1000)
     regulation: str = Field(default="general", pattern="^(gdpr|ccpa|pdpa|general)$")
@@ -120,7 +120,9 @@ async def restrict_processing(
     """Restrict processing of the user's data (GDPR Article 18)."""
     current_user.processing_restricted = True
     await log_event(
-        db, "processing_restricted", user_id=current_user.id,
+        db,
+        "processing_restricted",
+        user_id=current_user.id,
     )
     await db.commit()
     return {"data": {"message": "Data processing has been restricted"}, "meta": {}}
@@ -134,7 +136,9 @@ async def unrestrict_processing(
     """Remove processing restriction on the user's data."""
     current_user.processing_restricted = False
     await log_event(
-        db, "processing_unrestricted", user_id=current_user.id,
+        db,
+        "processing_unrestricted",
+        user_id=current_user.id,
     )
     await db.commit()
     return {"data": {"message": "Data processing restriction removed"}, "meta": {}}

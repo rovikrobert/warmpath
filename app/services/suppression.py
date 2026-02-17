@@ -284,8 +284,12 @@ async def rectify_contact_data(
 
     # Apply corrections
     allowed_fields = {
-        "first_name", "last_name", "current_company", "current_title",
-        "email", "location",
+        "first_name",
+        "last_name",
+        "current_company",
+        "current_title",
+        "email",
+        "location",
     }
     safe_corrections = {k: v for k, v in corrections.items() if k in allowed_fields}
 

@@ -101,6 +101,7 @@ async def create_application(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Create a new job application."""
     # Validate contact belongs to user if provided
     if body.contact_id:
         contact_result = await db.execute(
@@ -185,6 +186,7 @@ async def list_applications(
     needs_follow_up: bool | None = Query(default=None),
     sort: str = Query(default="created_at"),
 ) -> dict:
+    """List all applications for the current user with optional filters."""
     query = select(Application).where(
         Application.user_id == current_user.id,
         Application.deleted_at.is_(None),
@@ -237,6 +239,7 @@ async def get_application_stats(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Return aggregate application statistics for the current user."""
     result = await db.execute(
         select(Application).where(
             Application.user_id == current_user.id,
@@ -333,6 +336,7 @@ async def get_application(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Retrieve a single application by ID."""
     app_record = await _load_application(db, application_id, current_user.id)
     if app_record is None:
         raise HTTPException(
@@ -354,6 +358,7 @@ async def update_application(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Update an application's status, notes, or follow-up date."""
     result = await db.execute(
         select(Application).where(
             Application.id == application_id,
@@ -411,6 +416,7 @@ async def delete_application(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Soft-delete an application."""
     result = await db.execute(
         select(Application).where(
             Application.id == application_id,

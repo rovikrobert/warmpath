@@ -9,7 +9,6 @@ registered companies grouped by region.
 """
 
 import asyncio
-import json
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -54,7 +53,9 @@ BOARD_REGISTRY: dict[str, dict[str, str]] = {
     "elastic": {"greenhouse": "elastic"},
     "cloudflare": {"greenhouse": "cloudflare"},
     # --- Singapore / Southeast Asia ---
-    "google": {"career_page": "https://www.google.com/about/careers/applications/jobs/results"},
+    "google": {
+        "career_page": "https://www.google.com/about/careers/applications/jobs/results"
+    },
     "grab": {"career_page": "https://grab.careers/jobs/"},
     "sea-group": {"career_page": "https://career.sea.com/"},
     "shopee": {"career_page": "https://careers.shopee.sg/"},
@@ -380,7 +381,9 @@ async def discover_boards(company_name: str) -> dict[str, str] | None:
     for slug in candidates:
         result = await _probe_ats(slug)
         if result is not None:
-            logger.info("Discovered ATS for '%s' via slug '%s': %s", company_name, slug, result)
+            logger.info(
+                "Discovered ATS for '%s' via slug '%s': %s", company_name, slug, result
+            )
             return result
 
     logger.info("No ATS discovered for '%s' (tried %s)", company_name, candidates)

@@ -8,6 +8,7 @@ def _passthrough_filter(jobs, role, **kwargs):
     """Mock filter_and_rank_jobs: add fit_score and pass through."""
     return [{**j, "fit_score": j.get("role_relevance", 50)} for j in jobs]
 
+
 import pytest_asyncio
 from httpx import AsyncClient
 

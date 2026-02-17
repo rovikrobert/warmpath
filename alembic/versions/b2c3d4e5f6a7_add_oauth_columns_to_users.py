@@ -18,7 +18,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.alter_column("users", "password_hash", existing_type=sa.String(255), nullable=True)
+    op.alter_column(
+        "users", "password_hash", existing_type=sa.String(255), nullable=True
+    )
     op.add_column("users", sa.Column("oauth_provider", sa.String(50), nullable=True))
     op.add_column(
         "users",
@@ -35,4 +37,6 @@ def downgrade() -> None:
     op.drop_index("ix_users_oauth_provider_id", table_name="users")
     op.drop_column("users", "oauth_provider_id")
     op.drop_column("users", "oauth_provider")
-    op.alter_column("users", "password_hash", existing_type=sa.String(255), nullable=False)
+    op.alter_column(
+        "users", "password_hash", existing_type=sa.String(255), nullable=False
+    )

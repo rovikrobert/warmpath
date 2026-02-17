@@ -58,6 +58,7 @@ async def get_job_preferences(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Retrieve the current user's job preferences."""
     result = await db.execute(
         select(UserJobPreferences).where(UserJobPreferences.user_id == current_user.id)
     )
@@ -79,6 +80,7 @@ async def delete_job_preferences(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Delete the current user's job preferences."""
     result = await db.execute(
         select(UserJobPreferences).where(UserJobPreferences.user_id == current_user.id)
     )

@@ -1,6 +1,5 @@
 """Tests for company ATS auto-discovery and job filtering/ranking."""
 
-from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -12,7 +11,6 @@ from app.services.board_registry import (
     _slug_candidates,
     discover_boards,
     lookup_or_discover_boards,
-    register_board,
 )
 from app.services.job_fetcher import JobFetcher
 
@@ -424,9 +422,7 @@ class TestScanWithDiscovery:
                 ],
             ),
         ):
-            resp = await client.get(
-                "/api/v1/jobs/scan/bytedance", headers=auth_headers
-            )
+            resp = await client.get("/api/v1/jobs/scan/bytedance", headers=auth_headers)
             assert resp.status_code == 200
             assert resp.json()["meta"]["openings_count"] == 1
 

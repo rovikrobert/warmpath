@@ -3,7 +3,6 @@
 import uuid as uuid_mod
 from unittest.mock import AsyncMock, patch
 
-import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
@@ -12,7 +11,6 @@ from app.services.coach import (
     _build_chat_messages,
     _mock_briefing,
     _mock_chat_response,
-    get_suggested_prompts,
 )
 from tests.conftest import TestSessionLocal
 
@@ -46,9 +44,19 @@ async def user_with_data(auth_headers: dict, client: AsyncClient) -> dict:
     """Create contacts, preferences, and an application."""
     # Contacts
     contacts_data = [
-        {"first_name": "Alice", "last_name": "Eng", "company": "Google", "position": "SWE"},
+        {
+            "first_name": "Alice",
+            "last_name": "Eng",
+            "company": "Google",
+            "position": "SWE",
+        },
         {"first_name": "Bob", "last_name": "PM", "company": "Stripe", "position": "PM"},
-        {"first_name": "Carol", "last_name": "DS", "company": "Stripe", "position": "Data Scientist"},
+        {
+            "first_name": "Carol",
+            "last_name": "DS",
+            "company": "Stripe",
+            "position": "Data Scientist",
+        },
     ]
     await client.post(
         "/api/v1/contacts/manual/bulk",
@@ -119,7 +127,12 @@ class TestCoachBriefingEndpoint:
             "app.services.coach._assemble_context",
             new_callable=AsyncMock,
             return_value={
-                "user": {"name": "Cache Test", "title": None, "company": None, "location": None},
+                "user": {
+                    "name": "Cache Test",
+                    "title": None,
+                    "company": None,
+                    "location": None,
+                },
                 "preferences": None,
                 "network": None,
                 "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
@@ -136,9 +149,7 @@ class TestCoachBriefingEndpoint:
 
             assert mock_ctx.call_count == 1
 
-    async def test_briefing_with_data(
-        self, client: AsyncClient, user_with_data: dict
-    ):
+    async def test_briefing_with_data(self, client: AsyncClient, user_with_data: dict):
         resp = await client.get("/api/v1/coach/briefing", headers=user_with_data)
         assert resp.status_code == 200
         data = resp.json()["data"]
@@ -187,14 +198,23 @@ class TestCoachChatEndpoint:
             json={
                 "message": "Tell me about my network",
                 "context_snapshot": {
-                    "user": {"name": "Test", "title": None, "company": None, "location": None},
+                    "user": {
+                        "name": "Test",
+                        "title": None,
+                        "company": None,
+                        "location": None,
+                    },
                     "preferences": None,
                     "network": {
                         "total_contacts": 42,
                         "top_companies": [{"company": "Google", "count": 10}],
                         "summary": "42 contacts",
                     },
-                    "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
+                    "pipeline": {
+                        "status_counts": {},
+                        "follow_ups_needed": 0,
+                        "total": 0,
+                    },
                     "recent_searches": [],
                     "credits": 100,
                     "market": None,
@@ -269,7 +289,12 @@ class TestContextAssembly:
 class TestMockResponses:
     def test_mock_briefing_includes_name(self):
         context = {
-            "user": {"name": "Alice Smith", "title": None, "company": None, "location": None},
+            "user": {
+                "name": "Alice Smith",
+                "title": None,
+                "company": None,
+                "location": None,
+            },
             "preferences": None,
             "network": None,
             "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
@@ -285,7 +310,11 @@ class TestMockResponses:
             "user": {"name": "Bob", "title": None, "company": None, "location": None},
             "preferences": None,
             "network": None,
-            "pipeline": {"status_counts": {"message_sent": 2}, "follow_ups_needed": 2, "total": 2},
+            "pipeline": {
+                "status_counts": {"message_sent": 2},
+                "follow_ups_needed": 2,
+                "total": 2,
+            },
             "recent_searches": [],
             "credits": 0,
             "market": None,
@@ -376,10 +405,19 @@ class TestCoachChatStreamEndpoint:
             json={
                 "message": "Tell me about my credits",
                 "context_snapshot": {
-                    "user": {"name": "Injected", "title": None, "company": None, "location": None},
+                    "user": {
+                        "name": "Injected",
+                        "title": None,
+                        "company": None,
+                        "location": None,
+                    },
                     "preferences": None,
                     "network": None,
-                    "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
+                    "pipeline": {
+                        "status_counts": {},
+                        "follow_ups_needed": 0,
+                        "total": 0,
+                    },
                     "recent_searches": [],
                     "credits": 75,
                     "market": None,

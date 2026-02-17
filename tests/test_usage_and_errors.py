@@ -2,7 +2,7 @@ import io
 from datetime import date, timedelta
 
 from httpx import AsyncClient
-from sqlalchemy import select, update
+from sqlalchemy import update
 
 from app.models.user import User
 

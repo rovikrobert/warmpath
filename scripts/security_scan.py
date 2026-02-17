@@ -18,9 +18,7 @@ Exit codes: 0 = clean, 1 = findings, 2 = critical findings
 """
 
 import argparse
-import ast
 import json
-import os
 import re
 import sys
 import urllib.request
@@ -41,19 +39,24 @@ BOLD = "\033[1m"
 findings: list[dict] = []
 
 
-def _add(severity: str, category: str, message: str, file: str = "", line: int = 0) -> None:
-    findings.append({
-        "severity": severity,
-        "category": category,
-        "message": message,
-        "file": file,
-        "line": line,
-    })
+def _add(
+    severity: str, category: str, message: str, file: str = "", line: int = 0
+) -> None:
+    findings.append(
+        {
+            "severity": severity,
+            "category": category,
+            "message": message,
+            "file": file,
+            "line": line,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # 1. Dependency CVE scan (OSV database — same source as pip-audit)
 # ---------------------------------------------------------------------------
+
 
 def _parse_requirements() -> dict[str, str]:
     """Parse requirements.txt into {package: min_version}."""
@@ -85,10 +88,12 @@ def scan_dependencies() -> None:
     vuln_count = 0
     for pkg, ver in sorted(pkgs.items()):
         try:
-            payload = json.dumps({
-                "version": ver,
-                "package": {"name": pkg, "ecosystem": "PyPI"},
-            }).encode()
+            payload = json.dumps(
+                {
+                    "version": ver,
+                    "package": {"name": pkg, "ecosystem": "PyPI"},
+                }
+            ).encode()
             req = urllib.request.Request(
                 "https://api.osv.dev/v1/query",
                 data=payload,
@@ -121,8 +126,16 @@ def scan_dependencies() -> None:
                                 fixed_in = event["fixed"]
 
                 summary = v.get("summary", "No summary")[:120]
-                sev = "CRITICAL" if "arbitrary" in summary.lower() or "rce" in summary.lower() else "HIGH"
-                _add(sev, "dependency", f"{pkg}>={ver}: {canonical} — {summary} (fixed in {fixed_in})")
+                sev = (
+                    "CRITICAL"
+                    if "arbitrary" in summary.lower() or "rce" in summary.lower()
+                    else "HIGH"
+                )
+                _add(
+                    sev,
+                    "dependency",
+                    f"{pkg}>={ver}: {canonical} — {summary} (fixed in {fixed_in})",
+                )
                 vuln_count += 1
 
         except Exception as e:
@@ -139,16 +152,42 @@ def scan_dependencies() -> None:
 # ---------------------------------------------------------------------------
 
 _PATTERNS: list[tuple[str, str, str, re.Pattern]] = [
-    ("HIGH", "hardcoded_secret", "Possible hardcoded secret/password",
-     re.compile(r'(?:password|secret|api_key|token)\s*=\s*["\'][^"\']{8,}["\']', re.IGNORECASE)),
-    ("HIGH", "sql_injection", "Possible SQL injection (raw string formatting in query)",
-     re.compile(r'(?:execute|text)\s*\(\s*f["\']', re.IGNORECASE)),
-    ("MEDIUM", "eval_exec", "Use of eval/exec",
-     re.compile(r'\b(?:eval|exec)\s*\(', re.IGNORECASE)),
-    ("MEDIUM", "pickle_load", "Insecure deserialization (pickle.load/loads)",
-     re.compile(r'pickle\.loads?\s*\(')),
-    ("LOW", "debug_print", "Debug print/logging of sensitive data pattern",
-     re.compile(r'(?:print|logger\.\w+)\s*\(.*(?:password|secret|token|api_key)', re.IGNORECASE)),
+    (
+        "HIGH",
+        "hardcoded_secret",
+        "Possible hardcoded secret/password",
+        re.compile(
+            r'(?:password|secret|api_key|token)\s*=\s*["\'][^"\']{8,}["\']',
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "HIGH",
+        "sql_injection",
+        "Possible SQL injection (raw string formatting in query)",
+        re.compile(r'(?:execute|text)\s*\(\s*f["\']', re.IGNORECASE),
+    ),
+    (
+        "MEDIUM",
+        "eval_exec",
+        "Use of eval/exec",
+        re.compile(r"\b(?:eval|exec)\s*\(", re.IGNORECASE),
+    ),
+    (
+        "MEDIUM",
+        "pickle_load",
+        "Insecure deserialization (pickle.load/loads)",
+        re.compile(r"pickle\.loads?\s*\("),
+    ),
+    (
+        "LOW",
+        "debug_print",
+        "Debug print/logging of sensitive data pattern",
+        re.compile(
+            r"(?:print|logger\.\w+)\s*\(.*(?:password|secret|token|api_key)",
+            re.IGNORECASE,
+        ),
+    ),
 ]
 
 # Files/dirs to skip
@@ -183,7 +222,13 @@ def scan_code_patterns() -> None:
                     if "settings." in stripped and category == "hardcoded_secret":
                         continue
                     relpath = str(py_file.relative_to(PROJECT_ROOT))
-                    _add(severity, category, f"{message}: {stripped[:100]}", relpath, lineno)
+                    _add(
+                        severity,
+                        category,
+                        f"{message}: {stripped[:100]}",
+                        relpath,
+                        lineno,
+                    )
                     count += 1
 
     if count == 0:
@@ -195,6 +240,7 @@ def scan_code_patterns() -> None:
 # ---------------------------------------------------------------------------
 # 3. Production config safety
 # ---------------------------------------------------------------------------
+
 
 def scan_config() -> None:
     """Check config.py for unsafe defaults that could slip into production."""
@@ -208,26 +254,46 @@ def scan_config() -> None:
     relpath = str(config_file.relative_to(PROJECT_ROOT))
 
     # Check SECRET_KEY default
-    if 'SECRET_KEY' in content and 'change-me' in content:
-        _add("HIGH", "config", "SECRET_KEY has a guessable default value — must be overridden in production", relpath)
+    if "SECRET_KEY" in content and "change-me" in content:
+        _add(
+            "HIGH",
+            "config",
+            "SECRET_KEY has a guessable default value — must be overridden in production",
+            relpath,
+        )
 
     # Check ENCRYPTION_KEY default
-    if 'ENCRYPTION_KEY' in content:
+    if "ENCRYPTION_KEY" in content:
         match = re.search(r'ENCRYPTION_KEY.*=\s*"([^"]*)"', content)
         if match and match.group(1) == "":
-            _add("HIGH", "config", "ENCRYPTION_KEY defaults to empty string — encryption silently disabled", relpath)
+            _add(
+                "HIGH",
+                "config",
+                "ENCRYPTION_KEY defaults to empty string — encryption silently disabled",
+                relpath,
+            )
 
     # Check CORS default
-    if 'CORS_ORIGINS' in content:
+    if "CORS_ORIGINS" in content:
         match = re.search(r'CORS_ORIGINS.*=\s*"([^"]*)"', content)
         if match and match.group(1) == "*":
-            _add("MEDIUM", "config", "CORS_ORIGINS defaults to wildcard (*) — restrict in production", relpath)
+            _add(
+                "MEDIUM",
+                "config",
+                "CORS_ORIGINS defaults to wildcard (*) — restrict in production",
+                relpath,
+            )
 
     # Check BLIND_INDEX_KEY default
-    if 'BLIND_INDEX_KEY' in content:
+    if "BLIND_INDEX_KEY" in content:
         match = re.search(r'BLIND_INDEX_KEY.*=\s*"([^"]*)"', content)
         if match and match.group(1) == "":
-            _add("MEDIUM", "config", "BLIND_INDEX_KEY defaults to empty — blind indexes use weaker SHA-256 fallback", relpath)
+            _add(
+                "MEDIUM",
+                "config",
+                "BLIND_INDEX_KEY defaults to empty — blind indexes use weaker SHA-256 fallback",
+                relpath,
+            )
 
     found = sum(1 for f in findings if f["category"] == "config")
     if found == 0:
@@ -240,6 +306,7 @@ def scan_config() -> None:
 # 4. Auth coverage — endpoints missing authentication
 # ---------------------------------------------------------------------------
 
+
 def scan_auth_coverage() -> None:
     """Check API endpoints for missing authentication dependencies."""
     print(f"\n{BOLD}{CYAN}[4/5] Auth coverage scan{RESET}")
@@ -249,9 +316,17 @@ def scan_auth_coverage() -> None:
 
     # Endpoints that are intentionally public
     public_allowlist = {
-        "login", "register", "refresh_token", "forgot_password",
-        "reset_password", "verify_email", "health", "serve_spa",
-        "linkedin_callback", "stripe_webhook", "suppression_request",
+        "login",
+        "register",
+        "refresh_token",
+        "forgot_password",
+        "reset_password",
+        "verify_email",
+        "health",
+        "serve_spa",
+        "linkedin_callback",
+        "stripe_webhook",
+        "suppression_request",
         "request_rectification",
     }
 
@@ -265,8 +340,8 @@ def scan_auth_coverage() -> None:
 
         # Find route decorators and check if the function has get_current_user
         route_pattern = re.compile(
-            r'@router\.(get|post|put|patch|delete)\s*\([^)]*\)\s*\n'
-            r'async\s+def\s+(\w+)\s*\(([^)]*)\)',
+            r"@router\.(get|post|put|patch|delete)\s*\([^)]*\)\s*\n"
+            r"async\s+def\s+(\w+)\s*\(([^)]*)\)",
             re.MULTILINE,
         )
         for match in route_pattern.finditer(content):
@@ -276,10 +351,14 @@ def scan_auth_coverage() -> None:
             if func_name in public_allowlist:
                 continue
             if "get_current_user" not in params and "current_user" not in params:
-                lineno = content[:match.start()].count("\n") + 1
-                _add("MEDIUM", "auth_coverage",
-                     f"Endpoint `{func_name}` may be missing authentication",
-                     relpath, lineno)
+                lineno = content[: match.start()].count("\n") + 1
+                _add(
+                    "MEDIUM",
+                    "auth_coverage",
+                    f"Endpoint `{func_name}` may be missing authentication",
+                    relpath,
+                    lineno,
+                )
                 count += 1
 
     if count == 0:
@@ -291,6 +370,7 @@ def scan_auth_coverage() -> None:
 # ---------------------------------------------------------------------------
 # 5. Input validation (max_length on string fields)
 # ---------------------------------------------------------------------------
+
 
 def scan_input_validation() -> None:
     """Check Pydantic schemas for missing max_length on string fields."""
@@ -313,16 +393,37 @@ def scan_input_validation() -> None:
             if "BaseModel" in stripped and "class " in stripped:
                 in_model = True
                 continue
-            if in_model and stripped and not stripped.startswith("#") and not stripped.startswith("class"):
-                if ": str" in stripped and "max_length" not in stripped and "pattern" not in stripped:
-                    if "EmailStr" not in stripped and "password" not in stripped.lower():
+            if (
+                in_model
+                and stripped
+                and not stripped.startswith("#")
+                and not stripped.startswith("class")
+            ):
+                if (
+                    ": str" in stripped
+                    and "max_length" not in stripped
+                    and "pattern" not in stripped
+                ):
+                    if (
+                        "EmailStr" not in stripped
+                        and "password" not in stripped.lower()
+                    ):
                         # Only flag if it looks like a field definition
                         if "=" in stripped or ":" in stripped:
-                            _add("LOW", "validation",
-                                 f"String field without max_length: {stripped[:80]}",
-                                 relpath, lineno)
+                            _add(
+                                "LOW",
+                                "validation",
+                                f"String field without max_length: {stripped[:80]}",
+                                relpath,
+                                lineno,
+                            )
                             count += 1
-            if in_model and stripped and not stripped.startswith(" ") and not stripped.startswith("\t"):
+            if (
+                in_model
+                and stripped
+                and not stripped.startswith(" ")
+                and not stripped.startswith("\t")
+            ):
                 if not stripped.startswith("#") and not stripped.startswith("@"):
                     in_model = False
 
@@ -336,11 +437,12 @@ def scan_input_validation() -> None:
 # Report
 # ---------------------------------------------------------------------------
 
+
 def print_report() -> None:
     """Print the final findings report."""
-    print(f"\n{BOLD}{'='*70}{RESET}")
+    print(f"\n{BOLD}{'=' * 70}{RESET}")
     print(f"{BOLD}Security Scan Report{RESET}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     if not findings:
         print(f"{GREEN}{BOLD}No security issues found.{RESET}\n")
@@ -352,7 +454,9 @@ def print_report() -> None:
         if not sev_findings:
             continue
 
-        color = RED if sev in ("CRITICAL", "HIGH") else YELLOW if sev == "MEDIUM" else RESET
+        color = (
+            RED if sev in ("CRITICAL", "HIGH") else YELLOW if sev == "MEDIUM" else RESET
+        )
         print(f"{color}{BOLD}[{sev}] — {len(sev_findings)} finding(s){RESET}")
         for f in sev_findings:
             loc = f"{f['file']}:{f['line']}" if f["file"] else ""
@@ -369,11 +473,15 @@ def print_report() -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Security — security vulnerability scanner")
+    parser = argparse.ArgumentParser(
+        description="Security — security vulnerability scanner"
+    )
     parser.add_argument("--deps", action="store_true", help="Dependency CVEs only")
     parser.add_argument("--code", action="store_true", help="Code patterns only")
     parser.add_argument("--config", action="store_true", help="Config checks only")
-    parser.add_argument("--json", action="store_true", help="Output JSON instead of text")
+    parser.add_argument(
+        "--json", action="store_true", help="Output JSON instead of text"
+    )
     args = parser.parse_args()
 
     run_all = not (args.deps or args.code or args.config)

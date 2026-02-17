@@ -19,15 +19,19 @@ depends_on = None
 
 def upgrade() -> None:
     op.create_index("ix_connector_profiles_user_id", "connector_profiles", ["user_id"])
-    op.create_index("ix_user_job_preferences_user_id", "user_job_preferences", ["user_id"])
+    op.create_index(
+        "ix_user_job_preferences_user_id", "user_job_preferences", ["user_id"]
+    )
     op.create_index("ix_contacts_relationship_type", "contacts", ["relationship_type"])
     op.create_index("ix_contacts_source", "contacts", ["source"])
     op.create_index("ix_applications_status", "applications", ["status"])
     op.create_index("ix_match_results_match_type", "match_results", ["match_type"])
     op.create_index("ix_credit_transactions_type", "credit_transactions", ["type"])
+    op.create_index("ix_contacts_csv_upload_id", "contacts", ["csv_upload_id"])
 
 
 def downgrade() -> None:
+    op.drop_index("ix_contacts_csv_upload_id", "contacts")
     op.drop_index("ix_credit_transactions_type", "credit_transactions")
     op.drop_index("ix_match_results_match_type", "match_results")
     op.drop_index("ix_applications_status", "applications")
