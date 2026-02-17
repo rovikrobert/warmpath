@@ -29,6 +29,12 @@ data_team/reports/*.json
 !data_team/reports/.gitkeep
 data_team/shared/intel_cache.json
 data_team/*/state.json
+
+# Product team artifacts (auto-generated)
+product_team/reports/*.json
+!product_team/reports/.gitkeep
+product_team/shared/intel_cache.json
+product_team/*/state.json
 coverage.json
 .coverage
 junit.xml

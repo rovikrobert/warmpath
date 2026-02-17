@@ -368,7 +368,7 @@ class TestCosConfig:
         assert "daily_brief_time" in COS_CONFIG
         assert "teams" in COS_CONFIG
         assert COS_CONFIG["teams"]["engineering"]["active"] is True
-        assert COS_CONFIG["teams"]["product"]["active"] is False
+        assert COS_CONFIG["teams"]["product"]["active"] is True
 
     def test_severity_weights(self):
         from agents.chief_of_staff.cos_config import SEVERITY_WEIGHT
