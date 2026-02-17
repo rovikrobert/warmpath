@@ -4,6 +4,7 @@ When AI_MOCK_MODE=true (default), returns deterministic fake profile data
 without requiring pdfplumber or an Anthropic API key.
 """
 
+import asyncio
 import io
 import json
 import logging
@@ -121,7 +122,7 @@ Resume text:
 {text[:8000]}"""
 
     message = await client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-haiku-4-5-20251001",
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -146,5 +147,5 @@ async def parse_resume(pdf_bytes: bytes) -> dict:
     if settings.AI_MOCK_MODE:
         return _mock_parse()
 
-    text = _extract_text(pdf_bytes)
+    text = await asyncio.to_thread(_extract_text, pdf_bytes)
     return await _ai_parse(text)

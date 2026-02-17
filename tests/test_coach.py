@@ -9,6 +9,7 @@ from httpx import AsyncClient
 
 from app.services.coach import (
     _assemble_context,
+    _build_chat_messages,
     _mock_briefing,
     _mock_chat_response,
     get_suggested_prompts,
@@ -309,3 +310,80 @@ class TestMockResponses:
         response = _mock_chat_response("Tell me about my network", context)
         assert "50" in response
         assert "Google" in response
+
+    def test_build_chat_messages_structure(self):
+        context = {
+            "user": {"name": "Test"},
+            "preferences": None,
+        }
+        history = [
+            {"role": "user", "content": "Hi"},
+            {"role": "keevs", "content": "Hello!"},
+        ]
+        messages = _build_chat_messages("New question", history, context)
+        # Context injection pair + 2 history + 1 current = 5 messages
+        assert len(messages) == 5
+        assert messages[0]["role"] == "user"
+        assert messages[1]["role"] == "assistant"
+        assert messages[-1]["content"] == "New question"
+
+
+# ---------------------------------------------------------------------------
+# TestCoachChatStreamEndpoint
+# ---------------------------------------------------------------------------
+
+
+class TestCoachChatStreamEndpoint:
+    async def test_requires_auth(self, client: AsyncClient):
+        resp = await client.post(
+            "/api/v1/coach/chat/stream",
+            json={"message": "hello"},
+        )
+        assert resp.status_code in (401, 403)
+
+    async def test_stream_returns_sse(self, client: AsyncClient, auth_headers: dict):
+        resp = await client.post(
+            "/api/v1/coach/chat/stream",
+            headers=auth_headers,
+            json={"message": "What should I focus on?"},
+        )
+        assert resp.status_code == 200
+        assert "text/event-stream" in resp.headers["content-type"]
+        body = resp.text
+        assert "data: " in body
+        assert "[DONE]" in body
+
+    async def test_stream_contains_mock_response(
+        self, client: AsyncClient, auth_headers: dict
+    ):
+        """SSE data events should contain the mock chat response text."""
+        resp = await client.post(
+            "/api/v1/coach/chat/stream",
+            headers=auth_headers,
+            json={"message": "How do I get started?"},
+        )
+        assert resp.status_code == 200
+        # Mock response for "get started" should contain game plan text
+        assert "game plan" in resp.text.lower() or "upload" in resp.text.lower()
+
+    async def test_stream_with_context_snapshot(
+        self, client: AsyncClient, auth_headers: dict
+    ):
+        resp = await client.post(
+            "/api/v1/coach/chat/stream",
+            headers=auth_headers,
+            json={
+                "message": "Tell me about my credits",
+                "context_snapshot": {
+                    "user": {"name": "Test", "title": None, "company": None, "location": None},
+                    "preferences": None,
+                    "network": None,
+                    "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
+                    "recent_searches": [],
+                    "credits": 75,
+                    "market": None,
+                },
+            },
+        )
+        assert resp.status_code == 200
+        assert "75" in resp.text

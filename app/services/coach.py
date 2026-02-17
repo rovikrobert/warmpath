@@ -465,15 +465,12 @@ async def generate_chat_response(
     return {"response": response_text}
 
 
-async def _generate_chat_via_claude(
+def _build_chat_messages(
     message: str,
     conversation_history: list[dict],
     context: dict,
-) -> str:
-    """Call Claude API for chat response."""
-    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-
-    # Build messages: inject context, then history, then current message
+) -> list[dict]:
+    """Build Claude messages array with context injection + history."""
     messages: list[dict] = []
 
     # Context injection as first user message
@@ -492,6 +489,17 @@ async def _generate_chat_via_claude(
 
     # Current message
     messages.append({"role": "user", "content": message})
+    return messages
+
+
+async def _generate_chat_via_claude(
+    message: str,
+    conversation_history: list[dict],
+    context: dict,
+) -> str:
+    """Call Claude API for chat response."""
+    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    messages = _build_chat_messages(message, conversation_history, context)
 
     response = await client.messages.create(
         model=CLAUDE_MODEL,
@@ -501,3 +509,26 @@ async def _generate_chat_via_claude(
     )
 
     return response.content[0].text.strip()
+
+
+async def generate_chat_response_stream(
+    message: str,
+    conversation_history: list[dict],
+    context: dict,
+):
+    """Yield text chunks as they arrive from Claude. Mock mode yields full text at once."""
+    if settings.AI_MOCK_MODE:
+        yield _mock_chat_response(message, context)
+        return
+
+    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    messages = _build_chat_messages(message, conversation_history, context)
+
+    async with client.messages.stream(
+        model=CLAUDE_MODEL,
+        max_tokens=1024,
+        system=_KEEVS_SYSTEM_PROMPT,
+        messages=messages,
+    ) as stream:
+        async for text in stream.text_stream:
+            yield text
