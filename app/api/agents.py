@@ -4,6 +4,7 @@ from __futu[RESEND_KEY_REDACTED] import annotations
 
 import logging
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -48,15 +49,19 @@ RunMode = Literal[
 _run_log: list[dict] = []
 
 
+def _log(msg: str) -> None:
+    """Print to stdout with flush — guaranteed to appear in Railway logs."""
+    print(msg, flush=True)
+
+
 def _run_agent(mode: str) -> dict:
-    """Execute an agent command in a subprocess. Streams stdout/stderr to logger."""
+    """Execute an agent command in a subprocess. Pipes output to stdout."""
     cmd = _COMMANDS[mode]
-    label = f"[{mode}]"
-    logger.info("%s started → %s", label, " ".join(cmd))
+    label = f"[agent:{mode}]"
+    _log(f"{label} started → {' '.join(cmd)}")
 
     entry = {"mode": mode, "started_at": datetime.now(timezone.utc).isoformat(), "status": "running"}
     _run_log.append(entry)
-    # Keep log bounded
     if len(_run_log) > 50:
         _run_log.pop(0)
 
@@ -64,41 +69,31 @@ def _run_agent(mode: str) -> dict:
     try:
         result = subprocess.run(
             cmd,
-            captu[RESEND_KEY_REDACTED]=True,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
             text=True,
-            timeout=600,  # 10 minute timeout
+            timeout=600,
         )
         elapsed = time.monotonic() - start
 
         if result.returncode == 0:
-            logger.info("%s completed in %.1fs", label, elapsed)
-            # Log last 5 lines of stdout for visibility
-            stdout_tail = "\n".join(result.stdout.strip().splitlines()[-5:])
-            if stdout_tail:
-                logger.info("%s output:\n%s", label, stdout_tail)
+            _log(f"{label} completed in {elapsed:.1f}s")
             entry["status"] = "completed"
         else:
-            logger.error(
-                "%s failed (exit %d, %.1fs)\nstderr: %s",
-                label,
-                result.returncode,
-                elapsed,
-                result.stderr[:2000],
-            )
+            _log(f"{label} FAILED (exit {result.returncode}, {elapsed:.1f}s)")
             entry["status"] = "failed"
-            entry["error"] = result.stderr[:500]
 
         entry["elapsed_s"] = round(elapsed, 1)
         return entry
 
     except subprocess.TimeoutExpired:
         elapsed = time.monotonic() - start
-        logger.error("%s timed out after %.1fs", label, elapsed)
+        _log(f"{label} TIMED OUT after {elapsed:.1f}s")
         entry["status"] = "timeout"
         entry["elapsed_s"] = round(elapsed, 1)
         return entry
     except Exception as exc:
-        logger.exception("%s error: %s", label, exc)
+        _log(f"{label} ERROR: {exc}")
         entry["status"] = "error"
         entry["error"] = str(exc)[:500]
         return entry
@@ -106,25 +101,20 @@ def _run_agent(mode: str) -> dict:
 
 def _run_full_scan() -> None:
     """Run all teams in sequence, then CoS daily. Single trigger for everything."""
-    logger.info("[full-scan] Starting full agent scan (%d steps)", len(_FULL_SCAN_ORDER))
+    _log(f"[full-scan] Starting ({len(_FULL_SCAN_ORDER)} steps: {' → '.join(_FULL_SCAN_ORDER)})")
     start = time.monotonic()
     results = []
 
-    for mode in _FULL_SCAN_ORDER:
+    for i, mode in enumerate(_FULL_SCAN_ORDER, 1):
+        _log(f"[full-scan] Step {i}/{len(_FULL_SCAN_ORDER)}: {mode}")
         result = _run_agent(mode)
         results.append(result)
-        # If a team scan fails, still continue with the rest
         if result["status"] != "completed":
-            logger.warning("[full-scan] %s finished with status: %s — continuing", mode, result["status"])
+            _log(f"[full-scan] {mode} → {result['status']} — continuing")
 
     elapsed = time.monotonic() - start
     completed = sum(1 for r in results if r["status"] == "completed")
-    logger.info(
-        "[full-scan] Done in %.1fs — %d/%d succeeded",
-        elapsed,
-        completed,
-        len(results),
-    )
+    _log(f"[full-scan] Done in {elapsed:.1f}s — {completed}/{len(results)} succeeded")
 
 
 def _verify_secret(x_agent_secret: str) -> None:
