@@ -269,11 +269,15 @@ async def list_benchmarks(
     query = select(PricingBenchmark).where(PricingBenchmark.deleted_at.is_(None))
     if product_category is not None:
         if product_category not in VALID_PRODUCT_CATEGORIES:
-            raise ValidationError(f"product_category must be one of {VALID_PRODUCT_CATEGORIES}")
+            raise ValidationError(
+                f"product_category must be one of {VALID_PRODUCT_CATEGORIES}"
+            )
         query = query.where(PricingBenchmark.product_category == product_category)
     if pricing_model is not None:
         if pricing_model not in VALID_PRICING_MODELS:
-            raise ValidationError(f"pricing_model must be one of {VALID_PRICING_MODELS}")
+            raise ValidationError(
+                f"pricing_model must be one of {VALID_PRICING_MODELS}"
+            )
         query = query.where(PricingBenchmark.pricing_model == pricing_model)
     query = query.order_by(PricingBenchmark.company_name)
     result = await db.execute(query)
@@ -310,7 +314,9 @@ async def create_benchmark(
 ) -> PricingBenchmark:
     """Create a new pricing benchmark entry."""
     if product_category not in VALID_PRODUCT_CATEGORIES:
-        raise ValidationError(f"product_category must be one of {VALID_PRODUCT_CATEGORIES}")
+        raise ValidationError(
+            f"product_category must be one of {VALID_PRODUCT_CATEGORIES}"
+        )
     if pricing_model not in VALID_PRICING_MODELS:
         raise ValidationError(f"pricing_model must be one of {VALID_PRICING_MODELS}")
 
@@ -342,15 +348,31 @@ async def update_benchmark(
     if benchmark is None:
         raise NotFoundError(f"Benchmark {benchmark_id} not found")
 
-    if "product_category" in kwargs and kwargs["product_category"] not in VALID_PRODUCT_CATEGORIES:
-        raise ValidationError(f"product_category must be one of {VALID_PRODUCT_CATEGORIES}")
-    if "pricing_model" in kwargs and kwargs["pricing_model"] not in VALID_PRICING_MODELS:
+    if (
+        "product_category" in kwargs
+        and kwargs["product_category"] not in VALID_PRODUCT_CATEGORIES
+    ):
+        raise ValidationError(
+            f"product_category must be one of {VALID_PRODUCT_CATEGORIES}"
+        )
+    if (
+        "pricing_model" in kwargs
+        and kwargs["pricing_model"] not in VALID_PRICING_MODELS
+    ):
         raise ValidationError(f"pricing_model must be one of {VALID_PRICING_MODELS}")
 
     allowed = {
-        "company_name", "domain", "product_category", "pricing_model",
-        "tiers", "free_tier_exists", "lowest_paid_price", "enterprise_available",
-        "source_url", "scraped_at", "notes",
+        "company_name",
+        "domain",
+        "product_category",
+        "pricing_model",
+        "tiers",
+        "free_tier_exists",
+        "lowest_paid_price",
+        "enterprise_available",
+        "source_url",
+        "scraped_at",
+        "notes",
     }
     for key, value in kwargs.items():
         if key in allowed:
@@ -505,7 +527,9 @@ async def create_partnership(
     if stage not in VALID_STAGES:
         raise ValidationError(f"stage must be one of {VALID_STAGES}")
     if legal_review_status not in VALID_LEGAL_STATUSES:
-        raise ValidationError(f"legal_review_status must be one of {VALID_LEGAL_STATUSES}")
+        raise ValidationError(
+            f"legal_review_status must be one of {VALID_LEGAL_STATUSES}"
+        )
 
     partnership = PartnershipOpportunity(
         partner_name=partner_name,
@@ -545,7 +569,9 @@ async def update_partnership(
         "legal_review_status" in kwargs
         and kwargs["legal_review_status"] not in VALID_LEGAL_STATUSES
     ):
-        raise ValidationError(f"legal_review_status must be one of {VALID_LEGAL_STATUSES}")
+        raise ValidationError(
+            f"legal_review_status must be one of {VALID_LEGAL_STATUSES}"
+        )
 
     allowed = {
         "partner_name",
@@ -588,7 +614,9 @@ async def advance_partnership(
         raise NotFoundError(f"Partnership {partnership_id} not found")
 
     if partnership.stage in _TERMINAL_STAGES:
-        raise ValidationError(f"Cannot advance from terminal stage '{partnership.stage}'")
+        raise ValidationError(
+            f"Cannot advance from terminal stage '{partnership.stage}'"
+        )
 
     current_index = STAGE_ORDER.index(partnership.stage)
     next_stage = STAGE_ORDER[current_index + 1]
@@ -655,16 +683,21 @@ async def get_pipeline_metrics(db: AsyncSession) -> dict:
     for p in all_partnerships:
         if p.stage in _TERMINAL_STAGES:
             continue
-        if p.stage_changed_at is not None and p.stage_changed_at < stuck_threshold:
-            days = (now - p.stage_changed_at).days
-            stuck_deals.append(
-                {
-                    "id": str(p.id),
-                    "partner_name": p.partner_name,
-                    "stage": p.stage,
-                    "days_in_stage": days,
-                }
-            )
+        if p.stage_changed_at is not None:
+            # Ensure timezone-aware comparison (SQLite stores naive datetimes)
+            sca = p.stage_changed_at
+            if sca.tzinfo is None:
+                sca = sca.replace(tzinfo=timezone.utc)
+            if sca < stuck_threshold:
+                days = (now - sca).days
+                stuck_deals.append(
+                    {
+                        "id": str(p.id),
+                        "partner_name": p.partner_name,
+                        "stage": p.stage,
+                        "days_in_stage": days,
+                    }
+                )
 
     # Conversion rate: signed / (signed + lost)
     signed = deals_per_stage.get("signed", 0)
@@ -709,7 +742,9 @@ async def list_experiments(
         query = query.where(GTMExperiment.status == status)
     if experiment_type is not None:
         if experiment_type not in VALID_EXPERIMENT_TYPES:
-            raise ValidationError(f"experiment_type must be one of {VALID_EXPERIMENT_TYPES}")
+            raise ValidationError(
+                f"experiment_type must be one of {VALID_EXPERIMENT_TYPES}"
+            )
         query = query.where(GTMExperiment.experiment_type == experiment_type)
     query = query.order_by(GTMExperiment.name)
     result = await db.execute(query)
@@ -743,7 +778,9 @@ async def create_experiment(
 ) -> GTMExperiment:
     """Create a new GTM experiment."""
     if experiment_type not in VALID_EXPERIMENT_TYPES:
-        raise ValidationError(f"experiment_type must be one of {VALID_EXPERIMENT_TYPES}")
+        raise ValidationError(
+            f"experiment_type must be one of {VALID_EXPERIMENT_TYPES}"
+        )
     if status not in VALID_EXPERIMENT_STATUSES:
         raise ValidationError(f"status must be one of {VALID_EXPERIMENT_STATUSES}")
 
@@ -772,12 +809,21 @@ async def update_experiment(
     if experiment is None:
         raise NotFoundError(f"Experiment {experiment_id} not found")
 
-    if "experiment_type" in kwargs and kwargs["experiment_type"] not in VALID_EXPERIMENT_TYPES:
-        raise ValidationError(f"experiment_type must be one of {VALID_EXPERIMENT_TYPES}")
+    if (
+        "experiment_type" in kwargs
+        and kwargs["experiment_type"] not in VALID_EXPERIMENT_TYPES
+    ):
+        raise ValidationError(
+            f"experiment_type must be one of {VALID_EXPERIMENT_TYPES}"
+        )
 
     allowed = {
-        "name", "hypothesis", "experiment_type", "variants",
-        "metrics", "target_sample_size",
+        "name",
+        "hypothesis",
+        "experiment_type",
+        "variants",
+        "metrics",
+        "target_sample_size",
     }
     for key, value in kwargs.items():
         if key in allowed:
@@ -797,7 +843,8 @@ async def start_experiment(db: AsyncSession, experiment_id: uuid.UUID) -> GTMExp
         raise NotFoundError(f"Experiment {experiment_id} not found")
 
     if experiment.status != "draft":
-        raise ValidationError(f"Can only start experiments in 'draft' status, current: '{experiment.status}'"
+        raise ValidationError(
+            f"Can only start experiments in 'draft' status, current: '{experiment.status}'"
         )
 
     experiment.status = "running"
@@ -824,7 +871,8 @@ async def complete_experiment(
         raise NotFoundError(f"Experiment {experiment_id} not found")
 
     if experiment.status not in ("running", "paused"):
-        raise ValidationError(f"Can only complete experiments in 'running' or 'paused' status, "
+        raise ValidationError(
+            f"Can only complete experiments in 'running' or 'paused' status, "
             f"current: '{experiment.status}'"
         )
 

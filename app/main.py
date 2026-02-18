@@ -10,17 +10,21 @@ from app.api import (
     agents,
     applications,
     auth,
+    benchmarks,
     coach,
     companies,
+    competitors,
     contacts,
     credits,
     dashboard,
+    experiments,
     feedback,
     friends,
     health,
     jobs,
     marketplace,
     matches,
+    partnerships,
     preferences,
     privacy,
     referrals,
@@ -158,6 +162,16 @@ app.include_router(friends.router, prefix="/api/v1/friends", tags=["friends"])
 app.include_router(registry.router, prefix="/api/v1/registry", tags=["registry"])
 app.include_router(webhooks.router, prefix="/api/v1", tags=["webhooks"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
+app.include_router(
+    competitors.router, prefix="/api/v1/competitors", tags=["competitors"]
+)
+app.include_router(
+    partnerships.router, prefix="/api/v1/partnerships", tags=["partnerships"]
+)
+app.include_router(
+    experiments.router, prefix="/api/v1/experiments", tags=["experiments"]
+)
+app.include_router(benchmarks.router, prefix="/api/v1/benchmarks", tags=["benchmarks"])
 
 # ---------------------------------------------------------------------------
 # Frontend static files (SPA)
