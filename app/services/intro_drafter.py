@@ -24,7 +24,7 @@ from app.models.user import ConnectorProfile
 logger = logging.getLogger(__name__)
 
 LINKEDIN_CHAR_LIMIT = 300
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+CLAUDE_MODEL = settings.CLAUDE_MODEL
 
 
 @dataclass

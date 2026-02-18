@@ -55,15 +55,17 @@ async def delete_user_data(
 
     purge_after = datetime.now(timezone.utc) + timedelta(days=730)  # 24 months
     for txn in credits:
-        db.add(ArchivedCreditTransaction(
-            original_user_id=user_id,
-            original_transaction_id=txn.id,
-            amount=txn.amount,
-            type=txn.type,
-            reason=txn.reason,
-            original_created_at=txn.created_at,
-            purge_after=purge_after,
-        ))
+        db.add(
+            ArchivedCreditTransaction(
+                original_user_id=user_id,
+                original_transaction_id=txn.id,
+                amount=txn.amount,
+                type=txn.type,
+                reason=txn.reason,
+                original_created_at=txn.created_at,
+                purge_after=purge_after,
+            )
+        )
 
     # 2. Add to suppression list (prevents re-import of this person's data)
     user_result = await db.execute(select(User).where(User.id == user_id))
@@ -81,7 +83,9 @@ async def delete_user_data(
     # 3. Delete user-owned data (order matters for FK constraints)
     # Marketplace listings first (depends on contacts)
     r = await db.execute(
-        delete(MarketplaceListing).where(MarketplaceListing.network_holder_id == user_id)
+        delete(MarketplaceListing).where(
+            MarketplaceListing.network_holder_id == user_id
+        )
     )
     counts["marketplace_listings"] = r.rowcount
 

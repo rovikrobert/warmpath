@@ -334,11 +334,13 @@ class TestGetAgentIntel:
 
     def test_returns_relevant_items(self):
         ei = ExternalIntelligence()
-        ei.add_item(IntelligenceItem(
-            id="conv-1",
-            category="ai_sdk_updates",
-            relevant_agents=["architect"],
-        ))
+        ei.add_item(
+            IntelligenceItem(
+                id="conv-1",
+                category="ai_sdk_updates",
+                relevant_agents=["architect"],
+            )
+        )
         result = get_agent_intel("architect")
         assert len(result) == 1
         assert result[0].id == "conv-1"

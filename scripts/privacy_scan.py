@@ -324,9 +324,9 @@ def check_vault_isolation() -> None:
     # Known-intentional cross-vault lookups (post-consent or hash-based).
     # Each entry is (filename_suffix, line_number).
     _SUPPRESSED_VAULT_LOOKUPS: list[tuple[str, int]] = [
-        ("matches.py", 271),        # post-consent contact reveal
-        ("applications.py", 456),   # hash-based duplicate check
-        ("marketplace.py", 243),    # anonymized marketplace index query
+        ("matches.py", 271),  # post-consent contact reveal
+        ("applications.py", 456),  # hash-based duplicate check
+        ("marketplace.py", 243),  # anonymized marketplace index query
     ]
 
     api_dir = APP_DIR / "api"

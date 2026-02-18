@@ -53,7 +53,7 @@ class EncryptedString(TypeDecorator):
     impl = Text
     cache_ok = True
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value, dialect) -> str | None:
         if value is None:
             return None
         f = _get_fernet()
@@ -61,7 +61,7 @@ class EncryptedString(TypeDecorator):
             return value
         return f.encrypt(value.encode()).decode()
 
-    def process_result_value(self, value, dialect):
+    def process_result_value(self, value, dialect) -> str | None:
         if value is None:
             return None
         f = _get_fernet()
@@ -82,7 +82,7 @@ class EncryptedText(TypeDecorator):
     impl = Text
     cache_ok = True
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value, dialect) -> str | None:
         if value is None:
             return None
         f = _get_fernet()
@@ -90,7 +90,7 @@ class EncryptedText(TypeDecorator):
             return value
         return f.encrypt(value.encode()).decode()
 
-    def process_result_value(self, value, dialect):
+    def process_result_value(self, value, dialect) -> str | None:
         if value is None:
             return None
         f = _get_fernet()

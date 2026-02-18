@@ -353,7 +353,9 @@ class TestGenerateMarketplaceListings:
             rows = result.fetchall()
             for row in rows:
                 row_dict = row._mapping
-                row_str = " ".join(str(v) for v in row_dict.values() if isinstance(v, str))
+                row_str = " ".join(
+                    str(v) for v in row_dict.values() if isinstance(v, str)
+                )
                 # No contact names or emails should appear in listing data
                 assert "alice" not in row_str.lower()
                 assert "bob" not in row_str.lower()
@@ -445,6 +447,7 @@ class TestGenerateMarketplaceListings:
 
             # Verify the MarketplaceSearchResult schema has no PII fields
             from app.schemas.marketplace import MarketplaceSearchResult
+
             schema_fields = set(MarketplaceSearchResult.model_fields.keys())
             pii_fields = {"email", "full_name", "first_name", "last_name", "phone"}
             assert pii_fields.isdisjoint(schema_fields), (

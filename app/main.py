@@ -41,9 +41,7 @@ app = FastAPI(title="WarmPath", version="0.1.0")
 if settings.SECURE_HEADERS:
     _boot_errors: list[str] = []
     if settings.SECRET_KEY == "change-me-to-a-random-secret":
-        _boot_errors.append(
-            "SECRET_KEY is the default value — set a random secret."
-        )
+        _boot_errors.append("SECRET_KEY is the default value — set a random secret.")
     if not settings.ENCRYPTION_KEY:
         _boot_errors.append(
             "ENCRYPTION_KEY is empty — PII will be stored as plaintext."

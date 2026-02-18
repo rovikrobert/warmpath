@@ -164,7 +164,11 @@ class TestLinkedInOAuth:
 
         monkeypatch.setattr(settings, "LINKEDIN_CLIENT_ID", "test_client_id")
         monkeypatch.setattr(settings, "LINKEDIN_CLIENT_SECRET", "test_client_secret")
-        monkeypatch.setattr(settings, "LINKEDIN_REDIRECT_URI", "http://localhost:3000/auth/linkedin/callback")
+        monkeypatch.setattr(
+            settings,
+            "LINKEDIN_REDIRECT_URI",
+            "http://localhost:3000/auth/linkedin/callback",
+        )
 
     @pytest.mark.asyncio
     async def test_linkedin_authorize_returns_url(self, client: AsyncClient):

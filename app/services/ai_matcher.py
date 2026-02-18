@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 100  # contacts per Claude API call
 MAX_CONCURRENT_BATCHES = 10
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+CLAUDE_MODEL = settings.CLAUDE_MODEL
 
 
 # ---------------------------------------------------------------------------

@@ -24,20 +24,34 @@ class TestPrivacyGuard:
 
     def _get_guard(self):
         from data_team.shared.privacy_guard import PrivacyGuard
+
         return PrivacyGuard()
 
     def _get_violation(self):
         from data_team.shared.privacy_guard import PrivacyViolation
+
         return PrivacyViolation
 
     # -- PII in SELECT (privy: pii_leak) ------------------------------------
 
-    @pytest.mark.parametrize("col", [
-        "first_name", "last_name", "full_name", "email", "linkedin_url",
-        "current_title", "current_company", "location", "notes",
-        "how_you_know", "email_blind_index", "name_company_blind_index",
-        "raw_csv_row",
-    ])
+    @pytest.mark.parametrize(
+        "col",
+        [
+            "first_name",
+            "last_name",
+            "full_name",
+            "email",
+            "linkedin_url",
+            "current_title",
+            "current_company",
+            "location",
+            "notes",
+            "how_you_know",
+            "email_blind_index",
+            "name_company_blind_index",
+            "raw_csv_row",
+        ],
+    )
     def test_rejects_pii_column_in_select(self, col):
         """Each of the 13 PII columns must be rejected in SELECT clauses."""
         guard = self._get_guard()
@@ -56,7 +70,9 @@ class TestPrivacyGuard:
 
     def test_accepts_avg_aggregation(self):
         guard = self._get_guard()
-        sql = "SELECT AVG(total_score) AS avg_score FROM warm_scores WHERE user_id = :uid"
+        sql = (
+            "SELECT AVG(total_score) AS avg_score FROM warm_scores WHERE user_id = :uid"
+        )
         assert guard.validate_query(sql) is True
 
     def test_accepts_user_scoped_vault_query(self):
@@ -144,7 +160,9 @@ class TestPrivacyGuard:
     def test_rejects_group_by_without_k_anonymity(self):
         guard = self._get_guard()
         PrivacyViolation = self._get_violation()
-        sql = "SELECT company_id, COUNT(*) FROM marketplace_listings GROUP BY company_id"
+        sql = (
+            "SELECT company_id, COUNT(*) FROM marketplace_listings GROUP BY company_id"
+        )
         with pytest.raises(PrivacyViolation) as exc_info:
             guard.validate_aggregation(sql)
         assert exc_info.value.privy_category == "info_leak"
@@ -226,34 +244,43 @@ class TestSqlTemplates:
 
     def test_all_templates_pass_validation(self):
         from data_team.shared.sql_templates import ALL_TEMPLATES, validate_all_templates
+
         errors = validate_all_templates()
         assert errors == [], f"Template violations: {errors}"
 
     def test_template_count(self):
         from data_team.shared.sql_templates import ALL_TEMPLATES
-        assert len(ALL_TEMPLATES) >= 10, f"Expected 10+ templates, got {len(ALL_TEMPLATES)}"
+
+        assert len(ALL_TEMPLATES) >= 10, (
+            f"Expected 10+ templates, got {len(ALL_TEMPLATES)}"
+        )
 
     def test_templates_have_parameters(self):
         from data_team.shared.sql_templates import ALL_TEMPLATES
+
         # Most templates should have :param_name placeholders
         parameterized = [
-            name for name, sql in ALL_TEMPLATES.items()
+            name
+            for name, sql in ALL_TEMPLATES.items()
             if ":start_date" in sql or ":end_date" in sql or ":user_id" in sql
         ]
         assert len(parameterized) >= 5, "Most templates should be parameterized"
 
     def test_funnel_templates_exist(self):
         from data_team.shared.sql_templates import ALL_TEMPLATES
+
         assert "daily_signups" in ALL_TEMPLATES
         assert "activation_funnel" in ALL_TEMPLATES
 
     def test_marketplace_templates_exist(self):
         from data_team.shared.sql_templates import ALL_TEMPLATES
+
         assert "marketplace_health" in ALL_TEMPLATES
         assert "intro_approval_rate" in ALL_TEMPLATES
 
     def test_cohort_templates_exist(self):
         from data_team.shared.sql_templates import ALL_TEMPLATES
+
         assert "signup_cohort_retention" in ALL_TEMPLATES
 
 
@@ -267,6 +294,7 @@ class TestDataTeamReport:
 
     def test_create_report(self):
         from data_team.shared.report import DataTeamReport
+
         report = DataTeamReport(agent="test_agent")
         assert report.agent == "test_agent"
         assert report.timestamp != ""
@@ -275,6 +303,7 @@ class TestDataTeamReport:
 
     def test_create_insight(self):
         from data_team.shared.report import Insight
+
         insight = Insight(
             id="test-001",
             category="funnel",
@@ -288,6 +317,7 @@ class TestDataTeamReport:
 
     def test_create_kpi_snapshot(self):
         from data_team.shared.report import KPISnapshot
+
         kpi = KPISnapshot(
             kpi_name="activation_rate",
             current_value=0.35,
@@ -304,8 +334,25 @@ class TestDataTeamReport:
         report = DataTeamReport(
             agent="test",
             scan_duration_seconds=1.5,
-            findings=[Finding(id="f1", severity="medium", category="test", title="Test", detail="Detail")],
-            insights=[Insight(id="i1", category="funnel", title="Insight", evidence="Ev", impact="Im", recommendation="Rec")],
+            findings=[
+                Finding(
+                    id="f1",
+                    severity="medium",
+                    category="test",
+                    title="Test",
+                    detail="Detail",
+                )
+            ],
+            insights=[
+                Insight(
+                    id="i1",
+                    category="funnel",
+                    title="Insight",
+                    evidence="Ev",
+                    impact="Im",
+                    recommendation="Rec",
+                )
+            ],
             metrics={"key": "value"},
         )
         serialized = report.serialize()
@@ -321,7 +368,15 @@ class TestDataTeamReport:
 
         report = DataTeamReport(
             agent="test",
-            findings=[Finding(id="f1", severity="high", category="test", title="Test Finding", detail="Details")],
+            findings=[
+                Finding(
+                    id="f1",
+                    severity="high",
+                    category="test",
+                    title="Test Finding",
+                    detail="Details",
+                )
+            ],
         )
         md = report.to_markdown()
         assert "# test Report" in md
@@ -346,6 +401,7 @@ class TestPipelineScan:
 
     def test_scan_returns_report(self):
         from data_team.pipeline.pipeline import scan
+
         report = scan()
         assert report.agent == "pipeline"
         assert report.scan_duration_seconds >= 0
@@ -354,14 +410,19 @@ class TestPipelineScan:
 
     def test_scan_produces_findings(self):
         from data_team.pipeline.pipeline import scan
+
         report = scan()
         # Should find at least some schema or instrumentation findings
         assert len(report.findings) >= 0  # May be zero if everything is clean
 
     def test_scan_has_metrics(self):
         from data_team.pipeline.pipeline import scan
+
         report = scan()
-        assert "tables_in_models" in report.metrics or "sql_templates_count" in report.metrics
+        assert (
+            "tables_in_models" in report.metrics
+            or "sql_templates_count" in report.metrics
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -374,6 +435,7 @@ class TestAnalystScan:
 
     def test_scan_returns_report(self):
         from data_team.analyst.analyst import scan
+
         report = scan()
         assert report.agent == "analyst"
         assert isinstance(report.findings, list)
@@ -381,6 +443,7 @@ class TestAnalystScan:
 
     def test_scan_has_funnel_metrics(self):
         from data_team.analyst.analyst import scan
+
         report = scan()
         assert "funnel_steps_total" in report.metrics
         assert "total_endpoints" in report.metrics
@@ -396,6 +459,7 @@ class TestModelEngineerScan:
 
     def test_scan_returns_report(self):
         from data_team.model_engineer.model_engineer import scan
+
         report = scan()
         assert report.agent == "model_engineer"
         assert isinstance(report.findings, list)
@@ -411,23 +475,27 @@ class TestDataLeadBrief:
 
     def test_daily_brief_produces_markdown(self):
         from data_team.data_lead.data_lead import generate_daily_brief
+
         brief = generate_daily_brief(reports=[])
         assert "# Data Team Daily Brief" in brief
 
     def test_daily_brief_with_reports(self):
         from data_team.data_lead.data_lead import generate_daily_brief
         from data_team.pipeline.pipeline import scan as pipeline_scan
+
         report = pipeline_scan()
         brief = generate_daily_brief(reports=[report])
         assert "Data Team Daily Brief" in brief
 
     def test_weekly_report_produces_markdown(self):
         from data_team.data_lead.data_lead import generate_weekly_report
+
         report = generate_weekly_report(reports=[])
         assert "Weekly Report" in report
 
     def test_monthly_review_produces_markdown(self):
         from data_team.data_lead.data_lead import generate_monthly_review
+
         review = generate_monthly_review(reports=[])
         assert "Monthly Review" in review
 
@@ -442,18 +510,21 @@ class TestCosIntegration:
 
     def test_cos_config_has_data_team(self):
         from agents.chief_of_staff.cos_config import COS_CONFIG
+
         teams = COS_CONFIG["teams"]
         assert "data" in teams
         assert teams["data"]["active"] is True
 
     def test_cos_config_has_data_report_dir(self):
         from agents.chief_of_staff.cos_config import COS_CONFIG
+
         teams = COS_CONFIG["teams"]
         assert "report_dir" in teams["data"]
         assert "data_team" in teams["data"]["report_dir"]
 
     def test_business_outcomes_has_data_categories(self):
         from agents.shared.business_outcomes import CATEGORY_OUTCOME_MAP
+
         assert "data_quality" in CATEGORY_OUTCOME_MAP
         assert "instrumentation" in CATEGORY_OUTCOME_MAP
         assert "model_calibration" in CATEGORY_OUTCOME_MAP
@@ -462,14 +533,20 @@ class TestCosIntegration:
 
     def test_business_outcomes_data_impact_templates(self):
         from agents.shared.business_outcomes import get_business_impact
+
         # data_quality should have custom templates
         impact = get_business_impact("data_quality", "critical")
-        assert "data" in impact.lower() or "analytics" in impact.lower() or "integrity" in impact.lower()
+        assert (
+            "data" in impact.lower()
+            or "analytics" in impact.lower()
+            or "integrity" in impact.lower()
+        )
 
     def test_data_team_report_converts_to_agent_report(self):
         """DataTeamReport.to_agent_report() produces CoS-compatible AgentReport."""
         from data_team.shared.report import DataTeamReport
         from agents.shared.report import AgentReport
+
         report = DataTeamReport(agent="test", scan_duration_seconds=1.0)
         ar = report.to_agent_report()
         assert isinstance(ar, AgentReport)
@@ -477,11 +554,13 @@ class TestCosIntegration:
 
     def test_cos_learning_default_has_data_team(self):
         from agents.chief_of_staff.cos_learning import _default_state
+
         state = _default_state()
         assert "data" in state["team_reliability"]
 
     def test_cos_config_has_data_budget(self):
         from agents.chief_of_staff.cos_config import COS_CONFIG
+
         budget = COS_CONFIG["cost_budget"]
         assert "data_team_daily_max_tokens" in budget
 
@@ -497,6 +576,7 @@ class TestDataLearningState:
     def _make_ls(self, tmp_path, agent="test_agent"):
         """Create a DataLearningState with state stored in tmp_path."""
         import data_team.shared.learning as learning_mod
+
         original_dir = learning_mod.DATA_TEAM_DIR
         learning_mod.DATA_TEAM_DIR = tmp_path
         ls = learning_mod.DataLearningState(agent)
@@ -506,25 +586,37 @@ class TestDataLearningState:
         ls._tmp_path = tmp_path
         # Override save/load to use tmp
         import functools
+
         state_path = tmp_path / agent / "state.json"
         state_path.parent.mkdir(parents=True, exist_ok=True)
 
         original_save = ls.save
+
         def patched_save():
             state_path.write_text(json.dumps(ls.state, indent=2, default=str))
+
         ls.save = patched_save
         return ls
 
     def test_record_finding_updates_history(self, tmp_path):
         ls = self._make_ls(tmp_path)
-        ls.record_finding({"id": "f1", "severity": "medium", "category": "test_cat", "title": "Test"})
+        ls.record_finding(
+            {"id": "f1", "severity": "medium", "category": "test_cat", "title": "Test"}
+        )
         assert len(ls.state["finding_history"]) == 1
         assert ls.state["finding_history"][0]["id"] == "f1"
 
     def test_recurring_pattern_detection(self, tmp_path):
         ls = self._make_ls(tmp_path)
         for i in range(6):
-            ls.record_finding({"id": f"f{i}", "severity": "medium", "category": "test_cat", "title": "Repeat"})
+            ls.record_finding(
+                {
+                    "id": f"f{i}",
+                    "severity": "medium",
+                    "category": "test_cat",
+                    "title": "Repeat",
+                }
+            )
         pattern = ls.detect_recurring_pattern("test_cat")
         assert pattern["count"] == 6
         assert pattern["auto_escalated"] is True
@@ -532,13 +624,22 @@ class TestDataLearningState:
     def test_systemic_pattern_at_10(self, tmp_path):
         ls = self._make_ls(tmp_path)
         for i in range(11):
-            ls.record_finding({"id": f"f{i}", "severity": "low", "category": "systemic_cat", "title": "Repeat"})
+            ls.record_finding(
+                {
+                    "id": f"f{i}",
+                    "severity": "low",
+                    "category": "systemic_cat",
+                    "title": "Repeat",
+                }
+            )
         pattern = ls.detect_recurring_pattern("systemic_cat")
         assert pattern["systemic"] is True
 
     def test_record_resolution_and_effectiveness(self, tmp_path):
         ls = self._make_ls(tmp_path)
-        ls.record_finding({"id": "fix-001", "severity": "high", "category": "bug", "title": "Bug"})
+        ls.record_finding(
+            {"id": "fix-001", "severity": "high", "category": "bug", "title": "Bug"}
+        )
         ls.record_resolution("fix-001", "fixed")
         assert "fix-001" in ls.state["resolutions"]
         rec = ls.check_fix_effectiveness("fix-001")
@@ -548,8 +649,11 @@ class TestDataLearningState:
 
     def test_resolution_with_enum(self, tmp_path):
         from data_team.shared.learning import ResolutionType
+
         ls = self._make_ls(tmp_path)
-        ls.record_finding({"id": "f-enum", "severity": "low", "category": "test", "title": "T"})
+        ls.record_finding(
+            {"id": "f-enum", "severity": "low", "category": "test", "title": "T"}
+        )
         ls.record_resolution("f-enum", ResolutionType.DEFERRED)
         assert ls.state["resolutions"]["f-enum"]["type"] == "deferred"
 
@@ -592,7 +696,9 @@ class TestDataLearningState:
 
     def test_methodology_recording(self, tmp_path):
         ls = self._make_ls(tmp_path)
-        ls.record_methodology("k-anonymity check", "privacy_guard.py", effectiveness=0.95)
+        ls.record_methodology(
+            "k-anonymity check", "privacy_guard.py", effectiveness=0.95
+        )
         assert len(ls.state["methodologies"]) == 1
         assert ls.state["methodologies"][0]["name"] == "k-anonymity check"
 
@@ -634,13 +740,22 @@ class TestDataLearningState:
 
     def test_insight_recording(self, tmp_path):
         ls = self._make_ls(tmp_path)
-        ls.record_insight({"id": "i1", "category": "funnel", "title": "Test insight", "confidence": 0.85})
+        ls.record_insight(
+            {
+                "id": "i1",
+                "category": "funnel",
+                "title": "Test insight",
+                "confidence": 0.85,
+            }
+        )
         assert len(ls.state["insight_history"]) == 1
         assert ls.state["insight_history"][0]["confidence"] == 0.85
 
     def test_meta_learning_report(self, tmp_path):
         ls = self._make_ls(tmp_path)
-        ls.record_finding({"id": "f1", "severity": "medium", "category": "test", "title": "T"})
+        ls.record_finding(
+            {"id": "f1", "severity": "medium", "category": "test", "title": "T"}
+        )
         ls.record_health_snapshot(85.0, {"medium": 1})
         ls.track_kpi("coverage", 0.8)
         report = ls.generate_meta_learning_report()
@@ -652,9 +767,15 @@ class TestDataLearningState:
 
     def test_recurrence_count(self, tmp_path):
         ls = self._make_ls(tmp_path)
-        ls.record_finding({"id": "f1", "severity": "low", "category": "cat_a", "title": "A"})
-        ls.record_finding({"id": "f2", "severity": "low", "category": "cat_a", "title": "A2"})
-        ls.record_finding({"id": "f3", "severity": "low", "category": "cat_b", "title": "B"})
+        ls.record_finding(
+            {"id": "f1", "severity": "low", "category": "cat_a", "title": "A"}
+        )
+        ls.record_finding(
+            {"id": "f2", "severity": "low", "category": "cat_a", "title": "A2"}
+        )
+        ls.record_finding(
+            {"id": "f3", "severity": "low", "category": "cat_b", "title": "B"}
+        )
         assert ls.get_recurrence_count("cat_a") == 2
         assert ls.get_recurrence_count("cat_b") == 1
         assert ls.get_recurrence_count("cat_c") == 0
@@ -670,10 +791,12 @@ class TestDataIntelligence:
 
     def test_10_categories(self):
         from data_team.shared.intelligence import DATA_INTEL_CATEGORIES
+
         assert len(DATA_INTEL_CATEGORIES) == 10
 
     def test_new_categories_exist(self):
         from data_team.shared.intelligence import DATA_INTEL_CATEGORIES
+
         assert "referral_science" in DATA_INTEL_CATEGORIES
         assert "data_infrastructure" in DATA_INTEL_CATEGORIES
         assert "ab_testing_methods" in DATA_INTEL_CATEGORIES
@@ -682,6 +805,7 @@ class TestDataIntelligence:
 
     def test_add_and_get_items(self):
         from data_team.shared.intelligence import DataIntelItem, DataIntelligence
+
         di = DataIntelligence()
         di.cache[di._items_key] = []  # Start clean
         item = DataIntelItem(
@@ -699,6 +823,7 @@ class TestDataIntelligence:
 
     def test_get_urgent(self):
         from data_team.shared.intelligence import DataIntelItem, DataIntelligence
+
         di = DataIntelligence()
         di.cache[di._items_key] = []
         di.add_item(DataIntelItem(title="Low", severity="low"))
@@ -712,6 +837,7 @@ class TestDataIntelligence:
 
     def test_mark_adopted(self):
         from data_team.shared.intelligence import DataIntelItem, DataIntelligence
+
         di = DataIntelligence()
         di.cache[di._items_key] = []
         item = DataIntelItem(id="test-adopt", title="To adopt")
@@ -722,6 +848,7 @@ class TestDataIntelligence:
 
     def test_check_freshness_all_stale(self):
         from data_team.shared.intelligence import DataIntelligence
+
         di = DataIntelligence()
         di.cache = {di._items_key: []}  # Empty cache = all stale
         freshness = di.check_freshness()
@@ -729,6 +856,7 @@ class TestDataIntelligence:
 
     def test_generate_research_agenda(self):
         from data_team.shared.intelligence import DataIntelligence
+
         di = DataIntelligence()
         di.cache = {di._items_key: []}
         agenda = di.generate_research_agenda()
@@ -736,6 +864,7 @@ class TestDataIntelligence:
 
     def test_generate_intel_report(self):
         from data_team.shared.intelligence import DataIntelItem, DataIntelligence
+
         di = DataIntelligence()
         di.cache[di._items_key] = []
         di.add_item(DataIntelItem(title="Item", severity="high"))
@@ -747,6 +876,7 @@ class TestDataIntelligence:
 
     def test_fetch_category(self):
         from data_team.shared.intelligence import DataIntelItem, DataIntelligence
+
         di = DataIntelligence()
         di.cache[di._items_key] = []
         di.add_item(DataIntelItem(category="ml_research", title="ML paper"))
@@ -757,6 +887,7 @@ class TestDataIntelligence:
 
     def test_fetch_all_grouped(self):
         from data_team.shared.intelligence import DataIntelItem, DataIntelligence
+
         di = DataIntelligence()
         di.cache[di._items_key] = []
         di.add_item(DataIntelItem(category="ml_research", title="A"))
@@ -782,6 +913,7 @@ class TestLearningConfig:
             RECURRING_PATTERN_THRESHOLD,
             SYSTEMIC_PATTERN_THRESHOLD,
         )
+
         assert RECURRING_PATTERN_THRESHOLD == 5
         assert SYSTEMIC_PATTERN_THRESHOLD == 10
         assert ATTENTION_WEIGHT_DECAY == 0.05
@@ -789,12 +921,14 @@ class TestLearningConfig:
 
     def test_config_has_health_weights(self):
         from data_team.shared.config import HEALTH_WEIGHTS
+
         assert "pipeline" in HEALTH_WEIGHTS
         assert "analyst" in HEALTH_WEIGHTS
         assert sum(HEALTH_WEIGHTS.values()) == 100
 
     def test_config_has_intel_cache_ttl(self):
         from data_team.shared.config import INTEL_CACHE_TTL_HOURS
+
         assert INTEL_CACHE_TTL_HOURS == 24
 
 
@@ -808,16 +942,19 @@ class TestLearningDataclasses:
 
     def test_resolution_type_enum(self):
         from data_team.shared.learning import ResolutionType
+
         assert ResolutionType.FIXED.value == "fixed"
         assert ResolutionType.FALSE_POSITIVE.value == "false_positive"
 
     def test_finding_severity_enum(self):
         from data_team.shared.learning import FindingSeverity
+
         assert FindingSeverity.CRITICAL.value == "critical"
         assert FindingSeverity.INFO.value == "info"
 
     def test_attention_weight_dataclass(self):
         from data_team.shared.learning import AttentionWeight
+
         aw = AttentionWeight(file="test.py", weight=1.5, reason="3 findings")
         assert aw.file == "test.py"
         assert aw.weight == 1.5
@@ -825,21 +962,26 @@ class TestLearningDataclasses:
 
     def test_methodology_record_dataclass(self):
         from data_team.shared.learning import MethodologyRecord
+
         mr = MethodologyRecord(name="test", source="paper.pdf", effectiveness=0.8)
         assert mr.name == "test"
         assert mr.adopted_at != ""
 
     def test_fix_effectiveness_record(self):
         from data_team.shared.learning import FixEffectivenessRecord
+
         fer = FixEffectivenessRecord(
-            finding_id="f1", resolution_type="fixed",
-            resolved_at="2026-01-01", effective=True
+            finding_id="f1",
+            resolution_type="fixed",
+            resolved_at="2026-01-01",
+            effective=True,
         )
         assert fer.effective is True
         assert fer.recurred is False
 
     def test_health_snapshot_dataclass(self):
         from data_team.shared.learning import HealthSnapshot
+
         hs = HealthSnapshot(score=85.0, finding_counts={"medium": 2})
         assert hs.score == 85.0
         assert hs.timestamp != ""

@@ -29,10 +29,12 @@ class TestOpsPrivacyGuard:
 
     def _get_guard(self):
         from ops_team.shared.privacy_guard import OpsPrivacyGuard
+
         return OpsPrivacyGuard()
 
     def _get_violation(self):
         from ops_team.shared.privacy_guard import PrivacyViolation
+
         return PrivacyViolation
 
     def test_rejects_email_in_finding(self):
@@ -58,7 +60,12 @@ class TestOpsPrivacyGuard:
 
     def test_accepts_clean_finding(self):
         guard = self._get_guard()
-        assert guard.validate_finding("Coaching quality score is 85/100 across 20 sessions") is True
+        assert (
+            guard.validate_finding(
+                "Coaching quality score is 85/100 across 20 sessions"
+            )
+            is True
+        )
 
     def test_rejects_forbidden_action(self):
         guard = self._get_guard()
@@ -157,6 +164,7 @@ class TestOpsTeamReport:
 
     def test_from_dict(self):
         from ops_team.shared.report import OpsTeamReport
+
         report = self._make_report()
         data = json.loads(report.serialize())
         restored = OpsTeamReport.from_dict(data)
@@ -206,6 +214,7 @@ class TestKeevsScan:
 
     def test_scan_returns_report(self):
         from ops_team.keevs.keevs import scan
+
         report = scan()
         assert report.agent == "keevs"
         assert report.scan_duration_seconds >= 0
@@ -214,12 +223,14 @@ class TestKeevsScan:
 
     def test_scan_has_coaching_metrics(self):
         from ops_team.keevs.keevs import scan
+
         report = scan()
         # Should have at least some coaching-related metric
         assert len(report.metrics) > 0
 
     def test_scan_findings_have_ids(self):
         from ops_team.keevs.keevs import scan
+
         report = scan()
         for f in report.findings:
             assert f.id, "Finding must have an ID"
@@ -227,13 +238,16 @@ class TestKeevsScan:
 
     def test_scan_ops_insights(self):
         from ops_team.keevs.keevs import scan
+
         report = scan()
         assert isinstance(report.ops_insights, list)
 
     def test_save_report(self, tmp_path, monkeypatch):
         from ops_team.shared import config
+
         monkeypatch.setattr(config, "REPORTS_DIR", tmp_path)
         from ops_team.keevs import keevs
+
         report = keevs.scan()
         keevs.save_report(report)
         saved = tmp_path / "keevs_latest.json"
@@ -252,17 +266,20 @@ class TestTrebScan:
 
     def test_scan_returns_report(self):
         from ops_team.treb.treb import scan
+
         report = scan()
         assert report.agent == "treb"
         assert report.scan_duration_seconds >= 0
 
     def test_scan_has_supply_metrics(self):
         from ops_team.treb.treb import scan
+
         report = scan()
         assert len(report.metrics) > 0
 
     def test_scan_findings_have_categories(self):
         from ops_team.treb.treb import scan
+
         report = scan()
         for f in report.findings:
             assert f.category, "Finding must have a category"
@@ -270,6 +287,7 @@ class TestTrebScan:
     def test_save_report(self, tmp_path, monkeypatch):
         from ops_team.treb import treb
         from ops_team.shared import config
+
         monkeypatch.setattr(config, "REPORTS_DIR", tmp_path)
         monkeypatch.setattr(treb, "REPORTS_DIR", tmp_path)
         report = treb.scan()
@@ -288,30 +306,36 @@ class TestNaivScan:
 
     def test_scan_returns_report(self):
         from ops_team.naiv.naiv import scan
+
         report = scan()
         assert report.agent == "naiv"
         assert report.scan_duration_seconds >= 0
 
     def test_scan_has_satisfaction_metrics(self):
         from ops_team.naiv.naiv import scan
+
         report = scan()
         assert len(report.metrics) > 0
 
     def test_scan_findings_are_valid(self):
         from ops_team.naiv.naiv import scan
+
         report = scan()
         for f in report.findings:
             assert f.severity in ("critical", "high", "medium", "low", "info")
 
     def test_save_report(self, tmp_path, monkeypatch):
         from ops_team.naiv import naiv
+
         # naiv's save_report resolves path from __file__, so monkeypatch Path
         original_save = naiv.save_report
+
         def patched_save(report):
             tmp_path.mkdir(parents=True, exist_ok=True)
             out_path = tmp_path / "naiv_latest.json"
             out_path.write_text(report.serialize(), encoding="utf-8")
             return out_path
+
         monkeypatch.setattr(naiv, "save_report", patched_save)
         report = naiv.scan()
         naiv.save_report(report)
@@ -329,17 +353,20 @@ class TestMarshScan:
 
     def test_scan_returns_report(self):
         from ops_team.marsh.marsh import scan
+
         report = scan()
         assert report.agent == "marsh"
         assert report.scan_duration_seconds >= 0
 
     def test_scan_has_marketplace_metrics(self):
         from ops_team.marsh.marsh import scan
+
         report = scan()
         assert len(report.metrics) > 0
 
     def test_scan_findings_have_ids(self):
         from ops_team.marsh.marsh import scan
+
         report = scan()
         for f in report.findings:
             assert f.id, "Finding must have an ID"
@@ -347,6 +374,7 @@ class TestMarshScan:
     def test_save_report(self, tmp_path, monkeypatch):
         from ops_team.marsh import marsh
         from ops_team.shared import config
+
         monkeypatch.setattr(config, "REPORTS_DIR", tmp_path)
         monkeypatch.setattr(marsh, "REPORTS_DIR", tmp_path)
         report = marsh.scan()
@@ -420,6 +448,7 @@ class TestOpsLeadBriefs:
 
     def test_daily_brief_with_reports(self):
         from ops_team.ops_lead.ops_lead import generate_daily_brief
+
         reports = self._make_sub_reports()
         brief = generate_daily_brief(reports)
         assert "Daily Brief" in brief
@@ -429,11 +458,13 @@ class TestOpsLeadBriefs:
 
     def test_daily_brief_no_reports(self):
         from ops_team.ops_lead.ops_lead import generate_daily_brief
+
         brief = generate_daily_brief([])
         assert "No agent reports available" in brief
 
     def test_weekly_report(self):
         from ops_team.ops_lead.ops_lead import generate_weekly_report
+
         reports = self._make_sub_reports()
         brief = generate_weekly_report(reports)
         assert "Weekly Report" in brief
@@ -441,6 +472,7 @@ class TestOpsLeadBriefs:
 
     def test_monthly_review(self):
         from ops_team.ops_lead.ops_lead import generate_monthly_review
+
         reports = self._make_sub_reports()
         brief = generate_monthly_review(reports)
         assert "Monthly Review" in brief
@@ -453,6 +485,7 @@ class TestOpsLeadBriefs:
 
         # Write a fake sub-agent report to tmp_path
         from ops_team.shared.report import OpsTeamReport
+
         fake_report = OpsTeamReport(
             agent="keevs",
             scan_duration_seconds=1.0,
@@ -480,9 +513,11 @@ class TestOpsLearningState:
 
     def _make_state(self, tmp_path, monkeypatch):
         from ops_team.shared import config, learning
+
         monkeypatch.setattr(config, "OPS_TEAM_DIR", tmp_path)
         monkeypatch.setattr(learning, "OPS_TEAM_DIR", tmp_path)
         from ops_team.shared.learning import OpsLearningState
+
         return OpsLearningState("test_agent")
 
     def test_record_scan(self, tmp_path, monkeypatch):
@@ -492,26 +527,30 @@ class TestOpsLearningState:
 
     def test_record_finding(self, tmp_path, monkeypatch):
         ls = self._make_state(tmp_path, monkeypatch)
-        ls.record_finding({
-            "id": "test-001",
-            "severity": "high",
-            "category": "coaching_quality",
-            "file": "test.py",
-            "title": "Test finding",
-        })
+        ls.record_finding(
+            {
+                "id": "test-001",
+                "severity": "high",
+                "category": "coaching_quality",
+                "file": "test.py",
+                "title": "Test finding",
+            }
+        )
         assert len(ls.state["finding_history"]) == 1
 
     def test_recurring_pattern_detection(self, tmp_path, monkeypatch):
         ls = self._make_state(tmp_path, monkeypatch)
         # Record same finding 5 times to trigger escalation
         for i in range(5):
-            ls.record_finding({
-                "id": f"rec-{i:03d}",
-                "severity": "medium",
-                "category": "coaching_quality",
-                "file": "coach.py",
-                "title": "Recurring issue",
-            })
+            ls.record_finding(
+                {
+                    "id": f"rec-{i:03d}",
+                    "severity": "medium",
+                    "category": "coaching_quality",
+                    "file": "coach.py",
+                    "title": "Recurring issue",
+                }
+            )
         pattern = ls.detect_recurring_pattern("coaching_quality", "coach.py")
         assert pattern["count"] >= 5
 
@@ -530,13 +569,15 @@ class TestOpsLearningState:
     def test_meta_learning_report(self, tmp_path, monkeypatch):
         ls = self._make_state(tmp_path, monkeypatch)
         ls.record_scan({"score": 0.80})
-        ls.record_finding({
-            "id": "f-001",
-            "severity": "medium",
-            "category": "coaching_quality",
-            "file": "test.py",
-            "title": "Test finding",
-        })
+        ls.record_finding(
+            {
+                "id": "f-001",
+                "severity": "medium",
+                "category": "coaching_quality",
+                "file": "test.py",
+                "title": "Test finding",
+            }
+        )
         report = ls.generate_meta_learning_report()
         assert report["total_scans"] == 1
         assert report["total_findings_tracked"] == 1
@@ -560,19 +601,23 @@ class TestOpsIntelligence:
 
     def _make_intel(self, tmp_path, monkeypatch):
         from ops_team.shared import config, intelligence
+
         cache_path = tmp_path / "intel_cache.json"
         monkeypatch.setattr(config, "INTEL_CACHE", cache_path)
         monkeypatch.setattr(intelligence, "INTEL_CACHE", cache_path)
         from ops_team.shared.intelligence import OpsIntelligence
+
         return OpsIntelligence()
 
     def test_categories_count(self):
         from ops_team.shared.intelligence import OPS_INTEL_CATEGORIES
+
         assert len(OPS_INTEL_CATEGORIES) == 12
 
     def test_add_and_get_item(self, tmp_path, monkeypatch):
         oi = self._make_intel(tmp_path, monkeypatch)
         from ops_team.shared.intelligence import OpsIntelItem
+
         item = OpsIntelItem(
             category="job_market_trends",
             title="Tech layoffs slowing",
@@ -588,16 +633,21 @@ class TestOpsIntelligence:
     def test_get_for_agent(self, tmp_path, monkeypatch):
         oi = self._make_intel(tmp_path, monkeypatch)
         from ops_team.shared.intelligence import OpsIntelItem
-        oi.add_item(OpsIntelItem(
-            category="nps_benchmarks",
-            title="NPS benchmark update",
-            relevant_agents=["naiv"],
-        ))
-        oi.add_item(OpsIntelItem(
-            category="job_market_trends",
-            title="Market update",
-            relevant_agents=["keevs"],
-        ))
+
+        oi.add_item(
+            OpsIntelItem(
+                category="nps_benchmarks",
+                title="NPS benchmark update",
+                relevant_agents=["naiv"],
+            )
+        )
+        oi.add_item(
+            OpsIntelItem(
+                category="job_market_trends",
+                title="Market update",
+                relevant_agents=["keevs"],
+            )
+        )
         naiv_items = oi.get_for_agent("naiv")
         assert len(naiv_items) == 1
         assert naiv_items[0].category == "nps_benchmarks"
@@ -605,16 +655,21 @@ class TestOpsIntelligence:
     def test_urgency_filtering(self, tmp_path, monkeypatch):
         oi = self._make_intel(tmp_path, monkeypatch)
         from ops_team.shared.intelligence import OpsIntelItem
-        oi.add_item(OpsIntelItem(
-            category="competitor_ux",
-            title="Competitor launched coaching",
-            severity="high",
-        ))
-        oi.add_item(OpsIntelItem(
-            category="survey_design",
-            title="Survey best practice",
-            severity="info",
-        ))
+
+        oi.add_item(
+            OpsIntelItem(
+                category="competitor_ux",
+                title="Competitor launched coaching",
+                severity="high",
+            )
+        )
+        oi.add_item(
+            OpsIntelItem(
+                category="survey_design",
+                title="Survey best practice",
+                severity="info",
+            )
+        )
         urgent = oi.get_urgent()
         assert len(urgent) == 1
         assert urgent[0].severity == "high"
@@ -622,6 +677,7 @@ class TestOpsIntelligence:
     def test_adoption_workflow(self, tmp_path, monkeypatch):
         oi = self._make_intel(tmp_path, monkeypatch)
         from ops_team.shared.intelligence import OpsIntelItem
+
         item = OpsIntelItem(
             category="marketplace_economics",
             title="Take rate benchmarks",
@@ -671,6 +727,7 @@ class TestCoSIntegration:
 
     def test_cos_config_has_ops_team(self):
         from agents.chief_of_staff.cos_config import COS_CONFIG
+
         teams = COS_CONFIG["teams"]
         assert "ops" in teams
         assert teams["ops"]["active"] is True
@@ -678,11 +735,13 @@ class TestCoSIntegration:
 
     def test_cos_config_has_ops_budget(self):
         from agents.chief_of_staff.cos_config import COS_CONFIG
+
         budget = COS_CONFIG["cost_budget"]
         assert "ops_team_daily_max_tokens" in budget
 
     def test_cos_learning_has_ops_team(self):
         from agents.chief_of_staff.cos_learning import _default_state
+
         state = _default_state()
         assert "ops" in state["team_reliability"]
         ops_stats = state["team_reliability"]["ops"]
@@ -691,6 +750,7 @@ class TestCoSIntegration:
 
     def test_business_outcomes_has_ops_categories(self):
         from agents.shared.business_outcomes import CATEGORY_OUTCOME_MAP
+
         ops_categories = [
             "coaching_effectiveness",
             "supply_activation",
@@ -703,6 +763,7 @@ class TestCoSIntegration:
 
     def test_business_outcomes_ops_impact_templates(self):
         from agents.shared.business_outcomes import get_business_impact
+
         # Should return ops-specific impact, not generic
         impact = get_business_impact("coaching_effectiveness", "critical")
         assert "coaching" in impact.lower() or "job seeker" in impact.lower()
@@ -734,12 +795,14 @@ class TestCoSIntegration:
     def test_orchestrator_agent_registry(self):
         """Orchestrator knows all 5 ops agents."""
         from ops_team.orchestrator import _AGENT_MODULES
+
         expected = {"keevs", "treb", "naiv", "marsh", "ops_lead"}
         assert set(_AGENT_MODULES.keys()) == expected
 
     def test_config_agent_names(self):
         """Config lists all 5 ops agent names."""
         from ops_team.shared.config import OPS_AGENT_NAMES
+
         assert len(OPS_AGENT_NAMES) == 5
         assert "keevs" in OPS_AGENT_NAMES
         assert "ops_lead" in OPS_AGENT_NAMES

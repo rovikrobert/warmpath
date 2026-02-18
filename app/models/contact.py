@@ -81,7 +81,9 @@ class Contact(Base):
         index=True,
     )
     csv_upload_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("csv_uploads.id", ondelete="SET NULL"), index=True,
+        UUID(as_uuid=True),
+        ForeignKey("csv_uploads.id", ondelete="SET NULL"),
+        index=True,
     )
 
     # Core identity fields (from LinkedIn CSV) — encrypted at rest

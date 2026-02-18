@@ -31,7 +31,15 @@ _COMMANDS: dict[str, list[str]] = {
 }
 
 # Full scan runs all teams then CoS — one trigger does everything
-_FULL_SCAN_ORDER = ["engineering", "data", "product", "ops", "finance", "gtm", "cos-daily"]
+_FULL_SCAN_ORDER = [
+    "engineering",
+    "data",
+    "product",
+    "ops",
+    "finance",
+    "gtm",
+    "cos-daily",
+]
 
 RunMode = Literal[
     "cos-daily",
@@ -60,7 +68,11 @@ def _run_agent(mode: str) -> dict:
     label = f"[agent:{mode}]"
     _log(f"{label} started → {' '.join(cmd)}")
 
-    entry = {"mode": mode, "started_at": datetime.now(timezone.utc).isoformat(), "status": "running"}
+    entry = {
+        "mode": mode,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "status": "running",
+    }
     _run_log.append(entry)
     if len(_run_log) > 50:
         _run_log.pop(0)
@@ -101,7 +113,9 @@ def _run_agent(mode: str) -> dict:
 
 def _run_full_scan() -> None:
     """Run all teams in sequence, then CoS daily. Single trigger for everything."""
-    _log(f"[full-scan] Starting ({len(_FULL_SCAN_ORDER)} steps: {' → '.join(_FULL_SCAN_ORDER)})")
+    _log(
+        f"[full-scan] Starting ({len(_FULL_SCAN_ORDER)} steps: {' → '.join(_FULL_SCAN_ORDER)})"
+    )
     start = time.monotonic()
     results = []
 
@@ -173,9 +187,15 @@ async def agent_status(
     report_freshness: dict[str, str | None] = {}
     for team, report_dir in report_dirs.items():
         if report_dir.is_dir():
-            json_files = sorted(report_dir.glob("*_latest.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+            json_files = sorted(
+                report_dir.glob("*_latest.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
             if json_files:
-                mtime = datetime.fromtimestamp(json_files[0].stat().st_mtime, tz=timezone.utc)
+                mtime = datetime.fromtimestamp(
+                    json_files[0].stat().st_mtime, tz=timezone.utc
+                )
                 report_freshness[team] = mtime.isoformat()
             else:
                 report_freshness[team] = None

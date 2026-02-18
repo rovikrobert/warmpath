@@ -4,7 +4,6 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     DATABASE_URL: str = "[DATABASE_URL_REDACTED]"
     SECRET_KEY: str = "change-me-to-a-random-secret"
-    ACCESS_TOKEN_EXPIRE_DAYS: int = 7  # legacy — kept for migration compat
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     SECURE_COOKIES: bool = False  # True in production (requires HTTPS)
@@ -16,7 +15,6 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
     CSV_ASYNC_PROCESSING: bool = True
     CORS_ORIGINS: str = "*"
-    PORT: int = 8000  # Railway injects via env
     STRIPE_WEBHOOK_SECRET: str = ""
     LINKEDIN_CLIENT_ID: str = ""
     LINKEDIN_CLIENT_SECRET: str = ""
@@ -37,6 +35,7 @@ class Settings(BaseSettings):
     DASHBOARD_NETWORK_CACHE_TTL_HOURS: int = 1
     KEEVS_BRIEFING_CACHE_TTL_HOURS: int = 6
     AGENT_RUN_SECRET: str = ""
+    CLAUDE_MODEL: str = "claude-sonnet-4-20250514"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
