@@ -506,6 +506,18 @@ async def smart_search(
         search_req.status = "completed"
         search_req.results_data = results
         search_req.last_run_at = datetime.now(timezone.utc)
+
+        # Funnel instrumentation: first_search
+        from app.models.enrichment import UsageLog
+
+        db.add(
+            UsageLog(
+                user_id=current_user.id,
+                action="search",
+                resource_id=search_id,
+                metadata_={"scope": scope, "companies": body.company_names[:5]},
+            )
+        )
         await db.commit()
 
         return {

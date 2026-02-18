@@ -58,8 +58,8 @@ export default function OnboardingChecklist() {
         // Preferences: check if they exist (404 = not set)
         done.preferences = prefsRes.status === 'fulfilled' && prefsRes.value?.data?.target_role;
 
-        // Sharing: check if opt_in_marketplace is true
-        done.sharing = sharingRes.status === 'fulfilled' && sharingRes.value?.data?.opt_in_marketplace;
+        // Sharing: check if user has saved their sharing preferences
+        done.sharing = sharingRes.status === 'fulfilled' && sharingRes.value?.data?.is_configured;
       } catch {
         // If API calls fail, don't block the UI
       }

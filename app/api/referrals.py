@@ -80,6 +80,18 @@ async def redeem_referral_code(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
+    # Funnel instrumentation: referral_redeem
+    from app.models.enrichment import UsageLog
+
+    db.add(
+        UsageLog(
+            user_id=current_user.id,
+            action="referral_redeem",
+            metadata_={"referral_type": ref_code.referral_type},
+        )
+    )
+    await db.commit()
+
     return {
         "data": {
             "code": ref_code.code,
