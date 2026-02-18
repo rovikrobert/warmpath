@@ -540,9 +540,9 @@ async def test_marketplace_two_user_flow(client: AsyncClient):
     holder_headers = {"Authorization": f"Bearer {holder_token}"}
 
     await client.patch(
-        "/api/v1/auth/user-type",
+        "/api/v1/auth/intent",
         headers=holder_headers,
-        json={"user_type": "network_holder"},
+        json={"intent": "sha[RESEND_KEY_REDACTED]"},
     )
 
     # -- b) Upload CSV with Stripe / Google contacts ---------------------
@@ -582,9 +582,9 @@ async def test_marketplace_two_user_flow(client: AsyncClient):
     seeker_headers = {"Authorization": f"Bearer {seeker_token}"}
 
     await client.patch(
-        "/api/v1/auth/user-type",
+        "/api/v1/auth/intent",
         headers=seeker_headers,
-        json={"user_type": "job_seeker"},
+        json={"intent": "find_referrals"},
     )
 
     seeker_bal = await client.get("/api/v1/credits/balance", headers=seeker_headers)

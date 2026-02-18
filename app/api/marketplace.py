@@ -686,7 +686,7 @@ async def get_sharing_preferences(
     if prefs is None:
         # For NH/both users, lazily create a default row so checklist
         # recognises sharing as configured after first visit to settings.
-        if current_user.user_type in ("network_holder", "both"):
+        if current_user.intent in ("sha[RESEND_KEY_REDACTED]", "explore") or current_user.user_type in ("network_holder", "both"):
             prefs = NetworkSharingPreferences(
                 user_id=current_user.id,
                 opt_in_marketplace=False,

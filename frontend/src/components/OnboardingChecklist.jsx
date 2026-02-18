@@ -11,7 +11,6 @@ const BASE_STEPS = [
     cta: 'Upload CSV',
     href: '/contacts',
     credits: 100,
-    forUserTypes: null,
   },
   {
     key: 'preferences',
@@ -20,7 +19,6 @@ const BASE_STEPS = [
     cta: 'Set Preferences',
     href: '/settings?tab=profile',
     credits: null,
-    forUserTypes: null,
   },
   {
     key: 'sharing',
@@ -29,7 +27,6 @@ const BASE_STEPS = [
     cta: 'Configure Sharing',
     href: '/settings?tab=sharing',
     credits: null,
-    forUserTypes: ['network_holder', 'both'],
   },
 ];
 
@@ -41,10 +38,7 @@ export default function OnboardingChecklist() {
     () => localStorage.getItem('warmpath_checklist_dismissed') === 'true'
   );
 
-  const userType = user?.user_type || 'job_seeker';
-  const STEPS = BASE_STEPS.filter(
-    (s) => !s.forUserTypes || s.forUserTypes.includes(userType)
-  );
+  const STEPS = BASE_STEPS;
 
   useEffect(() => {
     if (dismissed) return;
@@ -66,8 +60,7 @@ export default function OnboardingChecklist() {
 
         done.preferences = prefsRes.status === 'fulfilled' && prefsRes.value?.data?.target_role;
 
-        done.sharing = userType === 'job_seeker'
-          || (sharingRes.status === 'fulfilled' && sharingRes.value?.data?.is_configured);
+        done.sharing = sharingRes.status === 'fulfilled' && sharingRes.value?.data?.is_configured;
       } catch {
         // If API calls fail, don't block the UI
       }
@@ -78,7 +71,7 @@ export default function OnboardingChecklist() {
       }
     })();
     return () => { cancelled = true; };
-  }, [dismissed, userType]);
+  }, [dismissed]);
 
   if (dismissed || loading) return null;
 

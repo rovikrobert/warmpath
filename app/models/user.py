@@ -48,6 +48,9 @@ class User(Base):
     user_type: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default="job_seeker"
     )
+    intent: Mapped[str | None] = mapped_column(
+        String(20), nullable=True, default=None
+    )
     # Security / session management
     token_version: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="0"
