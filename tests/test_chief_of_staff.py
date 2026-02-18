@@ -398,7 +398,7 @@ class TestSynthesizer:
     def test_synthesize_daily_with_findings(self, sample_reports: list[AgentReport]):
         from agents.chief_of_staff.synthesizer import synthesize_daily
 
-        brief = synthesize_daily(sample_reports, kpi_snapshot="Health: 85")
+        brief, _ = synthesize_daily(sample_reports, kpi_snapshot="Health: 85")
         assert "# Founder Daily Brief" in brief
         assert "Decisions Needed" in brief
         assert "Key Updates" in brief
@@ -408,7 +408,7 @@ class TestSynthesizer:
     def test_synthesize_daily_empty(self):
         from agents.chief_of_staff.synthesizer import synthesize_daily
 
-        brief = synthesize_daily([])
+        brief, _ = synthesize_daily([])
         assert "# Founder Daily Brief" in brief
         assert "No decisions needed" in brief
 
@@ -419,7 +419,7 @@ class TestSynthesizer:
             _make_finding("CRIT-1", "critical", "security", "Urgent fix needed")
         ]
         reports = [_make_report("security", findings)]
-        brief = synthesize_daily(reports)
+        brief, _ = synthesize_daily(reports)
         assert "CRIT-1" in brief
         assert "Decisions Needed" in brief
 
@@ -427,7 +427,7 @@ class TestSynthesizer:
         from agents.chief_of_staff.synthesizer import synthesize_daily
 
         reports = [_make_report("architect"), _make_report("doc_keeper")]
-        brief = synthesize_daily(reports)
+        brief, _ = synthesize_daily(reports)
         assert "No decisions needed" in brief
         assert "Progress" in brief
 
@@ -439,7 +439,7 @@ class TestSynthesizer:
             "total_estimated_tokens": 500,
             "total_duration_seconds": 12.3,
         }
-        brief = synthesize_daily(sample_reports, costs=costs)
+        brief, _ = synthesize_daily(sample_reports, costs=costs)
         assert "Cost Summary" in brief
         assert "$0.0123" in brief
 
@@ -452,7 +452,7 @@ class TestSynthesizer:
             "total_duration_seconds": 100.0,
         }
         alerts = ["Token budget exceeded!"]
-        brief = synthesize_daily(sample_reports, costs=costs, alerts=alerts)
+        brief, _ = synthesize_daily(sample_reports, costs=costs, alerts=alerts)
         assert "ALERT" in brief
         assert "Token budget exceeded" in brief
 

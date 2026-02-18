@@ -16,7 +16,8 @@ from sqlalchemy.orm import selectinload
 from app.models.contact import Contact
 from app.models.marketplace import MarketplaceListing, NetworkSharingPreferences
 from app.models.match_result import WarmScore
-from app.services.suppression import check_suppression
+from app.models.privacy import SuppressionList
+from app.utils.hashing import hash_for_suppression
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +241,18 @@ async def generate_marketplace_listings(
     for listing in existing_result.scalars():
         listing.deleted_at = datetime.now(timezone.utc)
 
+    # Batch-load ALL suppression hashes (avoids 1 query per contact)
+    suppression_result = await db.execute(
+        select(SuppressionList.email_hash, SuppressionList.name_company_hash)
+    )
+    suppressed_email_hashes: set[str] = set()
+    suppressed_name_co_hashes: set[str] = set()
+    for row in suppression_result.all():
+        if row[0]:
+            suppressed_email_hashes.add(row[0])
+        if row[1]:
+            suppressed_name_co_hashes.add(row[1])
+
     created = 0
 
     for contact in contacts:
@@ -258,14 +271,19 @@ async def generate_marketplace_listings(
         if include_departments and dept not in include_departments:
             continue
 
-        # Check suppression list
-        is_suppressed = await check_suppression(
-            email=contact.email,
-            first_name=contact.first_name or "",
-            last_name=contact.last_name or "",
-            company=contact.current_company or "",
-            db=db,
-        )
+        # Check suppression list (in-memory, no DB query per contact)
+        is_suppressed = False
+        if contact.email:
+            if hash_for_suppression(contact.email) in suppressed_email_hashes:
+                is_suppressed = True
+        if not is_suppressed:
+            name_company = (
+                f"{contact.first_name or ''}"
+                f"{contact.last_name or ''}"
+                f"{contact.current_company or ''}"
+            )
+            if hash_for_suppression(name_company) in suppressed_name_co_hashes:
+                is_suppressed = True
         if is_suppressed:
             continue
 
