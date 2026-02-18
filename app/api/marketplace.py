@@ -47,6 +47,7 @@ from app.services.credits import (
     spend_credits,
 )
 from app.services.audit_logger import log_event
+from app.services.friendship_service import get_friend_and_fof_ids, get_friend_ids
 from app.services.marketplace_indexer import generate_marketplace_listings
 from app.utils.hashing import hash_for_suppression
 from app.utils.privacy_checks import require_not_restricted
@@ -158,6 +159,20 @@ async def marketplace_search(
         query = query.where(
             MarketplaceListing.department_category.in_(body.departments)
         )
+
+    # Friend filter: restrict to network holders who are friends (or FoF)
+    if body.friend_filter and body.friend_filter != "all":
+        if body.friend_filter == "friends_only":
+            fids = await get_friend_ids(current_user.id, db)
+            if not fids:
+                return {"data": [], "meta": {"total": 0}}
+            query = query.where(MarketplaceListing.network_holder_id.in_(fids))
+        elif body.friend_filter == "friends_and_fof":
+            fids, fof_ids = await get_friend_and_fof_ids(current_user.id, db)
+            all_ids = fids | fof_ids
+            if not all_ids:
+                return {"data": [], "meta": {"total": 0}}
+            query = query.where(MarketplaceListing.network_holder_id.in_(all_ids))
 
     result = await db.execute(query)
     listings = list(result.scalars())

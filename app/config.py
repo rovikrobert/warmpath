@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     LINKEDIN_CLIENT_SECRET: str = ""
     LINKEDIN_REDIRECT_URI: str = ""
     RESEND_API_KEY: str = ""
+    RESEND_WEBHOOK_SECRET: str = ""
     FROM_EMAIL: str = "WarmPath <noreply@majiq.agency>"
     FRONTEND_URL: str = "http://localhost:3000"
     ENCRYPTION_KEY: str = ""  # Fernet key (44-char base64). Empty = passthrough.

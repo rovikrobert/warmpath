@@ -48,15 +48,18 @@ async def _already_sent(
 
 
 async def _record_send(
-    db: AsyncSession, user_id: uuid.UUID, email_type: str
+    db: AsyncSession, user_id: uuid.UUID, email_type: str, external_id: str | None = None
 ) -> None:
-    """Record that an email was sent."""
+    """Record that an email was sent, optionally with Resend message ID."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # Ensure external_id is a real string (not a mock object)
+    eid = str(external_id) if isinstance(external_id, str) else None
     db.add(
         EmailCampaignLog(
             user_id=user_id,
             email_type=email_type,
             sent_date=today,
+            external_id=eid,
         )
     )
     await db.flush()
@@ -138,8 +141,8 @@ async def send_welcome_email_js(user: User, db: AsyncSession) -> bool:
   </div>
   {_footer_html()}
 </div>"""
-    _send_email(user.email, f"Your 50 welcome credits are ready, {first}", html)
-    await _record_send(db, user.id, "welcome_js")
+    eid = _send_email(user.email, f"Your 50 welcome credits are ready, {first}", html)
+    await _record_send(db, user.id, "welcome_js", external_id=eid)
     return True
 
 
@@ -176,8 +179,8 @@ async def send_welcome_email_nh(user: User, db: AsyncSession) -> bool:
   </div>
   {_footer_html()}
 </div>"""
-    _send_email(user.email, f"{first}, $5K+ in referral bonuses — here's how to claim them", html)
-    await _record_send(db, user.id, "welcome_nh")
+    eid = _send_email(user.email, f"{first}, $5K+ in referral bonuses — here's how to claim them", html)
+    await _record_send(db, user.id, "welcome_nh", external_id=eid)
     return True
 
 
@@ -219,8 +222,8 @@ async def send_csv_reminder_d1(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {agent}</p>
   {_footer_html()}
 </div>"""
-        _send_email(u.email, "2 minutes to unlock referral paths at your target companies", html)
-        await _record_send(db, u.id, "csv_reminder_d1")
+        eid = _send_email(u.email, "2 minutes to unlock referral paths at your target companies", html)
+        await _record_send(db, u.id, "csv_reminder_d1", external_id=eid)
         count += 1
     await db.commit()
     logger.info("csv_reminder_d1: sent %d emails", count)
@@ -259,8 +262,8 @@ async def send_csv_reminder_d3(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {agent}</p>
   {_footer_html()}
 </div>"""
-        _send_email(u.email, "Quick question: what's blocking your upload?", html)
-        await _record_send(db, u.id, "csv_reminder_d3")
+        eid = _send_email(u.email, "Quick question: what's blocking your upload?", html)
+        await _record_send(db, u.id, "csv_reminder_d3", external_id=eid)
         count += 1
     await db.commit()
     logger.info("csv_reminder_d3: sent %d emails", count)
@@ -309,8 +312,8 @@ async def send_nh_sharing_reminder_d2(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("network_holder")}</p>
   {_footer_html()}
 </div>"""
-        _send_email(u.email, "Your network is uploaded — unlock $2-10K in referral bonuses", html)
-        await _record_send(db, u.id, "nh_sharing_d2")
+        eid = _send_email(u.email, "Your network is uploaded — unlock $2-10K in referral bonuses", html)
+        await _record_send(db, u.id, "nh_sharing_d2", external_id=eid)
         count += 1
     await db.commit()
     logger.info("nh_sharing_d2: sent %d emails", count)
@@ -351,8 +354,8 @@ async def send_first_search_nudge_d2(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("job_seeker")}</p>
   {_footer_html()}
 </div>"""
-        _send_email(u.email, "We found warm paths in your network — see who can refer you", html)
-        await _record_send(db, u.id, "first_search_d2")
+        eid = _send_email(u.email, "We found warm paths in your network — see who can refer you", html)
+        await _record_send(db, u.id, "first_search_d2", external_id=eid)
         count += 1
     await db.commit()
     logger.info("first_search_d2: sent %d emails", count)
@@ -400,8 +403,8 @@ async def send_intro_pending_reminder(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("network_holder")}</p>
   {_footer_html()}
 </div>"""
-        _send_email(u.email, f"{pending_count} referral bonus opportunity waiting for your review", html)
-        await _record_send(db, nh_id, "intro_pending_24h")
+        eid = _send_email(u.email, f"{pending_count} referral bonus opportunity waiting for your review", html)
+        await _record_send(db, nh_id, "intro_pending_24h", external_id=eid)
         count += 1
     await db.commit()
     logger.info("intro_pending_24h: sent %d emails", count)
@@ -495,8 +498,8 @@ async def send_weekly_digest(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {agent}</p>
   {_footer_html()}
 </div>"""
-        _send_email(u.email, subject, html)
-        await _record_send(db, u.id, "weekly_digest")
+        eid = _send_email(u.email, subject, html)
+        await _record_send(db, u.id, "weekly_digest", external_id=eid)
         count += 1
     await db.commit()
     logger.info("weekly_digest: sent %d emails", count)
@@ -552,8 +555,8 @@ async def send_reengagement_d30(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {agent}</p>
   {_footer_html()}
 </div>"""
-        _send_email(u.email, "New referral paths appeared in your network this month", html)
-        await _record_send(db, u.id, "reengagement_d30")
+        eid = _send_email(u.email, "New referral paths appeared in your network this month", html)
+        await _record_send(db, u.id, "reengagement_d30", external_id=eid)
         count += 1
     await db.commit()
     logger.info("reengagement_d30: sent %d emails", count)
@@ -603,8 +606,8 @@ async def send_reengagement_d90(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {agent}</p>
   {_footer_html()}
 </div>"""
-        _send_email(u.email, "Still have your network on WarmPath — switch to connector mode?", html)
-        await _record_send(db, u.id, "reengagement_d90")
+        eid = _send_email(u.email, "Still have your network on WarmPath — switch to connector mode?", html)
+        await _record_send(db, u.id, "reengagement_d90", external_id=eid)
         count += 1
     await db.commit()
     logger.info("reengagement_d90: sent %d emails", count)

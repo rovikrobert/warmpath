@@ -37,6 +37,7 @@ class EmailCampaignLog(Base):
     )
     opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     clicked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    external_id: Mapped[str | None] = mapped_column(String(100))
 
     # Relationships
     user: Mapped["User"] = relationship()
