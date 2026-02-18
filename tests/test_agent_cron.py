@@ -365,7 +365,7 @@ class TestCheckBetaFeedback:
                                 {"text": {"content": "Call +65 9123 4567 for details"}}
                             ]
                         },
-                        "Page/Feature": {"select": {"name": "Dashboard"}},
+                        "Page/Feature": {"select": {"name": "Coach"}},
                         "Status": {"select": {"name": "New"}},
                     },
                 }

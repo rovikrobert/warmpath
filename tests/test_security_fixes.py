@@ -173,7 +173,7 @@ class TestSPAPathTraversal:
 
     async def test_normal_path_works(self, client: AsyncClient):
         """Normal SPA paths should work (return index or 404 if no frontend)."""
-        resp = await client.get("/dashboard")
+        resp = await client.get("/coach")
         assert resp.status_code in (200, 404)
 
 

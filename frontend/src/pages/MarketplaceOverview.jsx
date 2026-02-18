@@ -19,7 +19,7 @@ function StatusBadge({ status }) {
   );
 }
 
-export default function MarketplaceDashboard() {
+export default function MarketplaceOverview() {
   const [listings, setListings] = useState([]);
   const [incoming, setIncoming] = useState([]);
   const [balance, setBalance] = useState(0);
@@ -65,7 +65,7 @@ export default function MarketplaceDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20" aria-live="polite" aria-busy="true">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading dashboard" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading marketplace" />
       </div>
     );
   }
@@ -79,7 +79,7 @@ export default function MarketplaceDashboard() {
   return (
     <div className="space-y-6" role="main">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-50">Network Holder Dashboard</h1>
+        <h1 className="text-xl font-bold text-slate-50">Marketplace Overview</h1>
         <Link to="/settings?tab=sharing" className="rounded-md border border-slate-700/50 px-3 py-1.5 text-sm text-slate-400 hover:bg-slate-800">
           Sharing Settings
         </Link>

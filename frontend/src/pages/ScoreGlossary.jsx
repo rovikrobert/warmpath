@@ -5,8 +5,8 @@ export default function ScoreGlossary() {
   return (
     <div className="mx-auto max-w-2xl" role="main">
       <div className="mb-6">
-        <Link to="/dashboard" className="mb-1 inline-block text-sm text-amber-400 hover:text-amber-300">
-          &larr; Dashboard
+        <Link to="/coach" className="mb-1 inline-block text-sm text-amber-400 hover:text-amber-300">
+          &larr; Coach
         </Link>
         <h1 className="text-xl font-bold text-slate-50">How Scores Work</h1>
         <p className="mt-1 text-sm text-slate-400">

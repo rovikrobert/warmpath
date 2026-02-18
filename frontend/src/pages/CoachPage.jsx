@@ -44,7 +44,7 @@ function renderWithLinks(text) {
   });
 }
 
-export default function Dashboard() {
+export default function CoachPage() {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [contextSnapshot, setContextSnapshot] = useState(null);

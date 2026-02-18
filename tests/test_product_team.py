@@ -113,7 +113,7 @@ class TestProductTeamReport:
             severity="medium",
             category="ux_quality",
             title="Missing loading state",
-            detail="No spinner in Dashboard",
+            detail="No spinner in CoachPage",
         )
         report = ProductTeamReport(
             agent="ux_lead",

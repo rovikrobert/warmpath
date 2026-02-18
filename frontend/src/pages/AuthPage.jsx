@@ -41,7 +41,7 @@ export default function AuthPage() {
         navigate('/onboarding');
       } else {
         await login({ email: form.email, password: form.password });
-        navigate('/dashboard');
+        navigate('/coach');
       }
     } catch (err) {
       if (!isSignup && err.status === 404) {
