@@ -27,6 +27,10 @@ class UserTypeUpdate(BaseModel):
     user_type: str = Field(..., max_length=50)
 
 
+class IntentUpdate(BaseModel):
+    intent: str = Field(..., max_length=20)
+
+
 class ChangePasswordRequest(BaseModel):
     old_password: str = Field(..., max_length=128)
     new_password: str = Field(..., max_length=128)
@@ -46,14 +50,24 @@ class DeleteAccountRequest(BaseModel):
     confirm_deletion: bool
 
 
+class UserCapabilities(BaseModel):
+    has_contacts: bool
+    has_searches: bool
+    has_listings: bool
+    has_subscription: bool
+    facilitation_count: int
+
+
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
     full_name: str
     plan_tier: str
-    user_type: str
+    user_type: str  # Kept during transition
+    intent: str | None = None
     email_verified: bool
     created_at: datetime
+    capabilities: UserCapabilities | None = None
 
     model_config = {"from_attributes": True}
 

@@ -828,10 +828,8 @@ export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'profile';
 
-  const isHolder = user?.user_type === 'network_holder' || user?.user_type === 'both';
-
-  // Filter tabs — Sharing only visible to network holders / both
-  const visibleTabs = TABS.filter((t) => t.key !== 'sharing' || isHolder);
+  // All tabs visible to all users (action-based identity — no role gating)
+  const visibleTabs = TABS;
 
   const switchTab = (key) => {
     setSearchParams({ tab: key }, { replace: true });
@@ -841,7 +839,7 @@ export default function SettingsPage() {
     switch (activeTab) {
       case 'profile': return <ProfileTab />;
       case 'privacy': return <PrivacyTab />;
-      case 'sharing': return isHolder ? <SharingTab /> : <ProfileTab />;
+      case 'sharing': return <SharingTab />;
       case 'account': return <AccountTab />;
       default: return <ProfileTab />;
     }

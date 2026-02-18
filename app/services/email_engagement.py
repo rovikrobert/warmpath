@@ -87,9 +87,9 @@ def _preheader_html(text: str) -> str:
     )
 
 
-def _agent_signoff(user_type: str | None = None) -> str:
-    """Return ops agent persona signoff based on user type."""
-    if user_type in ("network_holder",):
+def _agent_signoff(intent: str | None = None) -> str:
+    """Return ops agent persona signoff based on user intent."""
+    if intent in ("share_network",):
         return "Treb, WarmPath Ops"
     return "Keevs, WarmPath Ops"
 
@@ -179,7 +179,7 @@ async def send_welcome_email_nh(user: User, db: AsyncSession) -> bool:
     <div style="text-align: center; margin: 24px 0;">
       <a href="{APP_URL}/contacts" style="display: inline-block; padding: 12px 28px; background: #2563eb; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600;">Upload &amp; Start Earning</a>
     </div>
-    <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("network_holder")}</p>
+    <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("share_network")}</p>
   </div>
   {_footer_html()}
 </div>"""
@@ -218,7 +218,7 @@ async def send_csv_reminder_d1(db: AsyncSession) -> int:
         if await _already_sent(db, u.id, "csv_reminder_d1"):
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
-        agent = _agent_signoff(u.user_type)
+        agent = _agent_signoff(u.intent)
         html = f"""\
 <div lang="en" dir="ltr" style="{_base_style()}">
   {_preheader_html("It takes 2 minutes to unlock referral paths")}
@@ -261,7 +261,7 @@ async def send_csv_reminder_d3(db: AsyncSession) -> int:
         if await _already_sent(db, u.id, "csv_reminder_d3"):
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
-        agent = _agent_signoff(u.user_type)
+        agent = _agent_signoff(u.intent)
         html = f"""\
 <div lang="en" dir="ltr" style="{_base_style()}">
   {_preheader_html("Reply if you're stuck — we'll help you upload")}
@@ -294,7 +294,6 @@ async def send_nh_sharing_reminder_d2(db: AsyncSession) -> int:
     )
     result = await db.execute(
         select(User).where(
-            User.user_type.in_(["network_holder", "both"]),
             User.deleted_at.is_(None),
             User.marketing_opt_out.is_(False),
             User.created_at < cutoff,
@@ -320,7 +319,7 @@ async def send_nh_sharing_reminder_d2(db: AsyncSession) -> int:
   <div style="margin: 16px 0;">
     <a href="{APP_URL}/marketplace/settings" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Turn On Sharing &amp; Earn Bonuses</a>
   </div>
-  <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("network_holder")}</p>
+  <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("share_network")}</p>
   {_footer_html()}
 </div>"""
         eid = _send_email(
@@ -343,7 +342,6 @@ async def send_first_search_nudge_d2(db: AsyncSession) -> int:
     searched_subq = select(SearchRequest.user_id).distinct().scalar_subquery()
     result = await db.execute(
         select(User).where(
-            User.user_type.in_(["job_seeker", "both"]),
             User.deleted_at.is_(None),
             User.marketing_opt_out.is_(False),
             User.created_at < cutoff,
@@ -418,7 +416,7 @@ async def send_intro_pending_reminder(db: AsyncSession) -> int:
   <div style="margin: 16px 0;">
     <a href="{APP_URL}/marketplace/requests" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Review &amp; Earn Credits</a>
   </div>
-  <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("network_holder")}</p>
+  <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("share_network")}</p>
   {_footer_html()}
 </div>"""
         eid = _send_email(
@@ -487,10 +485,10 @@ async def send_weekly_digest(db: AsyncSession) -> int:
         ).scalar() or 0
 
         stats_html = ""
-        if u.user_type in ("job_seeker", "both"):
+        if search_count or intro_sent:
             stats_html += f"<li><strong>{search_count}</strong> searches run</li>"
             stats_html += f"<li><strong>{intro_sent}</strong> intro requests sent</li>"
-        if u.user_type in ("network_holder", "both"):
+        if intro_received:
             stats_html += (
                 f"<li><strong>{intro_received}</strong> intro requests received</li>"
             )
@@ -512,7 +510,7 @@ async def send_weekly_digest(db: AsyncSession) -> int:
             else "Your WarmPath weekly digest"
         )
 
-        agent = _agent_signoff(u.user_type)
+        agent = _agent_signoff(u.intent)
         html = f"""\
 <div lang="en" dir="ltr" style="{_base_style()}">
   {_preheader_html("Here's what happened on WarmPath this week")}
@@ -521,7 +519,7 @@ async def send_weekly_digest(db: AsyncSession) -> int:
   <ul style="margin: 0 0 16px; padding-left: 20px;">{stats_html}</ul>
   <p style="margin: 0 0 16px; font-size: 14px; color: #6b7280;">Every intro you approve brings someone closer to a referral.</p>
   <div style="margin: 16px 0;">
-    <a href="{APP_URL}/dashboard" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">View Dashboard</a>
+    <a href="{APP_URL}/coach" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">View Dashboard</a>
   </div>
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {agent}</p>
   {_footer_html()}
@@ -571,7 +569,7 @@ async def send_reengagement_d30(db: AsyncSession) -> int:
         if await _already_sent(db, u.id, "reengagement_d30"):
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
-        agent = _agent_signoff(u.user_type)
+        agent = _agent_signoff(u.intent)
         html = f"""\
 <div lang="en" dir="ltr" style="{_base_style()}">
   {_preheader_html("New marketplace connections since you last searched")}
@@ -579,7 +577,7 @@ async def send_reengagement_d30(db: AsyncSession) -> int:
   <p style="margin: 0 0 16px;">It's been a month. Your contacts are still active on WarmPath — and the marketplace has grown since you last searched.</p>
   <p style="margin: 0 0 16px;">Log back in to check pending intro requests or refresh your network for fresh opportunities.</p>
   <div style="margin: 16px 0;">
-    <a href="{APP_URL}/dashboard" style="display: inline-block; background: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Check New Referral Paths</a>
+    <a href="{APP_URL}/coach" style="display: inline-block; background: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Check New Referral Paths</a>
   </div>
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {agent}</p>
   {_footer_html()}
@@ -625,14 +623,14 @@ async def send_reengagement_d90(db: AsyncSession) -> int:
         if await _already_sent(db, u.id, "reengagement_d90"):
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
-        agent = _agent_signoff(u.user_type)
+        agent = _agent_signoff(u.intent)
         html = f"""\
 <div lang="en" dir="ltr" style="{_base_style()}">
   {_preheader_html("Switch to connector mode and start earning")}
   <p style="margin: 0 0 16px;">Hi {first},</p>
   <p style="margin: 0 0 16px;">It's been a while. Your network is still private and secure on WarmPath. If you're no longer job hunting, your connections are still valuable — switch to connector mode and start earning referral bonuses when you help others get referred.</p>
   <div style="margin: 16px 0;">
-    <a href="{APP_URL}/dashboard" style="display: inline-block; background: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Switch to Connector Mode</a>
+    <a href="{APP_URL}/coach" style="display: inline-block; background: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Switch to Connector Mode</a>
   </div>
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {agent}</p>
   {_footer_html()}

@@ -30,6 +30,7 @@ from app.schemas.user import (
     ConnectorProfileUpsert,
     DeleteAccountRequest,
     ForgotPasswordRequest,
+    IntentUpdate,
     LinkedInCallbackRequest,
     ResetPasswordRequest,
     TokenResponse,
@@ -168,16 +169,10 @@ async def signup(
     # Send verification email
     await send_verification_email(user, db)
 
-    # Send welcome email (JS or NH variant)
-    from app.services.email_engagement import (
-        send_welcome_email_js,
-        send_welcome_email_nh,
-    )
+    # Send welcome email (intent set later during onboarding, not at signup)
+    from app.services.email_engagement import send_welcome_email_js
 
-    if getattr(body, "user_type", "job_seeker") in ("network_holder",):
-        await send_welcome_email_nh(user, db)
-    else:
-        await send_welcome_email_js(user, db)
+    await send_welcome_email_js(user, db)
 
     # Track funnel step
     from app.models.enrichment import UsageLog
@@ -523,12 +518,17 @@ async def change_password(
 
 
 @router.get("/me")
-async def get_me(current_user: User = Depends(get_current_user)) -> dict:
-    """Return the authenticated user's profile."""
-    return {
-        "data": UserResponse.model_validate(current_user).model_dump(mode="json"),
-        "meta": {},
-    }
+async def get_me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Return the authenticated user's profile with capabilities."""
+    from app.services.capabilities import compute_user_capabilities
+
+    caps = await compute_user_capabilities(current_user.id, db)
+    response = UserResponse.model_validate(current_user).model_dump(mode="json")
+    response["capabilities"] = caps.model_dump()
+    return {"data": response, "meta": {}}
 
 
 @router.patch("/user-type")
@@ -549,6 +549,28 @@ async def update_user_type(
     await db.refresh(current_user)
     return {
         "data": {"user_type": current_user.user_type},
+        "meta": {},
+    }
+
+
+@router.patch("/intent")
+async def update_intent(
+    body: IntentUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Update the user's onboarding intent (personalization only)."""
+    valid_intents = {"find_referrals", "share_network", "explore"}
+    if body.intent not in valid_intents:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"intent must be one of: {', '.join(sorted(valid_intents))}",
+        )
+    current_user.intent = body.intent
+    await db.commit()
+    await db.refresh(current_user)
+    return {
+        "data": {"intent": current_user.intent},
         "meta": {},
     }
 

@@ -121,8 +121,8 @@ export default function OnboardingPage() {
     open_to_remote: true,
   });
 
-  // Step 2: User type
-  const [userType, setUserType] = useState('');
+  // Step 2: Intent
+  const [intent, setIntent] = useState('');
 
   // Step 7: Upload
   const [file, setFile] = useState(null);
@@ -243,16 +243,16 @@ export default function OnboardingPage() {
     }
   };
 
-  // Step 2 -> 3 (NH bonus pitch) or 4 (privacy for job seekers)
-  const handleUserType = async () => {
-    if (!userType) return;
+  // Step 2 -> 3 (referral bonus pitch) or 4 (privacy)
+  const handleIntent = async () => {
+    if (!intent) return;
     setSaving(true);
     setError('');
     try {
-      await authApi.updateUserType(userType);
+      await authApi.updateIntent(intent);
       await refreshUser();
-      // NHs and "both" see the referral bonus pitch; pure job seekers skip to privacy
-      setStep(userType === 'job_seeker' ? 4 : 3);
+      // share_network and explore see referral bonus pitch; find_referrals skips to privacy
+      setStep(intent === 'find_referrals' ? 4 : 3);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -301,7 +301,7 @@ export default function OnboardingPage() {
     navigate('/coach');
   };
 
-  const isHolder = userType === 'network_holder' || userType === 'both';
+  const isHolder = intent === 'share_network' || intent === 'explore';
 
   const inputClass = 'w-full rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
 
@@ -322,7 +322,7 @@ export default function OnboardingPage() {
         <div className="mb-6 flex items-center gap-1" role="progressbar" aria-valuenow={step} aria-valuemin={1} aria-valuemax={TOTAL_STEPS} aria-label={`Onboarding step ${step} of ${TOTAL_STEPS}`}>
           {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => {
             // Job seekers skip step 3 (NH bonus pitch) — hide that segment
-            if (s === 3 && userType === 'job_seeker') return null;
+            if (s === 3 && intent === 'find_referrals') return null;
             return (
               <button
                 key={s}
@@ -397,26 +397,26 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 2: User Type */}
+          {/* Step 2: Intent */}
           {step === 2 && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold text-slate-50">How do you want to use WarmPath?</h2>
+                <h2 className="text-lg font-semibold text-slate-50">What brings you to WarmPath?</h2>
                 <p className="mt-1 text-sm text-slate-400">You can change this anytime.</p>
               </div>
 
               <div className="space-y-3">
                 {[
-                  { value: 'job_seeker', title: "I'm job hunting", desc: 'Search networks, find referral paths, and get introduced to people at your target companies.' },
-                  { value: 'network_holder', title: 'I want to help others get referred', desc: 'Share your network anonymously. Your employer pays $2-10K per referral hire \u2014 we send you pre-qualified candidates so you can capture those bonuses.' },
-                  { value: 'both', title: 'Both!', desc: 'Search for referrals AND share your network. Most members choose this.' },
+                  { value: 'find_referrals', title: 'I want to get referred to companies', desc: 'Search networks, find referral paths, and get introduced to people at your target companies.' },
+                  { value: 'share_network', title: 'I want to share my network and earn', desc: 'Share your network anonymously. Your employer pays $2-10K per referral hire \u2014 we send you pre-qualified candidates so you can capture those bonuses.' },
+                  { value: 'explore', title: "Both \u2014 I'm exploring", desc: 'Search for referrals AND share your network. Most members choose this.' },
                 ].map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => setUserType(opt.value)}
+                    onClick={() => setIntent(opt.value)}
                     className={`w-full rounded-lg border-2 p-4 text-left transition ${
-                      userType === opt.value
+                      intent === opt.value
                         ? 'border-amber-500 bg-amber-500/10'
                         : 'border-slate-700/50 hover:border-slate-600'
                     }`}
@@ -434,8 +434,8 @@ export default function OnboardingPage() {
                   Back
                 </Button>
                 <Button
-                  onClick={handleUserType}
-                  disabled={!userType}
+                  onClick={handleIntent}
+                  disabled={!intent}
                   loading={saving}
                   className="flex-1"
                   size="lg"
@@ -532,7 +532,7 @@ export default function OnboardingPage() {
                 <Button variant="secondary" onClick={() => {
                   setError('');
                   // From step 4, job seekers go back to step 2 (skip bonus pitch)
-                  setStep(step === 4 && userType === 'job_seeker' ? 2 : step - 1);
+                  setStep(step === 4 && intent === 'find_referrals' ? 2 : step - 1);
                 }} className="flex-1" size="lg">
                   Back
                 </Button>
