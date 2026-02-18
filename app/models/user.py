@@ -95,6 +95,11 @@ class User(Base):
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Stripe integration
+    stripe_customer_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
+    )
+
     # Relationships (passive_deletes=True defers to DB-level ON DELETE CASCADE)
     connector_profile: Mapped["ConnectorProfile | None"] = relationship(
         back_populates="user", uselist=False, passive_deletes=True

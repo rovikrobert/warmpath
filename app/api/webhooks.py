@@ -67,12 +67,11 @@ def _verify_stripe_signature(payload: bytes, sig_header: str, secret: str) -> bo
 
 
 @router.post("/webhooks/stripe")
-async def stripe_webhook(request: Request) -> dict:
-    """Receive Stripe webhook events with signature verification.
-
-    If STRIPE_WEBHOOK_SECRET is empty (dev mode), accepts all webhooks
-    with a warning log. In production, rejects unsigned/invalid webhooks.
-    """
+async def stripe_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Receive Stripe webhook events with signature verification."""
     payload = await request.body()
 
     if settings.STRIPE_WEBHOOK_SECRET:
@@ -94,7 +93,6 @@ async def stripe_webhook(request: Request) -> dict:
             "STRIPE_WEBHOOK_SECRET not set — accepting webhook without verification"
         )
 
-    # Parse and process the event
     try:
         event = json.loads(payload)
     except json.JSONDecodeError:
@@ -106,10 +104,9 @@ async def stripe_webhook(request: Request) -> dict:
     event_type = event.get("type", "unknown")
     logger.info("Stripe webhook received: %s", event_type)
 
-    # Route to event-specific handlers
     handler = _EVENT_HANDLERS.get(event_type)
     if handler:
-        handler(event)
+        await handler(event, db)
     else:
         logger.debug("Unhandled Stripe event type: %s", event_type)
 
@@ -117,69 +114,237 @@ async def stripe_webhook(request: Request) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Event handlers (stubs — wire to services when Stripe goes live)
+# Event handlers — wired to credit/subscription services
 # ---------------------------------------------------------------------------
 
 
-def _handle_checkout_completed(event: dict) -> None:
-    """Grant credits or activate subscription after successful checkout."""
-    session = event.get("data", {}).get("object", {})
+async def _resolve_user(event: dict, db: AsyncSession) -> "User | None":  # noqa: F821
+    """Look up user from Stripe event via metadata.user_id or stripe_customer_id."""
+    from app.models.user import User
+
+    obj = event.get("data", {}).get("object", {})
+
+    # Primary: metadata.user_id (set during checkout creation)
+    user_id_str = (obj.get("metadata") or {}).get("user_id")
+    if user_id_str:
+        import uuid as _uuid
+
+        try:
+            uid = _uuid.UUID(user_id_str)
+            result = await db.execute(select(User).where(User.id == uid))
+            user = result.scalar_one_or_none()
+            if user:
+                return user
+        except (ValueError, AttributeError):
+            pass
+
+    # Fallback: stripe_customer_id
+    customer_id = obj.get("customer")
+    if customer_id:
+        result = await db.execute(
+            select(User).where(User.stripe_customer_id == customer_id)
+        )
+        return result.scalar_one_or_none()
+
+    return None
+
+
+async def _handle_checkout_completed(event: dict, db: AsyncSession) -> None:
+    """Grant credits after successful checkout."""
+    from app.services.credits import earn_credits
+    from app.services.audit_logger import log_event
+
+    obj = event.get("data", {}).get("object", {})
+    user = await _resolve_user(event, db)
+
+    if not user:
+        logger.warning("checkout.session.completed: could not resolve user")
+        return
+
+    # Store stripe_customer_id if not yet set
+    customer_id = obj.get("customer")
+    if customer_id and not user.stripe_customer_id:
+        user.stripe_customer_id = customer_id
+
+    # Grant credits: amount_total is in cents, CREDIT_PURCHASE_RATE = 5 credits per dollar
+    amount_cents = obj.get("amount_total", 0)
+    credits_to_grant = (amount_cents * 5) // 100  # 5 credits per dollar
+
+    if credits_to_grant > 0:
+        await earn_credits(user.id, credits_to_grant, "purchase", db)
+        await log_event(
+            db,
+            "credit_purchase",
+            user_id=user.id,
+            metadata={
+                "credits": credits_to_grant,
+                "amount_cents": amount_cents,
+                "stripe_customer": customer_id,
+            },
+        )
+
     logger.info(
-        "Checkout completed: customer=%s, amount=%s",
-        session.get("customer"),
-        session.get("amount_total"),
+        "Checkout completed: user=%s, credits=%d, amount=%d",
+        user.id,
+        credits_to_grant,
+        amount_cents,
     )
 
 
-def _handle_invoice_paid(event: dict) -> None:
+async def _handle_invoice_paid(event: dict, db: AsyncSession) -> None:
     """Confirm recurring payment — extend subscription period."""
-    invoice = event.get("data", {}).get("object", {})
+    from app.services.audit_logger import log_event
+
+    obj = event.get("data", {}).get("object", {})
+    user = await _resolve_user(event, db)
+
+    if not user:
+        logger.warning("invoice.paid: could not resolve user")
+        return
+
+    await log_event(
+        db,
+        "invoice_paid",
+        user_id=user.id,
+        metadata={
+            "amount_paid": obj.get("amount_paid"),
+            "stripe_customer": obj.get("customer"),
+        },
+    )
+
     logger.info(
-        "Invoice paid: customer=%s, amount=%s",
-        invoice.get("customer"),
-        invoice.get("amount_paid"),
+        "Invoice paid: user=%s, amount=%s",
+        user.id,
+        obj.get("amount_paid"),
     )
 
 
-def _handle_invoice_payment_failed(event: dict) -> None:
-    """Flag failed payment — notify user, start grace period."""
-    invoice = event.get("data", {}).get("object", {})
+async def _handle_invoice_payment_failed(event: dict, db: AsyncSession) -> None:
+    """Flag failed payment — log warning."""
+    from app.services.audit_logger import log_event
+
+    obj = event.get("data", {}).get("object", {})
+    user = await _resolve_user(event, db)
+
+    if user:
+        await log_event(
+            db,
+            "invoice_payment_failed",
+            user_id=user.id,
+            metadata={
+                "attempt_count": obj.get("attempt_count"),
+                "stripe_customer": obj.get("customer"),
+            },
+        )
+
     logger.warning(
         "Invoice payment failed: customer=%s, attempt=%s",
-        invoice.get("customer"),
-        invoice.get("attempt_count"),
+        obj.get("customer"),
+        obj.get("attempt_count"),
     )
 
 
-def _handle_subscription_created(event: dict) -> None:
-    """New subscription — activate premium features."""
-    sub = event.get("data", {}).get("object", {})
+async def _handle_subscription_created(event: dict, db: AsyncSession) -> None:
+    """New subscription — upgrade plan_tier."""
+    from app.services.audit_logger import log_event
+
+    obj = event.get("data", {}).get("object", {})
+    user = await _resolve_user(event, db)
+
+    if not user:
+        logger.warning("subscription.created: could not resolve user")
+        return
+
+    # Store stripe_customer_id if not yet set
+    customer_id = obj.get("customer")
+    if customer_id and not user.stripe_customer_id:
+        user.stripe_customer_id = customer_id
+
+    # Upgrade to pro tier
+    old_tier = user.plan_tier
+    user.plan_tier = "pro"
+
+    await log_event(
+        db,
+        "subscription_created",
+        user_id=user.id,
+        metadata={
+            "old_tier": old_tier,
+            "new_tier": "pro",
+            "stripe_customer": customer_id,
+            "subscription_status": obj.get("status"),
+        },
+    )
+
     logger.info(
-        "Subscription created: customer=%s, plan=%s, status=%s",
-        sub.get("customer"),
-        sub.get("plan", {}).get("id"),
-        sub.get("status"),
+        "Subscription created: user=%s, tier=%s->pro",
+        user.id,
+        old_tier,
     )
 
 
-def _handle_subscription_updated(event: dict) -> None:
-    """Subscription change — upgrade/downgrade/cancel scheduled."""
-    sub = event.get("data", {}).get("object", {})
+async def _handle_subscription_updated(event: dict, db: AsyncSession) -> None:
+    """Subscription change — handle upgrades/downgrades/cancel scheduling."""
+    from app.services.audit_logger import log_event
+
+    obj = event.get("data", {}).get("object", {})
+    user = await _resolve_user(event, db)
+
+    if not user:
+        logger.warning("subscription.updated: could not resolve user")
+        return
+
+    cancel_at = obj.get("cancel_at")
+    sub_status = obj.get("status")
+
+    await log_event(
+        db,
+        "subscription_updated",
+        user_id=user.id,
+        metadata={
+            "status": sub_status,
+            "cancel_at": cancel_at,
+            "stripe_customer": obj.get("customer"),
+        },
+    )
+
     logger.info(
-        "Subscription updated: customer=%s, status=%s, cancel_at=%s",
-        sub.get("customer"),
-        sub.get("status"),
-        sub.get("cancel_at"),
+        "Subscription updated: user=%s, status=%s, cancel_at=%s",
+        user.id,
+        sub_status,
+        cancel_at,
     )
 
 
-def _handle_subscription_deleted(event: dict) -> None:
-    """Subscription ended — revoke premium access."""
-    sub = event.get("data", {}).get("object", {})
+async def _handle_subscription_deleted(event: dict, db: AsyncSession) -> None:
+    """Subscription ended — downgrade to free tier."""
+    from app.services.audit_logger import log_event
+
+    obj = event.get("data", {}).get("object", {})
+    user = await _resolve_user(event, db)
+
+    if not user:
+        logger.warning("subscription.deleted: could not resolve user")
+        return
+
+    old_tier = user.plan_tier
+    user.plan_tier = "free"
+
+    await log_event(
+        db,
+        "subscription_deleted",
+        user_id=user.id,
+        metadata={
+            "old_tier": old_tier,
+            "new_tier": "free",
+            "stripe_customer": obj.get("customer"),
+        },
+    )
+
     logger.info(
-        "Subscription deleted: customer=%s, ended_at=%s",
-        sub.get("customer"),
-        sub.get("ended_at"),
+        "Subscription deleted: user=%s, tier=%s->free",
+        user.id,
+        old_tier,
     )
 
 
@@ -319,7 +484,10 @@ async def resend_webhook(
 
     if log_entry is None:
         logger.debug("No campaign log found for email_id=%s", email_id)
-        return {"data": {"received": True, "type": event_type, "matched": False}, "meta": {}}
+        return {
+            "data": {"received": True, "type": event_type, "matched": False},
+            "meta": {},
+        }
 
     now = datetime.now(timezone.utc)
 
