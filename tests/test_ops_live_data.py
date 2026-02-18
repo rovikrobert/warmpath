@@ -344,3 +344,59 @@ class TestOpsLiveDataIntegration:
         report = scan()
         live_findings = [f for f in report.findings if "live" in f.id.lower()]
         assert len(live_findings) >= 1
+
+
+class TestOpsLeadLiveDataSurfacing:
+    """Verify ops_lead daily brief surfaces live data when available."""
+
+    def test_daily_brief_shows_live_data_section(self):
+        """When reports have live metrics, daily brief includes Live Platform Data."""
+        from ops_team.ops_lead.ops_lead import generate_daily_brief
+        from ops_team.shared.report import OpsTeamReport
+
+        report = OpsTeamReport(
+            agent="naiv",
+            scan_duration_seconds=0.1,
+            findings=[],
+            ops_insights=[],
+            metrics={
+                "live_feedback_count": 5,
+                "live_feedback_avg_rating": 0.6,
+                "live_feedback_nps_score": 0.4,
+            },
+        )
+        brief = generate_daily_brief([report])
+        assert "Live Platform Data" in brief
+        assert "5 entries" in brief
+
+    def test_daily_brief_shows_no_live_data_message(self):
+        """When no live metrics exist, brief says data is unavailable."""
+        from ops_team.ops_lead.ops_lead import generate_daily_brief
+        from ops_team.shared.report import OpsTeamReport
+
+        report = OpsTeamReport(
+            agent="naiv",
+            scan_duration_seconds=0.1,
+            findings=[],
+            ops_insights=[],
+            metrics={"some_static_metric": 42},
+        )
+        brief = generate_daily_brief([report])
+        assert "Live Platform Data" in brief
+        assert "No live data available" in brief
+
+    def test_satisfaction_score_wired_to_scorecard(self):
+        """When satisfaction_score is set, ops_lead shows it instead of N/A."""
+        from ops_team.ops_lead.ops_lead import generate_daily_brief
+        from ops_team.shared.report import OpsTeamReport
+
+        report = OpsTeamReport(
+            agent="naiv",
+            scan_duration_seconds=0.1,
+            findings=[],
+            ops_insights=[],
+            metrics={"satisfaction_score": 0.75},
+        )
+        brief = generate_daily_brief([report])
+        assert "| User Satisfaction | 0.75 |" in brief
+        assert "Needs Work" in brief
