@@ -4,6 +4,8 @@ import { auth as authApi, referrals as referralsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import PasswordStrength from '../components/PasswordStrength';
 import { trackEvent } from '../utils/analytics';
+import Button from '../components/ui/Button';
+import Spinner from '../components/ui/Spinner';
 
 export default function AuthPage() {
   const { login, signup } = useAuth();
@@ -76,28 +78,28 @@ export default function AuthPage() {
     }
   };
 
-  const inputClass = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
+  const inputClass = 'w-full rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4" role="main">
+    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4" role="main">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-slate-900">
+          <h1 className="text-3xl font-bold text-slate-50">
             <span className="text-amber-500">~</span> WarmPath
           </h1>
-          <p className="mt-2 text-lg font-medium text-slate-700">
+          <p className="mt-2 text-lg font-medium text-slate-300">
             Get referred to your dream job
           </p>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-slate-400">
             Employee referrals convert at 40% vs 1% for cold applications.
             Stop applying into the black hole.
           </p>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-slate-500">
             Already employed? Share your network and capture $2-10K referral bonuses.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} aria-label={isSignup ? 'Sign up form' : 'Log in form'} className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <form onSubmit={handleSubmit} aria-label={isSignup ? 'Sign up form' : 'Log in form'} className="space-y-4 rounded-xl bg-slate-900 border border-slate-700/50 p-6 shadow-sm">
           {/* Login tab: LinkedIn at top (only if backend has LinkedIn configured) */}
           {!isSignup && linkedinAvailable && (
             <>
@@ -112,21 +114,23 @@ export default function AuthPage() {
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
                 </svg>
-                {linkedinLoading ? 'Redirecting...' : 'Continue with LinkedIn'}
+                {linkedinLoading ? (
+                  <span className="flex items-center gap-2"><Spinner size="sm" /> Redirecting...</span>
+                ) : 'Continue with LinkedIn'}
               </button>
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200" />
+                  <div className="w-full border-t border-slate-700/50" />
                 </div>
                 <div className="relative flex justify-center text-xs">
-                  <span className="bg-white px-2 text-slate-400">or</span>
+                  <span className="bg-slate-900 px-2 text-slate-500">or</span>
                 </div>
               </div>
             </>
           )}
 
-          <div className="flex rounded-lg bg-slate-100 p-1" role="tablist" aria-label="Authentication mode">
+          <div className="flex rounded-lg bg-slate-800 p-1" role="tablist" aria-label="Authentication mode">
             <button
               type="button"
               role="tab"
@@ -134,7 +138,7 @@ export default function AuthPage() {
               aria-controls="auth-form-fields"
               onClick={() => { setIsSignup(false); setError(''); }}
               className={`flex-1 rounded-md py-2 text-sm font-medium transition ${
-                !isSignup ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                !isSignup ? 'bg-slate-700 text-slate-100 shadow-sm' : 'text-slate-400 hover:text-slate-300'
               }`}
             >
               Log in
@@ -146,7 +150,7 @@ export default function AuthPage() {
               aria-controls="auth-form-fields"
               onClick={() => { setIsSignup(true); setError(''); }}
               className={`flex-1 rounded-md py-2 text-sm font-medium transition ${
-                isSignup ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                isSignup ? 'bg-slate-700 text-slate-100 shadow-sm' : 'text-slate-400 hover:text-slate-300'
               }`}
             >
               Sign up
@@ -155,41 +159,41 @@ export default function AuthPage() {
 
           {isSignup && (
             <div>
-              <label htmlFor="auth-full-name" className="mb-1 block text-sm font-medium text-slate-700">Full Name</label>
+              <label htmlFor="auth-full-name" className="mb-1 block text-sm font-medium text-slate-300">Full Name</label>
               <input id="auth-full-name" type="text" value={form.full_name} onChange={set('full_name')} className={inputClass} placeholder="Jane Smith" required aria-required="true" />
             </div>
           )}
 
           <div>
-            <label htmlFor="auth-email" className="mb-1 block text-sm font-medium text-slate-700">Email</label>
+            <label htmlFor="auth-email" className="mb-1 block text-sm font-medium text-slate-300">Email</label>
             <input id="auth-email" type="email" value={form.email} onChange={set('email')} className={inputClass} placeholder="you@company.com" required aria-required="true" />
           </div>
 
           <div>
-            <label htmlFor="auth-password" className="mb-1 block text-sm font-medium text-slate-700">Password</label>
+            <label htmlFor="auth-password" className="mb-1 block text-sm font-medium text-slate-300">Password</label>
             <input id="auth-password" type="password" value={form.password} onChange={set('password')} className={inputClass} placeholder="••••••••" required aria-required="true" />
             {isSignup && <PasswordStrength password={form.password} />}
             {!isSignup && (
               <div className="mt-1 text-right">
-                <Link to="/forgot-password" className="text-xs text-amber-600 hover:text-amber-700">Forgot password?</Link>
+                <Link to="/forgot-password" className="text-xs text-amber-400 hover:text-amber-300">Forgot password?</Link>
               </div>
             )}
           </div>
 
           {isSignup && (
             <div>
-              <label htmlFor="auth-confirm-password" className="mb-1 block text-sm font-medium text-slate-700">Confirm Password</label>
+              <label htmlFor="auth-confirm-password" className="mb-1 block text-sm font-medium text-slate-300">Confirm Password</label>
               <input id="auth-confirm-password" type="password" value={form.confirm_password} onChange={set('confirm_password')} className={inputClass} placeholder="••••••••" required aria-required="true" />
               {form.confirm_password && !passwordsMatch && (
-                <p className="mt-1 text-xs text-red-500">Passwords do not match</p>
+                <p className="mt-1 text-xs text-red-400">Passwords do not match</p>
               )}
             </div>
           )}
 
           {isSignup && (
             <div>
-              <label htmlFor="auth-referral-code" className="mb-1 block text-sm font-medium text-slate-700">
-                Referral Code <span className="text-slate-400">(optional)</span>
+              <label htmlFor="auth-referral-code" className="mb-1 block text-sm font-medium text-slate-300">
+                Referral Code <span className="text-slate-500">(optional)</span>
               </label>
               <input id="auth-referral-code" type="text" value={form.referral_code} onChange={set('referral_code')} className={inputClass} placeholder="Enter code from a friend" />
             </div>
@@ -209,33 +213,36 @@ export default function AuthPage() {
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
                 </svg>
-                {linkedinLoading ? 'Redirecting...' : 'Continue with LinkedIn'}
+                {linkedinLoading ? (
+                  <span className="flex items-center gap-2"><Spinner size="sm" /> Redirecting...</span>
+                ) : 'Continue with LinkedIn'}
               </button>
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200" />
+                  <div className="w-full border-t border-slate-700/50" />
                 </div>
                 <div className="relative flex justify-center text-xs">
-                  <span className="bg-white px-2 text-slate-400">or</span>
+                  <span className="bg-slate-900 px-2 text-slate-500">or</span>
                 </div>
               </div>
             </>
           )}
 
-          {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+          {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
 
-          <button
+          <Button
             type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+            loading={loading}
+            className="w-full"
+            size="lg"
           >
-            {loading ? 'Please wait...' : isSignup ? 'Create Account' : 'Log In'}
-          </button>
+            {isSignup ? 'Create Account' : 'Log In'}
+          </Button>
 
-          <p className="text-center text-xs text-slate-400">
+          <p className="text-center text-xs text-slate-500">
             By continuing, you agree to our{' '}
-            <Link to="/privacy" className="text-amber-600 hover:text-amber-700">Privacy Policy</Link>.
+            <Link to="/privacy" className="text-amber-400 hover:text-amber-300">Privacy Policy</Link>.
           </p>
         </form>
       </div>

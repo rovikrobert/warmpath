@@ -6,6 +6,10 @@ import FeedbackModal from '../components/FeedbackModal';
 import MatchBadge from '../components/MatchBadge';
 import ScoreExplainer from '../components/ScoreExplainer';
 import { WARM_TIERS } from '../utils/scores';
+import Modal from '../components/ui/Modal';
+import Button from '../components/ui/Button';
+import Badge from '../components/ui/Badge';
+import Spinner from '../components/ui/Spinner';
 
 /* ------------------------------------------------------------------ */
 /* Channel + likelihood labels                                        */
@@ -49,32 +53,26 @@ const REL_LABELS = {
 function IntroModal({ intro, onClose }) {
   if (!intro) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="referral-intro-modal-title">
-      <div className="w-full max-w-xl rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 id="referral-intro-modal-title" className="text-lg font-semibold text-slate-900">Intro Drafts</h2>
-          <button onClick={onClose} aria-label="Close intro drafts" className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
-        </div>
-        <div className="max-h-[70vh] overflow-y-auto px-6 py-4 space-y-4">
-          {intro.messages?.map((msg) => (
-            <div key={msg.id} className="rounded-lg border border-slate-200 p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                  {msg.variant_label}
-                </span>
-                <span className="text-xs text-slate-400">{msg.ai_model_version}</span>
-              </div>
-              {msg.subject_line && (
-                <p className="mb-1 text-xs text-slate-500">
-                  Subject: <span className="font-medium text-slate-700">{msg.subject_line}</span>
-                </p>
-              )}
-              <p className="whitespace-pre-wrap text-sm text-slate-700">{msg.message_body}</p>
+    <Modal open={!!intro} onClose={onClose} title="Intro Drafts" maxWidth="max-w-xl">
+      <div className="space-y-4">
+        {intro.messages?.map((msg) => (
+          <div key={msg.id} className="rounded-lg border border-slate-700/50 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <Badge color="amber">
+                {msg.variant_label}
+              </Badge>
+              <span className="text-xs text-slate-500">{msg.ai_model_version}</span>
             </div>
-          ))}
-        </div>
+            {msg.subject_line && (
+              <p className="mb-1 text-xs text-slate-400">
+                Subject: <span className="font-medium text-slate-300">{msg.subject_line}</span>
+              </p>
+            )}
+            <p className="whitespace-pre-wrap text-sm text-slate-300">{msg.message_body}</p>
+          </div>
+        ))}
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -104,43 +102,43 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
   const atsLabel = atsSource === 'greenhouse' ? 'Greenhouse' : atsSource === 'lever' ? 'Lever' : atsSource === 'ashby' ? 'Ashby' : 'their job board';
 
   return (
-    <div className="rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-      <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
-        <h3 className="text-base font-semibold text-slate-900">{company.name}</h3>
+    <div className="rounded-xl bg-slate-900 border border-slate-700/50 shadow-sm">
+      <div className="border-b border-slate-700/50 px-5 py-4 flex items-center justify-between">
+        <h3 className="text-base font-semibold text-slate-50">{company.name}</h3>
         {company.careers_url && (
           <a
             href={company.careers_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-amber-600 hover:text-amber-700"
+            className="text-xs text-amber-400 hover:text-amber-300"
           >
             Careers page &rarr;
           </a>
         )}
       </div>
 
-      <div className="divide-y divide-slate-100 px-5">
+      <div className="divide-y divide-slate-700/50 px-5">
         {/* Active Openings */}
         <div className="py-4">
-          <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">
+          <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-400">
             Live Openings
             {(company.job_scan_status === 'matched' || company.job_scan_status === 'discovered') && (
-              <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-normal normal-case text-green-700">
+              <Badge color="emerald" className="ml-2 font-normal normal-case">
                 {totalMatched} found
-              </span>
+              </Badge>
             )}
             {company.job_scan_status === 'discovered' && (
-              <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-normal normal-case text-blue-600">
+              <Badge color="blue" className="ml-2 font-normal normal-case">
                 auto-detected
-              </span>
+              </Badge>
             )}
             {company.job_scan_status === 'no_match' && (
-              <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-normal normal-case text-slate-500">
+              <Badge color="slate" className="ml-2 font-normal normal-case">
                 {company.total_jobs_fetched} scanned, 0 match your role
-              </span>
+              </Badge>
             )}
             {company.job_scan_status === 'no_board' && (
-              <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-normal normal-case text-slate-400">
+              <span className="ml-2 rounded-full bg-slate-700/50 px-2 py-0.5 text-xs font-normal normal-case text-slate-500">
                 job board not indexed
               </span>
             )}
@@ -151,12 +149,12 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
                 <div key={i} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <FitBadge score={job.fit_score} />
-                    <span className="text-slate-900">{job.title}</span>
-                    {job.location && <span className="text-xs text-slate-400">{job.location}</span>}
-                    {job.is_remote && <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">Remote</span>}
+                    <span className="text-slate-50">{job.title}</span>
+                    {job.location && <span className="text-xs text-slate-500">{job.location}</span>}
+                    {job.is_remote && <Badge color="blue" size="sm">Remote</Badge>}
                   </div>
                   {job.url && (
-                    <a href={job.url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-xs text-amber-600 hover:text-amber-700">
+                    <a href={job.url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-xs text-amber-400 hover:text-amber-300">
                       View &rarr;
                     </a>
                   )}
@@ -166,63 +164,63 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
                 <button
                   onClick={() => setShowAll(true)}
                   aria-label={`Show ${openings.length - 5} more openings`}
-                  className="mt-1 text-xs font-medium text-amber-600 hover:text-amber-700"
+                  className="mt-1 text-xs font-medium text-amber-400 hover:text-amber-300"
                 >
                   Show {openings.length - 5} more
                 </button>
               )}
               {showAll && hasMoreBeyondPage && company.careers_url && (
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-slate-400">
                   View all {totalMatched} openings on{' '}
-                  <a href={company.careers_url} target="_blank" rel="noopener noreferrer" className="text-amber-600 hover:text-amber-700">
+                  <a href={company.careers_url} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300">
                     {atsLabel} &rarr;
                   </a>
                 </p>
               )}
             </div>
           ) : company.careers_url ? (
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-slate-500">
               No openings matching your role found.{' '}
-              <a href={company.careers_url} target="_blank" rel="noopener noreferrer" className="text-amber-600 hover:text-amber-700">
+              <a href={company.careers_url} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300">
                 Browse all openings &rarr;
               </a>
             </p>
           ) : company.job_scan_status !== 'no_board' ? (
-            <p className="text-sm text-slate-400">No openings matching your target role.</p>
+            <p className="text-sm text-slate-500">No openings matching your target role.</p>
           ) : (
-            <p className="text-sm text-slate-400">This company's job board isn't in our index yet.</p>
+            <p className="text-sm text-slate-500">This company's job board isn't in our index yet.</p>
           )}
         </div>
 
         {/* Own Network Paths */}
         {ownPaths.length > 0 && (
           <div className="py-4">
-            <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">Your Network</h4>
+            <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-400">Your Network</h4>
             <div className="space-y-2">
               {ownPaths.map((path, i) => (
-                <div key={i} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
+                <div key={i} className="flex items-center justify-between rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
                   <div>
-                    <p className="text-sm font-medium text-slate-900">
+                    <p className="text-sm font-medium text-slate-50">
                       {path.contact.name} — {path.contact.title} at {path.contact.company}
                       {path.contact.relationship_type && (
-                        <span className="ml-1 text-slate-400">({REL_LABELS[path.contact.relationship_type] || path.contact.relationship_type})</span>
+                        <span className="ml-1 text-slate-500">({REL_LABELS[path.contact.relationship_type] || path.contact.relationship_type})</span>
                       )}
                     </p>
                     <div className="mt-1 flex flex-wrap gap-2">
                       <MatchBadge score={path.contact.warm_score} type="warm" showScore />
                       <LikelihoodBadge level={path.contact.referral_likelihood} />
                       {path.recommended_channel && (
-                        <span className="text-xs text-slate-400">via {channelLabel(path.recommended_channel)}</span>
+                        <span className="text-xs text-slate-500">via {channelLabel(path.recommended_channel)}</span>
                       )}
                     </div>
                   </div>
-                  <button
+                  <Button
                     onClick={() => onDraftIntro(path.contact.id)}
-                    disabled={introLoading === path.contact.id}
-                    className="shrink-0 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+                    loading={introLoading === path.contact.id}
+                    size="sm"
                   >
-                    {introLoading === path.contact.id ? 'Drafting...' : 'Draft Intro'}
-                  </button>
+                    Draft Intro
+                  </Button>
                 </div>
               ))}
             </div>
@@ -232,31 +230,33 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
         {/* Marketplace Paths */}
         {marketPaths.length > 0 && (
           <div className="py-4">
-            <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">Via Marketplace</h4>
+            <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-400">Via Marketplace</h4>
             <div className="space-y-2">
               {marketPaths.map((path, i) => (
-                <div key={i} className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-3">
-                  <p className="text-sm font-medium text-slate-900">
+                <div key={i} className="rounded-lg border border-dashed border-slate-600 bg-slate-800/30 p-3">
+                  <p className="text-sm font-medium text-slate-50">
                     {path.listing.role_level} at {company.name}
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-400">
                     {path.listing.department_category && `${path.listing.department_category} · `}
                     {path.listing.warm_score_range} connection
                     {path.listing.connection_recency && ` · ${path.listing.connection_recency}`}
                   </p>
                   {path.network_holder_reputation && (
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-xs text-slate-500">
                       Reputation: {path.network_holder_reputation.avg_rating?.toFixed(1) ?? '—'}
                       {' '}({path.network_holder_reputation.intros_facilitated} intros
                       {path.network_holder_reputation.response_rate != null && `, ${Math.round(path.network_holder_reputation.response_rate * 100)}% response`})
                     </p>
                   )}
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => onRequestIntro(path)}
-                    className="mt-2 rounded-md border border-amber-500 px-3 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50"
+                    className="mt-2"
                   >
                     Request Intro — 20 credits
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -265,7 +265,7 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
 
         {/* No paths */}
         {ownPaths.length === 0 && marketPaths.length === 0 && (
-          <div className="py-4 text-center text-sm text-slate-400">
+          <div className="py-4 text-center text-sm text-slate-500">
             No referral paths found at {company.name}
           </div>
         )}
@@ -346,14 +346,14 @@ export default function ReferralResults() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20" role="main" aria-live="polite" aria-busy="true">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading referral results" />
+        <Spinner size="lg" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="mx-auto max-w-2xl rounded-xl bg-red-50 p-6 text-center text-sm text-red-600" role="alert" aria-live="polite">
+      <div className="mx-auto max-w-2xl rounded-xl bg-red-500/10 p-6 text-center text-sm text-red-400" role="alert" aria-live="polite">
         {error}
       </div>
     );
@@ -367,14 +367,14 @@ export default function ReferralResults() {
     <div className="mx-auto max-w-3xl" role="main">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Referral Results</h1>
+          <h1 className="text-xl font-bold text-slate-50">Referral Results</h1>
           {searchedNames.length > 0 && (
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm text-slate-400">
               {searchedNames.join(', ')}
             </p>
           )}
           {summary.companies_searched != null && (
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               {summary.companies_searched} searched · {summary.total_referral_paths ?? 0} referral paths · {summary.total_openings ?? 0} openings
             </p>
           )}
@@ -382,40 +382,41 @@ export default function ReferralResults() {
         <div className="flex shrink-0 items-center gap-2">
           <Link
             to="/help/scores"
-            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-500 hover:bg-slate-50"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-700/50 bg-slate-900 px-2 py-1 text-xs text-slate-400 hover:bg-slate-800"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
             </svg>
             How scores work
           </Link>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => navigate('/referrals')}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
           >
             New Search
-          </button>
+          </Button>
         </div>
       </div>
 
       {companies.length === 0 ? (
-        <div className="rounded-xl bg-white p-12 text-center ring-1 ring-slate-200">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100" aria-hidden="true">
-            <svg className="h-7 w-7 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+        <div className="rounded-xl bg-slate-900 border border-slate-700/50 p-12 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800" aria-hidden="true">
+            <svg className="h-7 w-7 text-slate-500" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
             </svg>
           </div>
-          <h2 className="mb-2 text-base font-semibold text-slate-900">No referral paths found</h2>
-          <p className="mx-auto mb-4 max-w-sm text-sm text-slate-500">
+          <h2 className="mb-2 text-base font-semibold text-slate-50">No referral paths found</h2>
+          <p className="mx-auto mb-4 max-w-sm text-sm text-slate-400">
             We couldn't find connections at these companies yet. This is a growing network — try different companies, or help grow it by sharing your own network.
           </p>
           <div className="flex items-center justify-center gap-3">
-            <Link to="/referrals" className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600">
+            <Button onClick={() => navigate('/referrals')}>
               Try Different Companies
-            </Link>
-            <Link to="/marketplace/settings" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+            </Button>
+            <Button variant="secondary" onClick={() => navigate('/marketplace/settings')}>
               Share Your Network
-            </Link>
+            </Button>
           </div>
         </div>
       ) : (
@@ -434,7 +435,7 @@ export default function ReferralResults() {
 
       {alsoHiring.length > 0 && (
         <div className="mt-6">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
             Also hiring for your role
           </h2>
           <div className="flex flex-wrap gap-2">
@@ -442,10 +443,10 @@ export default function ReferralResults() {
               <button
                 key={rec.company}
                 onClick={() => navigate('/referrals')}
-                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:border-amber-300 hover:bg-amber-50"
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-700/50 bg-slate-900 px-3 py-1.5 text-sm text-slate-300 hover:border-amber-500/30 hover:bg-amber-500/10"
               >
                 {rec.display_name}
-                <span className="text-xs text-slate-400">{rec.matching_count} openings</span>
+                <span className="text-xs text-slate-500">{rec.matching_count} openings</span>
               </button>
             ))}
           </div>

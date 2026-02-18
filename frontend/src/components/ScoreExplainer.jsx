@@ -28,17 +28,17 @@ export default function ScoreExplainer({ title, body, tiers }) {
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-label={`What is ${title}?`}
-        className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-500 hover:bg-slate-300"
+        className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-700 text-[10px] font-bold text-slate-400 hover:bg-slate-600"
       >
         ?
       </button>
       {open && (
         <div
-          className="absolute left-0 z-20 mt-1 w-64 rounded-lg border border-slate-200 bg-white p-3 shadow-lg"
+          className="absolute left-0 z-20 mt-1 w-64 rounded-lg border border-slate-700/50 bg-slate-800 p-3 shadow-lg"
           role="tooltip"
         >
-          <h4 className="mb-1 text-xs font-semibold text-slate-700">{title}</h4>
-          <p className="text-xs text-slate-500">{body}</p>
+          <h4 className="mb-1 text-xs font-semibold text-slate-200">{title}</h4>
+          <p className="text-xs text-slate-400">{body}</p>
           {tiers && tiers.length > 0 && (
             <div className="mt-2 space-y-1">
               {tiers.map((t) => (
@@ -46,7 +46,7 @@ export default function ScoreExplainer({ title, body, tiers }) {
                   <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${t.color}`}>
                     {t.min != null ? `${t.min}+` : t.label}
                   </span>
-                  <span className="text-[11px] text-slate-500">{t.desc || t.label}</span>
+                  <span className="text-[11px] text-slate-400">{t.desc || t.label}</span>
                 </div>
               ))}
             </div>
@@ -54,7 +54,7 @@ export default function ScoreExplainer({ title, body, tiers }) {
           <button
             onClick={() => setOpen(false)}
             aria-label={`Close ${title} explanation`}
-            className="mt-2 text-[11px] text-amber-600 hover:text-amber-700"
+            className="mt-2 text-[11px] text-amber-400 hover:text-amber-300"
           >
             Got it
           </button>

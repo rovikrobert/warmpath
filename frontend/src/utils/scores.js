@@ -8,34 +8,34 @@
 // -- Match Strength (combined_score from search results) --------------------
 
 export const MATCH_TIERS = [
-  { min: 80, label: 'Excellent', color: 'bg-green-100 text-green-700', dot: 'bg-green-500' },
-  { min: 60, label: 'Strong',    color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
-  { min: 40, label: 'Good',      color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
-  { min: 0,  label: 'Fair',      color: 'bg-slate-100 text-slate-600', dot: 'bg-slate-400' },
+  { min: 80, label: 'Excellent', color: 'bg-emerald-500/10 text-emerald-400', dot: 'bg-emerald-500' },
+  { min: 60, label: 'Strong',    color: 'bg-emerald-500/10 text-emerald-400', dot: 'bg-emerald-500' },
+  { min: 40, label: 'Good',      color: 'bg-amber-500/10 text-amber-400', dot: 'bg-amber-500' },
+  { min: 0,  label: 'Fair',      color: 'bg-slate-700/50 text-slate-400', dot: 'bg-slate-400' },
 ];
 
 // -- Warm Score (contact relationship warmth) --------------------------------
 
 export const WARM_TIERS = [
-  { min: 70, label: 'Strong',   color: 'bg-green-100 text-green-700', desc: 'Recent contact, strong relationship — ideal referral path' },
-  { min: 40, label: 'Moderate', color: 'bg-amber-100 text-amber-700', desc: 'Some connection — may need a warm-up message first' },
-  { min: 0,  label: 'Weak',     color: 'bg-slate-100 text-slate-600', desc: 'Distant or old connection — consider building rapport before asking' },
+  { min: 70, label: 'Strong',   color: 'bg-emerald-500/10 text-emerald-400', desc: 'Recent contact, strong relationship — ideal referral path' },
+  { min: 40, label: 'Moderate', color: 'bg-amber-500/10 text-amber-400', desc: 'Some connection — may need a warm-up message first' },
+  { min: 0,  label: 'Weak',     color: 'bg-slate-700/50 text-slate-400', desc: 'Distant or old connection — consider building rapport before asking' },
 ];
 
 // -- Fit Score (job opening relevance to your profile) -----------------------
 
 export const FIT_TIERS = [
-  { min: 80, label: 'Great fit', color: 'bg-green-50 text-green-600' },
-  { min: 50, label: 'Good fit',  color: 'bg-amber-50 text-amber-600' },
-  { min: 0,  label: 'Possible',  color: 'bg-slate-50 text-slate-500' },
+  { min: 80, label: 'Great fit', color: 'bg-emerald-500/10 text-emerald-400' },
+  { min: 50, label: 'Good fit',  color: 'bg-amber-500/10 text-amber-400' },
+  { min: 0,  label: 'Possible',  color: 'bg-slate-700/50 text-slate-500' },
 ];
 
 // -- Referral Likelihood (high / medium / low) -------------------------------
 
 export const LIKELIHOOD_MAP = {
-  high:   { label: 'Likely to refer', color: 'bg-green-100 text-green-700' },
-  medium: { label: 'May refer',       color: 'bg-amber-100 text-amber-700' },
-  low:    { label: 'Unlikely',        color: 'bg-slate-100 text-slate-600' },
+  high:   { label: 'Likely to refer', color: 'bg-emerald-500/10 text-emerald-400' },
+  medium: { label: 'May refer',       color: 'bg-amber-500/10 text-amber-400' },
+  low:    { label: 'Unlikely',        color: 'bg-slate-700/50 text-slate-400' },
 };
 
 // -- Helpers ----------------------------------------------------------------

@@ -9,22 +9,22 @@ function ResumePreviewModal({ data, onApply, onClose }) {
   if (!data) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="resume-preview-title">
-      <div className="mx-4 w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
-        <h3 id="resume-preview-title" className="text-lg font-bold text-slate-900">Resume Preview</h3>
-        <p className="mt-1 text-sm text-slate-500">Review parsed data before applying to your profile.</p>
+      <div className="mx-4 w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl bg-slate-900 p-6 shadow-xl border border-slate-700/50">
+        <h3 id="resume-preview-title" className="text-lg font-bold text-slate-50">Resume Preview</h3>
+        <p className="mt-1 text-sm text-slate-400">Review parsed data before applying to your profile.</p>
         <div className="mt-4 space-y-3 text-sm">
-          {data.headline && <div><span className="font-medium text-slate-700">Headline:</span> {data.headline}</div>}
-          {data.current_title && <div><span className="font-medium text-slate-700">Title:</span> {data.current_title}</div>}
-          {data.current_company && <div><span className="font-medium text-slate-700">Company:</span> {data.current_company}</div>}
-          {data.industry && <div><span className="font-medium text-slate-700">Industry:</span> {data.industry}</div>}
-          {data.location && <div><span className="font-medium text-slate-700">Location:</span> {data.location}</div>}
-          {data.bio_summary && <div><span className="font-medium text-slate-700">Summary:</span> {data.bio_summary}</div>}
+          {data.headline && <div><span className="font-medium text-slate-300">Headline:</span> {data.headline}</div>}
+          {data.current_title && <div><span className="font-medium text-slate-300">Title:</span> {data.current_title}</div>}
+          {data.current_company && <div><span className="font-medium text-slate-300">Company:</span> {data.current_company}</div>}
+          {data.industry && <div><span className="font-medium text-slate-300">Industry:</span> {data.industry}</div>}
+          {data.location && <div><span className="font-medium text-slate-300">Location:</span> {data.location}</div>}
+          {data.bio_summary && <div><span className="font-medium text-slate-300">Summary:</span> {data.bio_summary}</div>}
           {data.work_history?.length > 0 && (
             <div>
-              <span className="font-medium text-slate-700">Work History:</span>
+              <span className="font-medium text-slate-300">Work History:</span>
               <ul className="mt-1 space-y-1 pl-4">
                 {data.work_history.map((w, i) => (
-                  <li key={i} className="text-slate-600">
+                  <li key={i} className="text-slate-400">
                     {w.title} at {w.company} ({w.start_date || '?'} - {w.end_date || 'Present'})
                   </li>
                 ))}
@@ -33,10 +33,10 @@ function ResumePreviewModal({ data, onApply, onClose }) {
           )}
         </div>
         <div className="mt-5 flex gap-3">
-          <button onClick={onClose} className="flex-1 rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          <button onClick={onClose} className="flex-1 rounded-lg border border-slate-700/50 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800">
             Cancel
           </button>
-          <button onClick={() => onApply(data)} className="flex-1 rounded-lg bg-amber-500 py-2 text-sm font-medium text-white hover:bg-amber-600">
+          <button onClick={() => onApply(data)} className="flex-1 rounded-lg bg-amber-500 py-2 text-sm font-medium text-white hover:bg-amber-400">
             Apply to Profile
           </button>
         </div>
@@ -233,24 +233,24 @@ export default function EditProfile() {
     }
   };
 
-  const inputClass = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
+  const inputClass = 'w-full rounded-lg border border-slate-700/50 bg-slate-800 text-slate-100 placeholder-slate-500 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
 
   return (
     <div className="mx-auto max-w-2xl" role="main">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Edit Profile</h1>
+        <h1 className="text-2xl font-bold text-slate-50">Edit Profile</h1>
         <button
           onClick={() => navigate('/dashboard')}
-          className="text-sm text-amber-600 hover:text-amber-700"
+          className="text-sm text-amber-400 hover:text-amber-300"
         >
           &larr; Back to Dashboard
         </button>
       </div>
 
       {/* Import Profile Card */}
-      <div className="mb-6 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <h2 className="text-sm font-semibold text-slate-900">Import Profile</h2>
-        <p className="mt-1 text-xs text-slate-500">Pre-fill your profile from a resume or LinkedIn.</p>
+      <div className="mb-6 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
+        <h2 className="text-sm font-semibold text-slate-50">Import Profile</h2>
+        <p className="mt-1 text-xs text-slate-400">Pre-fill your profile from a resume or LinkedIn.</p>
         <div className="mt-3 flex gap-3">
           <div>
             <input ref={resumeRef} type="file" accept=".pdf" onChange={handleResumeUpload} className="hidden" aria-label="Upload resume PDF" />
@@ -258,7 +258,7 @@ export default function EditProfile() {
               type="button"
               onClick={() => resumeRef.current?.click()}
               disabled={importLoading === 'resume'}
-              className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-600 hover:bg-amber-50 disabled:opacity-50"
+              className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
             >
               {importLoading === 'resume' ? 'Parsing...' : 'Import from Resume (PDF)'}
             </button>
@@ -277,68 +277,68 @@ export default function EditProfile() {
 
       <ResumePreviewModal data={resumePreview} onApply={applyResumeData} onClose={() => setResumePreview(null)} />
 
-      <form onSubmit={handleSubmit} className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <p className="text-sm text-slate-500">
+      <form onSubmit={handleSubmit} className="space-y-4 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
+        <p className="text-sm text-slate-400">
           Your profile is used as context when AI drafts intro messages on your behalf.
         </p>
 
         <div>
-          <label htmlFor="profile-headline" className="mb-1 block text-sm font-medium text-slate-700">Headline</label>
+          <label htmlFor="profile-headline" className="mb-1 block text-sm font-medium text-slate-300">Headline</label>
           <input id="profile-headline" type="text" value={form.headline} onChange={set('headline')} className={inputClass} placeholder="B2B GTM Leader | Field Marketing..." />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label htmlFor="profile-title" className="mb-1 block text-sm font-medium text-slate-700">Title</label>
+            <label htmlFor="profile-title" className="mb-1 block text-sm font-medium text-slate-300">Title</label>
             <input id="profile-title" type="text" value={form.current_title} onChange={set('current_title')} className={inputClass} placeholder="Managing Director" />
           </div>
           <div>
-            <label htmlFor="profile-company" className="mb-1 block text-sm font-medium text-slate-700">Company</label>
+            <label htmlFor="profile-company" className="mb-1 block text-sm font-medium text-slate-300">Company</label>
             <input id="profile-company" type="text" value={form.current_company} onChange={set('current_company')} className={inputClass} placeholder="Acme Corp" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label htmlFor="profile-industry" className="mb-1 block text-sm font-medium text-slate-700">Industry</label>
+            <label htmlFor="profile-industry" className="mb-1 block text-sm font-medium text-slate-300">Industry</label>
             <input id="profile-industry" type="text" value={form.industry} onChange={set('industry')} className={inputClass} placeholder="Professional Services" />
           </div>
           <div>
-            <label htmlFor="profile-location" className="mb-1 block text-sm font-medium text-slate-700">Location</label>
+            <label htmlFor="profile-location" className="mb-1 block text-sm font-medium text-slate-300">Location</label>
             <input id="profile-location" type="text" value={form.location} onChange={set('location')} className={inputClass} placeholder="Singapore" />
           </div>
         </div>
 
         <div>
-          <label htmlFor="profile-linkedin-url" className="mb-1 block text-sm font-medium text-slate-700">LinkedIn URL</label>
+          <label htmlFor="profile-linkedin-url" className="mb-1 block text-sm font-medium text-slate-300">LinkedIn URL</label>
           <input id="profile-linkedin-url" type="url" value={form.linkedin_url} onChange={set('linkedin_url')} className={inputClass} placeholder="https://linkedin.com/in/yourname" />
         </div>
 
         <div>
-          <label htmlFor="profile-bio" className="mb-1 block text-sm font-medium text-slate-700">Bio summary</label>
+          <label htmlFor="profile-bio" className="mb-1 block text-sm font-medium text-slate-300">Bio summary</label>
           <textarea id="profile-bio" value={form.bio_summary} onChange={set('bio_summary')} rows={3} className={inputClass} placeholder="What you do and who you help..." />
         </div>
 
         {/* Work History */}
-        <div className="border-t border-slate-200 pt-4">
+        <div className="border-t border-slate-700/50 pt-4">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-slate-900">Work History</h3>
-              <p className="text-xs text-slate-500">Helps match you with contacts at your former companies.</p>
+              <h3 className="text-sm font-semibold text-slate-50">Work History</h3>
+              <p className="text-xs text-slate-400">Helps match you with contacts at your former companies.</p>
             </div>
             <button
               type="button"
               onClick={addWorkEntry}
-              className="rounded-md border border-amber-500 px-3 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50"
+              className="rounded-md border border-amber-500 px-3 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/10"
             >
               Add another
             </button>
           </div>
 
           {workHistory.length === 0 && (
-            <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center">
-              <p className="text-sm text-slate-500">No work history added yet.</p>
-              <button type="button" onClick={addWorkEntry} className="mt-2 text-sm font-medium text-amber-600 hover:text-amber-700">
+            <div className="rounded-lg border border-dashed border-slate-700/50 p-4 text-center">
+              <p className="text-sm text-slate-400">No work history added yet.</p>
+              <button type="button" onClick={addWorkEntry} className="mt-2 text-sm font-medium text-amber-400 hover:text-amber-300">
                 Add your first role
               </button>
             </div>
@@ -346,10 +346,10 @@ export default function EditProfile() {
 
           <div className="space-y-3">
             {workHistory.map((entry, i) => (
-              <div key={i} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div key={i} className="rounded-lg bg-slate-800/50 border border-slate-700/50 p-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor={`work-company-${i}`} className="mb-1 block text-xs font-medium text-slate-700">Company</label>
+                    <label htmlFor={`work-company-${i}`} className="mb-1 block text-xs font-medium text-slate-300">Company</label>
                     <input
                       id={`work-company-${i}`}
                       type="text"
@@ -360,7 +360,7 @@ export default function EditProfile() {
                     />
                   </div>
                   <div>
-                    <label htmlFor={`work-title-${i}`} className="mb-1 block text-xs font-medium text-slate-700">Title / Role</label>
+                    <label htmlFor={`work-title-${i}`} className="mb-1 block text-xs font-medium text-slate-300">Title / Role</label>
                     <input
                       id={`work-title-${i}`}
                       type="text"
@@ -373,7 +373,7 @@ export default function EditProfile() {
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor={`work-start-${i}`} className="mb-1 block text-xs font-medium text-slate-700">Start date</label>
+                    <label htmlFor={`work-start-${i}`} className="mb-1 block text-xs font-medium text-slate-300">Start date</label>
                     <input
                       id={`work-start-${i}`}
                       type="month"
@@ -383,9 +383,9 @@ export default function EditProfile() {
                     />
                   </div>
                   <div>
-                    <label htmlFor={`work-end-${i}`} className="mb-1 block text-xs font-medium text-slate-700">End date</label>
+                    <label htmlFor={`work-end-${i}`} className="mb-1 block text-xs font-medium text-slate-300">End date</label>
                     {entry.is_current ? (
-                      <p className="py-2 text-sm text-slate-500">Present</p>
+                      <p className="py-2 text-sm text-slate-400">Present</p>
                     ) : (
                       <input
                         id={`work-end-${i}`}
@@ -398,19 +398,19 @@ export default function EditProfile() {
                   </div>
                 </div>
                 <div className="mt-2 flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-xs text-slate-600">
+                  <label className="flex items-center gap-2 text-xs text-slate-400">
                     <input
                       type="checkbox"
                       checked={entry.is_current}
                       onChange={(e) => updateWorkEntry(i, 'is_current', e.target.checked)}
-                      className="h-3.5 w-3.5 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                      className="h-3.5 w-3.5 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500"
                     />
                     I currently work here
                   </label>
                   <button
                     type="button"
                     onClick={() => removeWorkEntry(i)}
-                    className="text-xs text-red-500 hover:text-red-600"
+                    className="text-xs text-red-400 hover:text-red-300"
                     aria-label={`Remove work history entry ${i + 1}`}
                   >
                     Remove
@@ -421,26 +421,26 @@ export default function EditProfile() {
           </div>
         </div>
 
-        {error && <p className="rounded-md bg-red-50 p-2 text-sm text-red-600" role="alert" aria-live="assertive">{error}</p>}
-        {saved && <p className="rounded-md bg-green-50 p-2 text-sm text-green-600" role="status" aria-live="polite">Profile saved!</p>}
-        {matchFeedback && <p className="rounded-md bg-blue-50 p-2 text-sm text-blue-700" role="status" aria-live="polite">{matchFeedback}</p>}
+        {error && <p className="rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert" aria-live="assertive">{error}</p>}
+        {saved && <p className="rounded-md bg-emerald-500/10 p-2 text-sm text-emerald-400" role="status" aria-live="polite">Profile saved!</p>}
+        {matchFeedback && <p className="rounded-md bg-blue-500/10 p-2 text-sm text-blue-400" role="status" aria-live="polite">{matchFeedback}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+          className="w-full rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50"
         >
           {loading ? 'Saving...' : 'Save Profile'}
         </button>
       </form>
 
       {/* Danger Zone */}
-      <div className="mt-8 rounded-xl border-2 border-red-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-bold text-red-700">Danger Zone</h2>
-        <p className="mt-1 text-sm text-slate-600">
+      <div className="mt-8 rounded-xl border-2 border-red-500/30 bg-red-500/10 p-6">
+        <h2 className="text-lg font-bold text-red-400">Danger Zone</h2>
+        <p className="mt-1 text-sm text-slate-400">
           Permanently delete your account and all associated data. This action cannot be undone.
         </p>
-        <ul className="mt-3 space-y-1 text-xs text-slate-500">
+        <ul className="mt-3 space-y-1 text-xs text-slate-400">
           <li>All data permanently deleted (contacts, searches, applications, messages)</li>
           <li>Credits forfeited with no refund</li>
           <li>Re-registration will not include welcome bonus credits</li>
@@ -449,7 +449,7 @@ export default function EditProfile() {
         <button
           type="button"
           onClick={() => { setShowDeleteModal(true); setDeletePassword(''); setDeleteConfirmed(false); setDeleteError(''); }}
-          className="mt-4 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+          className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20"
         >
           Delete my account
         </button>
@@ -458,25 +458,25 @@ export default function EditProfile() {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
-          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 id="delete-modal-title" className="text-lg font-bold text-red-700">Delete Account</h3>
-            <p className="mt-2 text-sm text-slate-600">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-slate-900 p-6 shadow-xl border border-slate-700/50">
+            <h3 id="delete-modal-title" className="text-lg font-bold text-red-400">Delete Account</h3>
+            <p className="mt-2 text-sm text-slate-400">
               This will permanently delete your account, all contacts, search history, applications,
               and credits. This cannot be undone.
             </p>
 
-            <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
+            <label className="mt-4 flex items-start gap-2 text-sm text-slate-300">
               <input
                 type="checkbox"
                 checked={deleteConfirmed}
                 onChange={(e) => setDeleteConfirmed(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-red-500 focus:ring-red-500"
+                className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 text-red-500 focus:ring-red-500"
               />
               I understand this action is permanent and my data cannot be recovered
             </label>
 
             <div className="mt-4">
-              <label htmlFor="delete-confirm-password" className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="delete-confirm-password" className="mb-1 block text-sm font-medium text-slate-300">
                 Enter your password to confirm
               </label>
               <input
@@ -491,14 +491,14 @@ export default function EditProfile() {
             </div>
 
             {deleteError && (
-              <p className="mt-3 rounded-md bg-red-50 p-2 text-sm text-red-600" role="alert" aria-live="assertive">{deleteError}</p>
+              <p className="mt-3 rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert" aria-live="assertive">{deleteError}</p>
             )}
 
             <div className="mt-5 flex gap-3">
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
-                className="flex-1 rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="flex-1 rounded-lg border border-slate-700/50 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
               >
                 Cancel
               </button>

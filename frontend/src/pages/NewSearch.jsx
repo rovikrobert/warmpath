@@ -5,6 +5,7 @@ import TagInput from '../components/TagInput';
 import ScoreExplainer from '../components/ScoreExplainer';
 import { MATCH_TIERS } from '../utils/scores';
 import { trackEvent } from '../utils/analytics';
+import Button from '../components/ui/Button';
 
 export default function NewSearch() {
   const navigate = useNavigate();
@@ -53,27 +54,27 @@ export default function NewSearch() {
     }
   };
 
-  const inputClass = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
+  const inputClass = 'w-full rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
 
   return (
     <div className="mx-auto max-w-2xl" role="main">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">New Search</h1>
+        <h1 className="text-2xl font-bold text-slate-50">New Search</h1>
         <button
           onClick={() => navigate('/dashboard')}
-          className="text-sm text-amber-600 hover:text-amber-700"
+          className="text-sm text-amber-400 hover:text-amber-300"
         >
           &larr; Back to Dashboard
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <p className="text-sm text-slate-500">
+      <form onSubmit={handleSubmit} className="space-y-5 rounded-xl bg-slate-900 border border-slate-700/50 p-6 shadow-sm">
+        <p className="text-sm text-slate-400">
           Define who you're looking for. WarmPath will search your network and score each contact by relevance and warmth.
         </p>
 
         <div>
-          <label htmlFor="search-name" className="mb-1 block text-sm font-medium text-slate-700">Search Name</label>
+          <label htmlFor="search-name" className="mb-1 block text-sm font-medium text-slate-300">Search Name</label>
           <input
             id="search-name"
             type="text"
@@ -87,7 +88,7 @@ export default function NewSearch() {
         </div>
 
         <div>
-          <label htmlFor="search-description" className="mb-1 block text-sm font-medium text-slate-700">Description</label>
+          <label htmlFor="search-description" className="mb-1 block text-sm font-medium text-slate-300">Description</label>
           <textarea
             id="search-description"
             value={form.description}
@@ -127,7 +128,7 @@ export default function NewSearch() {
         />
 
         <div>
-          <label htmlFor="search-min-score" className="mb-1 block text-sm font-medium text-slate-700">
+          <label htmlFor="search-min-score" className="mb-1 block text-sm font-medium text-slate-300">
             Minimum Match Quality
             <ScoreExplainer
               title="Match Quality"
@@ -148,8 +149,8 @@ export default function NewSearch() {
                 onClick={() => setForm({ ...form, min_score: opt.value })}
                 className={`rounded-lg border-2 px-3 py-1.5 text-xs font-medium transition ${
                   form.min_score === opt.value
-                    ? 'border-amber-500 bg-amber-50 text-amber-700'
-                    : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                    ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+                    : 'border-slate-700/50 text-slate-400 hover:border-slate-600'
                 }`}
               >
                 {opt.label}
@@ -158,15 +159,16 @@ export default function NewSearch() {
           </div>
         </div>
 
-        {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+        {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
 
-        <button
+        <Button
           type="submit"
-          disabled={loading}
-          className="w-full rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+          loading={loading}
+          className="w-full"
+          size="lg"
         >
-          {loading ? 'Creating & running search...' : 'Create & Run Search'}
-        </button>
+          Create & Run Search
+        </Button>
       </form>
     </div>
   );

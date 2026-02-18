@@ -3,9 +3,9 @@ import { useLocation } from 'react-router-dom';
 import { feedback as feedbackApi } from '../api/client';
 
 const ACTIONS = [
-  { value: 1, label: 'This works well', icon: '\u{1F44D}', color: 'bg-green-100 text-green-700 hover:bg-green-200' },
-  { value: -1, label: 'Something is broken', icon: '\u{1F41B}', color: 'bg-red-100 text-red-700 hover:bg-red-200' },
-  { value: 0, label: 'Suggestion', icon: '\u{1F4A1}', color: 'bg-blue-100 text-blue-700 hover:bg-blue-200' },
+  { value: 1, label: 'This works well', icon: '\u{1F44D}', color: 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' },
+  { value: -1, label: 'Something is broken', icon: '\u{1F41B}', color: 'bg-red-500/10 text-red-400 hover:bg-red-500/20' },
+  { value: 0, label: 'Suggestion', icon: '\u{1F4A1}', color: 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' },
 ];
 
 export default function BetaFeedbackButton() {
@@ -50,7 +50,7 @@ export default function BetaFeedbackButton() {
       <button
         onClick={() => setOpen(true)}
         aria-label="Give feedback"
-        className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-colors"
+        className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-amber-500 text-white shadow-lg hover:bg-amber-400 transition-colors"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
@@ -61,25 +61,25 @@ export default function BetaFeedbackButton() {
 
   return (
     <div
-      className="fixed bottom-6 right-6 z-50 w-80 rounded-xl bg-white shadow-lg ring-1 ring-slate-200"
+      className="fixed bottom-6 right-6 z-50 w-80 rounded-xl bg-slate-900 border border-slate-700/50 shadow-lg"
       role="dialog"
       aria-label="Beta feedback"
     >
       {done ? (
         <div className="px-5 py-4 text-center">
-          <p className="text-sm font-medium text-slate-700">Thanks for the feedback!</p>
+          <p className="text-sm font-medium text-slate-300">Thanks for the feedback!</p>
         </div>
       ) : (
         <div className="px-5 py-4">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold text-slate-900">Beta Feedback</p>
+              <p className="text-sm font-semibold text-slate-50">Beta Feedback</p>
               <p className="text-xs text-slate-500">on {location.pathname}</p>
             </div>
             <button
               onClick={() => setOpen(false)}
               aria-label="Close feedback"
-              className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+              className="text-slate-500 hover:text-slate-300 text-lg leading-none"
             >
               &times;
             </button>
@@ -94,7 +94,7 @@ export default function BetaFeedbackButton() {
                 aria-pressed={rating === a.value}
                 className={`flex flex-1 flex-col items-center gap-1 rounded-lg px-2 py-2.5 text-xs font-medium transition ${
                   rating === a.value
-                    ? `${a.color} ring-2 ring-offset-1 ring-slate-400`
+                    ? `${a.color} ring-2 ring-offset-1 ring-offset-slate-900 ring-slate-500`
                     : `${a.color} opacity-70`
                 }`}
               >
@@ -112,12 +112,12 @@ export default function BetaFeedbackButton() {
                 placeholder="Tell us more... (optional)"
                 aria-label="Feedback details"
                 rows={3}
-                className="mb-3 w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mb-3 w-full resize-none rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
               />
               <button
                 onClick={handleSubmit}
                 disabled={sending}
-                className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="w-full rounded-lg bg-amber-500 py-2 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50"
               >
                 {sending ? 'Sending...' : 'Submit Feedback'}
               </button>

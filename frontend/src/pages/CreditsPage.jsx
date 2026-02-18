@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { credits as creditsApi, usage as usageApi } from '../api/client';
+import Spinner from '../components/ui/Spinner';
 
 const REASON_LABELS = {
   welcome_bonus: 'Welcome bonus',
@@ -14,11 +15,11 @@ const REASON_LABELS = {
 
 function TypeBadge({ type }) {
   const colors = {
-    earned: 'bg-green-100 text-green-700',
-    purchased: 'bg-blue-100 text-blue-700',
-    spent: 'bg-red-100 text-red-700',
-    expired: 'bg-slate-100 text-slate-500',
-    refunded: 'bg-amber-100 text-amber-700',
+    earned: 'bg-emerald-500/10 text-emerald-400',
+    purchased: 'bg-blue-500/10 text-blue-400',
+    spent: 'bg-red-500/10 text-red-400',
+    expired: 'bg-slate-700/50 text-slate-400',
+    refunded: 'bg-amber-500/10 text-amber-400',
   };
   return (
     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${colors[type] || colors.earned}`}>
@@ -34,20 +35,20 @@ function UsageBar({ label, count, limit }) {
   const atLimit = !isUnlimited && typeof limit === 'number' && count >= limit;
   const nearLimit = !isUnlimited && typeof limit === 'number' && count >= limit * 0.8 && !atLimit;
 
-  const barColor = isBlocked ? 'bg-slate-300' : atLimit ? 'bg-red-500' : nearLimit ? 'bg-amber-500' : 'bg-green-500';
-  const textColor = isBlocked ? 'text-slate-500' : atLimit ? 'text-red-600' : nearLimit ? 'text-amber-600' : 'text-slate-700';
+  const barColor = isBlocked ? 'bg-slate-600' : atLimit ? 'bg-red-500' : nearLimit ? 'bg-amber-500' : 'bg-green-500';
+  const textColor = isBlocked ? 'text-slate-400' : atLimit ? 'text-red-400' : nearLimit ? 'text-amber-400' : 'text-slate-300';
 
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-sm">
-        <span className="text-slate-700">{label}</span>
+        <span className="text-slate-300">{label}</span>
         <span className={`font-medium ${textColor}`}>
           {isBlocked ? 'Upgrade to unlock' : isUnlimited ? `${count} used` : `${count}/${limit}`}
           {atLimit && !isBlocked && ' (limit reached)'}
         </span>
       </div>
       {!isUnlimited && (
-        <div className="h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={count} aria-valuemin={0} aria-valuemax={typeof limit === 'number' ? limit : 100} aria-label={`${label} usage`}>
+        <div className="h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-valuenow={count} aria-valuemin={0} aria-valuemax={typeof limit === 'number' ? limit : 100} aria-label={`${label} usage`}>
           <div
             className={`h-full rounded-full transition-all ${barColor}`}
             style={{ width: `${Math.max(pct, isBlocked ? 0 : 2)}%` }}
@@ -89,35 +90,35 @@ export default function CreditsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20" aria-live="polite" aria-busy="true">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading credits" />
+        <Spinner size="lg" />
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6" role="main">
-      <h1 className="text-xl font-bold text-slate-900">Credits</h1>
+      <h1 className="text-xl font-bold text-slate-50">Credits</h1>
 
       {/* Balance card */}
       <div className="rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 p-6 text-white shadow-sm">
         <p className="text-sm font-medium text-amber-100">Available Balance</p>
-        <p className="mt-1 text-4xl font-bold">{balance?.balance ?? 0}</p>
+        <p className="mt-1 text-4xl font-bold font-mono">{balance?.balance ?? 0}</p>
         <div className="mt-4 flex gap-6 text-sm">
           <div>
             <p className="text-amber-200">Total Earned</p>
-            <p className="font-semibold">{balance?.earned_total ?? 0}</p>
+            <p className="font-semibold font-mono">{balance?.earned_total ?? 0}</p>
           </div>
           <div>
             <p className="text-amber-200">Total Spent</p>
-            <p className="font-semibold">{balance?.spent_total ?? 0}</p>
+            <p className="font-semibold font-mono">{balance?.spent_total ?? 0}</p>
           </div>
         </div>
       </div>
 
       {/* Expiring soon warning */}
       {balance?.expiring_soon > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4" role="alert" aria-live="polite">
-          <p className="text-sm text-amber-800">
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4" role="alert" aria-live="polite">
+          <p className="text-sm text-amber-400">
             <span className="font-semibold">{balance.expiring_soon} credits</span> will expire in the next 30 days. Use them before they're gone!
           </p>
         </div>
@@ -125,10 +126,10 @@ export default function CreditsPage() {
 
       {/* Usage this month */}
       {usageData && (
-        <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-900">Usage This Month</h2>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+            <h2 className="text-base font-semibold text-slate-50">Usage This Month</h2>
+            <span className="rounded-full bg-slate-700/50 px-2.5 py-0.5 text-xs font-medium text-slate-400">
               {usageData.plan_tier === 'free' ? 'Free plan' : usageData.plan_tier}
             </span>
           </div>
@@ -156,15 +157,15 @@ export default function CreditsPage() {
               }
               setShowActivity(!showActivity);
             }}
-            className="mt-4 text-sm font-medium text-amber-600 hover:text-amber-700"
+            className="mt-4 text-sm font-medium text-amber-400 hover:text-amber-300"
           >
             {showActivity ? 'Hide activity' : 'View all activity'}
           </button>
           {showActivity && activityLog.length > 0 && (
-            <div className="mt-3 max-h-60 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+            <div className="mt-3 max-h-60 divide-y divide-slate-700/50 overflow-y-auto rounded-lg border border-slate-700/50">
               {activityLog.map((entry) => (
                 <div key={entry.id} className="flex items-center justify-between px-3 py-2 text-xs">
-                  <span className="text-slate-700">{entry.action}</span>
+                  <span className="text-slate-300">{entry.action}</span>
                   <span className="text-slate-400">
                     {entry.created_at ? new Date(entry.created_at).toLocaleString() : ''}
                   </span>
@@ -179,8 +180,8 @@ export default function CreditsPage() {
       )}
 
       {/* How to earn credits */}
-      <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">How to Earn Credits</h2>
+      <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
+        <h2 className="mb-3 text-base font-semibold text-slate-50">How to Earn Credits</h2>
         <div className="space-y-3">
           {[
             { action: 'Upload your LinkedIn CSV', amount: '+100', desc: 'Import your connections to get started' },
@@ -188,42 +189,42 @@ export default function CreditsPage() {
             { action: 'Keep data fresh', amount: '+10', desc: 'Re-upload your CSV each quarter' },
             { action: 'Welcome bonus', amount: '+50', desc: 'Awarded when you create your account' },
           ].map((item, i) => (
-            <div key={i} className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+            <div key={i} className="flex items-center justify-between rounded-lg bg-slate-800/50 p-3">
               <div>
-                <p className="text-sm font-medium text-slate-900">{item.action}</p>
-                <p className="text-xs text-slate-500">{item.desc}</p>
+                <p className="text-sm font-medium text-slate-50">{item.action}</p>
+                <p className="text-xs text-slate-400">{item.desc}</p>
               </div>
-              <span className="text-sm font-bold text-green-600">{item.amount}</span>
+              <span className="text-sm font-bold font-mono text-emerald-400">{item.amount}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* How credits are spent */}
-      <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">How Credits Are Spent</h2>
+      <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
+        <h2 className="mb-3 text-base font-semibold text-slate-50">How Credits Are Spent</h2>
         <div className="space-y-3">
           {[
             { action: 'Marketplace search', amount: '-5', desc: 'Search other people\'s networks' },
             { action: 'Request intro', amount: '-20', desc: 'Ask a network holder to introduce you (15 refunded if declined)' },
           ].map((item, i) => (
-            <div key={i} className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+            <div key={i} className="flex items-center justify-between rounded-lg bg-slate-800/50 p-3">
               <div>
-                <p className="text-sm font-medium text-slate-900">{item.action}</p>
-                <p className="text-xs text-slate-500">{item.desc}</p>
+                <p className="text-sm font-medium text-slate-50">{item.action}</p>
+                <p className="text-xs text-slate-400">{item.desc}</p>
               </div>
-              <span className="text-sm font-bold text-red-500">{item.amount}</span>
+              <span className="text-sm font-bold font-mono text-red-400">{item.amount}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Buy credits stub */}
-      <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Buy Credits</h2>
-            <p className="text-sm text-slate-500">$1 = 5 credits. Credits expire after 12 months.</p>
+            <h2 className="text-base font-semibold text-slate-50">Buy Credits</h2>
+            <p className="text-sm text-slate-400">$1 = 5 credits. Credits expire after 12 months.</p>
           </div>
           <button
             disabled
@@ -236,22 +237,22 @@ export default function CreditsPage() {
       </div>
 
       {/* Transaction history */}
-      <div className="rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-        <div className="border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900">Transaction History</h2>
+      <div className="rounded-xl bg-slate-900 border border-slate-700/50">
+        <div className="border-b border-slate-700/50 px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-50">Transaction History</h2>
         </div>
         {history.length === 0 ? (
           <div className="p-8 text-center text-sm text-slate-400">
             No transactions yet.
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-700/50">
             {history.map((tx) => (
               <div key={tx.id} className="flex items-center justify-between px-5 py-3">
                 <div className="flex items-center gap-3">
                   <TypeBadge type={tx.type} />
                   <div>
-                    <p className="text-sm text-slate-900">
+                    <p className="text-sm text-slate-50">
                       {REASON_LABELS[tx.reason] || tx.reason}
                     </p>
                     <p className="text-xs text-slate-400">
@@ -262,7 +263,7 @@ export default function CreditsPage() {
                     </p>
                   </div>
                 </div>
-                <span className={`text-sm font-bold ${tx.amount > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                <span className={`text-sm font-bold font-mono ${tx.amount > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {tx.amount > 0 ? '+' : ''}{tx.amount}
                 </span>
               </div>

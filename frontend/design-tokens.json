@@ -1,17 +1,20 @@
 {
   "colors": {
-    "primary": ["amber-50", "amber-100", "amber-300", "amber-400", "amber-500", "amber-600", "amber-700", "amber-800", "amber-900"],
-    "neutral": ["slate-50", "slate-100", "slate-200", "slate-300", "slate-400", "slate-500", "slate-600", "slate-700", "slate-800", "slate-900"],
-    "info": ["blue-50", "blue-100", "blue-300", "blue-500", "blue-600", "blue-700", "blue-800", "blue-900"],
-    "success": ["green-50", "green-100", "green-200", "green-500", "green-600", "green-700"],
-    "danger": ["red-50", "red-100", "red-200", "red-500", "red-600", "red-700"],
-    "surface": ["white", "black", "transparent"]
+    "primary": ["amber-400", "amber-500"],
+    "surface": ["slate-950", "slate-900", "slate-800"],
+    "text": ["slate-50", "slate-300", "slate-400", "slate-500"],
+    "border": ["slate-700/50", "slate-600"],
+    "success": ["emerald-400", "emerald-500/10"],
+    "danger": ["red-400", "red-500/10"],
+    "info": ["blue-400", "blue-500/10"],
+    "warning": ["amber-400", "amber-500/10"]
   },
-  "spacing": ["0", "0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "5", "6", "7", "8", "9", "10", "11", "12", "14", "16", "20", "24", "28", "32", "36", "40", "44", "48", "52", "56", "60", "64", "72", "80", "96", "px", "auto"],
   "typography": {
-    "sizes": ["text-xs", "text-sm", "text-base", "text-lg", "text-xl", "text-2xl", "text-3xl"],
+    "fonts": ["font-sans (Inter)", "font-mono (JetBrains Mono)"],
+    "sizes": ["text-xs", "text-sm", "text-base", "text-lg", "text-xl", "text-2xl"],
     "weights": ["font-normal", "font-medium", "font-semibold", "font-bold"]
   },
-  "border_radii": ["rounded", "rounded-md", "rounded-lg", "rounded-xl", "rounded-2xl", "rounded-full"],
-  "shadows": ["shadow", "shadow-sm", "shadow-md", "shadow-lg"]
+  "spacing": ["1", "1.5", "2", "3", "4", "5", "6", "8", "10", "12", "16", "20", "24"],
+  "border_radii": ["rounded-lg", "rounded-xl", "rounded-2xl", "rounded-full"],
+  "shadows": ["shadow-sm", "shadow-lg shadow-slate-950/50"]
 }
