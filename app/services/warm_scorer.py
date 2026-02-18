@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
+from app.utils.performance import timed
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -382,6 +384,7 @@ def compute_tenu[RESEND_KEY_REDACTED](months_at_company: int | None = None) -> f
 # ---------------------------------------------------------------------------
 
 
+@timed("warm_sco[RESEND_KEY_REDACTED]")
 def compute_warm_score(
     contact: Contact,
     connector_profile: ConnectorProfile | None,
@@ -475,6 +478,7 @@ def compute_referral_score(
 # ---------------------------------------------------------------------------
 
 
+@timed("warm_sco[RESEND_KEY_REDACTED]")
 async def batch_compute_scores(
     user_id: uuid.UUID,
     db: AsyncSession,

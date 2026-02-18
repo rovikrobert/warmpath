@@ -16,7 +16,7 @@ const STEPS = [
     label: 'Set job preferences',
     description: 'Tell us what roles and companies you\'re targeting for smarter matches.',
     cta: 'Set Preferences',
-    href: '/profile/edit',
+    href: '/settings?tab=profile',
     credits: null,
   },
   {
@@ -24,7 +24,7 @@ const STEPS = [
     label: 'Configure sharing settings',
     description: 'Opt in to help others get referrals and earn credits for every intro you facilitate.',
     cta: 'Configure Sharing',
-    href: '/marketplace/settings',
+    href: '/settings?tab=sharing',
     credits: null,
   },
 ];

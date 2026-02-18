@@ -4,6 +4,8 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+
+from app.utils.performance import timed
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +45,7 @@ ALLOWED_CSV_CONTENT_TYPES = {"text/csv", "application/octet-stream"}
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
+@timed("csv_upload_endpoint")
 async def upload_csv(
     file: UploadFile,
     current_user: User = Depends(get_current_user),
@@ -194,6 +197,7 @@ _ENCRYPTED_SORT_COLUMNS = {"full_name", "current_company", "connected_on"}
 
 
 @router.get("")
+@timed("contacts_list")
 async def list_contacts(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),

@@ -116,7 +116,7 @@ export default function FindReferrals() {
       {hasPrefs === false && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           You haven't set your job preferences yet. Results will be better if you{' '}
-          <button onClick={() => navigate('/profile/edit')} className="font-medium underline">
+          <button onClick={() => navigate('/settings?tab=profile')} className="font-medium underline">
             set your target role
           </button>.
         </div>

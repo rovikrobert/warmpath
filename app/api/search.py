@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from app.utils.performance import timed
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -114,6 +116,7 @@ async def list_searches(
 
 
 @router.get("/recommendations")
+@timed("job_recommendations")
 async def get_recommendations_endpoint(
     exclude: str | None = Query(
         None, description="Comma-separated company names to exclude"
@@ -189,6 +192,7 @@ async def get_search(
 
 
 @router.post("/{search_id}/run")
+@timed("search_execute")
 async def execute_search(
     search_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -227,6 +231,7 @@ async def execute_search(
 
 
 @router.get("/{search_id}/results")
+@timed("search_results")
 async def get_search_results(
     search_id: uuid.UUID,
     page: int = Query(1, ge=1),

@@ -8,6 +8,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, select, update
+
+from app.utils.performance import timed
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.contact import Contact, CsvUpload
@@ -28,6 +30,7 @@ from app.services.friendship_service import delete_user_friendships
 from app.services.suppression import add_to_suppression
 
 
+@timed("account_deletion")
 async def delete_user_data(
     user_id: uuid.UUID,
     db: AsyncSession,

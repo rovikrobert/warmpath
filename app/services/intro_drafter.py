@@ -13,6 +13,8 @@ import json
 import logging
 from dataclasses import dataclass
 
+from app.utils.performance import timed
+
 import anthropic
 
 from app.config import settings
@@ -578,6 +580,7 @@ async def _call_claude_api(
 # ---------------------------------------------------------------------------
 
 
+@timed("intro_draft")
 async def draft_referral_request(
     contact: Contact,
     user_profile: ConnectorProfile | None,

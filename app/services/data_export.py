@@ -8,6 +8,8 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import select
+
+from app.utils.performance import timed
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -23,6 +25,7 @@ from app.models.search_request import SearchRequest
 from app.models.user import User
 
 
+@timed("data_export")
 async def export_user_data(user_id: uuid.UUID, db: AsyncSession) -> dict:
     """Export all personal data for a user (DSAR / data portability).
 

@@ -11,6 +11,8 @@ from __futu[RESEND_KEY_REDACTED] import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.utils.performance import timed
+
 from app.database import get_db
 from app.models.user import User
 from app.schemas.referral import (
@@ -26,6 +28,7 @@ router = APIRouter()
 
 
 @router.post("/create", status_code=status.HTTP_201_CREATED)
+@timed("referral_create")
 async def create_referral_code(
     body: ReferralCodeCreate,
     current_user: User = Depends(requi[RESEND_KEY_REDACTED]),
@@ -64,6 +67,7 @@ async def list_my_referral_codes(
 
 
 @router.post("/redeem")
+@timed("referral_redeem")
 async def redeem_referral_code(
     body: ReferralRedeemRequest,
     current_user: User = Depends(get_current_user),
@@ -102,6 +106,7 @@ async def redeem_referral_code(
 
 
 @router.get("/leaderboard")
+@timed("referral_leaderboard")
 async def referral_leaderboard(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

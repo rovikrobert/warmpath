@@ -17,6 +17,7 @@ import ContactsPage from './pages/ContactsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import ReferralCodesPage from './pages/ReferralCodesPage';
 import PrivacySettingsPage from './pages/PrivacySettingsPage';
+import SettingsPage from './pages/SettingsPage';
 import ScoreGlossary from './pages/ScoreGlossary';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -72,13 +73,14 @@ export default function App() {
         <Route path="/applications" element={<ApplicationsPage />} />
         <Route path="/marketplace/dashboard" element={<MarketplaceDashboard />} />
         <Route path="/marketplace/requests" element={<MyRequests />} />
-        <Route path="/marketplace/settings" element={<SharingSettings />} />
         <Route path="/credits" element={<CreditsPage />} />
         <Route path="/invite" element={<ReferralCodesPage />} />
-        <Route path="/settings/privacy" element={<PrivacySettingsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/help/scores" element={<ScoreGlossary />} />
-        <Route path="/profile/edit" element={<EditProfile />} />
-        {/* Legacy routes */}
+        {/* Legacy routes — redirect to unified settings */}
+        <Route path="/profile/edit" element={<Navigate to="/settings?tab=profile" replace />} />
+        <Route path="/settings/privacy" element={<Navigate to="/settings?tab=privacy" replace />} />
+        <Route path="/marketplace/settings" element={<Navigate to="/settings?tab=sharing" replace />} />
         <Route path="/marketplace" element={<Navigate to="/marketplace/dashboard" replace />} />
         <Route path="/my-requests" element={<Navigate to="/marketplace/requests" replace />} />
       </Route>

@@ -13,6 +13,8 @@ import re
 import time
 import uuid
 from dataclasses import dataclass, field
+
+from app.utils.performance import timed
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -243,6 +245,7 @@ def _mock_cultural_context(location: str, title: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
+@timed("ai_mock_score")
 def _mock_sco[RESEND_KEY_REDACTED](
     search: SearchRequest,
     contacts: list[Contact],
@@ -532,6 +535,7 @@ CONTACTS:
 {json.dumps(contacts_data, indent=2)}"""
 
 
+@timed("ai_call_claude")
 async def _call_claude_api(
     search: SearchRequest,
     contacts: list[Contact],
@@ -789,6 +793,7 @@ def _p[RESEND_KEY_REDACTED](
 # ---------------------------------------------------------------------------
 
 
+@timed("ai_sco[RESEND_KEY_REDACTED]")
 async def sco[RESEND_KEY_REDACTED](
     search: SearchRequest,
     contacts: list[Contact],
@@ -884,6 +889,7 @@ async def sco[RESEND_KEY_REDACTED](
     return all_results
 
 
+@timed("ai_match")
 async def run_search(
     search_id: uuid.UUID,
     user_id: uuid.UUID,

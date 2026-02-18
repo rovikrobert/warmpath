@@ -14,6 +14,8 @@ Endpoints:
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from app.utils.performance import timed
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -110,6 +112,7 @@ def _build_seeker_profile_snapshot(user: User, visibility: str) -> dict:
 
 
 @router.post("/search")
+@timed("marketplace_search")
 async def marketplace_search(
     body: MarketplaceSearchBody,
     current_user: User = Depends(requi[RESEND_KEY_REDACTED]),

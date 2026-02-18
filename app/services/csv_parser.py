@@ -4,6 +4,8 @@ import io
 import re
 from datetime import date, datetime
 
+from app.utils.performance import timed
+
 
 # LinkedIn changes column names across export versions. Map known variants
 # to our internal field names.
@@ -306,6 +308,7 @@ def parse_manual_csv(raw_bytes: bytes) -> list[dict]:
     return contacts
 
 
+@timed("csv_parse")
 def parse_linkedin_csv(raw_bytes: bytes) -> list[dict]:
     """Parse a LinkedIn connections CSV export and return normalized contact dicts.
 
