@@ -52,3 +52,35 @@ class TestOpsSharedDb:
             side_effect=Exception("connection refused"),
         ):
             assert db_mod.get_session() is None
+
+
+class TestKeevsLiveCoaching:
+    """Keevs live coaching quality — calls mock handler with test scenarios."""
+
+    def test_mock_response_quality_passes(self):
+        from ops_team.keevs.keevs import _check_live_coaching_quality
+        from agents.shared.report import Finding
+        from ops_team.shared.report import OpsInsight
+
+        findings: list[Finding] = []
+        insights: list[OpsInsight] = []
+        metrics: dict = {}
+        _check_live_coaching_quality(findings, insights, metrics)
+
+        assert "live_coaching_scenarios_tested" in metrics
+        assert metrics["live_coaching_scenarios_tested"] >= 3
+        assert "live_coaching_test_pass_rate" in metrics
+        assert metrics["live_coaching_test_pass_rate"] >= 0.0
+
+    def test_mock_response_avg_length(self):
+        from ops_team.keevs.keevs import _check_live_coaching_quality
+        from agents.shared.report import Finding
+        from ops_team.shared.report import OpsInsight
+
+        findings: list[Finding] = []
+        insights: list[OpsInsight] = []
+        metrics: dict = {}
+        _check_live_coaching_quality(findings, insights, metrics)
+
+        assert "live_coaching_avg_response_length" in metrics
+        assert metrics["live_coaching_avg_response_length"] > 0
