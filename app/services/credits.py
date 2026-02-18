@@ -9,7 +9,7 @@ Credit economy:
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.credits import CreditTransaction
@@ -35,48 +35,39 @@ async def get_balance(user_id: uuid.UUID, db: AsyncSession) -> int:
 
 
 async def get_credit_summary(user_id: uuid.UUID, db: AsyncSession) -> dict:
-    """Get detailed credit summary: balance, lifetime totals, expiring soon."""
+    """Get detailed credit summary: balance, lifetime totals, expiring soon (single query)."""
     now = datetime.now(timezone.utc)
     thirty_days = now + timedelta(days=30)
 
-    # Current balance (non-expired)
-    balance = await get_balance(user_id, db)
-
-    # Lifetime earned (all positive transactions)
-    earned_result = await db.execute(
-        select(func.coalesce(func.sum(CreditTransaction.amount), 0)).where(
-            CreditTransaction.user_id == user_id,
-            CreditTransaction.amount > 0,
+    balance_cond = (
+        (CreditTransaction.type != "expired")
+        & (
+            (CreditTransaction.expires_at.is_(None))
+            | (CreditTransaction.expires_at > now)
         )
     )
-    earned_total = int(earned_result.scalar())
-
-    # Lifetime spent (sum of negative transactions, returned as positive)
-    spent_result = await db.execute(
-        select(func.coalesce(func.sum(CreditTransaction.amount), 0)).where(
-            CreditTransaction.user_id == user_id,
-            CreditTransaction.amount < 0,
-        )
+    earned_cond = CreditTransaction.amount > 0
+    spent_cond = CreditTransaction.amount < 0
+    expiring_cond = (
+        (CreditTransaction.amount > 0)
+        & (CreditTransaction.expires_at.isnot(None))
+        & (CreditTransaction.expires_at > now)
+        & (CreditTransaction.expires_at <= thirty_days)
     )
-    spent_total = abs(int(spent_result.scalar()))
 
-    # Credits expiring in next 30 days (positive transactions with near expiry)
-    expiring_result = await db.execute(
-        select(func.coalesce(func.sum(CreditTransaction.amount), 0)).where(
-            CreditTransaction.user_id == user_id,
-            CreditTransaction.amount > 0,
-            CreditTransaction.expires_at.isnot(None),
-            CreditTransaction.expires_at > now,
-            CreditTransaction.expires_at <= thirty_days,
-        )
-    )
-    expiring_soon = int(expiring_result.scalar())
+    q = select(
+        func.coalesce(func.sum(case((balance_cond, CreditTransaction.amount), else_=0)), 0).label("balance"),
+        func.coalesce(func.sum(case((earned_cond, CreditTransaction.amount), else_=0)), 0).label("earned"),
+        func.coalesce(func.sum(case((spent_cond, CreditTransaction.amount), else_=0)), 0).label("spent"),
+        func.coalesce(func.sum(case((expiring_cond, CreditTransaction.amount), else_=0)), 0).label("expiring"),
+    ).where(CreditTransaction.user_id == user_id)
 
+    row = (await db.execute(q)).one()
     return {
-        "balance": balance,
-        "earned_total": earned_total,
-        "spent_total": spent_total,
-        "expiring_soon": expiring_soon,
+        "balance": int(row.balance),
+        "earned_total": int(row.earned),
+        "spent_total": abs(int(row.spent)),
+        "expiring_soon": int(row.expiring),
     }
 
 

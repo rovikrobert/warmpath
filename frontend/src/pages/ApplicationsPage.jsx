@@ -119,7 +119,7 @@ export default function ApplicationsPage() {
   const load = async () => {
     try {
       const [appsRes, statsRes] = await Promise.all([
-        appsApi.list(),
+        appsApi.list({ per_page: 100 }),
         appsApi.stats().catch(() => null),
       ]);
       setApps(appsRes.data || []);

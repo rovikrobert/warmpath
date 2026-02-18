@@ -1,10 +1,11 @@
+import math
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.utils.performance import timed
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,6 +22,7 @@ from app.schemas.application import (
     ApplicationStatsResponse,
     ApplicationUpdate,
 )
+from app.schemas.contact import PaginationMeta
 from app.utils.security import get_current_user
 
 router = APIRouter()
@@ -193,6 +195,25 @@ async def create_application(
     }
 
 
+def _needs_follow_up_sql_condition(positive: bool):
+    """SQL: needs_follow_up is True when message_sent, no response, and (overdue follow_up or 7+ days since sent)."""
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+    seven_days_ago = now - timedelta(days=7)
+    condition = (
+        (Application.status == "message_sent")
+        & (Application.responded_at.is_(None))
+        & (
+            (Application.follow_up_at.isnot(None) & (Application.follow_up_at <= now))
+            | (
+                (Application.sent_at.isnot(None)) & (Application.sent_at <= seven_days_ago)
+            )
+        )
+    )
+    return condition if positive else ~condition
+
+
 @router.get("")
 @timed("applications_list")
 async def list_applications(
@@ -202,22 +223,26 @@ async def list_applications(
     company: str | None = Query(default=None),
     needs_follow_up: bool | None = Query(default=None),
     sort: str = Query(default="created_at"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100),
 ) -> dict:
-    """List all applications for the current user with optional filters."""
-    query = select(Application).where(
+    """List applications for the current user with optional filters and pagination."""
+    base = select(Application).where(
         Application.user_id == current_user.id,
         Application.deleted_at.is_(None),
     )
 
     if status_filter:
-        query = query.where(Application.status == status_filter)
+        base = base.where(Application.status == status_filter)
 
     if company:
-        query = query.where(
+        base = base.where(
             func.lower(Application.company_name).contains(company.lower())
         )
 
-    # Sort
+    if needs_follow_up is not None:
+        base = base.where(_needs_follow_up_sql_condition(needs_follow_up))
+
     sort_column = {
         "created_at": Application.created_at,
         "sent_at": Application.sent_at,
@@ -225,35 +250,46 @@ async def list_applications(
         "status": Application.status,
     }.get(sort, Application.created_at)
 
-    query = query.order_by(sort_column.desc().nullslast())
+    base = base.order_by(sort_column.desc().nullslast())
 
-    # Eager-load relationships in one query (avoids N+1)
-    query = query.options(
+    count_query = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_query)).scalar() or 0
+
+    query = base.options(
         selectinload(Application.contact),
         selectinload(Application.company),
         selectinload(Application.job_opening),
-    )
+    ).offset((page - 1) * per_page).limit(per_page)
 
     result = await db.execute(query)
     apps = result.scalars().all()
 
     now = datetime.now(timezone.utc)
-    response_list = []
+    response_list = [_enrich_response(app_record, now) for app_record in apps]
 
-    for app_record in apps:
-        enriched = _enrich_response(app_record, now)
-        response_list.append(enriched)
+    meta = PaginationMeta(
+        page=page,
+        per_page=per_page,
+        total=total,
+        total_pages=max(1, math.ceil(total / per_page)),
+    ).model_dump()
+    meta["count"] = total  # backward compatibility
+    return {"data": response_list, "meta": meta}
 
-    # Filter by needs_follow_up after enrichment (computed field)
-    if needs_follow_up is not None:
-        response_list = [
-            a for a in response_list if a["needs_follow_up"] == needs_follow_up
-        ]
 
-    return {
-        "data": response_list,
-        "meta": {"count": len(response_list)},
-    }
+RESPONDED_STATUSES = (
+    "responded",
+    "interview_scheduled",
+    "interviewed",
+    "offer_received",
+    "offer_accepted",
+)
+INTERVIEW_STATUSES = (
+    "interview_scheduled",
+    "interviewed",
+    "offer_received",
+    "offer_accepted",
+)
 
 
 @router.get("/stats")
@@ -261,80 +297,80 @@ async def get_application_stats(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Return aggregate application statistics for the current user."""
-    result = await db.execute(
-        select(Application).where(
-            Application.user_id == current_user.id,
-            Application.deleted_at.is_(None),
-        )
+    """Return aggregate application statistics for the current user (SQL aggregates)."""
+    base = (
+        Application.user_id == current_user.id,
+        Application.deleted_at.is_(None),
     )
-    apps = result.scalars().all()
 
-    total = len(apps)
-    by_status: dict[str, int] = {}
-    sent_count = 0
-    responded_count = 0
-    interview_count = 0
-    response_days: list[float] = []
-    channel_stats: dict[str, dict[str, int]] = {}
+    # Total and by_status in one query
+    by_status_query = (
+        select(Application.status, func.count().label("cnt"))
+        .where(*base)
+        .group_by(Application.status)
+    )
+    by_status_rows = (await db.execute(by_status_query)).all()
+    total = sum(r[1] for r in by_status_rows)
+    by_status = {r[0]: r[1] for r in by_status_rows}
 
-    for app_record in apps:
-        by_status[app_record.status] = by_status.get(app_record.status, 0) + 1
+    # sent_count, responded_count, interview_count via conditional sums (one row)
+    sent_expr = case((Application.status != "draft", 1), else_=0)
+    responded_expr = case(
+        (Application.status.in_(RESPONDED_STATUSES), 1), else_=0
+    )
+    interview_expr = case(
+        (Application.status.in_(INTERVIEW_STATUSES), 1), else_=0
+    )
+    agg_query = select(
+        func.sum(sent_expr).label("sent_count"),
+        func.sum(responded_expr).label("responded_count"),
+        func.sum(interview_expr).label("interview_count"),
+    ).where(*base)
+    agg_row = (await db.execute(agg_query)).one()
+    sent_count = int(agg_row.sent_count or 0)
+    responded_count = int(agg_row.responded_count or 0)
+    interview_count = int(agg_row.interview_count or 0)
 
-        if app_record.status != "draft":
-            sent_count += 1
+    # Avg days to response (only where both sent_at and responded_at set)
+    avg_days_query = select(
+        func.avg(
+            func.extract(
+                "epoch", Application.responded_at - Application.sent_at
+            )
+            / 86400
+        ).label("avg_days")
+    ).where(
+        *base,
+        Application.sent_at.isnot(None),
+        Application.responded_at.isnot(None),
+    )
+    avg_days_row = (await db.execute(avg_days_query)).one()
+    avg_days = (
+        round(float(avg_days_row.avg_days), 1)
+        if avg_days_row.avg_days is not None
+        else None
+    )
 
-        if app_record.status in (
-            "responded",
-            "interview_scheduled",
-            "interviewed",
-            "offer_received",
-            "offer_accepted",
-        ):
-            responded_count += 1
-
-        if app_record.status in (
-            "interview_scheduled",
-            "interviewed",
-            "offer_received",
-            "offer_accepted",
-        ):
-            interview_count += 1
-
-        # Response time calculation
-        if app_record.sent_at and app_record.responded_at:
-            sent = _make_tz_aware(app_record.sent_at)
-            resp = _make_tz_aware(app_record.responded_at)
-            if sent and resp:
-                response_days.append((resp - sent).total_seconds() / 86400)
-
-        # Channel tracking
-        ch = app_record.channel or "unknown"
-        if ch not in channel_stats:
-            channel_stats[ch] = {"sent": 0, "responded": 0}
-        if app_record.status != "draft":
-            channel_stats[ch]["sent"] += 1
-        if app_record.status in (
-            "responded",
-            "interview_scheduled",
-            "interviewed",
-            "offer_received",
-            "offer_accepted",
-        ):
-            channel_stats[ch]["responded"] += 1
+    # Channel stats: sent and responded per channel
+    ch_sent = case((Application.status != "draft", 1), else_=0)
+    ch_resp = case(
+        (Application.status.in_(RESPONDED_STATUSES), 1), else_=0
+    )
+    channel_query = select(
+        func.coalesce(Application.channel, "unknown").label("channel"),
+        func.sum(ch_sent).label("sent"),
+        func.sum(ch_resp).label("responded"),
+    ).where(*base).group_by(func.coalesce(Application.channel, "unknown"))
+    channel_rows = (await db.execute(channel_query)).all()
 
     response_rate = responded_count / sent_count if sent_count > 0 else 0.0
     interview_rate = interview_count / sent_count if sent_count > 0 else 0.0
-    avg_days = (
-        round(sum(response_days) / len(response_days), 1) if response_days else None
-    )
 
-    # Best channel by response rate
     best_channel = None
     best_rate = 0.0
-    for ch, stats in channel_stats.items():
-        if stats["sent"] > 0:
-            rate = stats["responded"] / stats["sent"]
+    for ch, sent, resp in channel_rows:
+        if sent and sent > 0:
+            rate = resp / sent
             if rate > best_rate:
                 best_rate = rate
                 best_channel = ch
