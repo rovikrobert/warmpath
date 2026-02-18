@@ -167,18 +167,44 @@ def _run_agent(mode: str) -> dict:
 
 def _run_full_scan() -> None:
     """Run all teams in sequence, then CoS daily. Single trigger for everything."""
+    # Separate team scans from cos-daily — cos-daily only makes sense if teams produced data
+    team_modes = [m for m in _FULL_SCAN_ORDER if not m.startswith("cos-")]
+    cos_modes = [m for m in _FULL_SCAN_ORDER if m.startswith("cos-")]
+
     _log(
         f"[full-scan] Starting ({len(_FULL_SCAN_ORDER)} steps: {' → '.join(_FULL_SCAN_ORDER)})"
     )
     start = time.monotonic()
     results = []
+    failed_teams = []
 
-    for i, mode in enumerate(_FULL_SCAN_ORDER, 1):
+    for i, mode in enumerate(team_modes, 1):
         _log(f"[full-scan] Step {i}/{len(_FULL_SCAN_ORDER)}: {mode}")
         result = _run_agent(mode)
         results.append(result)
         if result["status"] != "completed":
-            _log(f"[full-scan] {mode} → {result['status']} — continuing")
+            failed_teams.append(mode)
+            _log(f"[full-scan] WARNING: {mode} → {result['status']}")
+
+    team_succeeded = len(team_modes) - len(failed_teams)
+
+    if team_succeeded == 0:
+        _log(
+            f"[full-scan] ABORTING cos-daily — all {len(team_modes)} team scans failed: "
+            f"{failed_teams}. CoS brief would be empty/misleading."
+        )
+    else:
+        if failed_teams:
+            _log(
+                f"[full-scan] WARNING: {len(failed_teams)} team scan(s) failed: "
+                f"{failed_teams}. CoS brief will be incomplete."
+            )
+        for i, mode in enumerate(cos_modes, len(team_modes) + 1):
+            _log(f"[full-scan] Step {i}/{len(_FULL_SCAN_ORDER)}: {mode}")
+            result = _run_agent(mode)
+            results.append(result)
+            if result["status"] != "completed":
+                _log(f"[full-scan] {mode} → {result['status']}")
 
     elapsed = time.monotonic() - start
     completed = sum(1 for r in results if r["status"] == "completed")
@@ -187,46 +213,80 @@ def _run_full_scan() -> None:
 
 def _run_full_scan_weekly() -> None:
     """Run all teams, their weekly briefs, then CoS weekly."""
-    _log(
-        f"[full-scan-weekly] Starting ({len(_WEEKLY_SCAN_ORDER)} steps: {' → '.join(_WEEKLY_SCAN_ORDER)})"
-    )
+    tag = "full-scan-weekly"
+    team_modes = [m for m in _WEEKLY_SCAN_ORDER if not m.startswith("cos-")]
+    cos_modes = [m for m in _WEEKLY_SCAN_ORDER if m.startswith("cos-")]
+
+    _log(f"[{tag}] Starting ({len(_WEEKLY_SCAN_ORDER)} steps: {' → '.join(_WEEKLY_SCAN_ORDER)})")
     start = time.monotonic()
     results = []
+    failed = []
 
-    for i, mode in enumerate(_WEEKLY_SCAN_ORDER, 1):
-        _log(f"[full-scan-weekly] Step {i}/{len(_WEEKLY_SCAN_ORDER)}: {mode}")
+    for i, mode in enumerate(team_modes, 1):
+        _log(f"[{tag}] Step {i}/{len(_WEEKLY_SCAN_ORDER)}: {mode}")
         result = _run_agent(mode)
         results.append(result)
         if result["status"] != "completed":
-            _log(f"[full-scan-weekly] {mode} → {result['status']} — continuing")
+            failed.append(mode)
+            _log(f"[{tag}] WARNING: {mode} → {result['status']}")
+
+    # Only run CoS if at least one base scan succeeded
+    base_scans = [m for m in team_modes if "-weekly" not in m]
+    base_failed = [m for m in failed if m in base_scans]
+    if len(base_failed) == len(base_scans):
+        _log(f"[{tag}] ABORTING cos-weekly — all base scans failed: {base_failed}")
+    else:
+        if failed:
+            _log(f"[{tag}] WARNING: {len(failed)} step(s) failed: {failed}")
+        for i, mode in enumerate(cos_modes, len(team_modes) + 1):
+            _log(f"[{tag}] Step {i}/{len(_WEEKLY_SCAN_ORDER)}: {mode}")
+            result = _run_agent(mode)
+            results.append(result)
+            if result["status"] != "completed":
+                _log(f"[{tag}] {mode} → {result['status']}")
 
     elapsed = time.monotonic() - start
     completed = sum(1 for r in results if r["status"] == "completed")
-    _log(
-        f"[full-scan-weekly] Done in {elapsed:.1f}s — {completed}/{len(results)} succeeded"
-    )
+    _log(f"[{tag}] Done in {elapsed:.1f}s — {completed}/{len(results)} succeeded")
 
 
 def _run_full_scan_monthly() -> None:
     """Run all teams, their monthly briefs, then CoS weekly synthesis."""
-    _log(
-        f"[full-scan-monthly] Starting ({len(_MONTHLY_SCAN_ORDER)} steps: {' → '.join(_MONTHLY_SCAN_ORDER)})"
-    )
+    tag = "full-scan-monthly"
+    team_modes = [m for m in _MONTHLY_SCAN_ORDER if not m.startswith("cos-")]
+    cos_modes = [m for m in _MONTHLY_SCAN_ORDER if m.startswith("cos-")]
+
+    _log(f"[{tag}] Starting ({len(_MONTHLY_SCAN_ORDER)} steps: {' → '.join(_MONTHLY_SCAN_ORDER)})")
     start = time.monotonic()
     results = []
+    failed = []
 
-    for i, mode in enumerate(_MONTHLY_SCAN_ORDER, 1):
-        _log(f"[full-scan-monthly] Step {i}/{len(_MONTHLY_SCAN_ORDER)}: {mode}")
+    for i, mode in enumerate(team_modes, 1):
+        _log(f"[{tag}] Step {i}/{len(_MONTHLY_SCAN_ORDER)}: {mode}")
         result = _run_agent(mode)
         results.append(result)
         if result["status"] != "completed":
-            _log(f"[full-scan-monthly] {mode} → {result['status']} — continuing")
+            failed.append(mode)
+            _log(f"[{tag}] WARNING: {mode} → {result['status']}")
+
+    # Only run CoS if at least one base scan succeeded
+    base_scans = [m for m in team_modes if "-monthly" not in m]
+    base_failed = [m for m in failed if m in base_scans]
+    if len(base_failed) == len(base_scans):
+        _log(f"[{tag}] ABORTING cos-weekly — all base scans failed: {base_failed}")
+    else:
+        if failed:
+            _log(f"[{tag}] WARNING: {len(failed)} step(s) failed: {failed}")
+        for i, mode in enumerate(cos_modes, len(team_modes) + 1):
+            _log(f"[{tag}] Step {i}/{len(_MONTHLY_SCAN_ORDER)}: {mode}")
+            result = _run_agent(mode)
+            results.append(result)
+            if result["status"] != "completed":
+                _log(f"[{tag}] {mode} → {result['status']}")
 
     elapsed = time.monotonic() - start
     completed = sum(1 for r in results if r["status"] == "completed")
-    _log(
-        f"[full-scan-monthly] Done in {elapsed:.1f}s — {completed}/{len(results)} succeeded"
-    )
+    _log(f"[{tag}] Done in {elapsed:.1f}s — {completed}/{len(results)} succeeded")
 
 
 def _verify_secret(x_agent_secret: str) -> None:
