@@ -103,3 +103,47 @@ class TestFinanceSQLTemplates:
                 assert has_having or has_subquery, (
                     f"Template '{name}' has GROUP BY without k-anonymity guard"
                 )
+
+
+class TestStripeClient:
+    """Read-only Stripe API client for finance agents."""
+
+    def test_get_client_returns_instance(self):
+        from finance_team.shared.stripe_client import get_stripe_client
+
+        client = get_stripe_client()
+        assert client is not None
+
+    def test_graceful_degradation_without_key(self, monkeypatch):
+        """Without STRIPE_SECRET_KEY, all methods return None."""
+        monkeypatch.delenv("STRIPE_SECRET_KEY", raising=False)
+        # Reset singleton
+        import finance_team.shared.stripe_client as mod
+
+        mod._client = None
+
+        client = mod.get_stripe_client()
+        assert client.is_available() is False
+        assert client.get_balance() is None
+        assert client.list_charges() is None
+        assert client.list_subscriptions() is None
+        assert client.list_disputes() is None
+
+    def test_available_when_key_set(self, monkeypatch):
+        monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_fake_key_for_testing")
+        import finance_team.shared.stripe_client as mod
+
+        mod._client = None
+
+        client = mod.get_stripe_client()
+        assert client.is_available() is True
+
+    def test_api_methods_exist(self):
+        from finance_team.shared.stripe_client import StripeClient
+
+        client = StripeClient()
+        assert callable(getattr(client, "get_balance", None))
+        assert callable(getattr(client, "list_charges", None))
+        assert callable(getattr(client, "list_subscriptions", None))
+        assert callable(getattr(client, "list_disputes", None))
+        assert callable(getattr(client, "get_customer", None))
