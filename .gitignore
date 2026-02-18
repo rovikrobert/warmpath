@@ -71,3 +71,24 @@ junit.xml
 
 # Mutation testing backup journals (safety restore files)
 *.mutation_backup
+
+# Claude Code local config
+.claude/settings.json
+.claude/agent-memory/
+
+# Node (not a Node project — occasional tooling only)
+node_modules/
+package-lock.json
+package.json
+
+# Generated reports (binary)
+finance_team/reports/*.xlsx
+
+# CoS telegram reports
+agents/chief_of_staff/reports/telegram/*.txt
+
+# User documents (not code)
+*.docx
+
+# One-off spec files
+finance_team_spec.json
