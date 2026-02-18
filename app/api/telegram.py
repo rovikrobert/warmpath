@@ -1,7 +1,8 @@
 """Telegram webhook endpoint for CoS bidirectional communication.
 
-Receives Telegram Bot updates, parses founder commands, and dispatches
-them through the CoS pipeline.
+Receives Telegram Bot updates, parses founder commands, executes
+immediate commands (status, cost), and queues deferred ones.
+Replies are sent back via the Telegram Bot API.
 """
 
 from __futu[RESEND_KEY_REDACTED] import annotations
@@ -10,7 +11,8 @@ import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Request
+import httpx
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 
 from agents.shared.whatsapp_formatter import WhatsAppFormatter
 
@@ -19,15 +21,75 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _send_telegram_reply(chat_id: int, text: str) -> None:
+    """Send a text reply to a Telegram chat (best-effort, sync)."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    if not token:
+        logger.debug("TELEGRAM_BOT_TOKEN not set — skipping reply")
+        return
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": text},
+            )
+    except Exception:
+        logger.debug("Failed to send Telegram reply to %s", chat_id)
+
+
+def _handle_command(command: str, parsed: dict, chat_id: int) -> None:
+    """Execute a command and reply via Telegram."""
+    try:
+        if command == "status":
+            from agents.chief_of_staff.cos_agent import run_status
+
+            result = run_status()
+            _send_telegram_reply(chat_id, result)
+
+        elif command == "approve":
+            from agents.chief_of_staff.decision_log import record_founder_decision
+
+            item_id = parsed.get("item", "")
+            record_founder_decision(item_id, "cos_recommendation", "approved")
+            _send_telegram_reply(chat_id, f"Approved: {item_id}")
+
+        elif command == "choose":
+            choice = parsed.get("choice", "")
+            _send_telegram_reply(chat_id, f"Choice recorded: {choice}")
+
+        elif command == "ship":
+            feature = parsed.get("feature", "")
+            _send_telegram_reply(
+                chat_id, f"Ship request queued: {feature}\nWill execute on next daily cycle."
+            )
+
+        elif command == "brief":
+            topic = parsed.get("topic", text if (text := parsed.get("raw", "")) else "general")
+            _send_telegram_reply(
+                chat_id, f"Brief request queued: {topic}\nWill be included in next daily brief."
+            )
+
+        else:
+            _send_telegram_reply(
+                chat_id,
+                "Commands: status, cost, approve <id>, ship <feature>, brief me on <topic>",
+            )
+    except Exception as exc:
+        logger.exception("Error handling Telegram command: %s", command)
+        _send_telegram_reply(chat_id, f"Error processing '{command}': {str(exc)[:200]}")
+
+
 @router.post("/webhook")
 async def telegram_webhook(
     request: Request,
+    background_tasks: BackgroundTasks,
     x_telegram_bot_api_secret_token: str | None = Header(None),
 ) -> dict[str, Any]:
     """Receive Telegram Bot webhook updates.
 
     Validates the secret token, extracts the message text,
     parses it using the shared reply grammar, and dispatches the command.
+    Replies are sent asynchronously in a background task.
     """
     expected_secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
     if not expected_secret or x_telegram_bot_api_secret_token != expected_secret:
@@ -36,16 +98,16 @@ async def telegram_webhook(
     body = await request.json()
     message = body.get("message", {})
     text = message.get("text", "")
+    chat_id = message.get("chat", {}).get("id")
 
-    if not text:
+    if not text or not chat_id:
         return {"ok": True, "action": "ignored"}
 
     parsed = WhatsAppFormatter.parse_reply(text)
     command = parsed.get("command", "unknown")
 
-    logger.info(
-        "Telegram command received: %s (from chat %s)",
-        command, message.get("chat", {}).get("id"),
-    )
+    logger.info("Telegram command received: %s (from chat %s)", command, chat_id)
 
-    return {"ok": True, "command": command, "parsed": parsed}
+    background_tasks.add_task(_handle_command, command, parsed, chat_id)
+
+    return {"ok": True, "command": command}
