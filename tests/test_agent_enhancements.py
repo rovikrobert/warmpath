@@ -1,15 +1,19 @@
 """Tests for engineering agent enhancements: cross-team findings, vault isolation,
-circular imports, dead code, external intelligence, and production health.
+circular imports, dead code, mypy, mutation testing, external intelligence,
+and production health.
 
 Covers:
   - Lead: _load_cross_team_summaries() + Cross-Team Highlights in daily brief
-  - Architect: _scan_vault_isolation, _scan_circular_imports, _scan_dead_code, intel wiring
+  - Architect: _scan_vault_isolation, _scan_circular_imports, _scan_dead_code,
+               _scan_mypy, _scan_mutation_testing, intel wiring
   - PerfMonitor: _scan_production_health
 """
 
 from __futu[RESEND_KEY_REDACTED] import annotations
 
+import ast
 import json
+import subprocess
 import textwrap
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -316,7 +320,12 @@ class TestArchitectExternalIntel:
         """architect.scan() doesn't crash when intelligence module is available."""
         from agents.architect.architect import scan
 
-        report = scan()
+        mock_result = MagicMock()
+        mock_result.stdout = ""
+        mock_result.returncode = 0
+
+        with patch("agents.architect.architect._run_tool", return_value=mock_result):
+            report = scan()
         # The report should succeed (intel is optional)
         assert report.agent == "architect"
         assert isinstance(report.intelligence_applied, list)
@@ -402,6 +411,240 @@ class TestPerfMonitorProductionHealth:
 
 
 # ---------------------------------------------------------------------------
+# Architect: Mypy scanner
+# ---------------------------------------------------------------------------
+
+
+class TestArchitectMypy:
+    """Test mypy type checking scanner."""
+
+    def test_scan_mypy_unavailable(self):
+        """Returns info finding when mypy is not installed."""
+        from agents.architect.architect import _scan_mypy
+
+        findings: list[Finding] = []
+        with patch("agents.architect.architect._run_tool", return_value=None):
+            metrics = _scan_mypy(findings)
+
+        assert metrics["mypy_available"] is False
+        assert len(findings) == 1
+        assert findings[0].id == "ARCH-MYPY-UNAVAIL"
+
+    def test_scan_mypy_zero_errors(self):
+        """Reports info finding when mypy is clean."""
+        from agents.architect.architect import _scan_mypy
+
+        mock_result = MagicMock()
+        mock_result.stdout = ""
+        mock_result.returncode = 0
+
+        findings: list[Finding] = []
+        with patch("agents.architect.architect._run_tool", return_value=mock_result):
+            metrics = _scan_mypy(findings)
+
+        assert metrics["mypy_available"] is True
+        assert metrics["mypy_errors"] == 0
+        assert any(f.id == "ARCH-MYPY-CLEAN" for f in findings)
+
+    def test_scan_mypy_few_errors(self):
+        """Reports low severity for 10-50 errors."""
+        from agents.architect.architect import _scan_mypy
+
+        # Simulate 15 mypy errors
+        lines = [
+            f'app/services/svc{i}.py:{i}: error: Incompatible type [assignment]'
+            for i in range(15)
+        ]
+        mock_result = MagicMock()
+        mock_result.stdout = "\n".join(lines)
+
+        findings: list[Finding] = []
+        with patch("agents.architect.architect._run_tool", return_value=mock_result):
+            metrics = _scan_mypy(findings)
+
+        assert metrics["mypy_errors"] == 15
+        mypy_findings = [f for f in findings if f.id == "ARCH-MYPY-ERRORS"]
+        assert len(mypy_findings) == 1
+        assert mypy_findings[0].severity == "low"
+
+    def test_scan_mypy_many_errors(self):
+        """Reports medium severity for >50 errors."""
+        from agents.architect.architect import _scan_mypy
+
+        lines = [
+            f'app/services/svc.py:{i}: error: Bad type [misc]'
+            for i in range(60)
+        ]
+        mock_result = MagicMock()
+        mock_result.stdout = "\n".join(lines)
+
+        findings: list[Finding] = []
+        with patch("agents.architect.architect._run_tool", return_value=mock_result):
+            metrics = _scan_mypy(findings)
+
+        assert metrics["mypy_errors"] == 60
+        mypy_findings = [f for f in findings if f.id == "ARCH-MYPY-ERRORS"]
+        assert len(mypy_findings) == 1
+        assert mypy_findings[0].severity == "medium"
+
+    def test_scan_mypy_parses_error_codes(self):
+        """Error codes are correctly extracted and counted."""
+        from agents.architect.architect import _scan_mypy
+
+        mock_result = MagicMock()
+        mock_result.stdout = (
+            "app/a.py:1: error: Type mismatch [assignment]\n"
+            "app/a.py:5: error: Missing return [return]\n"
+            "app/b.py:3: error: Bad call [assignment]\n"
+            "app/c.py:1: warning: Unused import [misc]\n"
+        )
+
+        findings: list[Finding] = []
+        with patch("agents.architect.architect._run_tool", return_value=mock_result):
+            metrics = _scan_mypy(findings)
+
+        assert metrics["mypy_errors"] == 3
+        assert metrics["mypy_warnings"] == 1
+        assert metrics["mypy_error_codes"]["assignment"] == 2
+        assert metrics["mypy_error_codes"]["return"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Architect: Mutation testing
+# ---------------------------------------------------------------------------
+
+
+class TestArchitectMutationTesting:
+    """Test lightweight mutation testing sampler."""
+
+    def test_collect_mutation_sites_finds_comparisons(self):
+        """Collects compa[RESEND_KEY_REDACTED] sites from source code."""
+        from agents.architect.architect import _collect_mutation_sites
+
+        source = textwrap.dedent("""\
+        def check(x):
+            if x > 0:
+                return True
+            return False
+        """)
+        sites = _collect_mutation_sites(source)
+        types = [t for _, t in sites]
+        assert "compa[RESEND_KEY_REDACTED]" in types
+        assert "return_none" in types
+
+    def test_collect_mutation_sites_handles_syntax_error(self):
+        from agents.architect.architect import _collect_mutation_sites
+
+        sites = _collect_mutation_sites("def bad(:\n")
+        assert sites == []
+
+    def test_apply_mutation_compa[RESEND_KEY_REDACTED](self):
+        """Applies operator swap mutation correctly."""
+        from agents.architect.architect import _apply_mutation
+
+        source = textwrap.dedent("""\
+        def check(x):
+            if x > 0:
+                return True
+        """)
+        # Line 2 has the comparison x > 0
+        mutated = _apply_mutation(source, 2, "compa[RESEND_KEY_REDACTED]")
+        assert mutated is not None
+        # The > should become <=
+        tree = ast.parse(mutated)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Compare) and node.ops:
+                assert isinstance(node.ops[0], ast.LtE)
+
+    def test_apply_mutation_return_none(self):
+        """Applies return-None mutation correctly."""
+        from agents.architect.architect import _apply_mutation
+
+        source = textwrap.dedent("""\
+        def get_value():
+            return 42
+        """)
+        mutated = _apply_mutation(source, 2, "return_none")
+        assert mutated is not None
+        assert "None" in mutated or "return None" in mutated
+
+    def test_apply_mutation_wrong_line_returns_none(self):
+        """Returns None when mutation can't be applied at target line."""
+        from agents.architect.architect import _apply_mutation
+
+        source = "def f():\n    pass\n"
+        result = _apply_mutation(source, 999, "compa[RESEND_KEY_REDACTED]")
+        assert result is None
+
+    def test_scan_mutation_testing_all_targets_missing(self, tmp_path):
+        """Returns empty metrics when no target files exist."""
+        from agents.architect.architect import _scan_mutation_testing
+
+        findings: list[Finding] = []
+        with patch("agents.architect.architect.PROJECT_ROOT", tmp_path):
+            metrics = _scan_mutation_testing(findings)
+
+        assert metrics["mutation_files_tested"] == 0
+        assert metrics["mutation_total_tested"] == 0
+
+    def test_scan_mutation_testing_runs_and_restores(self, tmp_path):
+        """Mutation testing writes mutations, runs pytest, restores original."""
+        from agents.architect.architect import _scan_mutation_testing
+
+        # Create a target file
+        svc_dir = tmp_path / "app" / "services"
+        svc_dir.mkdir(parents=True)
+        target = svc_dir / "warm_scorer.py"
+        original_code = textwrap.dedent("""\
+        def score(x):
+            if x > 0:
+                return 100
+            return 0
+        """)
+        target.write_text(original_code)
+
+        # Mock _run_tool for pytest: return failure (= mutation killed)
+        mock_pytest_result = MagicMock()
+        mock_pytest_result.returncode = 1  # tests caught the mutation
+
+        findings: list[Finding] = []
+        with patch("agents.architect.architect.PROJECT_ROOT", tmp_path):
+            with patch("agents.architect.architect._run_tool", return_value=mock_pytest_result):
+                metrics = _scan_mutation_testing(findings)
+
+        # Original file should be restored
+        assert target.read_text() == original_code
+        assert metrics["mutation_files_tested"] >= 1
+        assert metrics["mutation_killed"] >= 1
+
+    def test_mutation_visitor_applies_once(self):
+        """_MutationVisitor only applies one mutation."""
+        from agents.architect.architect import _MutationVisitor
+
+        source = textwrap.dedent("""\
+        def f(x, y):
+            if x > 0:
+                pass
+            if y > 0:
+                pass
+        """)
+        tree = ast.parse(source)
+        visitor = _MutationVisitor(target_line=2, mutation_type="compa[RESEND_KEY_REDACTED]")
+        new_tree = visitor.visit(tree)
+        assert visitor.applied is True
+
+        # Only line 2 should be mutated, line 4 should remain >
+        compares = [
+            n for n in ast.walk(new_tree) if isinstance(n, ast.Compare)
+        ]
+        assert len(compares) == 2
+        # First compare (line 2) should be mutated to LtE
+        assert isinstance(compares[0].ops[0], ast.LtE)
+        # Second compare (line 4) should stay as Gt
+        assert isinstance(compares[1].ops[0], ast.Gt)
+
+
+# ---------------------------------------------------------------------------
 # Integration: architect scan() includes new scanners
 # ---------------------------------------------------------------------------
 
@@ -412,14 +655,29 @@ class TestArchitectScanIntegration:
     def test_scan_has_new_metrics(self):
         from agents.architect.architect import scan
 
-        report = scan()
+        # Mock the external tools to avoid real mypy/pytest calls during test
+        mock_mypy = MagicMock()
+        mock_mypy.stdout = ""
+        mock_mypy.returncode = 0
+
+        with patch("agents.architect.architect._run_tool", return_value=mock_mypy):
+            report = scan()
+
         assert "circular_import_cycles" in report.metrics
         assert "dead_functions_detected" in report.metrics
+        assert "mypy_available" in report.metrics
+        assert "mutation_files_tested" in report.metrics
 
     def test_scan_report_is_valid(self):
         from agents.architect.architect import scan
 
-        report = scan()
+        mock_result = MagicMock()
+        mock_result.stdout = ""
+        mock_result.returncode = 0
+
+        with patch("agents.architect.architect._run_tool", return_value=mock_result):
+            report = scan()
+
         assert report.agent == "architect"
         assert report.scan_duration_seconds >= 0
         assert isinstance(report.findings, list)

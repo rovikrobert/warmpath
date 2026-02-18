@@ -4,6 +4,12 @@ filterwarnings = [
     "error::DeprecationWarning",
 ]
 
+[tool.mypy]
+python_version = "3.11"
+igno[RESEND_KEY_REDACTED] = true
+warn_return_any = true
+warn_unused_configs = true
+
 [tool.ruff]
 target-version = "py311"
 
