@@ -31,6 +31,7 @@ from app.api import (
 from app.config import settings
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.middleware.usage import UsageTrackingMiddleware
+from app.utils.error_reporter import send_error_alert
 from app.utils.exceptions import AppError
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,21 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 @app.exception_handler(Exception)
 async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+
+    # WhatsApp alert for founder (rate-limited per endpoint)
+    user_email = None
+    try:
+        from app.utils.security import decode_access_token
+
+        auth = request.headers.get("authorization", "")
+        if auth.startswith("Bearer "):
+            user_id = decode_access_token(auth[7:])
+            if user_id:
+                user_email = f"user:{user_id}"
+    except Exception:
+        pass
+    send_error_alert(request.method, request.url.path, exc, user_email)
+
     return JSONResponse(
         status_code=500,
         content={
