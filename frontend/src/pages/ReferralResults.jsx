@@ -414,7 +414,7 @@ export default function ReferralResults() {
             <Button onClick={() => navigate('/referrals')}>
               Try Different Companies
             </Button>
-            <Button variant="secondary" onClick={() => navigate('/marketplace/settings')}>
+            <Button variant="secondary" onClick={() => navigate('/settings?tab=sharing')}>
               Share Your Network
             </Button>
           </div>
