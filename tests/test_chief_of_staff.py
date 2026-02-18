@@ -1743,24 +1743,20 @@ class TestBudgetEnforcer:
 
 
 # ---------------------------------------------------------------------------
-# WhatsApp command processing tests (Gap 8)
+# Telegram command processing tests (Gap 8)
 # ---------------------------------------------------------------------------
 
 
-class TestWhatsAppCommands:
+class TestTelegramCommands:
     @pytest.fixture(autouse=True)
     def _use_tmp_dirs(self, tmp_path: Path):
         state_path = tmp_path / "cos_state.json"
-        wa_dir = tmp_path / "whatsapp"
-        wa_dir.mkdir()
         tg_dir = tmp_path / "telegram"
         tg_dir.mkdir()
         with (
             patch("agents.chief_of_staff.cos_learning._STATE_PATH", state_path),
-            patch("agents.chief_of_staff.cos_agent.WHATSAPP_DIR", wa_dir),
             patch("agents.chief_of_staff.cos_agent.TELEGRAM_DIR", tg_dir),
         ):
-            self._wa_dir = wa_dir
             self._tg_dir = tg_dir
             yield
 
@@ -1773,12 +1769,13 @@ class TestWhatsAppCommands:
     def test_process_status_command(self):
         from agents.chief_of_staff.cos_agent import _process_async_commands
 
-        reply = self._wa_dir / "whatsapp-reply-001.txt"
+        reply = self._tg_dir / "telegram-reply-001.txt"
         reply.write_text("status", encoding="utf-8")
 
         results = _process_async_commands()
         assert len(results) == 1
         assert results[0].get("command") == "status"
+        assert results[0]["source"] == "telegram"
         # File should be renamed to .processed
         assert not reply.exists()
         assert reply.with_suffix(".processed").exists()
@@ -1786,7 +1783,7 @@ class TestWhatsAppCommands:
     def test_process_approve_command(self):
         from agents.chief_of_staff.cos_agent import _process_async_commands
 
-        reply = self._wa_dir / "whatsapp-reply-002.txt"
+        reply = self._tg_dir / "telegram-reply-002.txt"
         reply.write_text("1=yes", encoding="utf-8")
 
         results = _process_async_commands()
@@ -1795,7 +1792,7 @@ class TestWhatsAppCommands:
     def test_process_empty_reply(self):
         from agents.chief_of_staff.cos_agent import _process_async_commands
 
-        reply = self._wa_dir / "whatsapp-reply-003.txt"
+        reply = self._tg_dir / "telegram-reply-003.txt"
         reply.write_text("", encoding="utf-8")
 
         results = _process_async_commands()
@@ -1804,8 +1801,8 @@ class TestWhatsAppCommands:
     def test_process_multiple_replies(self):
         from agents.chief_of_staff.cos_agent import _process_async_commands
 
-        (self._wa_dir / "whatsapp-reply-001.txt").write_text("status", encoding="utf-8")
-        (self._wa_dir / "whatsapp-reply-002.txt").write_text("cost", encoding="utf-8")
+        (self._tg_dir / "telegram-reply-001.txt").write_text("status", encoding="utf-8")
+        (self._tg_dir / "telegram-reply-002.txt").write_text("cost", encoding="utf-8")
 
         results = _process_async_commands()
         assert len(results) == 2
@@ -1837,8 +1834,6 @@ class TestCosWiringIntegration:
         reports_dir = tmp_path / "reports"
         reports_dir.mkdir()
         state_path = tmp_path / "cos_state.json"
-        wa_dir = tmp_path / "whatsapp"
-        wa_dir.mkdir()
         tg_dir = tmp_path / "telegram"
         tg_dir.mkdir()
 
@@ -1862,12 +1857,10 @@ class TestCosWiringIntegration:
                 "agents.chief_of_staff.cos_agent.GTM_TEAM_REPORTS_DIR", tmp_path / "g"
             ),
             patch("agents.chief_of_staff.cos_learning._STATE_PATH", state_path),
-            patch("agents.chief_of_staff.cos_agent.WHATSAPP_DIR", wa_dir),
             patch("agents.chief_of_staff.cos_agent.TELEGRAM_DIR", tg_dir),
             patch("agents.chief_of_staff.telegram_bridge.TELEGRAM_DIR", tg_dir),
         ):
             self._reports_dir = reports_dir
-            self._wa_dir = wa_dir
             self._tg_dir = tg_dir
             yield
 
@@ -1890,15 +1883,15 @@ class TestCosWiringIntegration:
         # Brief should be generated (even if no budget issues)
         assert "# Founder Daily Brief" in result
 
-    def test_run_daily_processes_whatsapp_commands(self):
+    def test_run_daily_processes_telegram_commands(self):
         from agents.chief_of_staff.cos_agent import run_daily
 
         self._write_report(_make_report("architect"))
-        (self._wa_dir / "whatsapp-reply-001.txt").write_text("status")
+        (self._tg_dir / "telegram-reply-001.txt").write_text("status")
         result = run_daily()
         assert "# Founder Daily Brief" in result
         # Reply file should be processed
-        assert (self._wa_dir / "whatsapp-reply-001.processed").exists()
+        assert (self._tg_dir / "telegram-reply-001.processed").exists()
 
     def test_run_daily_routes_cross_team_requests(self):
         from agents.chief_of_staff.cos_agent import run_daily
