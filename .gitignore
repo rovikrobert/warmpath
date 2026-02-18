@@ -68,3 +68,6 @@ agents/shared/resolved_registry.json
 coverage.json
 .coverage
 junit.xml
+
+# Mutation testing backup journals (safety restore files)
+*.mutation_backup
