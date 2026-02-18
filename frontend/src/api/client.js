@@ -124,6 +124,8 @@ export const auth = {
     api('/api/v1/auth/reset-password', { method: 'POST', body }),
   deleteAccount: (body) =>
     api('/api/v1/auth/delete-account', { method: 'POST', body }),
+  changePassword: (body) =>
+    api('/api/v1/auth/change-password', { method: 'POST', body }),
   linkedinAuthorize: () => api('/api/v1/auth/linkedin/authorize'),
   linkedinCallback: (body) =>
     api('/api/v1/auth/linkedin/callback', { method: 'POST', body }),

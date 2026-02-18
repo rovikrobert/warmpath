@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from app.utils.performance import timed
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -192,6 +194,7 @@ async def create_application(
 
 
 @router.get("")
+@timed("applications_list")
 async def list_applications(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

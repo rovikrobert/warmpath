@@ -9,6 +9,8 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
+from app.utils.performance import timed
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -136,6 +138,7 @@ async def _match_and_build(
     }
 
 
+@timed("job_recommendations")
 async def get_recommendations(
     target_role: str,
     target_seniority: str | None,

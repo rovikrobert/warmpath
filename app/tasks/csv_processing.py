@@ -23,8 +23,10 @@ from app.services.csv_parser import classify_relationship, parse_linkedin_csv
 from app.services.suppression import check_suppression
 from app.services.warm_scorer import batch_compute_scores
 from app.utils.encryption import compute_blind_index
+from app.utils.performance import timed
 
 
+@timed("csv_process")
 async def process_csv_upload_core(
     csv_upload_id: str,
     user_id: str,

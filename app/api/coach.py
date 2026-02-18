@@ -7,6 +7,8 @@ from collections import defaultdict
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.utils.performance import timed
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +41,7 @@ class ChatRequest(BaseModel):
 
 
 @router.get("/briefing")
+@timed("coach_briefing")
 async def coach_briefing(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -59,6 +62,7 @@ async def coach_briefing(
 
 
 @router.post("/chat")
+@timed("coach_chat")
 async def coach_chat(
     body: ChatRequest,
     current_user: User = Depends(get_current_user),

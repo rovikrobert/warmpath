@@ -4,6 +4,8 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from app.utils.performance import timed
+
 from fastapi import (
     APIRouter,
     Cookie,
@@ -101,6 +103,7 @@ def _clear_refresh_cookie(response: Response) -> None:
 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
+@timed("auth_signup")
 async def signup(
     body: UserCreate,
     response: Response,
@@ -194,6 +197,7 @@ async def signup(
 
 
 @router.post("/login")
+@timed("auth_login")
 async def login(
     body: UserLogin,
     response: Response,
