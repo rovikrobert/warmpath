@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { auth as authApi } from '../api/client';
+import { auth as authApi, referrals as referralsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import PasswordStrength from '../components/PasswordStrength';
 
@@ -8,7 +8,7 @@ export default function AuthPage() {
   const { login, signup } = useAuth();
   const navigate = useNavigate();
   const [isSignup, setIsSignup] = useState(false);
-  const [form, setForm] = useState({ email: '', password: '', full_name: '' });
+  const [form, setForm] = useState({ email: '', password: '', full_name: '', referral_code: '' });
   const [loading, setLoading] = useState(false);
   const [linkedinLoading, setLinkedinLoading] = useState(false);
   const [linkedinAvailable, setLinkedinAvailable] = useState(false);
@@ -30,6 +30,10 @@ export default function AuthPage() {
     try {
       if (isSignup) {
         await signup({ email: form.email, password: form.password, full_name: form.full_name });
+        // Redeem referral code after signup (non-blocking)
+        if (form.referral_code.trim()) {
+          referralsApi.redeem({ code: form.referral_code.trim() }).catch(() => {});
+        }
         navigate('/onboarding');
       } else {
         await login({ email: form.email, password: form.password });
@@ -168,6 +172,15 @@ export default function AuthPage() {
               </div>
             )}
           </div>
+
+          {isSignup && (
+            <div>
+              <label htmlFor="auth-referral-code" className="mb-1 block text-sm font-medium text-slate-700">
+                Referral Code <span className="text-slate-400">(optional)</span>
+              </label>
+              <input id="auth-referral-code" type="text" value={form.referral_code} onChange={set('referral_code')} className={inputClass} placeholder="Enter code from a friend" />
+            </div>
+          )}
 
           {/* Signup tab: LinkedIn button below fields, requires all fields filled */}
           {isSignup && linkedinAvailable && (

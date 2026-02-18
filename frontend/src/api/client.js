@@ -257,6 +257,34 @@ export const coach = {
   },
 };
 
+export const referrals = {
+  create: (body) => api('/api/v1/referrals/create', { method: 'POST', body }),
+  mine: () => api('/api/v1/referrals/mine'),
+  redeem: (body) => api('/api/v1/referrals/redeem', { method: 'POST', body }),
+  leaderboard: () => api('/api/v1/referrals/leaderboard'),
+};
+
+export const privacy = {
+  exportData: () => api('/api/v1/privacy/export-data'),
+  restrictProcessing: () =>
+    api('/api/v1/privacy/restrict-processing', { method: 'POST' }),
+  unrestrictProcessing: () =>
+    api('/api/v1/privacy/unrestrict-processing', { method: 'POST' }),
+  marketingOptOut: () =>
+    api('/api/v1/privacy/marketing-opt-out', { method: 'POST' }),
+  marketingOptIn: () =>
+    api('/api/v1/privacy/marketing-opt-in', { method: 'POST' }),
+  listConsent: () => api('/api/v1/privacy/consent'),
+  submitConsent: (body) =>
+    api('/api/v1/privacy/consent', { method: 'POST', body }),
+  dataRequest: (body) =>
+    api('/api/v1/privacy/data-request', { method: 'POST', body }),
+};
+
+export const feedback = {
+  submit: (body) => api('/api/v1/feedback', { method: 'POST', body }),
+};
+
 export const health = {
   check: () => api('/health'),
   usage: () => api('/api/v1/usage/me'),

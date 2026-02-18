@@ -71,6 +71,8 @@ export default function Layout() {
     { to: '/marketplace/dashboard', label: 'Network Dashboard', show: isHolder },
     { to: '/marketplace/settings', label: 'Sharing Settings', show: isHolder },
     { to: '/credits', label: 'Credits', show: true },
+    { to: '/invite', label: 'Invite & Earn', show: true },
+    { to: '/settings/privacy', label: 'Privacy Settings', show: true },
   ];
 
   // All links for mobile nav
