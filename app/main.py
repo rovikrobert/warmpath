@@ -30,6 +30,7 @@ from app.api import (
     referrals,
     registry,
     search,
+    telegram,
     usage,
     webhooks,
 )
@@ -172,6 +173,7 @@ app.include_router(
     experiments.router, prefix="/api/v1/experiments", tags=["experiments"]
 )
 app.include_router(benchmarks.router, prefix="/api/v1/benchmarks", tags=["benchmarks"])
+app.include_router(telegram.router, prefix="/api/v1/telegram", tags=["telegram"])
 
 # ---------------------------------------------------------------------------
 # Frontend static files (SPA)
