@@ -279,3 +279,63 @@ class TestCreditVelocityAnalysis:
         metrics = {}
         _check_credit_velocity_live(findings, fin_findings, metrics)
         assert metrics.get("credit_velocity_available") is False
+
+
+class TestCashRunwayForecasting:
+    """Finance manager should forecast cash runway."""
+
+    def test_monthly_fixed_costs_defined(self):
+        from finance_team.shared.config import MONTHLY_FIXED_COSTS
+
+        assert isinstance(MONTHLY_FIXED_COSTS, dict)
+        assert "infrastructure" in MONTHLY_FIXED_COSTS
+        assert sum(MONTHLY_FIXED_COSTS.values()) > 0
+
+    def test_cash_runway_check_exists(self):
+        from finance_team.finance_manager import finance_manager
+
+        assert hasattr(finance_manager, "_check_cash_runway")
+
+    def test_cash_runway_without_data(self):
+        """Without Stripe or DB, uses fixed costs only."""
+        from finance_team.finance_manager.finance_manager import _check_cash_runway
+
+        findings = []
+        fin_findings = []
+        metrics = {}
+        cost_snapshots = []
+        _check_cash_runway(findings, fin_findings, metrics, cost_snapshots)
+
+        assert "monthly_burn_rate" in metrics
+        assert metrics["monthly_burn_rate"] > 0
+
+
+class TestInvestorReportExport:
+    """Investor report export as Excel workbook."""
+
+    def test_generate_workbook_returns_bytes(self):
+        from finance_team.shared.report_export import generate_workbook
+
+        wb_bytes = generate_workbook()
+        assert isinstance(wb_bytes, bytes)
+        assert wb_bytes[:2] == b"PK"
+
+    def test_workbook_has_expected_sheets(self):
+        from finance_team.shared.report_export import generate_workbook
+        from io import BytesIO
+
+        import openpyxl
+
+        wb_bytes = generate_workbook()
+        wb = openpyxl.load_workbook(BytesIO(wb_bytes))
+        sheet_names = wb.sheetnames
+
+        assert "Summary" in sheet_names
+        assert "Financial Health" in sheet_names
+        assert "Compliance" in sheet_names
+        assert "Technical Readiness" in sheet_names
+
+    def test_investor_relations_has_generate_method(self):
+        from finance_team.investor_relations import investor_relations
+
+        assert hasattr(investor_relations, "_generate_investor_report")
