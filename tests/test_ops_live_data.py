@@ -265,3 +265,45 @@ class TestMarshLiveVolume:
         _check_live_marketplace_volume(findings, mkt_findings, insights, metrics)
 
         assert "live_active_listings" not in metrics
+
+
+class TestOpsLiveDataIntegration:
+    """Verify all 4 agents run scan() without errors with live checks included."""
+
+    def test_keevs_scan_includes_live_metrics(self):
+        from ops_team.keevs.keevs import scan
+        report = scan()
+        assert "live_coaching_scenarios_tested" in report.metrics
+
+    def test_treb_scan_includes_live_findings(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import importlib
+        import ops_team.shared.db as db_mod
+        importlib.reload(db_mod)
+
+        from ops_team.treb.treb import scan
+        report = scan()
+        live_findings = [f for f in report.findings if "live" in f.id.lower()]
+        assert len(live_findings) >= 1
+
+    def test_naiv_scan_includes_live_findings(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import importlib
+        import ops_team.shared.db as db_mod
+        importlib.reload(db_mod)
+
+        from ops_team.naiv.naiv import scan
+        report = scan()
+        live_findings = [f for f in report.findings if "live" in f.id.lower()]
+        assert len(live_findings) >= 1
+
+    def test_marsh_scan_includes_live_findings(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import importlib
+        import ops_team.shared.db as db_mod
+        importlib.reload(db_mod)
+
+        from ops_team.marsh.marsh import scan
+        report = scan()
+        live_findings = [f for f in report.findings if "live" in f.id.lower()]
+        assert len(live_findings) >= 1
