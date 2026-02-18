@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     KEEVS_BRIEFING_CACHE_TTL_HOURS: int = 6
     AGENT_RUN_SECRET: str = ""
     CLAUDE_MODEL: str = "claude-sonnet-4-20250514"
+    POSTHOG_API_KEY: str = ""
+    POSTHOG_PROJECT_ID: str = ""
+    POSTHOG_HOST: str = "https://app.posthog.com"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
