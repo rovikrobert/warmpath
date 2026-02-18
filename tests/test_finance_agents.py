@@ -2,6 +2,7 @@
 
 from __futu[RESEND_KEY_REDACTED] import annotations
 import inspect
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -274,11 +275,19 @@ class TestCreditVelocityAnalysis:
             _check_credit_velocity_live,
         )
 
-        findings = []
-        fin_findings = []
-        metrics = {}
-        _check_credit_velocity_live(findings, fin_findings, metrics)
-        assert metrics.get("credit_velocity_available") is False
+        # Mock the executor to simulate no DB (singleton may be contaminated
+        # by other tests in the same xdist worker process)
+        mock_qe = MagicMock()
+        mock_qe.is_available.return_value = False
+        with patch(
+            "finance_team.shared.query_executor.get_finance_executor",
+            return_value=mock_qe,
+        ):
+            findings = []
+            fin_findings = []
+            metrics = {}
+            _check_credit_velocity_live(findings, fin_findings, metrics)
+            assert metrics.get("credit_velocity_available") is False
 
 
 class TestCashRunwayForecasting:
