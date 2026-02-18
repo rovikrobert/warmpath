@@ -34,7 +34,6 @@ class FriendSummary(BaseModel):
     headline: str | None = None
     current_company: str | None = None
     current_title: str | None = None
-    user_type: str
     friend_since: datetime
 
     model_config = {"from_attributes": True}

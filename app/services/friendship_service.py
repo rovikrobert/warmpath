@@ -239,7 +239,6 @@ async def get_friends(
                 "headline": profile.headline if profile else None,
                 "current_company": profile.current_company if profile else None,
                 "current_title": profile.current_title if profile else None,
-                "user_type": user.user_type,
                 "friend_since": f.responded_at or f.created_at,
             }
         )

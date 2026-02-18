@@ -745,8 +745,8 @@ function AccountTab() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <span className="font-medium text-slate-300">Account type:</span>
-            <span className="text-slate-400 capitalize">{user?.user_type?.replace('_', ' ') || 'Not set'}</span>
+            <span className="font-medium text-slate-300">Intent:</span>
+            <span className="text-slate-400 capitalize">{user?.intent?.replace('_', ' ') || 'Not set'}</span>
           </div>
         </div>
       </section>

@@ -59,7 +59,7 @@ async def export_user_data(user_id: uuid.UUID, db: AsyncSession) -> dict:
     user_data = {
         "email": user.email,
         "full_name": user.full_name,
-        "user_type": user.user_type,
+        "intent": user.intent,
         "plan_tier": user.plan_tier,
         "email_verified": user.email_verified,
         "created_at": _dt(user.created_at),

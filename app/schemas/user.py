@@ -23,10 +23,6 @@ class UserLogin(BaseModel):
     password: str = Field(..., max_length=128)
 
 
-class UserTypeUpdate(BaseModel):
-    user_type: str = Field(..., max_length=50)
-
-
 class IntentUpdate(BaseModel):
     intent: str = Field(..., max_length=20)
 
@@ -63,7 +59,6 @@ class UserResponse(BaseModel):
     email: str
     full_name: str
     plan_tier: str
-    user_type: str  # Kept during transition
     intent: str | None = None
     email_verified: bool
     created_at: datetime
