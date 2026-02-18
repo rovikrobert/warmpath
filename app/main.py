@@ -23,6 +23,7 @@ from app.api import (
     preferences,
     privacy,
     referrals,
+    registry,
     search,
     usage,
     webhooks,
@@ -136,6 +137,7 @@ app.include_router(coach.router, prefix="/api/v1/coach", tags=["coach"])
 app.include_router(privacy.router, prefix="/api/v1/privacy", tags=["privacy"])
 app.include_router(feedback.router, prefix="/api/v1/feedback", tags=["feedback"])
 app.include_router(referrals.router, prefix="/api/v1/referrals", tags=["referrals"])
+app.include_router(registry.router, prefix="/api/v1/registry", tags=["registry"])
 app.include_router(webhooks.router, prefix="/api/v1", tags=["webhooks"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 

@@ -32,4 +32,5 @@ from app.models.privacy import (  # noqa: E402, F401
     SuppressionList,
 )
 from app.models.referral import ReferralCode, ReferralConversion  # noqa: E402, F401
+from app.models.registry import CompanyBoard  # noqa: E402, F401
 from app.models.audit import AuditLog  # noqa: E402, F401

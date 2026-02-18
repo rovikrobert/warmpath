@@ -393,11 +393,18 @@ async def discover_boards(company_name: str) -> dict[str, str] | None:
 async def lookup_or_discover_boards(
     company_name: str, db: AsyncSession
 ) -> tuple[dict[str, str] | None, bool]:
-    """Look up boards from registry, cache, or live discovery.
+    """Look up boards from DB, static registry, cache, or live discovery.
 
     Returns (boards_dict, was_discovered) where was_discovered is True
-    when the board was found via auto-discovery (not static registry).
+    when the board was found via auto-discovery (not static registry/DB).
     """
+    # 0. Check DB-backed registry first
+    from app.services.registry_service import lookup_boards_db
+
+    db_boards = await lookup_boards_db(db, company_name)
+    if db_boards is not None:
+        return db_boards, False
+
     # 1. Check static registry (includes fuzzy match)
     boards = lookup_boards(company_name)
     if boards is not None:
@@ -441,10 +448,32 @@ async def lookup_or_discover_boards(
 
     await db.flush()
 
-    # 5. If found, register in-memory for this process
+    # 5. If found, register in-memory and persist to DB
     if discovered:
         for source, slug in discovered.items():
             register_board(company_name, source, slug)
+
+        # Persist to company_boards table for future lookups
+        from app.services.registry_service import get_board_by_key
+
+        key = company_name.strip().lower()
+        existing_db = await get_board_by_key(db, key)
+        if existing_db is None:
+            from app.models.registry import CompanyBoard
+
+            source = list(discovered.keys())[0]
+            slug = discovered[source]
+            new_board = CompanyBoard(
+                company_key=key,
+                display_name=key.replace("-", " ").title(),
+                board_source=source,
+                board_slug=slug,
+                is_active=True,
+                verified_at=datetime.now(timezone.utc),
+            )
+            db.add(new_board)
+            await db.flush()
+
         return discovered, True
 
     return None, False
