@@ -1917,6 +1917,94 @@ class TestCosWiringIntegration:
 
 
 # ---------------------------------------------------------------------------
+# NotionSync extension tests
+# ---------------------------------------------------------------------------
+
+
+class TestNotionSync:
+    """Tests for NotionSync extensions (Team Reports, Weekly, Comms Guide)."""
+
+    def test_setup_databases_disabled(self, monkeypatch):
+        monkeypatch.delenv("NOTION_API_KEY", raising=False)
+        from agents.chief_of_staff.notion_sync import NotionSync
+
+        ns = NotionSync()
+        result = ns.setup_databases("fake-page-id")
+        assert result == {}
+
+    def test_push_team_report_not_configured(self, monkeypatch):
+        monkeypatch.delenv("NOTION_API_KEY", raising=False)
+        from agents.chief_of_staff.notion_sync import NotionSync
+
+        ns = NotionSync()
+        result = ns.push_team_report(
+            date="2025-01-01",
+            team="engineering",
+            health="green",
+            summary="All clear",
+            agent_count=5,
+            finding_count=0,
+        )
+        assert result["synced"] is False
+
+    def test_push_weekly_synthesis_not_configured(self, monkeypatch):
+        monkeypatch.delenv("NOTION_API_KEY", raising=False)
+        from agents.chief_of_staff.notion_sync import NotionSync
+
+        ns = NotionSync()
+        result = ns.push_weekly_synthesis(
+            date="2025-01-01",
+            brief_markdown="# Weekly\n\nAll clear.",
+        )
+        assert result["synced"] is False
+
+    def test_push_communication_guide_not_configured(self, monkeypatch):
+        monkeypatch.delenv("NOTION_API_KEY", raising=False)
+        from agents.chief_of_staff.notion_sync import NotionSync
+
+        ns = NotionSync()
+        result = ns.push_communication_guide()
+        assert result["synced"] is False
+
+    def test_push_team_report_with_notion(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("NOTION_API_KEY", "fake-key")
+        import json as _json
+
+        state_path = tmp_path / "notion_state.json"
+        state_path.write_text(
+            _json.dumps(
+                {
+                    "team_reports_db": "fake-db-id",
+                    "daily_briefs_db": "",
+                    "decision_log_db": "",
+                    "founder_briefs_db": "",
+                    "weekly_synthesis_db": "",
+                    "command_center_page": "",
+                }
+            )
+        )
+        import agents.chief_of_staff.notion_sync as ns_mod
+
+        monkeypatch.setattr(ns_mod, "_STATE_FILE", state_path)
+        from agents.chief_of_staff.notion_sync import NotionSync
+
+        ns = NotionSync()
+        with patch.object(
+            ns._client, "create_page", return_value={"id": "new-page-id"}
+        ):
+            result = ns.push_team_report(
+                date="2025-01-01",
+                team="engineering",
+                health="green",
+                summary="All clear across 5 agents.",
+                agent_count=5,
+                finding_count=0,
+            )
+        assert result["synced"] is True
+        assert result["page_id"] == "new-page-id"
+
+
+# ---------------------------------------------------------------------------
 # Telegram bridge tests
 # ---------------------------------------------------------------------------
 
