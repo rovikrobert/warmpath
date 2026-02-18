@@ -27,9 +27,13 @@ from app.services.job_fetcher import JobFetcher
 logger = logging.getLogger(__name__)
 
 
+def _job_cache_key(company_key: str) -> str:
+    return f"job_scan:{company_key}"
+
+
 async def get_cached_jobs(company_key: str, db: AsyncSession) -> list[dict] | None:
     """Read cached job listings from EnrichmentCache if not expired."""
-    cache_key = f"job_scan:{company_key}"
+    cache_key = _job_cache_key(company_key)
     now = datetime.now(timezone.utc)
     result = await db.execute(
         select(EnrichmentCache).where(
@@ -43,9 +47,33 @@ async def get_cached_jobs(company_key: str, db: AsyncSession) -> list[dict] | No
     return entry.data.get("jobs", [])
 
 
+async def get_cached_jobs_batch(
+    company_keys: list[str], db: AsyncSession
+) -> dict[str, list[dict]]:
+    """Batch-read cached job listings for multiple companies (one query)."""
+    if not company_keys:
+        return {}
+    now = datetime.now(timezone.utc)
+    cache_keys = [_job_cache_key(k) for k in company_keys]
+    result = await db.execute(
+        select(EnrichmentCache.cache_key, EnrichmentCache.data).where(
+            EnrichmentCache.cache_key.in_(cache_keys),
+            EnrichmentCache.expires_at > now,
+        )
+    )
+    key_to_jobs: dict[str, list[dict]] = {}
+    prefix_len = len("job_scan:")
+    for row in result.all():
+        cache_key, data = row[0], row[1]
+        company_key = cache_key[prefix_len:] if cache_key.startswith("job_scan:") else cache_key
+        jobs = (data or {}).get("jobs", [])
+        key_to_jobs[company_key] = jobs
+    return key_to_jobs
+
+
 async def set_cached_jobs(company_key: str, jobs: list[dict], db: AsyncSession) -> None:
     """Upsert cached job listings with TTL."""
-    cache_key = f"job_scan:{company_key}"
+    cache_key = _job_cache_key(company_key)
     ttl = timedelta(hours=settings.RECOMMENDATION_CACHE_TTL_HOURS)
     expires_at = datetime.now(timezone.utc) + ttl
 
@@ -200,16 +228,9 @@ async def get_recommendations(
             exclude_set.add(name.strip().lower())
     candidates = [c for c in candidates if c not in exclude_set]
 
-    # Phase 1: Check cache for all candidates (fast — DB only)
-    cached_results: dict[str, list[dict]] = {}
-    uncached: list[str] = []
-
-    for key in candidates:
-        jobs = await get_cached_jobs(key, db)
-        if jobs is not None:
-            cached_results[key] = jobs
-        else:
-            uncached.append(key)
+    # Phase 1: Batch-check cache for all candidates (one query)
+    cached_results = await get_cached_jobs_batch(candidates, db)
+    uncached = [k for k in candidates if k not in cached_results]
 
     cache_hits = len(cached_results)
 

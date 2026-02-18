@@ -7,7 +7,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.utils.performance import timed
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -312,9 +312,14 @@ async def get_search_results(
         WarmScore.total_score, 0
     ) * Decimal("0.5")
 
+    # Cap in-memory company filter at 2000 rows for performance
+    SEARCH_COMPANY_CAP = 2000
+
     if company is not None:
-        # Load all matching rows, filter in-memory on decrypted company, then paginate
-        result = await db.execute(base_query.order_by(combined_expr.desc()))
+        # Load up to cap rows, filter in-memory on decrypted company, then paginate
+        result = await db.execute(
+            base_query.order_by(combined_expr.desc()).limit(SEARCH_COMPANY_CAP)
+        )
         all_rows = result.all()
         company_lower = company.lower()
         all_rows = [
@@ -347,8 +352,8 @@ async def get_search_results(
             (float(r[0].relevance_score), float(r[4] or 0)) for r in all_rows
         ]
     else:
-        # Run a lightweight stats query over the full filtered set
-        stats_query = (
+        # Single aggregated stats query (one row) instead of fetching all score pairs
+        stats_base = (
             select(
                 MatchResult.relevance_score,
                 func.coalesce(WarmScore.total_score, 0).label("warm"),
@@ -366,15 +371,61 @@ async def get_search_results(
             )
         )
         if match_type is not None:
-            stats_query = stats_query.where(MatchResult.match_type == match_type)
+            stats_base = stats_base.where(MatchResult.match_type == match_type)
         if min_warm is not None:
-            stats_query = stats_query.where(
+            stats_base = stats_base.where(
                 func.coalesce(WarmScore.total_score, 0) >= min_warm
             )
-        stats_pairs = [
-            (float(rel), float(warm_val))
-            for rel, warm_val in (await db.execute(stats_query)).all()
-        ]
+        subq = stats_base.subquery()
+        agg_query = select(
+            func.count().label("cnt"),
+            func.avg(subq.c.relevance_score).label("avg_rel"),
+            func.avg(subq.c.warm).label("avg_warm"),
+            func.sum(case((subq.c.relevance_score >= 90, 1), else_=0)).label("b90"),
+            func.sum(
+                case(
+                    (
+                        (subq.c.relevance_score >= 70)
+                        & (subq.c.relevance_score < 90),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("b70"),
+            func.sum(
+                case(
+                    (
+                        (subq.c.relevance_score >= 50)
+                        & (subq.c.relevance_score < 70),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("b50"),
+            func.sum(
+                case(
+                    (
+                        (subq.c.relevance_score >= 20)
+                        & (subq.c.relevance_score < 50),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("b20"),
+        ).select_from(subq)
+        agg_row = (await db.execute(agg_query)).one()
+        cnt = int(agg_row.cnt or 0)
+        avg_rel = float(agg_row.avg_rel or 0)
+        avg_warm = float(agg_row.avg_warm or 0)
+        sco[RESEND_KEY_REDACTED] = {
+            "90-100": int(agg_row.b90 or 0),
+            "70-89": int(agg_row.b70 or 0),
+            "50-69": int(agg_row.b50 or 0),
+            "20-49": int(agg_row.b20 or 0),
+        }
+        stats_pairs = []
+        all_relevance = [avg_rel] * cnt if cnt else []
+        all_warm = [avg_warm] * cnt if cnt else []
 
     for rel, warm_val in stats_pairs:
         r = float(rel)

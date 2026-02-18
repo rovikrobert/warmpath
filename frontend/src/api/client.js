@@ -246,8 +246,15 @@ export const preferences = {
 };
 
 export const applications = {
-  list: (status) => {
-    const qs = status ? `?status=${status}` : '';
+  list: (paramsOrStatus) => {
+    const params = typeof paramsOrStatus === 'string'
+      ? { status: paramsOrStatus }
+      : { ...paramsOrStatus };
+    const sp = new URLSearchParams();
+    if (params.status) sp.set('status', params.status);
+    if (params.page != null) sp.set('page', String(params.page));
+    if (params.per_page != null) sp.set('per_page', String(params.per_page));
+    const qs = sp.toString() ? `?${sp.toString()}` : '';
     return api(`/api/v1/applications${qs}`);
   },
   create: (body) => api('/api/v1/applications', { method: 'POST', body }),
