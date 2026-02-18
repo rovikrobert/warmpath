@@ -20,7 +20,10 @@ async def test_signup_returns_token(client: AsyncClient):
     # Decode the JWT and verify expected claims
     from jose import jwt
     from app.config import settings
-    payload = jwt.decode(body["data"]["access_token"], settings.SECRET_KEY, algorithms=["HS256"])
+
+    payload = jwt.decode(
+        body["data"]["access_token"], settings.SECRET_KEY, algorithms=["HS256"]
+    )
     assert payload["type"] == "access"
     assert "sub" in payload  # user ID (UUID string)
     assert "ver" in payload  # token version
@@ -42,7 +45,11 @@ async def test_signup_duplicate_email(client: AsyncClient):
     resp = await client.post("/api/v1/auth/signup", json=payload)
     assert resp.status_code == 409
     detail = resp.json().get("detail", "")
-    assert "email" in detail.lower() or "already" in detail.lower() or "exist" in detail.lower()
+    assert (
+        "email" in detail.lower()
+        or "already" in detail.lower()
+        or "exist" in detail.lower()
+    )
 
 
 async def test_login_success(client: AsyncClient):
@@ -66,7 +73,10 @@ async def test_login_success(client: AsyncClient):
     # Decode the JWT and verify expected claims
     from jose import jwt
     from app.config import settings
-    payload = jwt.decode(body["data"]["access_token"], settings.SECRET_KEY, algorithms=["HS256"])
+
+    payload = jwt.decode(
+        body["data"]["access_token"], settings.SECRET_KEY, algorithms=["HS256"]
+    )
     assert payload["type"] == "access"
     assert "sub" in payload  # user ID
     assert "exp" in payload  # expiration

@@ -29,10 +29,12 @@ class TestProductPrivacyGuard:
 
     def _get_guard(self):
         from product_team.shared.privacy_guard import ProductPrivacyGuard
+
         return ProductPrivacyGuard()
 
     def _get_violation(self):
         from product_team.shared.privacy_guard import PrivacyViolation
+
         return PrivacyViolation
 
     def test_rejects_email_in_finding(self):
@@ -96,6 +98,7 @@ class TestProductTeamReport:
 
     def test_create_empty_report(self):
         from product_team.shared.report import ProductTeamReport
+
         report = ProductTeamReport(agent="test_agent")
         assert report.agent == "test_agent"
         assert report.findings == []
@@ -104,6 +107,7 @@ class TestProductTeamReport:
     def test_create_report_with_findings(self):
         from agents.shared.report import Finding
         from product_team.shared.report import ProductTeamReport
+
         finding = Finding(
             id="test-001",
             severity="medium",
@@ -122,6 +126,7 @@ class TestProductTeamReport:
     def test_serialize_deserialize(self):
         from agents.shared.report import Finding
         from product_team.shared.report import ProductTeamReport
+
         finding = Finding(
             id="test-001",
             severity="medium",
@@ -145,6 +150,7 @@ class TestProductTeamReport:
     def test_to_markdown(self):
         from agents.shared.report import Finding
         from product_team.shared.report import ProductTeamReport
+
         finding = Finding(
             id="test-001",
             severity="high",
@@ -165,6 +171,7 @@ class TestProductTeamReport:
     def test_to_agent_report(self):
         from agents.shared.report import AgentReport, Finding
         from product_team.shared.report import ProductTeamReport
+
         finding = Finding(
             id="test-001",
             severity="medium",
@@ -197,6 +204,7 @@ class TestUXLeadScan:
 
     def test_scan_returns_report(self):
         from product_team.ux_lead.ux_lead import scan
+
         report = scan()
         assert report.agent == "ux_lead"
         assert isinstance(report.scan_duration_seconds, float)
@@ -206,12 +214,14 @@ class TestUXLeadScan:
 
     def test_scan_finds_jsx_files(self):
         from product_team.ux_lead.ux_lead import scan
+
         report = scan()
         # We know frontend has JSX files
         assert report.metrics["total_jsx_files"] > 0
 
     def test_scan_has_ux_health_score(self):
         from product_team.ux_lead.ux_lead import scan
+
         report = scan()
         assert "ux_health_score" in report.metrics
 
@@ -226,6 +236,7 @@ class TestDesignLeadScan:
 
     def test_scan_returns_report(self):
         from product_team.design_lead.design_lead import scan
+
         report = scan()
         assert report.agent == "design_lead"
         assert isinstance(report.scan_duration_seconds, float)
@@ -234,11 +245,13 @@ class TestDesignLeadScan:
 
     def test_scan_has_design_system_score(self):
         from product_team.design_lead.design_lead import scan
+
         report = scan()
         assert "design_system_score" in report.metrics
 
     def test_scan_checks_colors(self):
         from product_team.design_lead.design_lead import scan
+
         report = scan()
         assert "unique_hardcoded_colors" in report.metrics
 
@@ -253,17 +266,20 @@ class TestUserResearcherScan:
 
     def test_scan_returns_report(self):
         from product_team.user_researcher.user_researcher import scan
+
         report = scan()
         assert report.agent == "user_researcher"
         assert isinstance(report.scan_duration_seconds, float)
 
     def test_scan_maps_journeys(self):
         from product_team.user_researcher.user_researcher import scan
+
         report = scan()
         assert "pages_found" in report.metrics or "total_page_files" in report.metrics
 
     def test_scan_produces_insights(self):
         from product_team.user_researcher.user_researcher import scan
+
         report = scan()
         # Should produce at least persona insights + source catalog
         assert len(report.product_insights) >= 1
@@ -279,17 +295,20 @@ class TestProductManagerScan:
 
     def test_scan_returns_report(self):
         from product_team.product_manager.product_manager import scan
+
         report = scan()
         assert report.agent == "product_manager"
         assert isinstance(report.scan_duration_seconds, float)
 
     def test_scan_maps_endpoints(self):
         from product_team.product_manager.product_manager import scan
+
         report = scan()
         assert "total_api_endpoints" in report.metrics
 
     def test_scan_has_featu[RESEND_KEY_REDACTED](self):
         from product_team.product_manager.product_manager import scan
+
         report = scan()
         assert "featu[RESEND_KEY_REDACTED]" in report.metrics
 
@@ -304,6 +323,7 @@ class TestProductLeadBrief:
 
     def test_daily_brief_no_reports(self):
         from product_team.product_lead.product_lead import generate_daily_brief
+
         brief = generate_daily_brief(reports=[])
         assert "Product Team Daily Brief" in brief
         assert "No agent reports available" in brief
@@ -316,10 +336,15 @@ class TestProductLeadBrief:
         report = ProductTeamReport(
             agent="ux_lead",
             scan_duration_seconds=0.5,
-            findings=[Finding(
-                id="test-001", severity="medium", category="ux_quality",
-                title="Test UX finding", detail="Detail",
-            )],
+            findings=[
+                Finding(
+                    id="test-001",
+                    severity="medium",
+                    category="ux_quality",
+                    title="Test UX finding",
+                    detail="Detail",
+                )
+            ],
             metrics={"ux_health_score": 75},
         )
         brief = generate_daily_brief(reports=[report])
@@ -328,6 +353,7 @@ class TestProductLeadBrief:
 
     def test_weekly_report_no_reports(self):
         from product_team.product_lead.product_lead import generate_weekly_report
+
         report = generate_weekly_report(reports=[])
         assert "Product Team Weekly Report" in report
         assert "No agent reports available" in report
@@ -340,10 +366,15 @@ class TestProductLeadBrief:
         report = ProductTeamReport(
             agent="design_lead",
             scan_duration_seconds=0.3,
-            findings=[Finding(
-                id="ds-001", severity="low", category="design_system",
-                title="Test design finding", detail="Detail",
-            )],
+            findings=[
+                Finding(
+                    id="ds-001",
+                    severity="low",
+                    category="design_system",
+                    title="Test design finding",
+                    detail="Detail",
+                )
+            ],
             metrics={"design_system_score": 90},
         )
         result = generate_weekly_report(reports=[report])
@@ -352,6 +383,7 @@ class TestProductLeadBrief:
 
     def test_scan_returns_report(self):
         from product_team.product_lead.product_lead import scan
+
         report = scan()
         assert report.agent == "product_lead"
         assert isinstance(report.scan_duration_seconds, float)
@@ -367,36 +399,44 @@ class TestProductLearningState:
 
     def test_record_finding(self, tmp_path, monkeypatch):
         import product_team.shared.learning as learning_mod
+
         monkeypatch.setattr(learning_mod, "PRODUCT_TEAM_DIR", tmp_path)
 
         from product_team.shared.learning import ProductLearningState
+
         ls = ProductLearningState("test_agent")
-        ls.record_finding({
-            "id": "f-001",
-            "severity": "medium",
-            "category": "ux_quality",
-            "title": "Test finding",
-            "file": "test.jsx",
-        })
+        ls.record_finding(
+            {
+                "id": "f-001",
+                "severity": "medium",
+                "category": "ux_quality",
+                "title": "Test finding",
+                "file": "test.jsx",
+            }
+        )
         assert len(ls.state["finding_history"]) == 1
         assert ls.state["finding_history"][0]["category"] == "ux_quality"
 
     def test_recurring_pattern_detection(self, tmp_path, monkeypatch):
         import product_team.shared.learning as learning_mod
+
         monkeypatch.setattr(learning_mod, "PRODUCT_TEAM_DIR", tmp_path)
 
         from product_team.shared.learning import ProductLearningState
+
         ls = ProductLearningState("test_agent")
 
         # Record 5+ findings to trigger auto-escalation
         for i in range(6):
-            ls.record_finding({
-                "id": f"f-{i:03d}",
-                "severity": "medium",
-                "category": "accessibility",
-                "title": f"Finding {i}",
-                "file": "test.jsx",
-            })
+            ls.record_finding(
+                {
+                    "id": f"f-{i:03d}",
+                    "severity": "medium",
+                    "category": "accessibility",
+                    "title": f"Finding {i}",
+                    "file": "test.jsx",
+                }
+            )
 
         pattern = ls.detect_recurring_pattern("accessibility", "test.jsx")
         assert pattern["count"] >= 5
@@ -404,9 +444,11 @@ class TestProductLearningState:
 
     def test_health_trajectory(self, tmp_path, monkeypatch):
         import product_team.shared.learning as learning_mod
+
         monkeypatch.setattr(learning_mod, "PRODUCT_TEAM_DIR", tmp_path)
 
         from product_team.shared.learning import ProductLearningState
+
         ls = ProductLearningState("test_agent")
 
         # Record 2 health snapshots
@@ -418,9 +460,11 @@ class TestProductLearningState:
 
     def test_meta_learning_report(self, tmp_path, monkeypatch):
         import product_team.shared.learning as learning_mod
+
         monkeypatch.setattr(learning_mod, "PRODUCT_TEAM_DIR", tmp_path)
 
         from product_team.shared.learning import ProductLearningState
+
         ls = ProductLearningState("test_agent")
         ls.record_scan({"score": 75})
         report = ls.generate_meta_learning_report()
@@ -429,9 +473,11 @@ class TestProductLearningState:
 
     def test_severity_calibration(self, tmp_path, monkeypatch):
         import product_team.shared.learning as learning_mod
+
         monkeypatch.setattr(learning_mod, "PRODUCT_TEAM_DIR", tmp_path)
 
         from product_team.shared.learning import ProductLearningState
+
         ls = ProductLearningState("test_agent")
         ls.record_severity_calibration("medium")
         ls.record_severity_calibration("medium")
@@ -443,9 +489,11 @@ class TestProductLearningState:
 
     def test_tool_accuracy(self, tmp_path, monkeypatch):
         import product_team.shared.learning as learning_mod
+
         monkeypatch.setattr(learning_mod, "PRODUCT_TEAM_DIR", tmp_path)
 
         from product_team.shared.learning import ProductLearningState
+
         ls = ProductLearningState("test_agent")
         ls.record_tool_accuracy("regex_scanner", "f-001", confirmed=True)
         ls.record_tool_accuracy("regex_scanner", "f-002", confirmed=False)
@@ -465,13 +513,19 @@ class TestProductIntelligence:
 
     def test_categories_defined(self):
         from product_team.shared.intelligence import PRODUCT_INTEL_CATEGORIES
+
         assert len(PRODUCT_INTEL_CATEGORIES) == 12
 
     def test_add_and_get_item(self, tmp_path, monkeypatch):
         import product_team.shared.intelligence as intel_mod
+
         monkeypatch.setattr(intel_mod, "INTEL_CACHE", tmp_path / "cache.json")
 
-        from product_team.shared.intelligence import ProductIntelItem, ProductIntelligence
+        from product_team.shared.intelligence import (
+            ProductIntelItem,
+            ProductIntelligence,
+        )
+
         pi = ProductIntelligence()
         item = ProductIntelItem(
             category="user_forums",
@@ -488,9 +542,14 @@ class TestProductIntelligence:
 
     def test_get_urgent(self, tmp_path, monkeypatch):
         import product_team.shared.intelligence as intel_mod
+
         monkeypatch.setattr(intel_mod, "INTEL_CACHE", tmp_path / "cache.json")
 
-        from product_team.shared.intelligence import ProductIntelItem, ProductIntelligence
+        from product_team.shared.intelligence import (
+            ProductIntelItem,
+            ProductIntelligence,
+        )
+
         pi = ProductIntelligence()
         pi.add_item(ProductIntelItem(category="c1", title="Low", severity="low"))
         pi.add_item(ProductIntelItem(category="c2", title="High", severity="high"))
@@ -501,9 +560,14 @@ class TestProductIntelligence:
 
     def test_mark_adopted(self, tmp_path, monkeypatch):
         import product_team.shared.intelligence as intel_mod
+
         monkeypatch.setattr(intel_mod, "INTEL_CACHE", tmp_path / "cache.json")
 
-        from product_team.shared.intelligence import ProductIntelItem, ProductIntelligence
+        from product_team.shared.intelligence import (
+            ProductIntelItem,
+            ProductIntelligence,
+        )
+
         pi = ProductIntelligence()
         item = ProductIntelItem(id="test-id", category="c1", title="Test")
         pi.add_item(item)
@@ -514,9 +578,11 @@ class TestProductIntelligence:
 
     def test_freshness_check(self, tmp_path, monkeypatch):
         import product_team.shared.intelligence as intel_mod
+
         monkeypatch.setattr(intel_mod, "INTEL_CACHE", tmp_path / "cache.json")
 
         from product_team.shared.intelligence import ProductIntelligence
+
         pi = ProductIntelligence()
         freshness = pi.check_freshness()
         # All should be stale (no cache entries)
@@ -524,9 +590,11 @@ class TestProductIntelligence:
 
     def test_research_agenda(self, tmp_path, monkeypatch):
         import product_team.shared.intelligence as intel_mod
+
         monkeypatch.setattr(intel_mod, "INTEL_CACHE", tmp_path / "cache.json")
 
         from product_team.shared.intelligence import ProductIntelligence
+
         pi = ProductIntelligence()
         agenda = pi.generate_research_agenda()
         assert len(agenda) > 0
@@ -534,9 +602,11 @@ class TestProductIntelligence:
 
     def test_intel_report(self, tmp_path, monkeypatch):
         import product_team.shared.intelligence as intel_mod
+
         monkeypatch.setattr(intel_mod, "INTEL_CACHE", tmp_path / "cache.json")
 
         from product_team.shared.intelligence import ProductIntelligence
+
         pi = ProductIntelligence()
         report = pi.generate_intel_report()
         assert "total_items" in report
@@ -553,33 +623,47 @@ class TestCosIntegration:
 
     def test_product_team_active_in_config(self):
         from agents.chief_of_staff.cos_config import COS_CONFIG
+
         product = COS_CONFIG["teams"]["product"]
         assert product["active"] is True
         assert product["report_dir"] == "product_team/reports"
 
     def test_product_budget_in_config(self):
         from agents.chief_of_staff.cos_config import COS_CONFIG
+
         assert "product_team_daily_max_tokens" in COS_CONFIG["cost_budget"]
 
     def test_product_categories_in_outcome_map(self):
         from agents.shared.business_outcomes import CATEGORY_OUTCOME_MAP
-        product_categories = ["ux_quality", "design_system", "featu[RESEND_KEY_REDACTED]",
-                              "user_research", "product_strategy"]
+
+        product_categories = [
+            "ux_quality",
+            "design_system",
+            "featu[RESEND_KEY_REDACTED]",
+            "user_research",
+            "product_strategy",
+        ]
         for cat in product_categories:
             assert cat in CATEGORY_OUTCOME_MAP, f"Missing category: {cat}"
 
     def test_product_impact_templates(self):
         from agents.shared.business_outcomes import get_business_impact
+
         impact = get_business_impact("ux_quality", "high")
         assert "UX" in impact or "friction" in impact
 
     def test_product_team_in_cos_learning(self):
         from agents.chief_of_staff.cos_learning import _default_state
+
         state = _default_state()
         assert "product" in state["team_reliability"]
 
     def test_product_outcomes_score(self):
-        from agents.shared.business_outcomes import get_aligned_outcomes, sco[RESEND_KEY_REDACTED]
+        from agents.shared.business_outcomes import (
+            get_aligned_outcomes,
+            sco[RESEND_KEY_REDACTED],
+        )
+
         outcomes = get_aligned_outcomes("ux_quality")
         assert len(outcomes) >= 1
         score = sco[RESEND_KEY_REDACTED](outcomes)

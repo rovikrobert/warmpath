@@ -77,7 +77,10 @@ class TestLoginTokens:
         # Decode the access token and verify JWT claims
         from jose import jwt
         from app.config import settings
-        payload = jwt.decode(body["data"]["access_token"], settings.SECRET_KEY, algorithms=["HS256"])
+
+        payload = jwt.decode(
+            body["data"]["access_token"], settings.SECRET_KEY, algorithms=["HS256"]
+        )
         assert payload["type"] == "access"
         assert "sub" in payload  # user ID
         assert "ver" in payload  # token version
@@ -195,7 +198,11 @@ class TestTokenVersioning:
         resp2 = await client.post("/api/v1/auth/refresh")
         assert resp2.status_code == 401
         detail = resp2.json().get("detail", "")
-        assert "revoked" in detail.lower() or "invalid" in detail.lower() or "token" in detail.lower()
+        assert (
+            "revoked" in detail.lower()
+            or "invalid" in detail.lower()
+            or "token" in detail.lower()
+        )
 
     async def test_login_after_logout_all_works(self, client: AsyncClient):
         """After logout-all, user can still log in and get valid tokens."""
@@ -206,6 +213,7 @@ class TestTokenVersioning:
         # Decode old token to get its version
         from jose import jwt
         from app.config import settings
+
         old_payload = jwt.decode(access, settings.SECRET_KEY, algorithms=["HS256"])
         old_ver = old_payload["ver"]
 
@@ -272,6 +280,7 @@ class TestChangePassword:
         # Decode both tokens and verify the new token has incremented version
         from jose import jwt
         from app.config import settings
+
         old_payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         new_payload = jwt.decode(new_token, settings.SECRET_KEY, algorithms=["HS256"])
         assert new_payload["ver"] == old_payload["ver"] + 1
@@ -316,6 +325,7 @@ class TestChangePassword:
         from app.models.user import User
         from jose import jwt
         from app.config import settings
+
         old_payload = jwt.decode(old_token, settings.SECRET_KEY, algorithms=["HS256"])
         async with TestSessionLocal() as session:
             result = await session.execute(
@@ -367,6 +377,7 @@ class TestTokenTypeEnforcement:
         # Verify the refresh token actually is a refresh type
         from jose import jwt
         from app.config import settings
+
         refresh_payload = jwt.decode(refresh, settings.SECRET_KEY, algorithms=["HS256"])
         assert refresh_payload["type"] == "refresh"
 
@@ -513,7 +524,9 @@ class TestCSVContentType:
         )
         assert resp.status_code == 415
         detail = resp.json().get("detail", "")
-        assert "csv" in detail.lower() or "content" in detail.lower()  # Explains the rejection
+        assert (
+            "csv" in detail.lower() or "content" in detail.lower()
+        )  # Explains the rejection
 
     async def test_text_csv_accepted(self, client: AsyncClient):
         token = await _get_auth_token(client)
@@ -600,7 +613,10 @@ class TestSecurityHeaders:
         # Also verify CSP, referrer-policy, and permissions-policy on error responses
         assert "default-src 'self'" in resp.headers.get("content-security-policy", "")
         assert resp.headers.get("referrer-policy") == "strict-origin-when-cross-origin"
-        assert resp.headers.get("permissions-policy") == "camera=(), microphone=(), geolocation=()"
+        assert (
+            resp.headers.get("permissions-policy")
+            == "camera=(), microphone=(), geolocation=()"
+        )
 
     async def test_no_hsts_by_default(self, client: AsyncClient):
         """HSTS should NOT be present when SECURE_HEADERS is false (default)."""

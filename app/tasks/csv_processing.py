@@ -203,10 +203,12 @@ async def process_csv_upload_core(
 
         upload_count_result = await db.execute(
             select(sa_func.count()).select_from(
-                select(CsvUpload.id).where(
+                select(CsvUpload.id)
+                .where(
                     CsvUpload.user_id == user_uuid,
                     CsvUpload.status == "completed",
-                ).subquery()
+                )
+                .subquery()
             )
         )
         upload_count = upload_count_result.scalar() or 0
@@ -234,7 +236,7 @@ async def process_csv_upload_core(
 
 
 @celery_app.task(bind=True)
-def process_csv_upload(self, csv_upload_id: str, user_id: str, file_content_b64: str):
+def process_csv_upload(self, csv_upload_id: str, user_id: str, file_content_b64: str) -> None:
     """Celery task: process a CSV upload in the background.
 
     Creates its own async engine + session, then delegates to the core function.

@@ -111,9 +111,7 @@ class TestContactsErrors:
     async def test_delete_contact_not_found(self, client: AsyncClient):
         """DELETE /api/v1/contacts/{id} for nonexistent contact returns 404."""
         headers = await _auth_headers(client)
-        resp = await client.delete(
-            f"/api/v1/contacts/{FAKE_UUID}", headers=headers
-        )
+        resp = await client.delete(f"/api/v1/contacts/{FAKE_UUID}", headers=headers)
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
@@ -212,9 +210,7 @@ class TestMatchesErrors:
     async def test_get_intro_not_found(self, client: AsyncClient):
         """GET /api/v1/matches/intros/{id} for nonexistent intro returns 404."""
         headers = await _auth_headers(client)
-        resp = await client.get(
-            f"/api/v1/matches/intros/{FAKE_UUID}", headers=headers
-        )
+        resp = await client.get(f"/api/v1/matches/intros/{FAKE_UUID}", headers=headers)
         assert resp.status_code == 404
 
 
@@ -279,9 +275,7 @@ class TestWebhooksErrors:
         assert "Invalid JSON" in resp.json()["detail"]
 
     @pytest.mark.asyncio
-    async def test_webhook_missing_signatu[RESEND_KEY_REDACTED](
-        self, client: AsyncClient
-    ):
+    async def test_webhook_missing_signatu[RESEND_KEY_REDACTED](self, client: AsyncClient):
         """POST /api/v1/webhooks/stripe without Stripe-Signature when
         STRIPE_WEBHOOK_SECRET is configured returns 400."""
         from app.config import settings

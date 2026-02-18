@@ -423,11 +423,16 @@ async def update_application(
     # Track funnel step
     from app.models.enrichment import UsageLog
 
-    db.add(UsageLog(
-        user_id=current_user.id,
-        action="application_update",
-        metadata_={"application_id": str(application_id), "new_status": body.status},
-    ))
+    db.add(
+        UsageLog(
+            user_id=current_user.id,
+            action="application_update",
+            metadata_={
+                "application_id": str(application_id),
+                "new_status": body.status,
+            },
+        )
+    )
 
     await db.commit()
 

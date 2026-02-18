@@ -91,7 +91,7 @@ async def coach_chat_stream(
     body: ChatRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> StreamingResponse:
     """Stream a chat response from Keevs via Server-Sent Events."""
     user_key = str(current_user.id)
 

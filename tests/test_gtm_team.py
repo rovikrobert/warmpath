@@ -33,10 +33,12 @@ class TestGTMPrivacyGuard:
 
     def _get_guard(self):
         from gtm_team.shared.privacy_guard import GTMPrivacyGuard
+
         return GTMPrivacyGuard()
 
     def _get_violation(self):
         from gtm_team.shared.privacy_guard import PrivacyViolation
+
         return PrivacyViolation
 
     def test_rejects_email_in_finding(self):
@@ -62,7 +64,12 @@ class TestGTMPrivacyGuard:
 
     def test_accepts_clean_finding(self):
         guard = self._get_guard()
-        assert guard.validate_finding("Competitive coverage is 75% across 8 tracked competitors") is True
+        assert (
+            guard.validate_finding(
+                "Competitive coverage is 75% across 8 tracked competitors"
+            )
+            is True
+        )
 
     def test_rejects_forbidden_action_expose_data(self):
         guard = self._get_guard()
@@ -90,7 +97,12 @@ class TestGTMPrivacyGuard:
 
     def test_accepts_valid_marketing_claim(self):
         guard = self._get_guard()
-        assert guard.validate_marketing_claim("Get warm referrals through anonymous marketplace search") is True
+        assert (
+            guard.validate_marketing_claim(
+                "Get warm referrals through anonymous marketplace search"
+            )
+            is True
+        )
 
     def test_rejects_pii_columns_in_output(self):
         guard = self._get_guard()
@@ -100,7 +112,10 @@ class TestGTMPrivacyGuard:
 
     def test_accepts_clean_columns(self):
         guard = self._get_guard()
-        assert guard.validate_output_columns(["category", "count", "readiness_score"]) is True
+        assert (
+            guard.validate_output_columns(["category", "count", "readiness_score"])
+            is True
+        )
 
     def test_audit_log_populated(self):
         guard = self._get_guard()
@@ -227,7 +242,9 @@ class TestStrategyContext:
     def test_extract_competitive_info(self):
         from gtm_team.shared.strategy_context import extract_competitive_info
 
-        docs = {"CLAUDE.md": "Competitors include LinkedIn and Handshake in the referral space."}
+        docs = {
+            "CLAUDE.md": "Competitors include LinkedIn and Handshake in the referral space."
+        }
         comp = extract_competitive_info(docs)
         assert "LinkedIn" in comp["competitors_mentioned"]
         assert "Handshake" in comp["competitors_mentioned"]
@@ -236,7 +253,9 @@ class TestStrategyContext:
     def test_extract_personas(self):
         from gtm_team.shared.strategy_context import extract_personas
 
-        docs = {"CLAUDE.md": "Job seekers on the demand side need referrals. Network holders on the supply side."}
+        docs = {
+            "CLAUDE.md": "Job seekers on the demand side need referrals. Network holders on the supply side."
+        }
         personas = extract_personas(docs)
         assert personas["has_job_seeker_persona"] is True
         assert personas["has_network_holder_persona"] is True
@@ -244,7 +263,9 @@ class TestStrategyContext:
     def test_extract_geographic_strategy(self):
         from gtm_team.shared.strategy_context import extract_geographic_strategy
 
-        docs = {"CLAUDE.md": "Singapore is the home base. PDPA compliance required. Expansion to Southeast Asia."}
+        docs = {
+            "CLAUDE.md": "Singapore is the home base. PDPA compliance required. Expansion to Southeast Asia."
+        }
         geo = extract_geographic_strategy(docs)
         assert "singapore" in geo["markets_mentioned"]
         assert geo["has_regulatory_notes"] is True
@@ -252,7 +273,9 @@ class TestStrategyContext:
     def test_extract_privacy_constraints(self):
         from gtm_team.shared.strategy_context import extract_privacy_constraints
 
-        docs = {"CLAUDE.md": "Private vault model. Anonymized marketplace index. Consent gates. GDPR. PDPA. CCPA."}
+        docs = {
+            "CLAUDE.md": "Private vault model. Anonymized marketplace index. Consent gates. GDPR. PDPA. CCPA."
+        }
         privacy = extract_privacy_constraints(docs)
         assert privacy["has_vault_model"] is True
         assert privacy["has_anonymization"] is True
@@ -264,7 +287,7 @@ class TestStrategyContext:
 
         divergences = check_alignment(
             "We should offer free access to all features",
-            "Revenue from paid marketplace access"
+            "Revenue from paid marketplace access",
         )
         assert len(divergences) >= 1
 
@@ -273,7 +296,7 @@ class TestStrategyContext:
 
         divergences = check_alignment(
             "Strengthen referral matching algorithm",
-            "Core thesis: cold applications vs referrals"
+            "Core thesis: cold applications vs referrals",
         )
         assert len(divergences) == 0
 
@@ -347,10 +370,15 @@ class TestMonetizationScan:
 
         report = scan()
         # Should have credit-related metrics
-        assert "credit_signals_found" in report.metrics or "credit_economy_coverage" in report.metrics or any(
-            "credit" in f.category or "credit" in f.id.lower()
-            for f in report.findings
-        ) or report.metrics.get("monetization_readiness_score", 0) >= 0
+        assert (
+            "credit_signals_found" in report.metrics
+            or "credit_economy_coverage" in report.metrics
+            or any(
+                "credit" in f.category or "credit" in f.id.lower()
+                for f in report.findings
+            )
+            or report.metrics.get("monetization_readiness_score", 0) >= 0
+        )
 
     def test_scan_readiness_in_range(self):
         from gtm_team.monetization.scanner import scan
@@ -427,7 +455,10 @@ class TestPartnershipsScan:
             k.startswith("supply_") or k.startswith("csv_") or "contact" in k.lower()
             for k in report.metrics
         )
-        assert has_supply_metrics or report.metrics.get("partnership_readiness_score", 0) >= 0
+        assert (
+            has_supply_metrics
+            or report.metrics.get("partnership_readiness_score", 0) >= 0
+        )
 
     def test_scan_readiness_in_range(self):
         from gtm_team.partnerships.scanner import scan
@@ -476,7 +507,11 @@ class TestGTMLead:
         from gtm_team.gtm_lead.scanner import scan
 
         report = scan()
-        assert "gtm_readiness_score" in report.metrics or "gtm_health_score" in report.metrics or report.metrics.get("sub_agent_reports_loaded", 0) >= 0
+        assert (
+            "gtm_readiness_score" in report.metrics
+            or "gtm_health_score" in report.metrics
+            or report.metrics.get("sub_agent_reports_loaded", 0) >= 0
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -496,30 +531,35 @@ class TestGTMLearningState:
 
     def _make_ls(self):
         from gtm_team.shared.learning import GTMLearningState
+
         return GTMLearningState("stratops")
 
     def test_record_finding(self):
         ls = self._make_ls()
-        ls.record_finding({
-            "id": "STRAT-001",
-            "severity": "medium",
-            "category": "competitive",
-            "title": "Low coverage",
-            "file": "CLAUDE.md",
-        })
+        ls.record_finding(
+            {
+                "id": "STRAT-001",
+                "severity": "medium",
+                "category": "competitive",
+                "title": "Low coverage",
+                "file": "CLAUDE.md",
+            }
+        )
         ls.save()
         assert len(ls.state.get("finding_history", [])) >= 1
 
     def test_detect_recurring_pattern(self):
         ls = self._make_ls()
         for i in range(6):
-            ls.record_finding({
-                "id": "STRAT-001",
-                "severity": "medium",
-                "category": "competitive",
-                "title": "Low coverage",
-                "file": "CLAUDE.md",
-            })
+            ls.record_finding(
+                {
+                    "id": "STRAT-001",
+                    "severity": "medium",
+                    "category": "competitive",
+                    "title": "Low coverage",
+                    "file": "CLAUDE.md",
+                }
+            )
         result = ls.detect_recurring_pattern("STRAT-001")
         # After 6 occurrences, should detect as recurring (threshold = 5)
         assert result is not None or ls.state.get("total_findings_tracked", 0) >= 6
@@ -548,12 +588,14 @@ class TestGTMLearningState:
     def test_meta_learning_report(self):
         ls = self._make_ls()
         ls.record_scan({"readiness": 80})
-        ls.record_finding({
-            "id": "STRAT-001",
-            "severity": "medium",
-            "category": "competitive",
-            "title": "Low coverage",
-        })
+        ls.record_finding(
+            {
+                "id": "STRAT-001",
+                "severity": "medium",
+                "category": "competitive",
+                "title": "Low coverage",
+            }
+        )
         ls.save()
         report = ls.generate_meta_learning_report()
         assert isinstance(report, dict)
@@ -571,7 +613,9 @@ class TestGTMIntelligence:
     def _make_intel(self, tmp_path):
         from gtm_team.shared.intelligence import GTMIntelligence
 
-        with patch("gtm_team.shared.intelligence.INTEL_CACHE", tmp_path / "intel_cache.json"):
+        with patch(
+            "gtm_team.shared.intelligence.INTEL_CACHE", tmp_path / "intel_cache.json"
+        ):
             return GTMIntelligence()
 
     def test_categories_exist(self):
@@ -579,7 +623,9 @@ class TestGTMIntelligence:
 
         gi = GTMIntelligence.__new__(GTMIntelligence)
         # Access CATEGORIES class attribute
-        cats = GTMIntelligence.CATEGORIES if hasattr(GTMIntelligence, "CATEGORIES") else {}
+        cats = (
+            GTMIntelligence.CATEGORIES if hasattr(GTMIntelligence, "CATEGORIES") else {}
+        )
         assert isinstance(cats, dict)
 
     def test_check_freshness(self, tmp_path):
@@ -626,10 +672,18 @@ class TestCosGTMIntegration:
         from agents.shared.business_outcomes import CATEGORY_OUTCOME_MAP
 
         gtm_categories = [
-            "competitive_positioning", "market_entry", "pricing_strategy",
-            "customer_acquisition", "supply_recruitment", "marketing_compliance",
-            "channel_readiness", "partnership_pipeline", "brand_messaging",
-            "content_strategy", "revenue_model", "credit_strategy",
+            "competitive_positioning",
+            "market_entry",
+            "pricing_strategy",
+            "customer_acquisition",
+            "supply_recruitment",
+            "marketing_compliance",
+            "channel_readiness",
+            "partnership_pipeline",
+            "brand_messaging",
+            "content_strategy",
+            "revenue_model",
+            "credit_strategy",
         ]
         for cat in gtm_categories:
             assert cat in CATEGORY_OUTCOME_MAP, f"Missing GTM category: {cat}"

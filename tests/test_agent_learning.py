@@ -23,6 +23,7 @@ def _patch_agents_dir(monkeypatch):
     monkeypatch.setattr("agents.shared.learning.AGENTS_DIR", _agents_dir)
     # Clean up agent state dirs before each test
     import shutil
+
     for child in _agents_dir.iterdir():
         if child.is_dir():
             shutil.rmtree(child)
@@ -171,14 +172,17 @@ class TestBackwardCompat:
 
     def test_record_finding(self):
         agent = "test_compat"
-        record_finding(agent, {
-            "id": "f1",
-            "severity": "high",
-            "category": "security",
-            "file": "app/main.py",
-            "line": 42,
-            "title": "Test finding",
-        })
+        record_finding(
+            agent,
+            {
+                "id": "f1",
+                "severity": "high",
+                "category": "security",
+                "file": "app/main.py",
+                "line": 42,
+                "title": "Test finding",
+            },
+        )
         state = _load_state(agent)
         assert len(state["finding_history"]) == 1
         assert state["finding_history"][0]["id"] == "f1"
@@ -202,10 +206,22 @@ class TestBackwardCompat:
         now = datetime.now(timezone.utc)
         state = _load_state(agent)
         state["metrics_history"] = [
-            {"timestamp": (now - timedelta(days=5)).isoformat(), "metrics": {"score": 10}},
-            {"timestamp": (now - timedelta(days=4)).isoformat(), "metrics": {"score": 12}},
-            {"timestamp": (now - timedelta(days=3)).isoformat(), "metrics": {"score": 14}},
-            {"timestamp": (now - timedelta(days=2)).isoformat(), "metrics": {"score": 20}},
+            {
+                "timestamp": (now - timedelta(days=5)).isoformat(),
+                "metrics": {"score": 10},
+            },
+            {
+                "timestamp": (now - timedelta(days=4)).isoformat(),
+                "metrics": {"score": 12},
+            },
+            {
+                "timestamp": (now - timedelta(days=3)).isoformat(),
+                "metrics": {"score": 14},
+            },
+            {
+                "timestamp": (now - timedelta(days=2)).isoformat(),
+                "metrics": {"score": 20},
+            },
         ]
         _save_state(agent, state)
         result = get_trend(agent, "score")
@@ -454,7 +470,9 @@ class TestAgentLearningState:
 
     def test_generate_meta_learning_report(self):
         ls = self._make_ls("meta_agent")
-        ls.record_finding({"id": "f1", "severity": "high", "category": "sec", "file": "a.py"})
+        ls.record_finding(
+            {"id": "f1", "severity": "high", "category": "sec", "file": "a.py"}
+        )
         ls.record_resolution("f1", "fixed")
         ls.record_tool_accuracy("ruff", "f1", confirmed=True)
         ls.record_health_snapshot(85.0, {"high": 1})

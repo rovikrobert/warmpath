@@ -133,10 +133,12 @@ async def upload_csv(
     # Detect first upload for celebration UX
     prior_uploads = await db.execute(
         select(func.count()).select_from(
-            select(CsvUpload.id).where(
+            select(CsvUpload.id)
+            .where(
                 CsvUpload.user_id == current_user.id,
                 CsvUpload.id != csv_upload.id,
-            ).subquery()
+            )
+            .subquery()
         )
     )
     is_first_upload = (prior_uploads.scalar() or 0) == 0

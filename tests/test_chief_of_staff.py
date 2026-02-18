@@ -70,7 +70,9 @@ def sample_findings() -> list[Finding]:
 @pytest.fixture
 def sample_reports(sample_findings: list[Finding]) -> list[AgentReport]:
     return [
-        _make_report("security", [sample_findings[0], sample_findings[1]], duration=3.0),
+        _make_report(
+            "security", [sample_findings[0], sample_findings[1]], duration=3.0
+        ),
         _make_report("perf_monitor", [sample_findings[2]], duration=1.5),
         _make_report("test_engineer", [sample_findings[3]], duration=5.0),
         _make_report("doc_keeper", [sample_findings[4]], duration=0.8),
@@ -339,7 +341,10 @@ class TestCostTracker:
         assert summary["total_duration_seconds"] == 0
 
     def test_check_budget_alerts_under_budget(self, sample_reports: list[AgentReport]):
-        from agents.shared.cost_tracker import check_budget_alerts, get_team_cost_summary
+        from agents.shared.cost_tracker import (
+            check_budget_alerts,
+            get_team_cost_summary,
+        )
 
         costs = get_team_cost_summary(sample_reports)
         budgets = {"total_daily_max_tokens": 999999, "alert_threshold_pct": 150}
@@ -814,9 +819,7 @@ class TestCosLearning:
     def _use_tmp_state(self, tmp_path: Path):
         """Redirect CoS learning state to a temp directory."""
         state_path = tmp_path / "cos_state.json"
-        with patch(
-            "agents.chief_of_staff.cos_learning._STATE_PATH", state_path
-        ):
+        with patch("agents.chief_of_staff.cos_learning._STATE_PATH", state_path):
             yield
 
     def test_default_state(self):
@@ -966,13 +969,28 @@ class TestCosAgent:
         gtm_reports_dir = tmp_path / "gtm_reports"
         gtm_reports_dir.mkdir()
 
-        with patch("agents.chief_of_staff.cos_agent.REPORTS_DIR", reports_dir), \
-             patch("agents.chief_of_staff.cos_agent.DATA_TEAM_REPORTS_DIR", data_reports_dir), \
-             patch("agents.chief_of_staff.cos_agent.PRODUCT_TEAM_REPORTS_DIR", product_reports_dir), \
-             patch("agents.chief_of_staff.cos_agent.OPS_TEAM_REPORTS_DIR", ops_reports_dir), \
-             patch("agents.chief_of_staff.cos_agent.FINANCE_TEAM_REPORTS_DIR", finance_reports_dir), \
-             patch("agents.chief_of_staff.cos_agent.GTM_TEAM_REPORTS_DIR", gtm_reports_dir), \
-             patch("agents.chief_of_staff.cos_learning._STATE_PATH", state_path):
+        with (
+            patch("agents.chief_of_staff.cos_agent.REPORTS_DIR", reports_dir),
+            patch(
+                "agents.chief_of_staff.cos_agent.DATA_TEAM_REPORTS_DIR",
+                data_reports_dir,
+            ),
+            patch(
+                "agents.chief_of_staff.cos_agent.PRODUCT_TEAM_REPORTS_DIR",
+                product_reports_dir,
+            ),
+            patch(
+                "agents.chief_of_staff.cos_agent.OPS_TEAM_REPORTS_DIR", ops_reports_dir
+            ),
+            patch(
+                "agents.chief_of_staff.cos_agent.FINANCE_TEAM_REPORTS_DIR",
+                finance_reports_dir,
+            ),
+            patch(
+                "agents.chief_of_staff.cos_agent.GTM_TEAM_REPORTS_DIR", gtm_reports_dir
+            ),
+            patch("agents.chief_of_staff.cos_learning._STATE_PATH", state_path),
+        ):
             self._reports_dir = reports_dir
             yield
 

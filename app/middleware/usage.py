@@ -10,6 +10,7 @@ headers (X-WarmPath-Usage-Warning). Both operations use the same DB
 session to avoid BaseHTTPMiddleware stacking issues.
 """
 
+import logging
 import time
 import uuid
 
@@ -139,6 +140,6 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
                 break
         except Exception:
             # Never let usage logging break the actual request
-            pass
+            logging.getLogger(__name__).warning("Usage logging failed", exc_info=True)
 
         return response
