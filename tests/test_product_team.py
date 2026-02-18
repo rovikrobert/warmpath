@@ -682,6 +682,7 @@ class TestUserResearcherPostHog:
         monkeypatch.delenv("POSTHOG_API_KEY", raising=False)
         monkeypatch.delenv("POSTHOG_PROJECT_ID", raising=False)
         from product_team.user_researcher.user_researcher import _analyze_posthog_data
+
         insights = []
         metrics = {}
         _analyze_posthog_data(insights, metrics)
@@ -691,8 +692,16 @@ class TestUserResearcherPostHog:
     def test_analyze_posthog_with_mock_data(self, monkeypatch):
         monkeypatch.setenv("POSTHOG_API_KEY", "phx_test_key")
         monkeypatch.setenv("POSTHOG_PROJECT_ID", "12345")
-        mock_response = {"results": [{"data": [10, 20, 30], "labels": ["2026-02-16", "2026-02-17", "2026-02-18"]}]}
+        mock_response = {
+            "results": [
+                {
+                    "data": [10, 20, 30],
+                    "labels": ["2026-02-16", "2026-02-17", "2026-02-18"],
+                }
+            ]
+        }
         import product_team.user_researcher.user_researcher as ur_mod
+
         monkeypatch.setattr(ur_mod, "_posthog_query", lambda *a, **kw: mock_response)
         insights = []
         metrics = {}
@@ -702,6 +711,7 @@ class TestUserResearcherPostHog:
 
     def test_scan_includes_posthog(self):
         from product_team.user_researcher.user_researcher import scan
+
         report = scan()
         assert "posthog_configured" in report.metrics
 
@@ -716,6 +726,7 @@ class TestUserResearcherCompetitors:
 
     def test_monitor_competitors_loads_registry(self):
         from product_team.user_researcher.user_researcher import _monitor_competitors
+
         insights = []
         findings = []
         metrics = {}
@@ -725,6 +736,7 @@ class TestUserResearcherCompetitors:
 
     def test_monitor_competitors_produces_insights(self):
         from product_team.user_researcher.user_researcher import _monitor_competitors
+
         insights = []
         findings = []
         metrics = {}
@@ -733,6 +745,7 @@ class TestUserResearcherCompetitors:
 
     def test_scan_includes_competitors(self):
         from product_team.user_researcher.user_researcher import scan
+
         report = scan()
         assert "competitors_tracked" in report.metrics
 
@@ -747,6 +760,7 @@ class TestProductManagerContracts:
 
     def test_validate_contracts_finds_schemas(self):
         from product_team.product_manager.product_manager import _validate_api_contracts
+
         findings = []
         insights = []
         metrics = {}
@@ -756,6 +770,7 @@ class TestProductManagerContracts:
 
     def test_validate_contracts_extracts_fields(self):
         from product_team.product_manager.product_manager import _validate_api_contracts
+
         findings = []
         insights = []
         metrics = {}
@@ -764,6 +779,7 @@ class TestProductManagerContracts:
 
     def test_validate_contracts_checks_frontend(self):
         from product_team.product_manager.product_manager import _validate_api_contracts
+
         findings = []
         insights = []
         metrics = {}
@@ -772,6 +788,7 @@ class TestProductManagerContracts:
 
     def test_scan_includes_contracts(self):
         from product_team.product_manager.product_manager import scan
+
         report = scan()
         assert "schema_files_found" in report.metrics
 
@@ -786,6 +803,7 @@ class TestProductManagerExperiments:
 
     def test_track_experiments_empty_registry(self):
         from product_team.product_manager.product_manager import _track_experiments
+
         findings = []
         insights = []
         metrics = {}
@@ -796,16 +814,34 @@ class TestProductManagerExperiments:
     def test_track_experiments_with_data(self, tmp_path, monkeypatch):
         import json
         import product_team.shared.config as config_mod
+
         registry = {
             "experiments": [
-                {"id": "exp-001", "hypothesis": "Shorter onboarding increases completion", "metric": "onboarding_completion_rate", "status": "active", "start_date": "2026-02-01", "end_date": None, "result": None},
-                {"id": "exp-002", "hypothesis": "Social proof increases signups", "metric": "signup_rate", "status": "concluded", "start_date": "2026-01-01", "end_date": "2026-01-31", "result": "15% lift in signup rate"},
+                {
+                    "id": "exp-001",
+                    "hypothesis": "Shorter onboarding increases completion",
+                    "metric": "onboarding_completion_rate",
+                    "status": "active",
+                    "start_date": "2026-02-01",
+                    "end_date": None,
+                    "result": None,
+                },
+                {
+                    "id": "exp-002",
+                    "hypothesis": "Social proof increases signups",
+                    "metric": "signup_rate",
+                    "status": "concluded",
+                    "start_date": "2026-01-01",
+                    "end_date": "2026-01-31",
+                    "result": "15% lift in signup rate",
+                },
             ]
         }
         reg_path = tmp_path / "experiment_registry.json"
         reg_path.write_text(json.dumps(registry))
         monkeypatch.setattr(config_mod, "EXPERIMENT_REGISTRY_PATH", reg_path)
         from product_team.product_manager.product_manager import _track_experiments
+
         findings = []
         insights = []
         metrics = {}
@@ -816,6 +852,7 @@ class TestProductManagerExperiments:
 
     def test_scan_includes_experiments(self):
         from product_team.product_manager.product_manager import scan
+
         report = scan()
         assert "experiments_total" in report.metrics
 
@@ -830,11 +867,15 @@ class TestUXLeadAccessibility:
 
     def test_accessibility_audit_no_pally(self, monkeypatch):
         import subprocess
+
         original_run = subprocess.run
+
         def mock_run(*args, **kwargs):
             raise FileNotFoundError("pa11y not found")
+
         monkeypatch.setattr(subprocess, "run", mock_run)
         from product_team.ux_lead.ux_lead import _run_accessibility_audit
+
         ux_findings = []
         findings = []
         metrics = {}
@@ -844,18 +885,40 @@ class TestUXLeadAccessibility:
     def test_accessibility_audit_with_mock_results(self, monkeypatch):
         import subprocess
         import json
-        pa11y_output = json.dumps([
-            {"type": "error", "code": "WCAG2AA.Principle1.Guideline1_1.1_1_1.H37", "message": "Img missing alt", "selector": "img.hero", "context": "<img src='hero.png'>"},
-            {"type": "warning", "code": "WCAG2AA.Principle1.Guideline1_3.1_3_1.H48", "message": "Navigation not in list", "selector": "nav", "context": "<nav>"},
-        ])
+
+        pa11y_output = json.dumps(
+            [
+                {
+                    "type": "error",
+                    "code": "WCAG2AA.Principle1.Guideline1_1.1_1_1.H37",
+                    "message": "Img missing alt",
+                    "selector": "img.hero",
+                    "context": "<img src='hero.png'>",
+                },
+                {
+                    "type": "warning",
+                    "code": "WCAG2AA.Principle1.Guideline1_3.1_3_1.H48",
+                    "message": "Navigation not in list",
+                    "selector": "nav",
+                    "context": "<nav>",
+                },
+            ]
+        )
         call_count = {"n": 0}
+
         def mock_run(*args, **kwargs):
             call_count["n"] += 1
             if call_count["n"] == 1:
-                return type("Result", (), {"returncode": 0, "stdout": "8.0.0", "stderr": ""})()
-            return type("Result", (), {"returncode": 2, "stdout": pa11y_output, "stderr": ""})()
+                return type(
+                    "Result", (), {"returncode": 0, "stdout": "8.0.0", "stderr": ""}
+                )()
+            return type(
+                "Result", (), {"returncode": 2, "stdout": pa11y_output, "stderr": ""}
+            )()
+
         monkeypatch.setattr(subprocess, "run", mock_run)
         from product_team.ux_lead.ux_lead import _run_accessibility_audit
+
         ux_findings = []
         findings = []
         metrics = {}
@@ -865,6 +928,7 @@ class TestUXLeadAccessibility:
 
     def test_scan_includes_accessibility_audit(self):
         from product_team.ux_lead.ux_lead import scan
+
         report = scan()
         assert "pa11y_available" in report.metrics
 
@@ -879,6 +943,7 @@ class TestUXLeadFlowAnalysis:
 
     def test_analyze_flows_builds_graph(self):
         from product_team.ux_lead.ux_lead import _analyze_user_flows, _find_jsx_files
+
         jsx_files = _find_jsx_files()
         ux_findings = []
         findings = []
@@ -890,6 +955,7 @@ class TestUXLeadFlowAnalysis:
 
     def test_analyze_flows_validates_journeys(self):
         from product_team.ux_lead.ux_lead import _analyze_user_flows, _find_jsx_files
+
         jsx_files = _find_jsx_files()
         ux_findings = []
         findings = []
@@ -900,6 +966,7 @@ class TestUXLeadFlowAnalysis:
 
     def test_analyze_flows_detects_dead_ends(self):
         from product_team.ux_lead.ux_lead import _analyze_user_flows, _find_jsx_files
+
         jsx_files = _find_jsx_files()
         ux_findings = []
         findings = []
@@ -909,6 +976,7 @@ class TestUXLeadFlowAnalysis:
 
     def test_scan_includes_flow_analysis(self):
         from product_team.ux_lead.ux_lead import scan
+
         report = scan()
         assert "flow_graph_nodes" in report.metrics
 
@@ -922,7 +990,11 @@ class TestDesignLeadTokens:
     """DesignLead design token validation."""
 
     def test_validate_tokens_loads_spec(self):
-        from product_team.design_lead.design_lead import _validate_against_design_tokens, _find_jsx_files
+        from product_team.design_lead.design_lead import (
+            _validate_against_design_tokens,
+            _find_jsx_files,
+        )
+
         jsx_files = _find_jsx_files()
         design_findings = []
         metrics = {}
@@ -930,7 +1002,11 @@ class TestDesignLeadTokens:
         assert "design_tokens_loaded" in metrics
 
     def test_validate_tokens_detects_drift(self):
-        from product_team.design_lead.design_lead import _validate_against_design_tokens, _find_jsx_files
+        from product_team.design_lead.design_lead import (
+            _validate_against_design_tokens,
+            _find_jsx_files,
+        )
+
         jsx_files = _find_jsx_files()
         design_findings = []
         metrics = {}
@@ -940,6 +1016,7 @@ class TestDesignLeadTokens:
 
     def test_scan_includes_token_validation(self):
         from product_team.design_lead.design_lead import scan
+
         report = scan()
         assert "design_tokens_loaded" in report.metrics
 
@@ -954,6 +1031,7 @@ class TestProductLeadFeedback:
 
     def test_aggregate_feedback_no_db(self):
         from product_team.product_lead.product_lead import _aggregate_all_feedback
+
         findings = []
         insights = []
         metrics = {}
@@ -962,6 +1040,7 @@ class TestProductLeadFeedback:
 
     def test_aggregate_feedback_produces_insight(self):
         from product_team.product_lead.product_lead import _aggregate_all_feedback
+
         findings = []
         insights = []
         metrics = {}
@@ -970,5 +1049,6 @@ class TestProductLeadFeedback:
 
     def test_scan_includes_feedback_aggregation(self):
         from product_team.product_lead.product_lead import scan
+
         report = scan()
         assert "feedback_db_items" in report.metrics

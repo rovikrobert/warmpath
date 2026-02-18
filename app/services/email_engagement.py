@@ -32,9 +32,8 @@ APP_URL = settings.FRONTEND_URL
 # Dedup helper
 # ---------------------------------------------------------------------------
 
-async def _already_sent(
-    db: AsyncSession, user_id: uuid.UUID, email_type: str
-) -> bool:
+
+async def _already_sent(db: AsyncSession, user_id: uuid.UUID, email_type: str) -> bool:
     """Check if this email type was already sent to this user today."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     result = await db.execute(
@@ -48,7 +47,10 @@ async def _already_sent(
 
 
 async def _record_send(
-    db: AsyncSession, user_id: uuid.UUID, email_type: str, external_id: str | None = None
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    email_type: str,
+    external_id: str | None = None,
 ) -> None:
     """Record that an email was sent, optionally with Resend message ID."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -68,6 +70,7 @@ async def _record_send(
 # ---------------------------------------------------------------------------
 # Template helpers
 # ---------------------------------------------------------------------------
+
 
 def _base_style() -> str:
     return (
@@ -107,6 +110,7 @@ def _footer_html() -> str:
 # ---------------------------------------------------------------------------
 # Welcome emails
 # ---------------------------------------------------------------------------
+
 
 async def send_welcome_email_js(user: User, db: AsyncSession) -> bool:
     """Welcome email for job seekers."""
@@ -179,7 +183,11 @@ async def send_welcome_email_nh(user: User, db: AsyncSession) -> bool:
   </div>
   {_footer_html()}
 </div>"""
-    eid = _send_email(user.email, f"{first}, $5K+ in referral bonuses — here's how to claim them", html)
+    eid = _send_email(
+        user.email,
+        f"{first}, $5K+ in referral bonuses — here's how to claim them",
+        html,
+    )
     await _record_send(db, user.id, "welcome_nh", external_id=eid)
     return True
 
@@ -187,6 +195,7 @@ async def send_welcome_email_nh(user: User, db: AsyncSession) -> bool:
 # ---------------------------------------------------------------------------
 # Activation nudges
 # ---------------------------------------------------------------------------
+
 
 async def send_csv_reminder_d1(db: AsyncSession) -> int:
     """Nudge users who signed up 24h ago but haven't uploaded CSV."""
@@ -222,7 +231,9 @@ async def send_csv_reminder_d1(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {agent}</p>
   {_footer_html()}
 </div>"""
-        eid = _send_email(u.email, "2 minutes to unlock referral paths at your target companies", html)
+        eid = _send_email(
+            u.email, "2 minutes to unlock referral paths at your target companies", html
+        )
         await _record_send(db, u.id, "csv_reminder_d1", external_id=eid)
         count += 1
     await db.commit()
@@ -312,7 +323,11 @@ async def send_nh_sharing_reminder_d2(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("network_holder")}</p>
   {_footer_html()}
 </div>"""
-        eid = _send_email(u.email, "Your network is uploaded — unlock $2-10K in referral bonuses", html)
+        eid = _send_email(
+            u.email,
+            "Your network is uploaded — unlock $2-10K in referral bonuses",
+            html,
+        )
         await _record_send(db, u.id, "nh_sharing_d2", external_id=eid)
         count += 1
     await db.commit()
@@ -354,7 +369,9 @@ async def send_first_search_nudge_d2(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("job_seeker")}</p>
   {_footer_html()}
 </div>"""
-        eid = _send_email(u.email, "We found warm paths in your network — see who can refer you", html)
+        eid = _send_email(
+            u.email, "We found warm paths in your network — see who can refer you", html
+        )
         await _record_send(db, u.id, "first_search_d2", external_id=eid)
         count += 1
     await db.commit()
@@ -365,6 +382,7 @@ async def send_first_search_nudge_d2(db: AsyncSession) -> int:
 # ---------------------------------------------------------------------------
 # Operational reminders
 # ---------------------------------------------------------------------------
+
 
 async def send_intro_pending_reminder(db: AsyncSession) -> int:
     """Remind network holders of pending intro requests older than 24h."""
@@ -403,7 +421,11 @@ async def send_intro_pending_reminder(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("network_holder")}</p>
   {_footer_html()}
 </div>"""
-        eid = _send_email(u.email, f"{pending_count} referral bonus opportunity waiting for your review", html)
+        eid = _send_email(
+            u.email,
+            f"{pending_count} referral bonus opportunity waiting for your review",
+            html,
+        )
         await _record_send(db, nh_id, "intro_pending_24h", external_id=eid)
         count += 1
     await db.commit()
@@ -469,7 +491,9 @@ async def send_weekly_digest(db: AsyncSession) -> int:
             stats_html += f"<li><strong>{search_count}</strong> searches run</li>"
             stats_html += f"<li><strong>{intro_sent}</strong> intro requests sent</li>"
         if u.user_type in ("network_holder", "both"):
-            stats_html += f"<li><strong>{intro_received}</strong> intro requests received</li>"
+            stats_html += (
+                f"<li><strong>{intro_received}</strong> intro requests received</li>"
+            )
 
         if not stats_html:
             stats_html = "<li>You were active this week!</li>"
@@ -482,7 +506,11 @@ async def send_weekly_digest(db: AsyncSession) -> int:
             subject_parts.append(f"{intro_sent} intros")
         if intro_received:
             subject_parts.append(f"{intro_received} requests")
-        subject = f"Your week: {', '.join(subject_parts)}" if subject_parts else "Your WarmPath weekly digest"
+        subject = (
+            f"Your week: {', '.join(subject_parts)}"
+            if subject_parts
+            else "Your WarmPath weekly digest"
+        )
 
         agent = _agent_signoff(u.user_type)
         html = f"""\
@@ -509,6 +537,7 @@ async def send_weekly_digest(db: AsyncSession) -> int:
 # ---------------------------------------------------------------------------
 # Re-engagement
 # ---------------------------------------------------------------------------
+
 
 async def send_reengagement_d30(db: AsyncSession) -> int:
     """Re-engage users with no activity for ~30 days."""
@@ -555,7 +584,9 @@ async def send_reengagement_d30(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {agent}</p>
   {_footer_html()}
 </div>"""
-        eid = _send_email(u.email, "New referral paths appeared in your network this month", html)
+        eid = _send_email(
+            u.email, "New referral paths appeared in your network this month", html
+        )
         await _record_send(db, u.id, "reengagement_d30", external_id=eid)
         count += 1
     await db.commit()
@@ -606,7 +637,11 @@ async def send_reengagement_d90(db: AsyncSession) -> int:
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {agent}</p>
   {_footer_html()}
 </div>"""
-        eid = _send_email(u.email, "Still have your network on WarmPath — switch to connector mode?", html)
+        eid = _send_email(
+            u.email,
+            "Still have your network on WarmPath — switch to connector mode?",
+            html,
+        )
         await _record_send(db, u.id, "reengagement_d90", external_id=eid)
         count += 1
     await db.commit()

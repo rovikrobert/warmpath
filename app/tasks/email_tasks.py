@@ -55,9 +55,7 @@ def send_nh_sharing_d2() -> int:
 
 @celery_app.task(name="app.tasks.email_tasks.send_first_search_d2")
 def send_first_search_d2() -> int:
-    return _run_async(
-        _run_email_task("first_search_d2", "send_first_search_nudge_d2")
-    )
+    return _run_async(_run_email_task("first_search_d2", "send_first_search_nudge_d2"))
 
 
 @celery_app.task(name="app.tasks.email_tasks.send_intro_pending_24h")

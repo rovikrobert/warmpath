@@ -66,17 +66,19 @@ def send_error_alert(
 
         user_line = f"User: {user_email}" if user_email else "User: unauthenticated"
 
-        message = "\n".join([
-            f"BUG ALERT [{time_str}]",
-            "",
-            f"{method} {path}",
-            f"{error_type}: {error_msg}",
-            user_line,
-            "",
-            last_frame if last_frame else "No app-level traceback",
-            "",
-            "Fix needed. Check logs for full trace.",
-        ])
+        message = "\n".join(
+            [
+                f"BUG ALERT [{time_str}]",
+                "",
+                f"{method} {path}",
+                f"{error_type}: {error_msg}",
+                user_line,
+                "",
+                last_frame if last_frame else "No app-level traceback",
+                "",
+                "Fix needed. Check logs for full trace.",
+            ]
+        )
 
         filename = f"whatsapp-error-{date_str}-{now.strftime('%H%M%S')}.txt"
         filepath = WHATSAPP_DIR / filename

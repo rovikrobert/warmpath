@@ -22,9 +22,13 @@ def _requi[RESEND_KEY_REDACTED](current_user: User) -> None:
 
 
 class CreateBoardRequest(BaseModel):
-    company_key: str = Field(..., max_length=255, description="Normalized lowercase key")
+    company_key: str = Field(
+        ..., max_length=255, description="Normalized lowercase key"
+    )
     display_name: str = Field(..., max_length=500)
-    board_source: str = Field(..., max_length=50, description="greenhouse, lever, ashby, or career_page")
+    board_source: str = Field(
+        ..., max_length=50, description="greenhouse, lever, ashby, or career_page"
+    )
     board_slug: str | None = Field(None, max_length=255)
     career_page_url: str | None = Field(None, max_length=1000)
     region: str | None = Field(None, max_length=100)
@@ -110,9 +114,7 @@ async def create_registry_entry(
         )
         await db.commit()
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(e)
-        ) from e
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     return {"data": _board_to_dict(board)}
 
 
@@ -167,7 +169,9 @@ async def verify_registry_entry(
 
 class BatchDiscoverRequest(BaseModel):
     companies: list[str] = Field(
-        ..., min_length=1, max_length=200,
+        ...,
+        min_length=1,
+        max_length=200,
         description="List of company names to discover ATS boards for",
     )
 

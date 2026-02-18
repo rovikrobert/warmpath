@@ -17,7 +17,6 @@ from app.services.board_registry import (
     BOARD_REGISTRY,
     CAREERS_URLS,
     REGIONS,
-    _slug_candidates,
     discover_boards,
     get_display_name,
 )
@@ -78,9 +77,7 @@ async def get_board_by_id(db: AsyncSession, board_id: str) -> CompanyBoard | Non
         uid = uuid.UUID(board_id)
     except ValueError:
         return None
-    result = await db.execute(
-        select(CompanyBoard).where(CompanyBoard.id == uid)
-    )
+    result = await db.execute(select(CompanyBoard).where(CompanyBoard.id == uid))
     return result.scalar_one_or_none()
 
 
@@ -128,8 +125,12 @@ async def update_board(
     """Update fields on an existing board entry."""
     valid_sources = {"greenhouse", "lever", "ashby", "career_page"}
     allowed = {
-        "display_name", "board_source", "board_slug",
-        "career_page_url", "region", "is_active",
+        "display_name",
+        "board_source",
+        "board_slug",
+        "career_page_url",
+        "region",
+        "is_active",
     }
 
     for key, value in kwargs.items():
@@ -248,9 +249,15 @@ async def batch_discover(
                 "board_source": source,
                 "board_slug": slug,
             }
-            logger.info("Batch discover: found %s for '%s' (slug: %s)", source, key, slug)
+            logger.info(
+                "Batch discover: found %s for '%s' (slug: %s)", source, key, slug
+            )
         else:
-            results[key] = {"status": "not_found", "board_source": None, "board_slug": None}
+            results[key] = {
+                "status": "not_found",
+                "board_source": None,
+                "board_slug": None,
+            }
             logger.info("Batch discover: no ATS found for '%s'", key)
 
     return results

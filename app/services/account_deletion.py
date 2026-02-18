@@ -21,7 +21,7 @@ from app.models.marketplace import (
     MarketplaceListing,
     NetworkSharingPreferences,
 )
-from app.models.match_result import IntroRequest, MatchResult, WarmScore
+from app.models.match_result import MatchResult, WarmScore
 from app.models.privacy import ArchivedCreditTransaction, ConsentRecord, DataRequest
 from app.models.search_request import SearchRequest
 from app.models.user import ConnectorProfile, User

@@ -57,7 +57,9 @@ async def send_friend_request(
         )
     )
     if existing.scalar_one_or_none() is not None:
-        raise ValidationError("Friend request already exists or you are already friends")
+        raise ValidationError(
+            "Friend request already exists or you are already friends"
+        )
 
     # Rate limit: max 20 pending outbound requests
     pending_count_result = await db.execute(
@@ -82,7 +84,10 @@ async def send_friend_request(
         db,
         "friend_request_sent",
         user_id=requester_id,
-        metadata={"addressee_id": str(addressee_id), "friendship_id": str(friendship.id)},
+        metadata={
+            "addressee_id": str(addressee_id),
+            "friendship_id": str(friendship.id),
+        },
     )
     return friendship
 
@@ -132,11 +137,13 @@ async def get_incoming_requests(
 ) -> list[UserFriendship]:
     """Get pending friend requests sent to this user."""
     result = await db.execute(
-        select(UserFriendship).where(
+        select(UserFriendship)
+        .where(
             UserFriendship.addressee_id == user_id,
             UserFriendship.status == "pending",
             UserFriendship.deleted_at.is_(None),
-        ).order_by(UserFriendship.requested_at.desc())
+        )
+        .order_by(UserFriendship.requested_at.desc())
     )
     return list(result.scalars())
 
@@ -146,11 +153,13 @@ async def get_outgoing_requests(
 ) -> list[UserFriendship]:
     """Get pending friend requests sent by this user."""
     result = await db.execute(
-        select(UserFriendship).where(
+        select(UserFriendship)
+        .where(
             UserFriendship.requester_id == user_id,
             UserFriendship.status == "pending",
             UserFriendship.deleted_at.is_(None),
-        ).order_by(UserFriendship.requested_at.desc())
+        )
+        .order_by(UserFriendship.requested_at.desc())
     )
     return list(result.scalars())
 
@@ -223,15 +232,17 @@ async def get_friends(
             continue
         profile = profiles.get(fid)
         f = friendship_map[fid]
-        friends_list.append({
-            "friend_id": fid,
-            "full_name": user.full_name,
-            "headline": profile.headline if profile else None,
-            "current_company": profile.current_company if profile else None,
-            "current_title": profile.current_title if profile else None,
-            "user_type": user.user_type,
-            "friend_since": f.responded_at or f.created_at,
-        })
+        friends_list.append(
+            {
+                "friend_id": fid,
+                "full_name": user.full_name,
+                "headline": profile.headline if profile else None,
+                "current_company": profile.current_company if profile else None,
+                "current_title": profile.current_title if profile else None,
+                "user_type": user.user_type,
+                "friend_since": f.responded_at or f.created_at,
+            }
+        )
 
     return friends_list, total
 
@@ -296,7 +307,9 @@ async def remove_friend(
 
     friendship.deleted_at = datetime.now(timezone.utc)
     await log_event(
-        db, "friend_removed", user_id=user_id,
+        db,
+        "friend_removed",
+        user_id=user_id,
         metadata={"friendship_id": str(friendship_id)},
     )
     await db.flush()
@@ -365,9 +378,7 @@ async def unblock_user(
         raise NotFoundError("Block not found")
 
 
-async def get_blocked_users(
-    user_id: uuid.UUID, db: AsyncSession
-) -> list[dict]:
+async def get_blocked_users(user_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     """Get list of users blocked by this user."""
     result = await db.execute(
         select(UserBlock, User)
@@ -385,9 +396,7 @@ async def get_blocked_users(
     ]
 
 
-async def is_blocked(
-    user_a: uuid.UUID, user_b: uuid.UUID, db: AsyncSession
-) -> bool:
+async def is_blocked(user_a: uuid.UUID, user_b: uuid.UUID, db: AsyncSession) -> bool:
     """Check if either user has blocked the other."""
     result = await db.execute(
         select(func.count()).where(

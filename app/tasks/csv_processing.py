@@ -238,7 +238,9 @@ async def process_csv_upload_core(
 
 
 @celery_app.task(bind=True)
-def process_csv_upload(self, csv_upload_id: str, user_id: str, file_content_b64: str) -> None:
+def process_csv_upload(
+    self, csv_upload_id: str, user_id: str, file_content_b64: str
+) -> None:
     """Celery task: process a CSV upload in the background.
 
     Creates its own async engine + session, then delegates to the core function.

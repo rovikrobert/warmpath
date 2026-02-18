@@ -1,7 +1,6 @@
 """Tests for ops team live data checks (7 CoS audit gaps)."""
-from __futu[RESEND_KEY_REDACTED] import annotations
 
-import pytest
+from __futu[RESEND_KEY_REDACTED] import annotations
 
 
 class TestOpsSharedDb:
@@ -11,6 +10,7 @@ class TestOpsSharedDb:
         monkeypatch.delenv("DATABASE_URL", raising=False)
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
         assert db_mod.get_session() is None
 
@@ -25,6 +25,7 @@ class TestOpsSharedDb:
 
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         with patch("app.database._get_sync_engine", return_value=test_engine):
@@ -34,6 +35,7 @@ class TestOpsSharedDb:
 
         test_engine.dispose()
         import os
+
         if os.path.exists("test_ops.db"):
             os.remove("test_ops.db")
 
@@ -45,6 +47,7 @@ class TestOpsSharedDb:
 
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         with patch(
@@ -94,6 +97,7 @@ class TestTrebLiveFunnel:
         monkeypatch.delenv("DATABASE_URL", raising=False)
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         from ops_team.treb.treb import _check_live_nh_funnel
@@ -105,13 +109,17 @@ class TestTrebLiveFunnel:
         metrics: dict = {}
         _check_live_nh_funnel(findings, insights, metrics)
 
-        assert any("unavailable" in f.title.lower() or "DATABASE_URL" in f.detail for f in findings)
+        assert any(
+            "unavailable" in f.title.lower() or "DATABASE_URL" in f.detail
+            for f in findings
+        )
 
     def test_funnel_metrics_not_populated_without_db(self, monkeypatch):
         """Without DB, no funnel metrics should be set."""
         monkeypatch.delenv("DATABASE_URL", raising=False)
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         from ops_team.treb.treb import _check_live_nh_funnel
@@ -133,6 +141,7 @@ class TestTrebLiveReferral:
         monkeypatch.delenv("DATABASE_URL", raising=False)
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         from ops_team.treb.treb import _check_live_referral_workflow
@@ -144,12 +153,16 @@ class TestTrebLiveReferral:
         metrics: dict = {}
         _check_live_referral_workflow(findings, insights, metrics)
 
-        assert any("unavailable" in f.title.lower() or "DATABASE_URL" in f.detail for f in findings)
+        assert any(
+            "unavailable" in f.title.lower() or "DATABASE_URL" in f.detail
+            for f in findings
+        )
 
     def test_referral_metrics_not_populated_without_db(self, monkeypatch):
         monkeypatch.delenv("DATABASE_URL", raising=False)
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         from ops_team.treb.treb import _check_live_referral_workflow
@@ -171,6 +184,7 @@ class TestNaivLiveSatisfaction:
         monkeypatch.delenv("DATABASE_URL", raising=False)
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         from ops_team.naiv.naiv import _check_live_satisfaction
@@ -182,7 +196,10 @@ class TestNaivLiveSatisfaction:
         metrics: dict = {}
         _check_live_satisfaction(findings, sat_findings, metrics)
 
-        assert any("unavailable" in f.title.lower() or "DATABASE_URL" in f.detail for f in findings)
+        assert any(
+            "unavailable" in f.title.lower() or "DATABASE_URL" in f.detail
+            for f in findings
+        )
 
 
 class TestNaivLiveErrors:
@@ -192,6 +209,7 @@ class TestNaivLiveErrors:
         monkeypatch.delenv("DATABASE_URL", raising=False)
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         from ops_team.naiv.naiv import _check_live_error_telemetry
@@ -203,7 +221,10 @@ class TestNaivLiveErrors:
         metrics: dict = {}
         _check_live_error_telemetry(findings, sat_findings, metrics)
 
-        assert any("unavailable" in f.title.lower() or "DATABASE_URL" in f.detail for f in findings)
+        assert any(
+            "unavailable" in f.title.lower() or "DATABASE_URL" in f.detail
+            for f in findings
+        )
 
 
 class TestNaivLiveEmail:
@@ -213,6 +234,7 @@ class TestNaivLiveEmail:
         monkeypatch.delenv("DATABASE_URL", raising=False)
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         from ops_team.naiv.naiv import _check_live_email_engagement
@@ -224,7 +246,10 @@ class TestNaivLiveEmail:
         metrics: dict = {}
         _check_live_email_engagement(findings, sat_findings, metrics)
 
-        assert any("unavailable" in f.title.lower() or "DATABASE_URL" in f.detail for f in findings)
+        assert any(
+            "unavailable" in f.title.lower() or "DATABASE_URL" in f.detail
+            for f in findings
+        )
 
 
 class TestMarshLiveVolume:
@@ -234,6 +259,7 @@ class TestMarshLiveVolume:
         monkeypatch.delenv("DATABASE_URL", raising=False)
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         from ops_team.marsh.marsh import _check_live_marketplace_volume
@@ -246,12 +272,16 @@ class TestMarshLiveVolume:
         metrics: dict = {}
         _check_live_marketplace_volume(findings, mkt_findings, insights, metrics)
 
-        assert any("unavailable" in f.title.lower() or "DATABASE_URL" in f.detail for f in findings)
+        assert any(
+            "unavailable" in f.title.lower() or "DATABASE_URL" in f.detail
+            for f in findings
+        )
 
     def test_volume_metrics_not_populated_without_db(self, monkeypatch):
         monkeypatch.delenv("DATABASE_URL", raising=False)
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         from ops_team.marsh.marsh import _check_live_marketplace_volume
@@ -272,6 +302,7 @@ class TestOpsLiveDataIntegration:
 
     def test_keevs_scan_includes_live_metrics(self):
         from ops_team.keevs.keevs import scan
+
         report = scan()
         assert "live_coaching_scenarios_tested" in report.metrics
 
@@ -279,9 +310,11 @@ class TestOpsLiveDataIntegration:
         monkeypatch.delenv("DATABASE_URL", raising=False)
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         from ops_team.treb.treb import scan
+
         report = scan()
         live_findings = [f for f in report.findings if "live" in f.id.lower()]
         assert len(live_findings) >= 1
@@ -290,9 +323,11 @@ class TestOpsLiveDataIntegration:
         monkeypatch.delenv("DATABASE_URL", raising=False)
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         from ops_team.naiv.naiv import scan
+
         report = scan()
         live_findings = [f for f in report.findings if "live" in f.id.lower()]
         assert len(live_findings) >= 1
@@ -301,9 +336,11 @@ class TestOpsLiveDataIntegration:
         monkeypatch.delenv("DATABASE_URL", raising=False)
         import importlib
         import ops_team.shared.db as db_mod
+
         importlib.reload(db_mod)
 
         from ops_team.marsh.marsh import scan
+
         report = scan()
         live_findings = [f for f in report.findings if "live" in f.id.lower()]
         assert len(live_findings) >= 1

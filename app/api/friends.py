@@ -20,12 +20,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.user import ConnectorProfile, User
 from app.schemas.friendship import (
-    BlockedUserResponse,
     BlockUserRequest,
     FriendRequestAction,
     FriendRequestCreate,
     FriendRequestResponse,
-    FriendSummary,
 )
 from app.services.friendship_service import (
     block_user,
@@ -48,21 +46,23 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-async def _enrich_request(
-    friendship: "UserFriendship", db: AsyncSession
-) -> dict:
+async def _enrich_request(friendship: "UserFriendship", db: AsyncSession) -> dict:
     """Add requester/addressee profile info to a friendship response."""
     from sqlalchemy import select
 
     data = FriendRequestResponse.model_validate(friendship).model_dump(mode="json")
 
     # Load requester info
-    req_result = await db.execute(select(User).where(User.id == friendship.requester_id))
+    req_result = await db.execute(
+        select(User).where(User.id == friendship.requester_id)
+    )
     requester = req_result.scalar_one_or_none()
     if requester:
         data["requester_name"] = requester.full_name
 
-    addr_result = await db.execute(select(User).where(User.id == friendship.addressee_id))
+    addr_result = await db.execute(
+        select(User).where(User.id == friendship.addressee_id)
+    )
     addressee = addr_result.scalar_one_or_none()
     if addressee:
         data["addressee_name"] = addressee.full_name
@@ -70,7 +70,9 @@ async def _enrich_request(
     # Load connector profiles for headline/company
     profile_result = await db.execute(
         select(ConnectorProfile).where(
-            ConnectorProfile.user_id.in_([friendship.requester_id, friendship.addressee_id])
+            ConnectorProfile.user_id.in_(
+                [friendship.requester_id, friendship.addressee_id]
+            )
         )
     )
     for p in profile_result.scalars():
@@ -205,7 +207,10 @@ async def block_user_endpoint(
     """Block a user. Auto-unfriends and cancels pending requests."""
     block = await block_user(current_user.id, body.user_id, db)
     return {
-        "data": {"blocker_id": str(block.blocker_id), "blocked_id": str(block.blocked_id)},
+        "data": {
+            "blocker_id": str(block.blocker_id),
+            "blocked_id": str(block.blocked_id),
+        },
         "meta": {},
     }
 

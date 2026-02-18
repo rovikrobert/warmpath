@@ -9,7 +9,6 @@ from __futu[RESEND_KEY_REDACTED] import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from agents.shared.report import Finding
 from data_team.shared.report import Insight
@@ -119,13 +118,21 @@ class TestPipelineLiveDataQuality:
         insights: list[Insight] = []
         metrics: dict = {}
 
-        mock_qe = self._make_mock_executor({
-            "users": 0, "contacts": 5, "csv_uploads": 0,
-            "search_requests": 0, "marketplace_listings": 0,
-            "intro_facilitations": 0, "credit_transactions": 0,
-        })
+        mock_qe = self._make_mock_executor(
+            {
+                "users": 0,
+                "contacts": 5,
+                "csv_uploads": 0,
+                "search_requests": 0,
+                "marketplace_listings": 0,
+                "intro_facilitations": 0,
+                "credit_transactions": 0,
+            }
+        )
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_live_data_quality(findings, insights, metrics)
 
         assert metrics["live_db_available"] is True
@@ -142,13 +149,21 @@ class TestPipelineLiveDataQuality:
         insights: list[Insight] = []
         metrics: dict = {}
 
-        mock_qe = self._make_mock_executor({
-            "users": 100, "contacts": 5000, "csv_uploads": 50,
-            "search_requests": 200, "marketplace_listings": 300,
-            "intro_facilitations": 40, "credit_transactions": 150,
-        })
+        mock_qe = self._make_mock_executor(
+            {
+                "users": 100,
+                "contacts": 5000,
+                "csv_uploads": 50,
+                "search_requests": 200,
+                "marketplace_listings": 300,
+                "intro_facilitations": 40,
+                "credit_transactions": 150,
+            }
+        )
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_live_data_quality(findings, insights, metrics)
 
         assert metrics["live_empty_tables"] == 0
@@ -165,7 +180,9 @@ class TestPipelineLiveDataQuality:
         mock_qe = MagicMock()
         mock_qe.is_available.return_value = False
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_live_data_quality(findings, insights, metrics)
 
         assert metrics["live_db_available"] is False
@@ -181,13 +198,21 @@ class TestPipelineLiveDataQuality:
 
         old_time = datetime.now(timezone.utc) - timedelta(hours=100)
         mock_qe = self._make_mock_executor(
-            {"users": 10, "contacts": 50, "csv_uploads": 5,
-             "search_requests": 10, "marketplace_listings": 20,
-             "intro_facilitations": 5, "credit_transactions": 10},
+            {
+                "users": 10,
+                "contacts": 50,
+                "csv_uploads": 5,
+                "search_requests": 10,
+                "marketplace_listings": 20,
+                "intro_facilitations": 5,
+                "credit_transactions": 10,
+            },
             staleness_rows=[{"latest": old_time}],
         )
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_live_data_quality(findings, insights, metrics)
 
         assert any(f.id == "pipe-011" for f in findings)
@@ -245,14 +270,19 @@ class TestAnalystAnomalyDetection:
         mock_qe.is_available.return_value = True
         mock_qe.execute_template.side_effect = lambda name, params=None: {
             "weekly_active_users": [
-                {"active_users": 100}, {"active_users": 102},
-                {"active_users": 98}, {"active_users": 101},
-                {"active_users": 99}, {"active_users": 10},
+                {"active_users": 100},
+                {"active_users": 102},
+                {"active_users": 98},
+                {"active_users": 101},
+                {"active_users": 99},
+                {"active_users": 10},
             ],
             "credit_flow": [],
         }.get(name, [])
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_anomaly_detection(findings, insights, metrics)
 
         assert metrics["anomaly_detection_available"] is True
@@ -271,11 +301,17 @@ class TestAnalystAnomalyDetection:
         mock_qe.execute_template.side_effect = lambda name, params=None: {
             "weekly_active_users": [],
             "credit_flow": [
-                {"transaction_type": "earn_upload", "tx_count": 50, "total_amount": 5000},
+                {
+                    "transaction_type": "earn_upload",
+                    "tx_count": 50,
+                    "total_amount": 5000,
+                },
             ],
         }.get(name, [])
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_anomaly_detection(findings, insights, metrics)
 
         assert metrics["credit_earn_count"] == 50
@@ -292,7 +328,9 @@ class TestAnalystAnomalyDetection:
         mock_qe = MagicMock()
         mock_qe.is_available.return_value = False
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_anomaly_detection(findings, insights, metrics)
 
         assert metrics["anomaly_detection_available"] is False
@@ -318,7 +356,11 @@ class TestAnalystCohortRetention:
         mock_qe.is_available.return_value = True
         mock_qe.execute_template.side_effect = lambda name, params=None: {
             "signup_cohort_retention": [
-                {"cohort_week": "2024-01-01", "cohort_size": 100, "retained_week_2": 10},
+                {
+                    "cohort_week": "2024-01-01",
+                    "cohort_size": 100,
+                    "retained_week_2": 10,
+                },
                 {"cohort_week": "2024-01-08", "cohort_size": 80, "retained_week_2": 8},
             ],
             "signup_cohort_activation": [
@@ -326,7 +368,9 @@ class TestAnalystCohortRetention:
             ],
         }.get(name, [])
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_cohort_retention(findings, insights, metrics)
 
         assert metrics["avg_week2_retention"] == 0.1
@@ -343,7 +387,11 @@ class TestAnalystCohortRetention:
         mock_qe.is_available.return_value = True
         mock_qe.execute_template.side_effect = lambda name, params=None: {
             "signup_cohort_retention": [
-                {"cohort_week": "2024-01-01", "cohort_size": 100, "retained_week_2": 40},
+                {
+                    "cohort_week": "2024-01-01",
+                    "cohort_size": 100,
+                    "retained_week_2": 40,
+                },
                 {"cohort_week": "2024-01-08", "cohort_size": 80, "retained_week_2": 30},
             ],
             "signup_cohort_activation": [
@@ -351,7 +399,9 @@ class TestAnalystCohortRetention:
             ],
         }.get(name, [])
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_cohort_retention(findings, insights, metrics)
 
         assert not any(f.id == "analyst-cohort-001" for f in findings)
@@ -373,7 +423,9 @@ class TestAnalystCohortRetention:
             ],
         }.get(name, [])
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_cohort_retention(findings, insights, metrics)
 
         assert metrics["avg_activation_rate"] == 0.2
@@ -389,7 +441,9 @@ class TestAnalystCohortRetention:
         mock_qe = MagicMock()
         mock_qe.is_available.return_value = False
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_cohort_retention(findings, insights, metrics)
 
         assert metrics["cohort_analysis_available"] is False
@@ -418,13 +472,18 @@ class TestModelEngineerCalibration:
             {"sco[RESEND_KEY_REDACTED]": "low", "total_intros": 50, "approved": 40},
         ]
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_warm_sco[RESEND_KEY_REDACTED](findings, insights, metrics)
 
         assert metrics["warm_sco[RESEND_KEY_REDACTED]"] is False
         assert any(f.id == "model-009" for f in findings)
         # Band rates should be inverted
-        assert metrics["warm_sco[RESEND_KEY_REDACTED]"]["high"] < metrics["warm_sco[RESEND_KEY_REDACTED]"]["low"]
+        assert (
+            metrics["warm_sco[RESEND_KEY_REDACTED]"]["high"]
+            < metrics["warm_sco[RESEND_KEY_REDACTED]"]["low"]
+        )
 
     def test_well_calibrated_scores(self):
         from data_team.model_engineer.model_engineer import _scan_warm_sco[RESEND_KEY_REDACTED]
@@ -441,7 +500,9 @@ class TestModelEngineerCalibration:
             {"sco[RESEND_KEY_REDACTED]": "low", "total_intros": 50, "approved": 5},
         ]
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_warm_sco[RESEND_KEY_REDACTED](findings, insights, metrics)
 
         assert metrics["warm_sco[RESEND_KEY_REDACTED]"] is True
@@ -458,7 +519,9 @@ class TestModelEngineerCalibration:
         mock_qe.is_available.return_value = True
         mock_qe.execute_sql.return_value = []
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_warm_sco[RESEND_KEY_REDACTED](findings, insights, metrics)
 
         assert metrics["warm_sco[RESEND_KEY_REDACTED]"] == 0
@@ -474,7 +537,9 @@ class TestModelEngineerCalibration:
         mock_qe = MagicMock()
         mock_qe.is_available.return_value = False
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_warm_sco[RESEND_KEY_REDACTED](findings, insights, metrics)
 
         assert metrics["warm_sco[RESEND_KEY_REDACTED]"] is False
@@ -502,7 +567,9 @@ class TestModelEngineerABTest:
             {"approach_style": "formal", "total_matches": 30, "positive_rate": 0.50},
         ]
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_ab_test_analysis(findings, insights, metrics)
 
         assert metrics["ab_test_variants_tested"] == 2
@@ -523,7 +590,9 @@ class TestModelEngineerABTest:
             {"approach_style": "formal", "total_matches": 10, "positive_rate": 0.55},
         ]
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_ab_test_analysis(findings, insights, metrics)
 
         # Small gap (5%) + small sample — no finding
@@ -540,7 +609,9 @@ class TestModelEngineerABTest:
         mock_qe.is_available.return_value = True
         mock_qe.execute_sql.return_value = []
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _scan_ab_test_analysis(findings, insights, metrics)
 
         assert metrics["ab_test_variants_tested"] == 0
@@ -567,7 +638,9 @@ class TestDataLeadIntelFreshness:
             "ml_research": True,
         }
 
-        with patch("data_team.data_lead.data_lead.DataIntelligence", return_value=mock_di):
+        with patch(
+            "data_team.data_lead.data_lead.DataIntelligence", return_value=mock_di
+        ):
             _check_intel_freshness(findings, metrics)
 
         assert metrics["intel_categories_stale"] == 2
@@ -585,7 +658,9 @@ class TestDataLeadIntelFreshness:
             "job_market_data": True,
         }
 
-        with patch("data_team.data_lead.data_lead.DataIntelligence", return_value=mock_di):
+        with patch(
+            "data_team.data_lead.data_lead.DataIntelligence", return_value=mock_di
+        ):
             _check_intel_freshness(findings, metrics)
 
         assert metrics["intel_categories_stale"] == 0
@@ -611,17 +686,28 @@ class TestDataLeadLiveKPIs:
         mock_qe.is_available.return_value = True
         mock_qe.execute_template.side_effect = lambda name, params=None: {
             "activation_funnel": [
-                {"total_users": 100, "uploaded": 50, "searched": 30, "requested_intro": 10}
+                {
+                    "total_users": 100,
+                    "uploaded": 50,
+                    "searched": 30,
+                    "requested_intro": 10,
+                }
             ],
             "intro_approval_rate": [
                 {"total_requests": 20, "approved": 12, "declined": 5, "pending": 3}
             ],
             "marketplace_health": [
-                {"total_listings": 500, "active_listings": 300, "companies_represented": 75}
+                {
+                    "total_listings": 500,
+                    "active_listings": 300,
+                    "companies_represented": 75,
+                }
             ],
         }.get(name, [])
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _populate_live_kpis(findings, insights, metrics)
 
         assert metrics["live_kpis_available"] is True
@@ -643,7 +729,12 @@ class TestDataLeadLiveKPIs:
         mock_qe.is_available.return_value = True
         mock_qe.execute_template.side_effect = lambda name, params=None: {
             "activation_funnel": [
-                {"total_users": 100, "uploaded": 10, "searched": 2, "requested_intro": 0}
+                {
+                    "total_users": 100,
+                    "uploaded": 10,
+                    "searched": 2,
+                    "requested_intro": 0,
+                }
             ],
             "intro_approval_rate": [
                 {"total_requests": 10, "approved": 1, "declined": 8, "pending": 1}
@@ -653,7 +744,9 @@ class TestDataLeadLiveKPIs:
             ],
         }.get(name, [])
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _populate_live_kpis(findings, insights, metrics)
 
         # activation_rate = 0.1 < yellow threshold 0.25 → flagged
@@ -671,7 +764,9 @@ class TestDataLeadLiveKPIs:
         mock_qe = MagicMock()
         mock_qe.is_available.return_value = False
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             _populate_live_kpis(findings, insights, metrics)
 
         assert metrics["live_kpis_available"] is False
@@ -691,7 +786,9 @@ class TestIntegrationScans:
         mock_qe = MagicMock()
         mock_qe.is_available.return_value = False
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             report = scan()
 
         assert report.agent == "pipeline"
@@ -704,7 +801,9 @@ class TestIntegrationScans:
         mock_qe = MagicMock()
         mock_qe.is_available.return_value = False
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             report = scan()
 
         assert report.agent == "analyst"
@@ -717,7 +816,9 @@ class TestIntegrationScans:
         mock_qe = MagicMock()
         mock_qe.is_available.return_value = False
 
-        with patch("data_team.shared.query_executor.get_executor", return_value=mock_qe):
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
             report = scan()
 
         assert report.agent == "model_engineer"

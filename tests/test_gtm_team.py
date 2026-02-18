@@ -17,7 +17,6 @@ Tests cover:
 from __futu[RESEND_KEY_REDACTED] import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest

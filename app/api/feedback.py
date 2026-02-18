@@ -58,11 +58,16 @@ def _sync_feedback_to_notion(
             # Capitalize first segment
             first_segment = path.split("/")[0].capitalize() if path else ""
             page_map = {
-                "Dashboard": "Dashboard", "Contacts": "Contacts",
-                "Search": "Search", "Marketplace": "Marketplace",
-                "Coach": "Coach", "Applications": "Applications",
-                "Settings": "Settings", "Onboarding": "Onboarding",
-                "Signup": "Signup", "Invite": "Other",
+                "Dashboard": "Dashboard",
+                "Contacts": "Contacts",
+                "Search": "Search",
+                "Marketplace": "Marketplace",
+                "Coach": "Coach",
+                "Applications": "Applications",
+                "Settings": "Settings",
+                "Onboarding": "Onboarding",
+                "Signup": "Signup",
+                "Invite": "Other",
             }
             page_feature = page_map.get(first_segment, "Other")
 

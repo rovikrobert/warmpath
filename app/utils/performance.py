@@ -85,8 +85,8 @@ THRESHOLDS: dict[str, int] = {
 # Classification tiers for alerting
 SEVERITY_TIERS = {
     "critical": 2.0,  # >2x threshold
-    "warning": 1.0,   # >1x threshold
-    "info": 0.5,      # >0.5x threshold (approaching)
+    "warning": 1.0,  # >1x threshold
+    "info": 0.5,  # >0.5x threshold (approaching)
 }
 
 
@@ -132,20 +132,25 @@ def _log_timing(
     if severity == "critical":
         logger.warning(
             "PERF_CRITICAL: %s took %.0fms (threshold: %dms, %.0f%% over)",
-            operation, duration_ms, threshold_ms,
+            operation,
+            duration_ms,
+            threshold_ms,
             ((duration_ms / threshold_ms) - 1) * 100 if threshold_ms else 0,
             extra={"perf": log_data},
         )
     elif exceeded:
         logger.warning(
             "PERF_EXCEEDED: %s took %.0fms (threshold: %dms)",
-            operation, duration_ms, threshold_ms,
+            operation,
+            duration_ms,
+            threshold_ms,
             extra={"perf": log_data},
         )
     else:
         logger.info(
             "PERF: %s completed in %.0fms",
-            operation, duration_ms,
+            operation,
+            duration_ms,
             extra={"perf": log_data},
         )
 
@@ -160,9 +165,11 @@ _metrics_buffer: list[dict[str, Any]] = []
 
 def get_recent_metrics(operation: str | None = None, limit: int = 100) -> list[dict]:
     """Return recent timing metrics, optionally filtered by operation."""
-    items = _metrics_buffer if not operation else [
-        m for m in _metrics_buffer if m["op"] == operation
-    ]
+    items = (
+        _metrics_buffer
+        if not operation
+        else [m for m in _metrics_buffer if m["op"] == operation]
+    )
     return items[-limit:]
 
 
@@ -190,6 +197,7 @@ def get_stats(operation: str) -> dict[str, Any] | None:
 # Decorator
 # ---------------------------------------------------------------------------
 
+
 def timed(
     operation: str,
     threshold_ms: int | None = None,
@@ -209,6 +217,7 @@ def timed(
 
     def decorator(func: Callable) -> Callable:
         if inspect.iscoroutinefunction(func):
+
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 t0 = time.monotonic()
@@ -227,8 +236,10 @@ def timed(
                     _metrics_buffer.append(entry)
                     if len(_metrics_buffer) > _BUFFER_SIZE:
                         _metrics_buffer.pop(0)
+
             return async_wrapper
         else:
+
             @functools.wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 t0 = time.monotonic()
@@ -247,5 +258,7 @@ def timed(
                     _metrics_buffer.append(entry)
                     if len(_metrics_buffer) > _BUFFER_SIZE:
                         _metrics_buffer.pop(0)
+
             return sync_wrapper
+
     return decorator

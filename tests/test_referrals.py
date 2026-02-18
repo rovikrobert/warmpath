@@ -10,6 +10,7 @@ pytestmark = pytest.mark.anyio
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 async def _signup(client: AsyncClient, email: str, name: str = "Test User") -> dict:
     """Sign up a user and return login response data."""
     await client.post(
@@ -403,14 +404,10 @@ async def test_record_conversion_awards_credits(client: AsyncClient):
     # Simulate a conversion event
     async with TestSessionLocal() as db:
         referred = (
-            await db.execute(
-                select(User).where(User.email == "conv_user@test.com")
-            )
+            await db.execute(select(User).where(User.email == "conv_user@test.com"))
         ).scalar_one()
         referrer = (
-            await db.execute(
-                select(User).where(User.email == "conv_ref@test.com")
-            )
+            await db.execute(select(User).where(User.email == "conv_ref@test.com"))
         ).scalar_one()
 
         # Record csv_upload conversion
