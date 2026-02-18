@@ -96,7 +96,7 @@ export default function SearchResults() {
       {/* Header */}
       <div className="mb-4 flex items-start justify-between">
         <div>
-          <Link to="/dashboard" className="mb-1 inline-block text-sm text-amber-400 hover:text-amber-300">&larr; Dashboard</Link>
+          <Link to="/coach" className="mb-1 inline-block text-sm text-amber-400 hover:text-amber-300">&larr; Coach</Link>
           <h1 className="text-2xl font-bold text-slate-50">{searchInfo?.name || 'Search Results'}</h1>
           {searchInfo?.description && (
             <p className="mt-1 text-sm text-slate-400">{searchInfo.description}</p>

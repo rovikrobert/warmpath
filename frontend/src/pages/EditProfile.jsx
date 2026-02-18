@@ -240,10 +240,10 @@ export default function EditProfile() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-50">Edit Profile</h1>
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate('/coach')}
           className="text-sm text-amber-400 hover:text-amber-300"
         >
-          &larr; Back to Dashboard
+          &larr; Back to Coach
         </button>
       </div>
 

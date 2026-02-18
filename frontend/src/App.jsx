@@ -3,13 +3,13 @@ import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import Spinner from './components/ui/Spinner';
 import AuthPage from './pages/AuthPage';
-import Dashboard from './pages/Dashboard';
+import CoachPage from './pages/CoachPage';
 import SearchResults from './pages/SearchResults';
 import EditProfile from './pages/EditProfile';
 import OnboardingPage from './pages/OnboardingPage';
 import FindReferrals from './pages/FindReferrals';
 import ReferralResults from './pages/ReferralResults';
-import MarketplaceDashboard from './pages/MarketplaceDashboard';
+import MarketplaceOverview from './pages/MarketplaceOverview';
 import MyRequests from './pages/MyRequests';
 import CreditsPage from './pages/CreditsPage';
 import SharingSettings from './pages/SharingSettings';
@@ -41,7 +41,7 @@ function RootRedirect() {
   const { token, justSignedUp } = useAuth();
   if (!token) return <AuthPage />;
   if (justSignedUp) return <Navigate to="/onboarding" replace />;
-  return <Navigate to="/dashboard" replace />;
+  return <Navigate to="/coach" replace />;
 }
 
 export default function App() {
@@ -65,24 +65,25 @@ export default function App() {
       <Route path="/privacy" element={<PrivacyPage />} />
       <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/coach" element={<CoachPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/search/new" element={<FindReferrals />} />
         <Route path="/search/:id" element={<SearchResults />} />
         <Route path="/referrals" element={<FindReferrals />} />
         <Route path="/referrals/:id" element={<ReferralResults />} />
         <Route path="/applications" element={<ApplicationsPage />} />
-        <Route path="/marketplace/dashboard" element={<MarketplaceDashboard />} />
+        <Route path="/marketplace" element={<MarketplaceOverview />} />
         <Route path="/marketplace/requests" element={<MyRequests />} />
         <Route path="/credits" element={<CreditsPage />} />
         <Route path="/invite" element={<ReferralCodesPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/help/scores" element={<ScoreGlossary />} />
         {/* Legacy routes — redirect to unified settings */}
+        <Route path="/dashboard" element={<Navigate to="/coach" replace />} />
         <Route path="/profile/edit" element={<Navigate to="/settings?tab=profile" replace />} />
         <Route path="/settings/privacy" element={<Navigate to="/settings?tab=privacy" replace />} />
         <Route path="/marketplace/settings" element={<Navigate to="/settings?tab=sharing" replace />} />
-        <Route path="/marketplace" element={<Navigate to="/marketplace/dashboard" replace />} />
+        <Route path="/marketplace/dashboard" element={<Navigate to="/marketplace" replace />} />
         <Route path="/my-requests" element={<Navigate to="/marketplace/requests" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

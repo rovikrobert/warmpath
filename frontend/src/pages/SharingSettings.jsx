@@ -95,8 +95,8 @@ export default function SharingSettings() {
     <div className="mx-auto max-w-2xl space-y-6" role="main">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-slate-50">Sharing Settings</h1>
-        <Link to="/marketplace/dashboard" className="text-sm text-amber-400 hover:text-amber-300">
-          &larr; Back to Dashboard
+        <Link to="/marketplace" className="text-sm text-amber-400 hover:text-amber-300">
+          &larr; Back to Marketplace
         </Link>
       </div>
 

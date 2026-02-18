@@ -298,7 +298,7 @@ export default function OnboardingPage() {
 
   const finish = () => {
     setJustSignedUp(false);
-    navigate('/dashboard');
+    navigate('/coach');
   };
 
   const isHolder = userType === 'network_holder' || userType === 'both';

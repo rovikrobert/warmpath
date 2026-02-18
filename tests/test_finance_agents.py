@@ -223,13 +223,19 @@ class TestGDPRDeletionVerification:
             _check_deletion_verification,
         )
 
-        findings = []
-        compliance_findings = []
-        metrics = {}
+        mock_qe = MagicMock()
+        mock_qe.is_available.return_value = False
+        with patch(
+            "finance_team.shared.query_executor.get_finance_executor",
+            return_value=mock_qe,
+        ):
+            findings = []
+            compliance_findings = []
+            metrics = {}
 
-        _check_deletion_verification(findings, compliance_findings, metrics)
+            _check_deletion_verification(findings, compliance_findings, metrics)
 
-        assert metrics.get("deletion_verification_available") is False
+            assert metrics.get("deletion_verification_available") is False
 
 
 class TestCreditVelocityAnalysis:

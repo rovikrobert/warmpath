@@ -45,7 +45,7 @@ export default function LinkedInCallback() {
         if (isNew) {
           navigate('/onboarding');
         } else {
-          navigate('/dashboard');
+          navigate('/coach');
         }
       })
       .catch((err) => {
