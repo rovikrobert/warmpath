@@ -20,7 +20,7 @@ _REMOTE_PATTERNS = re.compile(
     r"\b(remote|anywhere|distributed|work from home|wfh)\b", re.IGNORECASE
 )
 
-HTTPX_TIMEOUT = 10.0
+HTTPX_TIMEOUT = 3.0
 
 
 class JobFetcher:

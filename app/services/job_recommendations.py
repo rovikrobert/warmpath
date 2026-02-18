@@ -94,6 +94,48 @@ async def _fetch_jobs(
             return []
 
 
+_FETCH_TIMEOUT = 5.0  # Total seconds for all fresh fetches combined
+
+
+async def _match_and_build(
+    fetcher: JobFetcher,
+    key: str,
+    jobs: list[dict],
+    target_role: str,
+    target_seniority: str | None,
+) -> dict | None:
+    """Match jobs for one company and build a recommendation entry."""
+    if not jobs:
+        return None
+    matched = await fetcher.match_jobs_to_role(jobs, target_role, target_seniority)
+    if not matched:
+        return None
+
+    avg_relevance = sum(j.get("role_relevance", 0) for j in matched) / len(matched)
+    top_titles = [j.get("title", "") for j in matched[:3]]
+
+    return {
+        "company": key,
+        "display_name": get_display_name(key),
+        "region": get_region(key),
+        "matching_openings": [
+            {
+                "title": j.get("title", ""),
+                "url": j.get("url", ""),
+                "location": j.get("location"),
+                "is_remote": j.get("is_remote", False),
+                "relevance": j.get("role_relevance", 0),
+            }
+            for j in matched[:5]
+        ],
+        "matching_count": len(matched),
+        "total_openings": len(jobs),
+        "top_titles": top_titles,
+        "score": len(matched) * avg_relevance,
+        "source": "board_registry",
+    }
+
+
 async def get_recommendations(
     target_role: str,
     target_seniority: str | None,
@@ -103,6 +145,11 @@ async def get_recommendations(
     db: AsyncSession,
 ) -> dict:
     """Return top companies with live openings matching the user's target role.
+
+    Performance strategy (cache-first):
+      1. Return cached results immediately — no external HTTP if cache has enough.
+      2. Only fetch fresh data if cached results < limit, with a 5s total timeout.
+      3. Location-scoped scanning: skip non-matching regions when location is set.
 
     Returns:
         {
@@ -115,11 +162,33 @@ async def get_recommendations(
         }
     """
     fetcher = JobFetcher()
-    max_scan = settings.RECOMMENDATION_MAX_SCAN
     max_results = min(limit, settings.RECOMMENDATION_MAX_RESULTS * 3)
 
-    # Build candidate list, prioritized by location
-    candidates = companies_for_locations(target_locations)
+    # Build candidate list, scoped to target locations
+    all_candidates = companies_for_locations(target_locations)
+
+    # When locations specified, only scan the prioritized (matched-region) companies.
+    # companies_for_locations returns matched first, then rest. We limit to the
+    # matched portion to avoid scanning irrelevant regions.
+    if target_locations:
+        from app.services.board_registry import _LOCATION_TO_REGIONS, REGIONS
+
+        matched_regions: set[str] = set()
+        for loc in target_locations:
+            loc_lower = loc.strip().lower()
+            for keyword, regions in _LOCATION_TO_REGIONS.items():
+                if keyword in loc_lower or loc_lower in keyword:
+                    matched_regions.update(regions)
+
+        if matched_regions:
+            region_keys: set[str] = set()
+            for region in matched_regions:
+                region_keys.update(REGIONS.get(region, []))
+            candidates = [c for c in all_candidates if c in region_keys]
+        else:
+            candidates = all_candidates
+    else:
+        candidates = all_candidates
 
     # Apply exclusions
     exclude_set = set()
@@ -128,7 +197,7 @@ async def get_recommendations(
             exclude_set.add(name.strip().lower())
     candidates = [c for c in candidates if c not in exclude_set]
 
-    # Phase 1: check cache for all candidates
+    # Phase 1: Check cache for all candidates (fast — DB only)
     cached_results: dict[str, list[dict]] = {}
     uncached: list[str] = []
 
@@ -139,61 +208,58 @@ async def get_recommendations(
         else:
             uncached.append(key)
 
-    # Phase 2: fetch uncached companies (up to max_scan, concurrency 5)
-    to_fetch = uncached[:max_scan]
     cache_hits = len(cached_results)
 
-    if to_fetch:
-        semaphore = asyncio.Semaphore(5)
-        tasks = []
-        for key in to_fetch:
-            boards = BOARD_REGISTRY.get(key, {})
-            tasks.append(_fetch_jobs(key, boards, fetcher, semaphore))
-
-        results = await asyncio.gather(*tasks)
-        # Cache results sequentially (DB session is not concurrency-safe)
-        for key, jobs in zip(to_fetch, results):
-            cached_results[key] = jobs
-            if jobs:
-                await set_cached_jobs(key, jobs, db)
-
-    await db.flush()
-
-    # Phase 3: match jobs to role for each company
+    # Phase 2: Match cached results immediately (no external I/O)
     recommendations: list[dict] = []
-
     for key, jobs in cached_results.items():
-        if not jobs:
-            continue
-        matched = await fetcher.match_jobs_to_role(jobs, target_role, target_seniority)
-        if not matched:
-            continue
+        rec = await _match_and_build(fetcher, key, jobs, target_role, target_seniority)
+        if rec:
+            recommendations.append(rec)
 
-        avg_relevance = sum(j.get("role_relevance", 0) for j in matched) / len(matched)
-        top_titles = [j.get("title", "") for j in matched[:3]]
+    # Phase 3: Only fetch fresh data if we don't have enough results.
+    # Use a tight timeout so we never block longer than _FETCH_TIMEOUT.
+    fresh_scanned = 0
+    max_scan = settings.RECOMMENDATION_MAX_SCAN
 
-        recommendations.append(
-            {
-                "company": key,
-                "display_name": get_display_name(key),
-                "region": get_region(key),
-                "matching_openings": [
-                    {
-                        "title": j.get("title", ""),
-                        "url": j.get("url", ""),
-                        "location": j.get("location"),
-                        "is_remote": j.get("is_remote", False),
-                        "relevance": j.get("role_relevance", 0),
-                    }
-                    for j in matched[:5]
-                ],
-                "matching_count": len(matched),
-                "total_openings": len(jobs),
-                "top_titles": top_titles,
-                "score": len(matched) * avg_relevance,
-                "source": "board_registry",
-            }
-        )
+    if len(recommendations) < max_results and uncached:
+        to_fetch = uncached[:max_scan]
+
+        async def _fetch_and_match_batch() -> list[dict]:
+            """Fetch + match uncached companies within timeout."""
+            batch_recs: list[dict] = []
+            semaphore = asyncio.Semaphore(5)
+            tasks = []
+            for key in to_fetch:
+                boards = BOARD_REGISTRY.get(key, {})
+                tasks.append(_fetch_jobs(key, boards, fetcher, semaphore))
+
+            results = await asyncio.gather(*tasks)
+            for key, jobs in zip(to_fetch, results):
+                if jobs:
+                    await set_cached_jobs(key, jobs, db)
+                rec = await _match_and_build(
+                    fetcher, key, jobs, target_role, target_seniority
+                )
+                if rec:
+                    batch_recs.append(rec)
+            return batch_recs
+
+        try:
+            fresh_recs = await asyncio.wait_for(
+                _fetch_and_match_batch(), timeout=_FETCH_TIMEOUT
+            )
+            recommendations.extend(fresh_recs)
+            fresh_scanned = len(to_fetch)
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Recommendation fresh fetch timed out after %.1fs (tried %d companies)",
+                _FETCH_TIMEOUT,
+                len(to_fetch),
+            )
+            fresh_scanned = len(to_fetch)
+
+        await db.flush()
 
     # Sort by score descending, then limit
     recommendations.sort(key=lambda r: r["score"], reverse=True)
@@ -202,8 +268,8 @@ async def get_recommendations(
     return {
         "recommendations": recommendations,
         "scan_stats": {
-            "companies_scanned": len(cached_results),
+            "companies_scanned": cache_hits + fresh_scanned,
             "cache_hits": cache_hits,
-            "fresh_scans": len(to_fetch),
+            "fresh_scans": fresh_scanned,
         },
     }
