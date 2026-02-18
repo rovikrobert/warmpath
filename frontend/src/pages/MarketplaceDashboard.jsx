@@ -80,7 +80,7 @@ export default function MarketplaceDashboard() {
     <div className="space-y-6" role="main">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-slate-50">Network Holder Dashboard</h1>
-        <Link to="/marketplace/settings" className="rounded-md border border-slate-700/50 px-3 py-1.5 text-sm text-slate-400 hover:bg-slate-800">
+        <Link to="/settings?tab=sharing" className="rounded-md border border-slate-700/50 px-3 py-1.5 text-sm text-slate-400 hover:bg-slate-800">
           Sharing Settings
         </Link>
       </div>
