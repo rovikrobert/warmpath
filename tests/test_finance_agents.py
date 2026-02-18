@@ -3,6 +3,8 @@
 from __future__ import annotations
 import inspect
 
+import pytest
+
 
 class TestFinanceQueryExecutor:
     def test_get_executor_returns_instance(self):
@@ -204,3 +206,76 @@ class TestWebhookHandlers:
         from app.api.webhooks import _resolve_user
 
         assert inspect.iscoroutinefunction(_resolve_user)
+
+
+class TestGDPRDeletionVerification:
+    """Legal compliance agent can verify deletions via DB query."""
+
+    def test_deletion_verification_check_exists(self):
+        from finance_team.legal_compliance import legal_compliance
+
+        assert hasattr(legal_compliance, "_check_deletion_verification")
+
+    def test_deletion_verification_produces_finding_when_unavailable(self):
+        """When DB is unavailable, produce an info finding (not a failure)."""
+        from finance_team.legal_compliance.legal_compliance import (
+            _check_deletion_verification,
+        )
+
+        findings = []
+        compliance_findings = []
+        metrics = {}
+
+        _check_deletion_verification(findings, compliance_findings, metrics)
+
+        assert metrics.get("deletion_verification_available") is False
+
+
+class TestCreditVelocityAnalysis:
+    """Credits manager should analyze credit velocity, distribution, expiry."""
+
+    def test_gini_coefficient_perfect_equality(self):
+        from finance_team.credits_manager.credits_manager import _compute_gini
+
+        assert _compute_gini([10, 10, 10, 10]) == pytest.approx(0.0, abs=0.01)
+
+    def test_gini_coefficient_perfect_inequality(self):
+        from finance_team.credits_manager.credits_manager import _compute_gini
+
+        assert _compute_gini([0, 0, 0, 100]) == pytest.approx(0.75, abs=0.01)
+
+    def test_gini_coefficient_empty(self):
+        from finance_team.credits_manager.credits_manager import _compute_gini
+
+        assert _compute_gini([]) == 0.0
+
+    def test_velocity_check_exists(self):
+        from finance_team.credits_manager import credits_manager
+
+        assert hasattr(credits_manager, "_check_credit_velocity_live")
+
+    def test_distribution_check_exists(self):
+        from finance_team.credits_manager import credits_manager
+
+        assert hasattr(credits_manager, "_check_credit_distribution_live")
+
+    def test_expiry_check_exists(self):
+        from finance_team.credits_manager import credits_manager
+
+        assert hasattr(credits_manager, "_check_expiry_rate_live")
+
+    def test_zero_balance_check_exists(self):
+        from finance_team.credits_manager import credits_manager
+
+        assert hasattr(credits_manager, "_check_zero_balance_rate_live")
+
+    def test_velocity_degrades_without_db(self):
+        from finance_team.credits_manager.credits_manager import (
+            _check_credit_velocity_live,
+        )
+
+        findings = []
+        fin_findings = []
+        metrics = {}
+        _check_credit_velocity_live(findings, fin_findings, metrics)
+        assert metrics.get("credit_velocity_available") is False
