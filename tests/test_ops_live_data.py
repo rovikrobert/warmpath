@@ -225,3 +225,43 @@ class TestNaivLiveEmail:
         _check_live_email_engagement(findings, sat_findings, metrics)
 
         assert any("unavailable" in f.title.lower() or "DATABASE_URL" in f.detail for f in findings)
+
+
+class TestMarshLiveVolume:
+    """Marsh live marketplace volume — queries listings + intros."""
+
+    def test_volume_without_db(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import importlib
+        import ops_team.shared.db as db_mod
+        importlib.reload(db_mod)
+
+        from ops_team.marsh.marsh import _check_live_marketplace_volume
+        from agents.shared.report import Finding
+        from ops_team.shared.report import OpsInsight, MarketplaceFinding
+
+        findings: list[Finding] = []
+        mkt_findings: list[MarketplaceFinding] = []
+        insights: list[OpsInsight] = []
+        metrics: dict = {}
+        _check_live_marketplace_volume(findings, mkt_findings, insights, metrics)
+
+        assert any("unavailable" in f.title.lower() or "DATABASE_URL" in f.detail for f in findings)
+
+    def test_volume_metrics_not_populated_without_db(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import importlib
+        import ops_team.shared.db as db_mod
+        importlib.reload(db_mod)
+
+        from ops_team.marsh.marsh import _check_live_marketplace_volume
+        from agents.shared.report import Finding
+        from ops_team.shared.report import OpsInsight, MarketplaceFinding
+
+        findings: list[Finding] = []
+        mkt_findings: list[MarketplaceFinding] = []
+        insights: list[OpsInsight] = []
+        metrics: dict = {}
+        _check_live_marketplace_volume(findings, mkt_findings, insights, metrics)
+
+        assert "live_active_listings" not in metrics
