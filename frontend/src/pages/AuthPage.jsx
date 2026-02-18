@@ -8,7 +8,7 @@ export default function AuthPage() {
   const { login, signup } = useAuth();
   const navigate = useNavigate();
   const [isSignup, setIsSignup] = useState(false);
-  const [form, setForm] = useState({ email: '', password: '', full_name: '', referral_code: '' });
+  const [form, setForm] = useState({ email: '', password: '', confirm_password: '', full_name: '', referral_code: '' });
   const [loading, setLoading] = useState(false);
   const [linkedinLoading, setLinkedinLoading] = useState(false);
   const [linkedinAvailable, setLinkedinAvailable] = useState(false);
@@ -51,7 +51,8 @@ export default function AuthPage() {
     }
   };
 
-  const signupFieldsFilled = form.full_name.trim() && form.email.trim() && form.password.trim();
+  const passwordsMatch = form.password === form.confirm_password;
+  const signupFieldsFilled = form.full_name.trim() && form.email.trim() && form.password.trim() && form.confirm_password.trim() && passwordsMatch;
 
   const handleLinkedIn = async () => {
     setLinkedinLoading(true);
@@ -172,6 +173,16 @@ export default function AuthPage() {
               </div>
             )}
           </div>
+
+          {isSignup && (
+            <div>
+              <label htmlFor="auth-confirm-password" className="mb-1 block text-sm font-medium text-slate-700">Confirm Password</label>
+              <input id="auth-confirm-password" type="password" value={form.confirm_password} onChange={set('confirm_password')} className={inputClass} placeholder="••••••••" required aria-required="true" />
+              {form.confirm_password && !passwordsMatch && (
+                <p className="mt-1 text-xs text-red-500">Passwords do not match</p>
+              )}
+            </div>
+          )}
 
           {isSignup && (
             <div>
