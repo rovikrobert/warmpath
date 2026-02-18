@@ -36,3 +36,9 @@ from app.models.registry import CompanyBoard  # noqa: E402, F401
 from app.models.audit import AuditLog  # noqa: E402, F401
 from app.models.email_campaign import EmailCampaignLog  # noqa: E402, F401
 from app.models.friendship import UserBlock, UserFriendship  # noqa: E402, F401
+from app.models.gtm import (  # noqa: E402, F401
+    CompetitorProfile,
+    GTMExperiment,
+    PartnershipOpportunity,
+    PricingBenchmark,
+)

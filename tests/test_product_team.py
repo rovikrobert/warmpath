@@ -668,3 +668,307 @@ class TestCosIntegration:
         assert len(outcomes) >= 1
         score = score_alignment(outcomes)
         assert 0.0 <= score <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# TestUserResearcherPostHog
+# ---------------------------------------------------------------------------
+
+
+class TestUserResearcherPostHog:
+    """UserResearcher PostHog analytics integration."""
+
+    def test_analyze_posthog_no_api_key(self, monkeypatch):
+        monkeypatch.delenv("POSTHOG_API_KEY", raising=False)
+        monkeypatch.delenv("POSTHOG_PROJECT_ID", raising=False)
+        from product_team.user_researcher.user_researcher import _analyze_posthog_data
+        insights = []
+        metrics = {}
+        _analyze_posthog_data(insights, metrics)
+        assert len(insights) == 1
+        assert metrics.get("posthog_configured") is False
+
+    def test_analyze_posthog_with_mock_data(self, monkeypatch):
+        monkeypatch.setenv("POSTHOG_API_KEY", "phx_test_key")
+        monkeypatch.setenv("POSTHOG_PROJECT_ID", "12345")
+        mock_response = {"results": [{"data": [10, 20, 30], "labels": ["2026-02-16", "2026-02-17", "2026-02-18"]}]}
+        import product_team.user_researcher.user_researcher as ur_mod
+        monkeypatch.setattr(ur_mod, "_posthog_query", lambda *a, **kw: mock_response)
+        insights = []
+        metrics = {}
+        ur_mod._analyze_posthog_data(insights, metrics)
+        assert metrics.get("posthog_configured") is True
+        assert len(insights) >= 1
+
+    def test_scan_includes_posthog(self):
+        from product_team.user_researcher.user_researcher import scan
+        report = scan()
+        assert "posthog_configured" in report.metrics
+
+
+# ---------------------------------------------------------------------------
+# TestUserResearcherCompetitors
+# ---------------------------------------------------------------------------
+
+
+class TestUserResearcherCompetitors:
+    """UserResearcher competitive monitoring."""
+
+    def test_monitor_competitors_loads_registry(self):
+        from product_team.user_researcher.user_researcher import _monitor_competitors
+        insights = []
+        findings = []
+        metrics = {}
+        _monitor_competitors(insights, findings, metrics)
+        assert "competitors_tracked" in metrics
+        assert metrics["competitors_tracked"] >= 4
+
+    def test_monitor_competitors_produces_insights(self):
+        from product_team.user_researcher.user_researcher import _monitor_competitors
+        insights = []
+        findings = []
+        metrics = {}
+        _monitor_competitors(insights, findings, metrics)
+        assert len(insights) >= 1
+
+    def test_scan_includes_competitors(self):
+        from product_team.user_researcher.user_researcher import scan
+        report = scan()
+        assert "competitors_tracked" in report.metrics
+
+
+# ---------------------------------------------------------------------------
+# TestProductManagerContracts
+# ---------------------------------------------------------------------------
+
+
+class TestProductManagerContracts:
+    """ProductManager schema/contract validation."""
+
+    def test_validate_contracts_finds_schemas(self):
+        from product_team.product_manager.product_manager import _validate_api_contracts
+        findings = []
+        insights = []
+        metrics = {}
+        _validate_api_contracts(findings, insights, metrics)
+        assert "schema_files_found" in metrics
+        assert metrics["schema_files_found"] > 0
+
+    def test_validate_contracts_extracts_fields(self):
+        from product_team.product_manager.product_manager import _validate_api_contracts
+        findings = []
+        insights = []
+        metrics = {}
+        _validate_api_contracts(findings, insights, metrics)
+        assert "schema_response_models" in metrics
+
+    def test_validate_contracts_checks_frontend(self):
+        from product_team.product_manager.product_manager import _validate_api_contracts
+        findings = []
+        insights = []
+        metrics = {}
+        _validate_api_contracts(findings, insights, metrics)
+        assert "frontend_api_calls" in metrics
+
+    def test_scan_includes_contracts(self):
+        from product_team.product_manager.product_manager import scan
+        report = scan()
+        assert "schema_files_found" in report.metrics
+
+
+# ---------------------------------------------------------------------------
+# TestProductManagerExperiments
+# ---------------------------------------------------------------------------
+
+
+class TestProductManagerExperiments:
+    """ProductManager experiment tracking."""
+
+    def test_track_experiments_empty_registry(self):
+        from product_team.product_manager.product_manager import _track_experiments
+        findings = []
+        insights = []
+        metrics = {}
+        _track_experiments(findings, insights, metrics)
+        assert "experiments_total" in metrics
+        assert metrics["experiments_total"] == 0
+
+    def test_track_experiments_with_data(self, tmp_path, monkeypatch):
+        import json
+        import product_team.shared.config as config_mod
+        registry = {
+            "experiments": [
+                {"id": "exp-001", "hypothesis": "Shorter onboarding increases completion", "metric": "onboarding_completion_rate", "status": "active", "start_date": "2026-02-01", "end_date": None, "result": None},
+                {"id": "exp-002", "hypothesis": "Social proof increases signups", "metric": "signup_rate", "status": "concluded", "start_date": "2026-01-01", "end_date": "2026-01-31", "result": "15% lift in signup rate"},
+            ]
+        }
+        reg_path = tmp_path / "experiment_registry.json"
+        reg_path.write_text(json.dumps(registry))
+        monkeypatch.setattr(config_mod, "EXPERIMENT_REGISTRY_PATH", reg_path)
+        from product_team.product_manager.product_manager import _track_experiments
+        findings = []
+        insights = []
+        metrics = {}
+        _track_experiments(findings, insights, metrics)
+        assert metrics["experiments_total"] == 2
+        assert metrics["experiments_active"] == 1
+        assert metrics["experiments_concluded"] == 1
+
+    def test_scan_includes_experiments(self):
+        from product_team.product_manager.product_manager import scan
+        report = scan()
+        assert "experiments_total" in report.metrics
+
+
+# ---------------------------------------------------------------------------
+# TestUXLeadAccessibility
+# ---------------------------------------------------------------------------
+
+
+class TestUXLeadAccessibility:
+    """UXLead pa11y accessibility audit."""
+
+    def test_accessibility_audit_no_pally(self, monkeypatch):
+        import subprocess
+        original_run = subprocess.run
+        def mock_run(*args, **kwargs):
+            raise FileNotFoundError("pa11y not found")
+        monkeypatch.setattr(subprocess, "run", mock_run)
+        from product_team.ux_lead.ux_lead import _run_accessibility_audit
+        ux_findings = []
+        findings = []
+        metrics = {}
+        _run_accessibility_audit(ux_findings, findings, metrics)
+        assert metrics.get("pa11y_available") is False
+
+    def test_accessibility_audit_with_mock_results(self, monkeypatch):
+        import subprocess
+        import json
+        pa11y_output = json.dumps([
+            {"type": "error", "code": "WCAG2AA.Principle1.Guideline1_1.1_1_1.H37", "message": "Img missing alt", "selector": "img.hero", "context": "<img src='hero.png'>"},
+            {"type": "warning", "code": "WCAG2AA.Principle1.Guideline1_3.1_3_1.H48", "message": "Navigation not in list", "selector": "nav", "context": "<nav>"},
+        ])
+        call_count = {"n": 0}
+        def mock_run(*args, **kwargs):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return type("Result", (), {"returncode": 0, "stdout": "8.0.0", "stderr": ""})()
+            return type("Result", (), {"returncode": 2, "stdout": pa11y_output, "stderr": ""})()
+        monkeypatch.setattr(subprocess, "run", mock_run)
+        from product_team.ux_lead.ux_lead import _run_accessibility_audit
+        ux_findings = []
+        findings = []
+        metrics = {}
+        _run_accessibility_audit(ux_findings, findings, metrics)
+        assert metrics.get("pa11y_available") is True
+        assert metrics.get("pa11y_issues", 0) >= 1
+
+    def test_scan_includes_accessibility_audit(self):
+        from product_team.ux_lead.ux_lead import scan
+        report = scan()
+        assert "pa11y_available" in report.metrics
+
+
+# ---------------------------------------------------------------------------
+# TestUXLeadFlowAnalysis
+# ---------------------------------------------------------------------------
+
+
+class TestUXLeadFlowAnalysis:
+    """UXLead cross-page flow analysis."""
+
+    def test_analyze_flows_builds_graph(self):
+        from product_team.ux_lead.ux_lead import _analyze_user_flows, _find_jsx_files
+        jsx_files = _find_jsx_files()
+        ux_findings = []
+        findings = []
+        metrics = {}
+        _analyze_user_flows(jsx_files, ux_findings, findings, metrics)
+        assert "flow_graph_nodes" in metrics
+        assert "flow_graph_edges" in metrics
+        assert metrics["flow_graph_nodes"] > 0
+
+    def test_analyze_flows_validates_journeys(self):
+        from product_team.ux_lead.ux_lead import _analyze_user_flows, _find_jsx_files
+        jsx_files = _find_jsx_files()
+        ux_findings = []
+        findings = []
+        metrics = {}
+        _analyze_user_flows(jsx_files, ux_findings, findings, metrics)
+        assert "journey_coverage_job_seeker" in metrics
+        assert "journey_coverage_network_holder" in metrics
+
+    def test_analyze_flows_detects_dead_ends(self):
+        from product_team.ux_lead.ux_lead import _analyze_user_flows, _find_jsx_files
+        jsx_files = _find_jsx_files()
+        ux_findings = []
+        findings = []
+        metrics = {}
+        _analyze_user_flows(jsx_files, ux_findings, findings, metrics)
+        assert "dead_end_pages" in metrics
+
+    def test_scan_includes_flow_analysis(self):
+        from product_team.ux_lead.ux_lead import scan
+        report = scan()
+        assert "flow_graph_nodes" in report.metrics
+
+
+# ---------------------------------------------------------------------------
+# TestDesignLeadTokens
+# ---------------------------------------------------------------------------
+
+
+class TestDesignLeadTokens:
+    """DesignLead design token validation."""
+
+    def test_validate_tokens_loads_spec(self):
+        from product_team.design_lead.design_lead import _validate_against_design_tokens, _find_jsx_files
+        jsx_files = _find_jsx_files()
+        design_findings = []
+        metrics = {}
+        _validate_against_design_tokens(jsx_files, design_findings, metrics)
+        assert "design_tokens_loaded" in metrics
+
+    def test_validate_tokens_detects_drift(self):
+        from product_team.design_lead.design_lead import _validate_against_design_tokens, _find_jsx_files
+        jsx_files = _find_jsx_files()
+        design_findings = []
+        metrics = {}
+        _validate_against_design_tokens(jsx_files, design_findings, metrics)
+        assert "token_color_drift" in metrics
+        assert "token_compliance_pct" in metrics
+
+    def test_scan_includes_token_validation(self):
+        from product_team.design_lead.design_lead import scan
+        report = scan()
+        assert "design_tokens_loaded" in report.metrics
+
+
+# ---------------------------------------------------------------------------
+# TestProductLeadFeedback
+# ---------------------------------------------------------------------------
+
+
+class TestProductLeadFeedback:
+    """ProductLead feedback aggregation."""
+
+    def test_aggregate_feedback_no_db(self):
+        from product_team.product_lead.product_lead import _aggregate_all_feedback
+        findings = []
+        insights = []
+        metrics = {}
+        _aggregate_all_feedback(findings, insights, metrics)
+        assert "feedback_db_items" in metrics
+
+    def test_aggregate_feedback_produces_insight(self):
+        from product_team.product_lead.product_lead import _aggregate_all_feedback
+        findings = []
+        insights = []
+        metrics = {}
+        _aggregate_all_feedback(findings, insights, metrics)
+        assert len(insights) >= 1
+
+    def test_scan_includes_feedback_aggregation(self):
+        from product_team.product_lead.product_lead import scan
+        report = scan()
+        assert "feedback_db_items" in report.metrics
