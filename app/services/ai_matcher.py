@@ -538,16 +538,35 @@ async def _call_claude_api(
     profile: ConnectorProfile | None = None,
     user_name: str | None = None,
 ) -> tuple[list[ContactMatch], TokenUsage]:
-    """Call the real Claude API with the referral-focused prompt."""
+    """Call the real Claude API with the referral-focused prompt.
+
+    Retries once on rate limit (429) with exponential backoff.
+    Falls back to mock scoring on persistent API failures.
+    """
     client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
     user_prompt = _build_user_prompt(search, contacts, profile, user_name)
 
-    message = await client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=2048,
-        system=_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            message = await client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=2048,
+                system=_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            break
+        except anthropic.RateLimitError:
+            if attempt < max_retries - 1:
+                wait = 2 ** (attempt + 1)
+                logger.warning("Claude rate limit hit, retrying in %ds...", wait)
+                await asyncio.sleep(wait)
+            else:
+                logger.error("Claude rate limit persists after retries, falling back to mock")
+                return _mock_sco[RESEND_KEY_REDACTED](search, contacts), TokenUsage(0, 0)
+        except anthropic.APIError as exc:
+            logger.error("Claude API error: %s — falling back to mock scoring", exc)
+            return _mock_sco[RESEND_KEY_REDACTED](search, contacts), TokenUsage(0, 0)
 
     usage = TokenUsage(
         input_tokens=message.usage.input_tokens,

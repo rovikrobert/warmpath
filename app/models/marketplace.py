@@ -117,6 +117,10 @@ class NetworkSharingPreferences(Base):
 
 class IntroFacilitation(Base):
     __tablename__ = "intro_facilitations"
+    __table_args__ = (
+        Index("idx_intro_status", "status"),
+        Index("idx_intro_expires", "expires_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -147,6 +151,7 @@ class IntroFacilitation(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

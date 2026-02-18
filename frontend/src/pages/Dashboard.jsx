@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { coach as coachApi } from '../api/client';
 import FeedbackModal from '../components/FeedbackModal';
+import OnboardingChecklist from '../components/OnboardingChecklist';
 
 /**
  * Render text with markdown-style links [text](/path) as React Router <Link>s.
@@ -182,6 +183,9 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col" role="main">
+      {/* Onboarding checklist for new users */}
+      <OnboardingChecklist />
+
       {/* Header */}
       <div className="flex-none border-b border-slate-200 px-4 py-3">
         <div className="flex items-center gap-2">

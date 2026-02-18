@@ -599,26 +599,44 @@ async def draft_referral_request(
             contact, user_profile, match_result, job_opening, channel
         )
 
-    try:
-        drafts, usage = await _call_claude_api(
-            contact, user_profile, match_result, job_opening, channel
-        )
-        logger.info(
-            "Referral drafts for %s (tokens: %d in / %d out)",
-            contact.full_name,
-            usage.input_tokens,
-            usage.output_tokens,
-        )
-        return drafts
-    except anthropic.APIError as exc:
-        logger.error(
-            "Claude API error drafting referral for %s: %s", contact.full_name, exc
-        )
-        return _mock_referral_drafts(
-            contact, user_profile, match_result, job_opening, channel
-        )
-    except (json.JSONDecodeError, KeyError, ValueError) as exc:
-        logger.error("Failed to parse Claude referral response: %s", exc)
-        return _mock_referral_drafts(
-            contact, user_profile, match_result, job_opening, channel
-        )
+    import asyncio
+
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            drafts, usage = await _call_claude_api(
+                contact, user_profile, match_result, job_opening, channel
+            )
+            logger.info(
+                "Referral drafts for %s (tokens: %d in / %d out)",
+                contact.full_name,
+                usage.input_tokens,
+                usage.output_tokens,
+            )
+            return drafts
+        except anthropic.RateLimitError:
+            if attempt < max_retries - 1:
+                wait = 2 ** (attempt + 1)
+                logger.warning("Claude rate limit hit (intro drafter), retrying in %ds...", wait)
+                await asyncio.sleep(wait)
+            else:
+                logger.error("Claude rate limit persists, falling back to mock drafts")
+                return _mock_referral_drafts(
+                    contact, user_profile, match_result, job_opening, channel
+                )
+        except anthropic.APIError as exc:
+            logger.error(
+                "Claude API error drafting referral for %s: %s", contact.full_name, exc
+            )
+            return _mock_referral_drafts(
+                contact, user_profile, match_result, job_opening, channel
+            )
+        except (json.JSONDecodeError, KeyError, ValueError) as exc:
+            logger.error("Failed to parse Claude referral response: %s", exc)
+            return _mock_referral_drafts(
+                contact, user_profile, match_result, job_opening, channel
+            )
+    # Unreachable, but satisfy type checker
+    return _mock_referral_drafts(
+        contact, user_profile, match_result, job_opening, channel
+    )
