@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { marketplace as mpApi, credits as creditsApi } from '../api/client';
+import { trackEvent } from '../utils/analytics';
 
 function StatusBadge({ status }) {
   const labels = { requested: 'Pending', reviewing: 'Reviewing', approved: 'Approved', declined: 'Declined', completed: 'Completed' };
@@ -50,6 +51,7 @@ export default function MarketplaceDashboard() {
     try {
       await mpApi.updateRequest(id, { action });
       if (action === 'approve') {
+        trackEvent('intro_approved');
         setApprovedCoaching(id);
       }
       await load();
