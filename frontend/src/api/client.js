@@ -1,4 +1,15 @@
+import posthog from 'posthog-js';
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+
+// ---------------------------------------------------------------------------
+// Analytics helper — no-op when PostHog is not initialized
+// ---------------------------------------------------------------------------
+export function track(event, properties = {}) {
+  if (posthog.__loaded) {
+    posthog.capture(event, properties);
+  }
+}
 
 let _getToken = () => null;
 let _setToken = () => {};
@@ -110,7 +121,11 @@ export async function api(path, options = {}) {
 }
 
 export const auth = {
-  signup: (body) => api('/api/v1/auth/signup', { method: 'POST', body }),
+  signup: (body) =>
+    api('/api/v1/auth/signup', { method: 'POST', body }).then((r) => {
+      track('signup');
+      return r;
+    }),
   login: (body) => api('/api/v1/auth/login', { method: 'POST', body }),
   me: () => api('/api/v1/auth/me'),
   upsertProfile: (body) => api('/api/v1/auth/profile', { method: 'POST', body }),
@@ -140,7 +155,10 @@ export const contacts = {
   upload: (file) => {
     const form = new FormData();
     form.append('file', file);
-    return api('/api/v1/contacts/upload', { method: 'POST', body: form });
+    return api('/api/v1/contacts/upload', { method: 'POST', body: form }).then((r) => {
+      track('csv_upload');
+      return r;
+    });
   },
   list: (params = {}) => {
     const qs = new URLSearchParams();
@@ -162,7 +180,11 @@ export const companies = {
 };
 
 export const search = {
-  create: (body) => api('/api/v1/search', { method: 'POST', body }),
+  create: (body) =>
+    api('/api/v1/search', { method: 'POST', body }).then((r) => {
+      track('search_created');
+      return r;
+    }),
   list: () => api('/api/v1/search'),
   get: (id) => api(`/api/v1/search/${id}`),
   run: (id) => api(`/api/v1/search/${id}/run`, { method: 'POST' }),
@@ -197,7 +219,10 @@ export const matches = {
 export const marketplace = {
   search: (body) => api('/api/v1/marketplace/search', { method: 'POST', body }),
   requestIntro: (body) =>
-    api('/api/v1/marketplace/request-intro', { method: 'POST', body }),
+    api('/api/v1/marketplace/request-intro', { method: 'POST', body }).then((r) => {
+      track('intro_requested');
+      return r;
+    }),
   myRequests: () => api('/api/v1/marketplace/my-requests'),
   incomingRequests: () => api('/api/v1/marketplace/incoming-requests'),
   updateRequest: (id, body) =>
@@ -284,7 +309,11 @@ export const privacy = {
 };
 
 export const feedback = {
-  submit: (body) => api('/api/v1/feedback', { method: 'POST', body }),
+  submit: (body) =>
+    api('/api/v1/feedback', { method: 'POST', body }).then((r) => {
+      track('feedback_submitted');
+      return r;
+    }),
 };
 
 export const health = {
