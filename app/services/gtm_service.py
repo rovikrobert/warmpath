@@ -1,6 +1,5 @@
 """GTM service layer — CRUD + business logic for competitors, pricing, partnerships, experiments."""
 
-import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -14,8 +13,7 @@ from app.models.gtm import (
     PartnershipOpportunity,
     PricingBenchmark,
 )
-
-logger = logging.getLogger(__name__)
+from app.utils.exceptions import NotFoundError, ValidationError
 
 # ---------------------------------------------------------------------------
 # Validation sets
@@ -94,11 +92,11 @@ async def list_competitors(
     query = select(CompetitorProfile).where(CompetitorProfile.deleted_at.is_(None))
     if category is not None:
         if category not in VALID_CATEGORIES:
-            raise ValueError(f"category must be one of {VALID_CATEGORIES}")
+            raise ValidationError(f"category must be one of {VALID_CATEGORIES}")
         query = query.where(CompetitorProfile.category == category)
     if threat_level is not None:
         if threat_level not in VALID_THREAT_LEVELS:
-            raise ValueError(f"threat_level must be one of {VALID_THREAT_LEVELS}")
+            raise ValidationError(f"threat_level must be one of {VALID_THREAT_LEVELS}")
         query = query.where(CompetitorProfile.threat_level == threat_level)
     query = query.order_by(CompetitorProfile.name)
     result = await db.execute(query)
@@ -137,9 +135,9 @@ async def create_competitor(
 ) -> CompetitorProfile:
     """Create a new competitor profile."""
     if category not in VALID_CATEGORIES:
-        raise ValueError(f"category must be one of {VALID_CATEGORIES}")
+        raise ValidationError(f"category must be one of {VALID_CATEGORIES}")
     if threat_level not in VALID_THREAT_LEVELS:
-        raise ValueError(f"threat_level must be one of {VALID_THREAT_LEVELS}")
+        raise ValidationError(f"threat_level must be one of {VALID_THREAT_LEVELS}")
 
     competitor = CompetitorProfile(
         name=name,
@@ -169,12 +167,12 @@ async def update_competitor(
     """Update fields on an existing competitor."""
     competitor = await get_competitor(db, competitor_id)
     if competitor is None:
-        raise ValueError(f"Competitor {competitor_id} not found")
+        raise NotFoundError(f"Competitor {competitor_id} not found")
 
     if "category" in kwargs and kwargs["category"] not in VALID_CATEGORIES:
-        raise ValueError(f"category must be one of {VALID_CATEGORIES}")
+        raise ValidationError(f"category must be one of {VALID_CATEGORIES}")
     if "threat_level" in kwargs and kwargs["threat_level"] not in VALID_THREAT_LEVELS:
-        raise ValueError(f"threat_level must be one of {VALID_THREAT_LEVELS}")
+        raise ValidationError(f"threat_level must be one of {VALID_THREAT_LEVELS}")
 
     allowed = {
         "name",
@@ -206,7 +204,7 @@ async def soft_delete_competitor(
     """Soft-delete a competitor by setting deleted_at."""
     competitor = await get_competitor(db, competitor_id)
     if competitor is None:
-        raise ValueError(f"Competitor {competitor_id} not found")
+        raise NotFoundError(f"Competitor {competitor_id} not found")
     competitor.deleted_at = datetime.now(timezone.utc)
     await db.flush()
     return competitor
@@ -271,13 +269,11 @@ async def list_benchmarks(
     query = select(PricingBenchmark).where(PricingBenchmark.deleted_at.is_(None))
     if product_category is not None:
         if product_category not in VALID_PRODUCT_CATEGORIES:
-            raise ValueError(
-                f"product_category must be one of {VALID_PRODUCT_CATEGORIES}"
-            )
+            raise ValidationError(f"product_category must be one of {VALID_PRODUCT_CATEGORIES}")
         query = query.where(PricingBenchmark.product_category == product_category)
     if pricing_model is not None:
         if pricing_model not in VALID_PRICING_MODELS:
-            raise ValueError(f"pricing_model must be one of {VALID_PRICING_MODELS}")
+            raise ValidationError(f"pricing_model must be one of {VALID_PRICING_MODELS}")
         query = query.where(PricingBenchmark.pricing_model == pricing_model)
     query = query.order_by(PricingBenchmark.company_name)
     result = await db.execute(query)
@@ -314,9 +310,9 @@ async def create_benchmark(
 ) -> PricingBenchmark:
     """Create a new pricing benchmark entry."""
     if product_category not in VALID_PRODUCT_CATEGORIES:
-        raise ValueError(f"product_category must be one of {VALID_PRODUCT_CATEGORIES}")
+        raise ValidationError(f"product_category must be one of {VALID_PRODUCT_CATEGORIES}")
     if pricing_model not in VALID_PRICING_MODELS:
-        raise ValueError(f"pricing_model must be one of {VALID_PRICING_MODELS}")
+        raise ValidationError(f"pricing_model must be one of {VALID_PRICING_MODELS}")
 
     benchmark = PricingBenchmark(
         company_name=company_name,
@@ -332,6 +328,46 @@ async def create_benchmark(
         notes=notes,
     )
     db.add(benchmark)
+    await db.flush()
+    return benchmark
+
+
+async def update_benchmark(
+    db: AsyncSession,
+    benchmark_id: uuid.UUID,
+    **kwargs: object,
+) -> PricingBenchmark:
+    """Update fields on an existing pricing benchmark."""
+    benchmark = await get_benchmark(db, benchmark_id)
+    if benchmark is None:
+        raise NotFoundError(f"Benchmark {benchmark_id} not found")
+
+    if "product_category" in kwargs and kwargs["product_category"] not in VALID_PRODUCT_CATEGORIES:
+        raise ValidationError(f"product_category must be one of {VALID_PRODUCT_CATEGORIES}")
+    if "pricing_model" in kwargs and kwargs["pricing_model"] not in VALID_PRICING_MODELS:
+        raise ValidationError(f"pricing_model must be one of {VALID_PRICING_MODELS}")
+
+    allowed = {
+        "company_name", "domain", "product_category", "pricing_model",
+        "tiers", "free_tier_exists", "lowest_paid_price", "enterprise_available",
+        "source_url", "scraped_at", "notes",
+    }
+    for key, value in kwargs.items():
+        if key in allowed:
+            setattr(benchmark, key, value)
+
+    await db.flush()
+    return benchmark
+
+
+async def soft_delete_benchmark(
+    db: AsyncSession, benchmark_id: uuid.UUID
+) -> PricingBenchmark:
+    """Soft-delete a pricing benchmark."""
+    benchmark = await get_benchmark(db, benchmark_id)
+    if benchmark is None:
+        raise NotFoundError(f"Benchmark {benchmark_id} not found")
+    benchmark.deleted_at = datetime.now(timezone.utc)
     await db.flush()
     return benchmark
 
@@ -418,11 +454,11 @@ async def list_partnerships(
     )
     if stage is not None:
         if stage not in VALID_STAGES:
-            raise ValueError(f"stage must be one of {VALID_STAGES}")
+            raise ValidationError(f"stage must be one of {VALID_STAGES}")
         query = query.where(PartnershipOpportunity.stage == stage)
     if partner_type is not None:
         if partner_type not in VALID_PARTNER_TYPES:
-            raise ValueError(f"partner_type must be one of {VALID_PARTNER_TYPES}")
+            raise ValidationError(f"partner_type must be one of {VALID_PARTNER_TYPES}")
         query = query.where(PartnershipOpportunity.partner_type == partner_type)
     if overdue:
         today = date.today()
@@ -465,11 +501,11 @@ async def create_partnership(
 ) -> PartnershipOpportunity:
     """Create a new partnership opportunity."""
     if partner_type not in VALID_PARTNER_TYPES:
-        raise ValueError(f"partner_type must be one of {VALID_PARTNER_TYPES}")
+        raise ValidationError(f"partner_type must be one of {VALID_PARTNER_TYPES}")
     if stage not in VALID_STAGES:
-        raise ValueError(f"stage must be one of {VALID_STAGES}")
+        raise ValidationError(f"stage must be one of {VALID_STAGES}")
     if legal_review_status not in VALID_LEGAL_STATUSES:
-        raise ValueError(f"legal_review_status must be one of {VALID_LEGAL_STATUSES}")
+        raise ValidationError(f"legal_review_status must be one of {VALID_LEGAL_STATUSES}")
 
     partnership = PartnershipOpportunity(
         partner_name=partner_name,
@@ -499,17 +535,17 @@ async def update_partnership(
     """Update fields on an existing partnership."""
     partnership = await get_partnership(db, partnership_id)
     if partnership is None:
-        raise ValueError(f"Partnership {partnership_id} not found")
+        raise NotFoundError(f"Partnership {partnership_id} not found")
 
     if "partner_type" in kwargs and kwargs["partner_type"] not in VALID_PARTNER_TYPES:
-        raise ValueError(f"partner_type must be one of {VALID_PARTNER_TYPES}")
+        raise ValidationError(f"partner_type must be one of {VALID_PARTNER_TYPES}")
     if "stage" in kwargs and kwargs["stage"] not in VALID_STAGES:
-        raise ValueError(f"stage must be one of {VALID_STAGES}")
+        raise ValidationError(f"stage must be one of {VALID_STAGES}")
     if (
         "legal_review_status" in kwargs
         and kwargs["legal_review_status"] not in VALID_LEGAL_STATUSES
     ):
-        raise ValueError(f"legal_review_status must be one of {VALID_LEGAL_STATUSES}")
+        raise ValidationError(f"legal_review_status must be one of {VALID_LEGAL_STATUSES}")
 
     allowed = {
         "partner_name",
@@ -549,10 +585,10 @@ async def advance_partnership(
     """
     partnership = await get_partnership(db, partnership_id)
     if partnership is None:
-        raise ValueError(f"Partnership {partnership_id} not found")
+        raise NotFoundError(f"Partnership {partnership_id} not found")
 
     if partnership.stage in _TERMINAL_STAGES:
-        raise ValueError(f"Cannot advance from terminal stage '{partnership.stage}'")
+        raise ValidationError(f"Cannot advance from terminal stage '{partnership.stage}'")
 
     current_index = STAGE_ORDER.index(partnership.stage)
     next_stage = STAGE_ORDER[current_index + 1]
@@ -572,7 +608,7 @@ async def lose_partnership(
     """Mark a partnership as lost with a reason."""
     partnership = await get_partnership(db, partnership_id)
     if partnership is None:
-        raise ValueError(f"Partnership {partnership_id} not found")
+        raise NotFoundError(f"Partnership {partnership_id} not found")
 
     partnership.stage = "lost"
     partnership.lost_reason = lost_reason
@@ -587,7 +623,7 @@ async def soft_delete_partnership(
     """Soft-delete a partnership by setting deleted_at."""
     partnership = await get_partnership(db, partnership_id)
     if partnership is None:
-        raise ValueError(f"Partnership {partnership_id} not found")
+        raise NotFoundError(f"Partnership {partnership_id} not found")
     partnership.deleted_at = datetime.now(timezone.utc)
     await db.flush()
     return partnership
@@ -669,11 +705,11 @@ async def list_experiments(
     query = select(GTMExperiment).where(GTMExperiment.deleted_at.is_(None))
     if status is not None:
         if status not in VALID_EXPERIMENT_STATUSES:
-            raise ValueError(f"status must be one of {VALID_EXPERIMENT_STATUSES}")
+            raise ValidationError(f"status must be one of {VALID_EXPERIMENT_STATUSES}")
         query = query.where(GTMExperiment.status == status)
     if experiment_type is not None:
         if experiment_type not in VALID_EXPERIMENT_TYPES:
-            raise ValueError(f"experiment_type must be one of {VALID_EXPERIMENT_TYPES}")
+            raise ValidationError(f"experiment_type must be one of {VALID_EXPERIMENT_TYPES}")
         query = query.where(GTMExperiment.experiment_type == experiment_type)
     query = query.order_by(GTMExperiment.name)
     result = await db.execute(query)
@@ -707,9 +743,9 @@ async def create_experiment(
 ) -> GTMExperiment:
     """Create a new GTM experiment."""
     if experiment_type not in VALID_EXPERIMENT_TYPES:
-        raise ValueError(f"experiment_type must be one of {VALID_EXPERIMENT_TYPES}")
+        raise ValidationError(f"experiment_type must be one of {VALID_EXPERIMENT_TYPES}")
     if status not in VALID_EXPERIMENT_STATUSES:
-        raise ValueError(f"status must be one of {VALID_EXPERIMENT_STATUSES}")
+        raise ValidationError(f"status must be one of {VALID_EXPERIMENT_STATUSES}")
 
     experiment = GTMExperiment(
         name=name,
@@ -726,6 +762,31 @@ async def create_experiment(
     return experiment
 
 
+async def update_experiment(
+    db: AsyncSession,
+    experiment_id: uuid.UUID,
+    **kwargs: object,
+) -> GTMExperiment:
+    """Update fields on an existing experiment."""
+    experiment = await get_experiment(db, experiment_id)
+    if experiment is None:
+        raise NotFoundError(f"Experiment {experiment_id} not found")
+
+    if "experiment_type" in kwargs and kwargs["experiment_type"] not in VALID_EXPERIMENT_TYPES:
+        raise ValidationError(f"experiment_type must be one of {VALID_EXPERIMENT_TYPES}")
+
+    allowed = {
+        "name", "hypothesis", "experiment_type", "variants",
+        "metrics", "target_sample_size",
+    }
+    for key, value in kwargs.items():
+        if key in allowed:
+            setattr(experiment, key, value)
+
+    await db.flush()
+    return experiment
+
+
 async def start_experiment(db: AsyncSession, experiment_id: uuid.UUID) -> GTMExperiment:
     """Start an experiment (transition from draft to running).
 
@@ -733,11 +794,10 @@ async def start_experiment(db: AsyncSession, experiment_id: uuid.UUID) -> GTMExp
     """
     experiment = await get_experiment(db, experiment_id)
     if experiment is None:
-        raise ValueError(f"Experiment {experiment_id} not found")
+        raise NotFoundError(f"Experiment {experiment_id} not found")
 
     if experiment.status != "draft":
-        raise ValueError(
-            f"Can only start experiments in 'draft' status, current: '{experiment.status}'"
+        raise ValidationError(f"Can only start experiments in 'draft' status, current: '{experiment.status}'"
         )
 
     experiment.status = "running"
@@ -761,11 +821,10 @@ async def complete_experiment(
     """
     experiment = await get_experiment(db, experiment_id)
     if experiment is None:
-        raise ValueError(f"Experiment {experiment_id} not found")
+        raise NotFoundError(f"Experiment {experiment_id} not found")
 
     if experiment.status not in ("running", "paused"):
-        raise ValueError(
-            f"Can only complete experiments in 'running' or 'paused' status, "
+        raise ValidationError(f"Can only complete experiments in 'running' or 'paused' status, "
             f"current: '{experiment.status}'"
         )
 
@@ -788,7 +847,7 @@ async def soft_delete_experiment(
     """Soft-delete an experiment by setting deleted_at."""
     experiment = await get_experiment(db, experiment_id)
     if experiment is None:
-        raise ValueError(f"Experiment {experiment_id} not found")
+        raise NotFoundError(f"Experiment {experiment_id} not found")
     experiment.deleted_at = datetime.now(timezone.utc)
     await db.flush()
     return experiment
