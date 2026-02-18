@@ -45,7 +45,11 @@ def _send_email(to: str, subject: str, html: str) -> str | None:
         except Exception:
             logger.exception("Resend API error sending to %s: %s", to, subject)
             return None
-        email_id = result.get("id") if isinstance(result, dict) else getattr(result, "id", None)
+        email_id = (
+            result.get("id")
+            if isinstance(result, dict)
+            else getattr(result, "id", None)
+        )
         logger.info("Email sent to %s via Resend (id=%s): %s", to, email_id, subject)
         return email_id
     else:

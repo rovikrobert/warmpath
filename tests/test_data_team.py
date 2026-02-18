@@ -243,7 +243,7 @@ class TestSqlTemplates:
     """All SQL templates must pass privacy validation."""
 
     def test_all_templates_pass_validation(self):
-        from data_team.shared.sql_templates import ALL_TEMPLATES, validate_all_templates
+        from data_team.shared.sql_templates import validate_all_templates
 
         errors = validate_all_templates()
         assert errors == [], f"Template violations: {errors}"
@@ -585,7 +585,6 @@ class TestDataLearningState:
         # Patch state path to use tmp
         ls._tmp_path = tmp_path
         # Override save/load to use tmp
-        import functools
 
         state_path = tmp_path / agent / "state.json"
         state_path.parent.mkdir(parents=True, exist_ok=True)

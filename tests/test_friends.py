@@ -6,7 +6,6 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from app.models.friendship import UserBlock, UserFriendship
 from app.models.user import User
 from tests.conftest import TestSessionLocal
 
@@ -406,9 +405,7 @@ async def test_block_user(
 
 
 @pytest.mark.asyncio
-async def test_block_self(
-    client: AsyncClient, user_a_headers: dict
-) -> None:
+async def test_block_self(client: AsyncClient, user_a_headers: dict) -> None:
     a_id = await _get_user_id(client, user_a_headers)
     resp = await client.post(
         "/api/v1/friends/block",
@@ -545,7 +542,11 @@ async def test_double_block(
 @pytest.mark.asyncio
 async def test_get_friend_ids_service() -> None:
     """Service-level test for get_friend_ids used by marketplace."""
-    from app.services.friendship_service import get_friend_ids, send_friend_request, respond_to_request
+    from app.services.friendship_service import (
+        get_friend_ids,
+        send_friend_request,
+        respond_to_request,
+    )
 
     async with TestSessionLocal() as db:
         # Create two users
@@ -645,7 +646,9 @@ async def test_unauthenticated_access(client: AsyncClient) -> None:
     resp = await client.get("/api/v1/friends")
     assert resp.status_code == 401
 
-    resp = await client.post("/api/v1/friends/request", json={"addressee_id": str(uuid_mod.uuid4())})
+    resp = await client.post(
+        "/api/v1/friends/request", json={"addressee_id": str(uuid_mod.uuid4())}
+    )
     assert resp.status_code == 401
 
     resp = await client.get("/api/v1/friends/blocked")
@@ -664,10 +667,13 @@ async def test_marketplace_friend_filter_invalid(
     """Verify invalid friend_filter values are rejected by Pydantic."""
     # Verify email first (marketplace search requires it)
     async with TestSessionLocal() as db:
-        from sqlalchemy import select, update
+        from sqlalchemy import update
         from app.models.user import User
+
         await db.execute(
-            update(User).where(User.email == "alice@test.com").values(email_verified=True)
+            update(User)
+            .where(User.email == "alice@test.com")
+            .values(email_verified=True)
         )
         await db.commit()
 

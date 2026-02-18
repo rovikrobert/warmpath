@@ -258,18 +258,26 @@ def scan_config() -> None:
     # default SECRET_KEY (RuntimeError). This is an INFO-level note, not HIGH.
     main_file = APP_DIR / "main.py"
     main_content = main_file.read_text() if main_file.exists() else ""
-    has_boot_validation = "RuntimeError" in main_content and "SECRET_KEY" in main_content
+    has_boot_validation = (
+        "RuntimeError" in main_content and "SECRET_KEY" in main_content
+    )
     if "SECRET_KEY" in content and "change-me" in content:
         _add(
             "INFO" if has_boot_validation else "HIGH",
             "config",
             "SECRET_KEY has a default value in config.py"
-            + (" (boot validation blocks production startup)" if has_boot_validation else " — must be overridden in production"),
+            + (
+                " (boot validation blocks production startup)"
+                if has_boot_validation
+                else " — must be overridden in production"
+            ),
             relpath,
         )
 
     # Check ENCRYPTION_KEY default
-    has_encryption_boot_check = "ENCRYPTION_KEY" in main_content and "RuntimeError" in main_content
+    has_encryption_boot_check = (
+        "ENCRYPTION_KEY" in main_content and "RuntimeError" in main_content
+    )
     if "ENCRYPTION_KEY" in content:
         match = re.search(r'ENCRYPTION_KEY.*=\s*"([^"]*)"', content)
         if match and match.group(1) == "":
@@ -277,7 +285,11 @@ def scan_config() -> None:
                 "INFO" if has_encryption_boot_check else "HIGH",
                 "config",
                 "ENCRYPTION_KEY defaults to empty string in config.py"
-                + (" (boot validation blocks production startup)" if has_encryption_boot_check else " — encryption silently disabled"),
+                + (
+                    " (boot validation blocks production startup)"
+                    if has_encryption_boot_check
+                    else " — encryption silently disabled"
+                ),
                 relpath,
             )
 

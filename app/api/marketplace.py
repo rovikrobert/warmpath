@@ -694,9 +694,9 @@ async def get_sharing_preferences(
             db.add(prefs)
             await db.commit()
             await db.refresh(prefs)
-            data = NetworkSharingPreferencesResponse.model_validate(
-                prefs
-            ).model_dump(mode="json")
+            data = NetworkSharingPreferencesResponse.model_validate(prefs).model_dump(
+                mode="json"
+            )
             data["is_configured"] = True
             return {"data": data, "meta": {}}
 

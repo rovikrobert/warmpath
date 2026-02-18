@@ -10,7 +10,6 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from app.models.registry import CompanyBoard
 from app.models.user import User
 from app.services.board_registry import BOARD_REGISTRY, lookup_or_discover_boards
 from app.services.registry_service import (
@@ -180,7 +179,8 @@ class TestRegistryServiceCRUD:
         await db_session.flush()
 
         board = await update_board(
-            db_session, board,
+            db_session,
+            board,
             display_name="Updated Corp",
             career_page_url="https://example.com/careers",
         )
@@ -455,9 +455,7 @@ class TestBatchDiscover:
             "app.services.registry_service.discover_boards",
             side_effect=mock_discover,
         ):
-            results = await batch_discover(
-                db_session, ["Already", "Found", "Missing"]
-            )
+            results = await batch_discover(db_session, ["Already", "Found", "Missing"])
             await db_session.commit()
 
         assert results["already"]["status"] == "exists"
@@ -524,7 +522,9 @@ class TestRegistryAPI:
         assert data["meta"]["total"] == 0
 
     @pytest.mark.asyncio
-    async def test_create_and_get(self, client: AsyncClient, admin_headers: dict, auth_headers: dict):
+    async def test_create_and_get(
+        self, client: AsyncClient, admin_headers: dict, auth_headers: dict
+    ):
         resp = await client.post(
             "/api/v1/registry",
             headers=admin_headers,
@@ -547,7 +547,9 @@ class TestRegistryAPI:
         assert resp2.json()["data"]["display_name"] == "API Corp"
 
     @pytest.mark.asyncio
-    async def test_create_non_admin_forbidden(self, client: AsyncClient, auth_headers: dict):
+    async def test_create_non_admin_forbidden(
+        self, client: AsyncClient, auth_headers: dict
+    ):
         resp = await client.post(
             "/api/v1/registry",
             headers=auth_headers,
@@ -603,7 +605,9 @@ class TestRegistryAPI:
         assert resp.json()["data"]["is_active"] is False
 
     @pytest.mark.asyncio
-    async def test_patch_non_admin_forbidden(self, client: AsyncClient, admin_headers: dict, auth_headers: dict):
+    async def test_patch_non_admin_forbidden(
+        self, client: AsyncClient, admin_headers: dict, auth_headers: dict
+    ):
         create_resp = await client.post(
             "/api/v1/registry",
             headers=admin_headers,
@@ -669,7 +673,9 @@ class TestRegistryAPI:
         assert resp2.json()["data"]["seeded"] == 0
 
     @pytest.mark.asyncio
-    async def test_seed_non_admin_forbidden(self, client: AsyncClient, auth_headers: dict):
+    async def test_seed_non_admin_forbidden(
+        self, client: AsyncClient, auth_headers: dict
+    ):
         resp = await client.post("/api/v1/registry/seed", headers=auth_headers)
         assert resp.status_code == 403
 
@@ -681,9 +687,7 @@ class TestRegistryAPI:
         await client.post("/api/v1/registry/seed", headers=admin_headers)
 
         # List (any user)
-        resp = await client.get(
-            "/api/v1/registry?region=India", headers=auth_headers
-        )
+        resp = await client.get("/api/v1/registry?region=India", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert data["meta"]["total"] > 0
@@ -739,7 +743,9 @@ class TestRegistryAPI:
         assert data["results"]["discoveredcorp"]["status"] == "discovered"
 
     @pytest.mark.asyncio
-    async def test_discover_non_admin_forbidden(self, client: AsyncClient, auth_headers: dict):
+    async def test_discover_non_admin_forbidden(
+        self, client: AsyncClient, auth_headers: dict
+    ):
         resp = await client.post(
             "/api/v1/registry/discover",
             headers=auth_headers,
@@ -748,7 +754,9 @@ class TestRegistryAPI:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_discover_empty_list_rejected(self, client: AsyncClient, admin_headers: dict):
+    async def test_discover_empty_list_rejected(
+        self, client: AsyncClient, admin_headers: dict
+    ):
         resp = await client.post(
             "/api/v1/registry/discover",
             headers=admin_headers,

@@ -210,8 +210,20 @@ class TestSchemas:
         brief = FounderBrief(
             date="2025-01-01",
             team_summaries=[
-                {"team": "engineering", "health": "green", "summary": "All clear", "agent_count": 5, "finding_count": 0},
-                {"team": "data", "health": "yellow", "summary": "Pipeline stale", "agent_count": 4, "finding_count": 2},
+                {
+                    "team": "engineering",
+                    "health": "green",
+                    "summary": "All clear",
+                    "agent_count": 5,
+                    "finding_count": 0,
+                },
+                {
+                    "team": "data",
+                    "health": "yellow",
+                    "summary": "Pipeline stale",
+                    "agent_count": 4,
+                    "finding_count": 2,
+                },
             ],
         )
         assert len(brief.team_summaries) == 2
@@ -1914,6 +1926,7 @@ class TestTelegramBridge:
 
     def test_escape_markdown_v2(self):
         from agents.chief_of_staff.telegram_bridge import TelegramBridge
+
         bridge = TelegramBridge()
         assert bridge.escape_md("hello_world") == r"hello\_world"
         assert bridge.escape_md("$1.50") == r"$1\.50"
@@ -1921,41 +1934,63 @@ class TestTelegramBridge:
 
     def test_format_daily_brief(self):
         from agents.chief_of_staff.telegram_bridge import TelegramBridge
+
         bridge = TelegramBridge()
         team_summaries = [
-            {"team": "engineering", "health": "green", "summary": "Clean scan", "agent_count": 5, "finding_count": 0},
-            {"team": "data", "health": "red", "summary": "Pipeline issue", "agent_count": 4, "finding_count": 3},
+            {
+                "team": "engineering",
+                "health": "green",
+                "summary": "Clean scan",
+                "agent_count": 5,
+                "finding_count": 0,
+            },
+            {
+                "team": "data",
+                "health": "red",
+                "summary": "Pipeline issue",
+                "agent_count": 4,
+                "finding_count": 3,
+            },
         ]
         msg = bridge.format_daily_brief(
-            date="Feb 18", team_summaries=team_summaries,
-            decisions=["Approve schema migration"], cost="$2.40/day",
+            date="Feb 18",
+            team_summaries=team_summaries,
+            decisions=["Approve schema migration"],
+            cost="$2.40/day",
         )
         assert "WarmPath Daily" in msg
         assert "Feb 18" in msg
 
     def test_format_weekly_summary(self):
         from agents.chief_of_staff.telegram_bridge import TelegramBridge
+
         bridge = TelegramBridge()
         msg = bridge.format_weekly_summary(
-            week_num=8, cost="$16.80", daily_avg="$2.40/day",
-            top_win="Deployed marketplace", top_risk="No NH signups",
+            week_num=8,
+            cost="$16.80",
+            daily_avg="$2.40/day",
+            top_win="Deployed marketplace",
+            top_risk="No NH signups",
         )
         assert "Week 8" in msg
         assert "Deployed marketplace" in msg
 
     def test_format_escalation(self):
         from agents.chief_of_staff.telegram_bridge import TelegramBridge
+
         bridge = TelegramBridge()
         msg = bridge.format_escalation(
             title="PII leak detected",
             detail="Contact emails exposed in marketplace API",
-            option_a="Shut down marketplace", option_b="Patch and monitor",
+            option_a="Shut down marketplace",
+            option_b="Patch and monitor",
         )
         assert "PII leak" in msg
         assert "A)" in msg
 
     def test_send_message_no_token(self, tmp_path, monkeypatch):
         from agents.chief_of_staff.telegram_bridge import TelegramBridge
+
         monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
         monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
         bridge = TelegramBridge(output_dir=tmp_path)
@@ -1967,12 +2002,16 @@ class TestTelegramBridge:
 
     def test_send_message_with_token(self, tmp_path, monkeypatch):
         from agents.chief_of_staff.telegram_bridge import TelegramBridge
+
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
         monkeypatch.setenv("TELEGRAM_CHAT_ID", "12345")
         bridge = TelegramBridge(output_dir=tmp_path)
         with patch("httpx.Client.post") as mock_post:
             mock_post.return_value.status_code = 200
-            mock_post.return_value.json.return_value = {"ok": True, "result": {"message_id": 1}}
+            mock_post.return_value.json.return_value = {
+                "ok": True,
+                "result": {"message_id": 1},
+            }
             mock_post.return_value.raise_for_status = lambda: None
             result = bridge.send("Hello", msg_type="test")
         assert result["telegram"] is True
@@ -1980,6 +2019,7 @@ class TestTelegramBridge:
 
     def test_parse_reply_reuses_whatsapp_grammar(self):
         from agents.chief_of_staff.telegram_bridge import TelegramBridge
+
         bridge = TelegramBridge()
         assert bridge.parse_reply("status") == {"command": "status"}
         assert bridge.parse_reply("1")["command"] == "approve_item"
@@ -1987,12 +2027,19 @@ class TestTelegramBridge:
 
     def test_generate_daily_brief_end_to_end(self, tmp_path, monkeypatch):
         from agents.chief_of_staff.telegram_bridge import TelegramBridge
+
         monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
         bridge = TelegramBridge(output_dir=tmp_path)
         brief_data = {
             "decisions_needed": [{"summary": "Approve migration"}],
             "team_summaries": [
-                {"team": "engineering", "health": "green", "summary": "Clean", "agent_count": 5, "finding_count": 0},
+                {
+                    "team": "engineering",
+                    "health": "green",
+                    "summary": "Clean",
+                    "agent_count": 5,
+                    "finding_count": 0,
+                },
             ],
         }
         costs = {"total_estimated_cost_usd": 2.40}

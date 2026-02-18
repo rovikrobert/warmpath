@@ -566,7 +566,9 @@ async def _call_claude_api(
                 logger.warning("Claude rate limit hit, retrying in %ds...", wait)
                 await asyncio.sleep(wait)
             else:
-                logger.error("Claude rate limit persists after retries, falling back to mock")
+                logger.error(
+                    "Claude rate limit persists after retries, falling back to mock"
+                )
                 return _mock_score_contacts(search, contacts), TokenUsage(0, 0)
         except anthropic.APIError as exc:
             logger.error("Claude API error: %s — falling back to mock scoring", exc)

@@ -39,7 +39,9 @@ async def create_referral_code(
     if referral_type not in ("nh_invite", "js_invite"):
         raise ValueError(f"Invalid referral_type: {referral_type}")
 
-    credits_per = CREDITS_NH_INVITE if referral_type == "nh_invite" else CREDITS_JS_INVITE
+    credits_per = (
+        CREDITS_NH_INVITE if referral_type == "nh_invite" else CREDITS_JS_INVITE
+    )
 
     # For targeted invites, default to single-use
     if target_email and max_uses is None:
@@ -53,7 +55,8 @@ async def create_referral_code(
         target_company_id=target_company_id,
         max_uses=max_uses,
         credits_per_conversion=credits_per,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=REFERRAL_CODE_EXPIRY_DAYS),
+        expires_at=datetime.now(timezone.utc)
+        + timedelta(days=REFERRAL_CODE_EXPIRY_DAYS),
     )
     db.add(code)
     await db.flush()
@@ -102,7 +105,11 @@ async def redeem_referral_code(
     # Expiry check — handle naive datetimes from SQLite
     now = datetime.now(timezone.utc)
     if ref_code.expires_at:
-        exp = ref_code.expires_at if ref_code.expires_at.tzinfo else ref_code.expires_at.replace(tzinfo=timezone.utc)
+        exp = (
+            ref_code.expires_at
+            if ref_code.expires_at.tzinfo
+            else ref_code.expires_at.replace(tzinfo=timezone.utc)
+        )
         if exp < now:
             raise ValueError("Referral code has expired")
 
@@ -220,7 +227,9 @@ async def get_leaderboard(
             func.count(ReferralConversion.id).label("total_conversions"),
             func.sum(ReferralConversion.credits_awarded).label("total_credits"),
         )
-        .join(ReferralConversion, ReferralConversion.referral_code_id == ReferralCode.id)
+        .join(
+            ReferralConversion, ReferralConversion.referral_code_id == ReferralCode.id
+        )
         .join(User, User.id == ReferralCode.owner_id)
         .where(ReferralCode.deleted_at.is_(None))
         .group_by(ReferralCode.owner_id, User.full_name)

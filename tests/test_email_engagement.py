@@ -14,7 +14,11 @@ from tests.conftest import TestSessionLocal
 from app.models.contact import CsvUpload
 from app.models.email_campaign import EmailCampaignLog
 from app.models.enrichment import UsageLog
-from app.models.marketplace import IntroFacilitation, MarketplaceListing, NetworkSharingPreferences
+from app.models.marketplace import (
+    IntroFacilitation,
+    MarketplaceListing,
+    NetworkSharingPreferences,
+)
 from app.models.search_request import SearchRequest
 from app.models.user import User
 from app.services.email_engagement import (
@@ -34,6 +38,7 @@ from app.services.email_engagement import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_user(
     email: str | None = None,
@@ -178,9 +183,7 @@ async def test_csv_reminder_d1_finds_eligible_users(
     mock_send: object, db: AsyncSession
 ) -> None:
     # User created 24h ago with no CSV upload
-    user = _make_user(
-        created_at=datetime.now(timezone.utc) - timedelta(hours=24)
-    )
+    user = _make_user(created_at=datetime.now(timezone.utc) - timedelta(hours=24))
     db.add(user)
     await db.flush()
 
@@ -194,9 +197,7 @@ async def test_csv_reminder_d1_finds_eligible_users(
 async def test_csv_reminder_d1_skips_users_with_csv(
     mock_send: object, db: AsyncSession
 ) -> None:
-    user = _make_user(
-        created_at=datetime.now(timezone.utc) - timedelta(hours=24)
-    )
+    user = _make_user(created_at=datetime.now(timezone.utc) - timedelta(hours=24))
     db.add(user)
     await db.flush()
 
@@ -215,9 +216,7 @@ async def test_csv_reminder_d1_skips_too_new_users(
     mock_send: object, db: AsyncSession
 ) -> None:
     # User created 2 hours ago — too recent
-    user = _make_user(
-        created_at=datetime.now(timezone.utc) - timedelta(hours=2)
-    )
+    user = _make_user(created_at=datetime.now(timezone.utc) - timedelta(hours=2))
     db.add(user)
     await db.flush()
 
@@ -227,12 +226,8 @@ async def test_csv_reminder_d1_skips_too_new_users(
 
 @pytest.mark.asyncio
 @patch("app.services.email_engagement._send_email")
-async def test_csv_reminder_d1_dedup(
-    mock_send: object, db: AsyncSession
-) -> None:
-    user = _make_user(
-        created_at=datetime.now(timezone.utc) - timedelta(hours=24)
-    )
+async def test_csv_reminder_d1_dedup(mock_send: object, db: AsyncSession) -> None:
+    user = _make_user(created_at=datetime.now(timezone.utc) - timedelta(hours=24))
     db.add(user)
     await db.flush()
 
@@ -255,9 +250,7 @@ async def test_csv_reminder_d1_dedup(
 async def test_csv_reminder_d3_finds_eligible(
     mock_send: object, db: AsyncSession
 ) -> None:
-    user = _make_user(
-        created_at=datetime.now(timezone.utc) - timedelta(hours=72)
-    )
+    user = _make_user(created_at=datetime.now(timezone.utc) - timedelta(hours=72))
     db.add(user)
     await db.flush()
 
@@ -303,9 +296,7 @@ async def test_nh_sharing_reminder_skips_opted_in(
     await db.flush()
 
     db.add(_make_csv_upload(user.id))
-    db.add(NetworkSharingPreferences(
-        user_id=user.id, opt_in_marketplace=True
-    ))
+    db.add(NetworkSharingPreferences(user_id=user.id, opt_in_marketplace=True))
     await db.flush()
 
     count = await send_nh_sharing_reminder_d2(db)
@@ -361,9 +352,7 @@ async def test_first_search_nudge_skips_searched(
 
 @pytest.mark.asyncio
 @patch("app.services.email_engagement._send_email")
-async def test_intro_pending_reminder(
-    mock_send: object, db: AsyncSession
-) -> None:
+async def test_intro_pending_reminder(mock_send: object, db: AsyncSession) -> None:
     from app.models.company import Company
     from app.models.contact import Contact
 
@@ -378,24 +367,32 @@ async def test_intro_pending_reminder(
     await db.flush()
 
     contact = Contact(
-        user_id=nh.id, company_id=company.id,
-        first_name="c", last_name="t", full_name="c t",
+        user_id=nh.id,
+        company_id=company.id,
+        first_name="c",
+        last_name="t",
+        full_name="c t",
     )
     db.add(contact)
     await db.flush()
 
     listing = MarketplaceListing(
-        network_holder_id=nh.id, contact_id=contact.id,
-        company_id=company.id, role_level="mid",
+        network_holder_id=nh.id,
+        contact_id=contact.id,
+        company_id=company.id,
+        role_level="mid",
         department_category="engineering",
-        warm_score_range="60-80", connection_recency="recent",
+        warm_score_range="60-80",
+        connection_recency="recent",
     )
     db.add(listing)
     await db.flush()
 
     intro = IntroFacilitation(
-        job_seeker_id=js.id, network_holder_id=nh.id,
-        marketplace_listing_id=listing.id, status="requested",
+        job_seeker_id=js.id,
+        network_holder_id=nh.id,
+        marketplace_listing_id=listing.id,
+        status="requested",
         requested_at=datetime.now(timezone.utc) - timedelta(hours=26),
     )
     db.add(intro)
@@ -461,6 +458,7 @@ async def test_reengagement_d30(mock_send: object, db: AsyncSession) -> None:
     await db.flush()
     # Manually set created_at to 30 days ago
     from sqlalchemy import update
+
     await db.execute(
         update(UsageLog)
         .where(UsageLog.id == log.id)
@@ -501,6 +499,7 @@ async def test_reengagement_d90(mock_send: object, db: AsyncSession) -> None:
     db.add(log)
     await db.flush()
     from sqlalchemy import update
+
     await db.execute(
         update(UsageLog)
         .where(UsageLog.id == log.id)
@@ -556,12 +555,6 @@ def test_celery_beat_schedule_registered() -> None:
 def test_celery_tasks_importable() -> None:
     from app.tasks.email_tasks import (
         send_csv_reminder_d1,
-        send_csv_reminder_d3,
-        send_first_search_d2,
-        send_intro_pending_24h,
-        send_nh_sharing_d2,
-        send_reengagement_d30,
-        send_reengagement_d90,
         send_weekly_digest,
     )
 

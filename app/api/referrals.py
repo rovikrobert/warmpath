@@ -60,7 +60,8 @@ async def list_my_referral_codes(
     )
     return {
         "data": [
-            ReferralCodeResponse.model_validate(c).model_dump(mode="json") for c in codes
+            ReferralCodeResponse.model_validate(c).model_dump(mode="json")
+            for c in codes
         ],
         "meta": {"total": len(codes)},
     }

@@ -58,7 +58,9 @@ async def test_submit_feedback_requires_auth(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_submit_feedback_validates_rating(client: AsyncClient, auth_headers: dict):
+async def test_submit_feedback_validates_rating(
+    client: AsyncClient, auth_headers: dict
+):
     resp = await client.post(
         "/api/v1/feedback",
         json={"feature": "search_results", "rating": 5},
@@ -68,7 +70,9 @@ async def test_submit_feedback_validates_rating(client: AsyncClient, auth_header
 
 
 @pytest.mark.asyncio
-async def test_submit_feedback_validates_feature_length(client: AsyncClient, auth_headers: dict):
+async def test_submit_feedback_validates_feature_length(
+    client: AsyncClient, auth_headers: dict
+):
     resp = await client.post(
         "/api/v1/feedback",
         json={"feature": "", "rating": 1},

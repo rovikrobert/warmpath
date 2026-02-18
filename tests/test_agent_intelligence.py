@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -29,7 +28,6 @@ from agents.shared.intelligence import (
     ExternalIntelligence,
     IntelligenceItem,
     _is_stale,
-    _load_cache,
     _save_cache,
     fetch_api_status,
     fetch_framework_updates,

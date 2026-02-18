@@ -12,13 +12,9 @@ Covers:
 from __future__ import annotations
 
 import ast
-import json
-import subprocess
 import textwrap
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from agents.shared.report import AgentReport, Finding
 
@@ -80,9 +76,7 @@ class TestLeadCrossTeam:
         )
         (report_dir / "test_lead_latest.json").write_text(report.serialize())
 
-        with patch(
-            "agents.lead.lead._CROSS_TEAM_REPORT_DIRS", {"test": report_dir}
-        ):
+        with patch("agents.lead.lead._CROSS_TEAM_REPORT_DIRS", {"test": report_dir}):
             result = _load_cross_team_summaries()
 
         assert len(result) == 1
@@ -344,9 +338,7 @@ class TestPerfMonitorProductionHealth:
         from agents.shared.api_client import HealthStatus
 
         mock_status = HealthStatus(healthy=True, status_code=200, response_ms=150.0)
-        with patch(
-            "agents.shared.api_client.check_health", return_value=mock_status
-        ):
+        with patch("agents.shared.api_client.check_health", return_value=mock_status):
             findings, metrics = _scan_production_health()
 
         assert metrics["production_healthy"] is True
@@ -358,9 +350,7 @@ class TestPerfMonitorProductionHealth:
         from agents.shared.api_client import HealthStatus
 
         mock_status = HealthStatus(healthy=False, status_code=503, response_ms=0.0)
-        with patch(
-            "agents.shared.api_client.check_health", return_value=mock_status
-        ):
+        with patch("agents.shared.api_client.check_health", return_value=mock_status):
             findings, metrics = _scan_production_health()
 
         assert metrics["production_healthy"] is False
@@ -373,9 +363,7 @@ class TestPerfMonitorProductionHealth:
         from agents.shared.api_client import HealthStatus
 
         mock_status = HealthStatus(healthy=True, status_code=200, response_ms=3000.0)
-        with patch(
-            "agents.shared.api_client.check_health", return_value=mock_status
-        ):
+        with patch("agents.shared.api_client.check_health", return_value=mock_status):
             findings, metrics = _scan_production_health()
 
         assert len(findings) == 1
@@ -387,9 +375,7 @@ class TestPerfMonitorProductionHealth:
         from agents.shared.api_client import HealthStatus
 
         mock_status = HealthStatus(healthy=True, status_code=200, response_ms=750.0)
-        with patch(
-            "agents.shared.api_client.check_health", return_value=mock_status
-        ):
+        with patch("agents.shared.api_client.check_health", return_value=mock_status):
             findings, metrics = _scan_production_health()
 
         assert len(findings) == 1
@@ -452,7 +438,7 @@ class TestArchitectMypy:
 
         # Simulate 15 mypy errors
         lines = [
-            f'app/services/svc{i}.py:{i}: error: Incompatible type [assignment]'
+            f"app/services/svc{i}.py:{i}: error: Incompatible type [assignment]"
             for i in range(15)
         ]
         mock_result = MagicMock()
@@ -471,10 +457,7 @@ class TestArchitectMypy:
         """Reports medium severity for >50 errors."""
         from agents.architect.architect import _scan_mypy
 
-        lines = [
-            f'app/services/svc.py:{i}: error: Bad type [misc]'
-            for i in range(60)
-        ]
+        lines = [f"app/services/svc.py:{i}: error: Bad type [misc]" for i in range(60)]
         mock_result = MagicMock()
         mock_result.stdout = "\n".join(lines)
 
@@ -609,7 +592,9 @@ class TestArchitectMutationTesting:
 
         findings: list[Finding] = []
         with patch("agents.architect.architect.PROJECT_ROOT", tmp_path):
-            with patch("agents.architect.architect._run_tool", return_value=mock_pytest_result):
+            with patch(
+                "agents.architect.architect._run_tool", return_value=mock_pytest_result
+            ):
                 metrics = _scan_mutation_testing(findings)
 
         # Original file should be restored
@@ -634,9 +619,7 @@ class TestArchitectMutationTesting:
         assert visitor.applied is True
 
         # Only line 2 should be mutated, line 4 should remain >
-        compares = [
-            n for n in ast.walk(new_tree) if isinstance(n, ast.Compare)
-        ]
+        compares = [n for n in ast.walk(new_tree) if isinstance(n, ast.Compare)]
         assert len(compares) == 2
         # First compare (line 2) should be mutated to LtE
         assert isinstance(compares[0].ops[0], ast.LtE)

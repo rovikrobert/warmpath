@@ -14,8 +14,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # Feature 1: Agent endpoint RunMode and scan orders
@@ -133,7 +131,9 @@ class TestAgentRunModes:
             ("monthly", _MONTHLY_SCAN_ORDER),
         ]:
             for mode in order:
-                assert mode in _COMMANDS, f"{mode} in {order_name} scan order but not in _COMMANDS"
+                assert mode in _COMMANDS, (
+                    f"{mode} in {order_name} scan order but not in _COMMANDS"
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +151,9 @@ class TestStripPii:
 
     def test_strips_email(self):
         assert "[email]" in self._strip("Contact john@example.com for details")
-        assert "john@example.com" not in self._strip("Contact john@example.com for details")
+        assert "john@example.com" not in self._strip(
+            "Contact john@example.com for details"
+        )
 
     def test_strips_phone(self):
         result = self._strip("Call +65 9123 4567 now")
@@ -164,7 +166,9 @@ class TestStripPii:
         assert "linkedin.com/in/johndoe" not in result
 
     def test_strips_multiple_pii(self):
-        text = "Email: a@b.com, phone: +1 555-123-4567, profile: https://linkedin.com/in/x"
+        text = (
+            "Email: a@b.com, phone: +1 555-123-4567, profile: https://linkedin.com/in/x"
+        )
         result = self._strip(text)
         assert "[email]" in result
         assert "[phone]" in result
@@ -242,9 +246,7 @@ class TestCheckBetaFeedback:
                 {
                     "id": "abc12345-1234-1234-1234-123456789abc",
                     "properties": {
-                        "Name": {
-                            "title": [{"text": {"content": "Search is slow"}}]
-                        },
+                        "Name": {"title": [{"text": {"content": "Search is slow"}}]},
                         "Severity": {"select": {"name": "Annoying"}},
                         "Category": {"select": {"name": "Bug"}},
                         "Description": {
@@ -360,11 +362,7 @@ class TestCheckBetaFeedback:
                         "Category": {"select": {"name": "Bug"}},
                         "Description": {
                             "rich_text": [
-                                {
-                                    "text": {
-                                        "content": "Call +65 9123 4567 for details"
-                                    }
-                                }
+                                {"text": {"content": "Call +65 9123 4567 for details"}}
                             ]
                         },
                         "Page/Feature": {"select": {"name": "Dashboard"}},
@@ -427,15 +425,29 @@ class TestDetectConflicts:
     def test_no_conflicts_single_request(self):
         from agents.chief_of_staff.cos_agent import _detect_conflicts
 
-        reqs = [{"request": "Fix security issue", "urgency": "critical", "source_agent": "architect"}]
+        reqs = [
+            {
+                "request": "Fix security issue",
+                "urgency": "critical",
+                "source_agent": "architect",
+            }
+        ]
         assert _detect_conflicts(reqs) == []
 
     def test_no_conflict_same_team(self):
         from agents.chief_of_staff.cos_agent import _detect_conflicts
 
         reqs = [
-            {"request": "Fix security issue", "urgency": "critical", "source_agent": "architect"},
-            {"request": "Security audit needed", "urgency": "low", "source_agent": "architect"},
+            {
+                "request": "Fix security issue",
+                "urgency": "critical",
+                "source_agent": "architect",
+            },
+            {
+                "request": "Security audit needed",
+                "urgency": "low",
+                "source_agent": "architect",
+            },
         ]
         assert _detect_conflicts(reqs) == []
 
@@ -443,8 +455,16 @@ class TestDetectConflicts:
         from agents.chief_of_staff.cos_agent import _detect_conflicts
 
         reqs = [
-            {"request": "Ship feature launch now", "urgency": "critical", "source_agent": "gtm_lead"},
-            {"request": "Feature launch blocked by shipping security review", "urgency": "low", "source_agent": "architect"},
+            {
+                "request": "Ship feature launch now",
+                "urgency": "critical",
+                "source_agent": "gtm_lead",
+            },
+            {
+                "request": "Feature launch blocked by shipping security review",
+                "urgency": "low",
+                "source_agent": "architect",
+            },
         ]
         conflicts = _detect_conflicts(reqs)
         assert len(conflicts) >= 1
@@ -456,8 +476,16 @@ class TestDetectConflicts:
         from agents.chief_of_staff.cos_agent import _detect_conflicts
 
         reqs = [
-            {"request": "Cost budget alert", "urgency": "high", "source_agent": "finance_lead"},
-            {"request": "Cost optimization needed", "urgency": "medium", "source_agent": "ops_lead"},
+            {
+                "request": "Cost budget alert",
+                "urgency": "high",
+                "source_agent": "finance_lead",
+            },
+            {
+                "request": "Cost optimization needed",
+                "urgency": "medium",
+                "source_agent": "ops_lead",
+            },
         ]
         # Gap of 1 (high=3, medium=2) < 2 threshold
         assert _detect_conflicts(reqs) == []
@@ -492,8 +520,14 @@ class TestResolutionWiring:
             id="test-002",
             teams=["engineering", "gtm"],
             description="Both have evidence",
-            positions={"engineering": "Technical elegance matters", "gtm": "Technical elegance also"},
-            evidence={"engineering": "Code review shows issues", "gtm": "Market data shows urgency"},
+            positions={
+                "engineering": "Technical elegance matters",
+                "gtm": "Technical elegance also",
+            },
+            evidence={
+                "engineering": "Code review shows issues",
+                "gtm": "Market data shows urgency",
+            },
             resolution_level=4,
         )
         resolution = attempt_resolution(conflict)
@@ -551,12 +585,14 @@ class TestFounderBriefSchema:
 
         brief = FounderBrief(
             date="2026-01-01",
-            resolutions=[{
-                "conflict_id": "c-001",
-                "strategy_used": "context_clarification",
-                "outcome": "Resolved in favor of engineering",
-                "escalated": False,
-            }],
+            resolutions=[
+                {
+                    "conflict_id": "c-001",
+                    "strategy_used": "context_clarification",
+                    "outcome": "Resolved in favor of engineering",
+                    "escalated": False,
+                }
+            ],
         )
         assert len(brief.resolutions) == 1
         assert brief.resolutions[0]["strategy_used"] == "context_clarification"
@@ -588,12 +624,14 @@ class TestDailyBriefRendering:
         report = AgentReport(agent="test", timestamp="2026-01-01T00:00:00Z")
         brief_md, brief_data = synthesize_daily(
             [report],
-            resolutions=[{
-                "conflict_id": "c-001",
-                "strategy_used": "compromise",
-                "outcome": "Sequence the work",
-                "escalated": False,
-            }],
+            resolutions=[
+                {
+                    "conflict_id": "c-001",
+                    "strategy_used": "compromise",
+                    "outcome": "Sequence the work",
+                    "escalated": False,
+                }
+            ],
         )
         assert "Conflict Resolutions" in brief_md
         assert "[compromise]" in brief_md
@@ -607,12 +645,14 @@ class TestDailyBriefRendering:
         report = AgentReport(agent="test", timestamp="2026-01-01T00:00:00Z")
         brief_md, _ = synthesize_daily(
             [report],
-            resolutions=[{
-                "conflict_id": "c-002",
-                "strategy_used": "escalation",
-                "outcome": "Escalated to founder",
-                "escalated": True,
-            }],
+            resolutions=[
+                {
+                    "conflict_id": "c-002",
+                    "strategy_used": "escalation",
+                    "outcome": "Escalated to founder",
+                    "escalated": True,
+                }
+            ],
         )
         assert "[ESCALATED]" in brief_md
 

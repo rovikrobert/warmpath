@@ -49,7 +49,9 @@ class ReferralCode(Base):
         ForeignKey("companies.id", ondelete="SET NULL"),
         nullable=True,
     )
-    max_uses: Mapped[int | None] = mapped_column(Integer, nullable=True)  # null = unlimited
+    max_uses: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )  # null = unlimited
     uses_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     credits_per_conversion: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="25"

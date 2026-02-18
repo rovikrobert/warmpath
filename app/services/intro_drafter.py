@@ -620,7 +620,9 @@ async def draft_referral_request(
         except anthropic.RateLimitError:
             if attempt < max_retries - 1:
                 wait = 2 ** (attempt + 1)
-                logger.warning("Claude rate limit hit (intro drafter), retrying in %ds...", wait)
+                logger.warning(
+                    "Claude rate limit hit (intro drafter), retrying in %ds...", wait
+                )
                 await asyncio.sleep(wait)
             else:
                 logger.error("Claude rate limit persists, falling back to mock drafts")

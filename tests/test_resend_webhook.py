@@ -2,7 +2,6 @@
 
 import json
 import uuid as uuid_mod
-from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio
@@ -23,7 +22,9 @@ async def campaign_log_with_external_id() -> str:
     """Create a campaign log entry with an external_id, return the external_id."""
     eid = f"resend_{uuid_mod.uuid4().hex[:12]}"
     async with TestSessionLocal() as db:
-        user = User(email="webhook@test.com", full_name="Webhook Tester", password_hash="x")
+        user = User(
+            email="webhook@test.com", full_name="Webhook Tester", password_hash="x"
+        )
         db.add(user)
         await db.flush()
 
@@ -220,7 +221,9 @@ async def test_record_send_stores_external_id() -> None:
         from sqlalchemy import select
 
         result = await db.execute(
-            select(EmailCampaignLog).where(EmailCampaignLog.external_id == "resend_abc123")
+            select(EmailCampaignLog).where(
+                EmailCampaignLog.external_id == "resend_abc123"
+            )
         )
         log = result.scalar_one()
         assert log.external_id == "resend_abc123"
@@ -244,7 +247,9 @@ async def test_record_send_handles_none_external_id() -> None:
         from sqlalchemy import select
 
         result = await db.execute(
-            select(EmailCampaignLog).where(EmailCampaignLog.email_type == "test_email_none")
+            select(EmailCampaignLog).where(
+                EmailCampaignLog.email_type == "test_email_none"
+            )
         )
         log = result.scalar_one()
         assert log.external_id is None

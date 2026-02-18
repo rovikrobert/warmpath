@@ -4,8 +4,6 @@ preferences, webhooks.
 Covers 401 Unauthorized, 404 Not Found, and 422 Invalid Input for each module.
 """
 
-import uuid
-
 import pytest
 from httpx import AsyncClient
 
