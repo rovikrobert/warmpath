@@ -4,7 +4,9 @@ WORKDIR /build
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci
 COPY frontend/ ./
+ARG VITE_BETA_MODE=false
 ENV VITE_API_URL=""
+ENV VITE_BETA_MODE=${VITE_BETA_MODE}
 RUN npm run build
 
 # Stage 2: Python runtime
