@@ -17,6 +17,7 @@ import ContactsPage from './pages/ContactsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import ReferralCodesPage from './pages/ReferralCodesPage';
 import PrivacySettingsPage from './pages/PrivacySettingsPage';
+import ScoreGlossary from './pages/ScoreGlossary';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="/credits" element={<CreditsPage />} />
         <Route path="/invite" element={<ReferralCodesPage />} />
         <Route path="/settings/privacy" element={<PrivacySettingsPage />} />
+        <Route path="/help/scores" element={<ScoreGlossary />} />
         <Route path="/profile/edit" element={<EditProfile />} />
         {/* Legacy routes */}
         <Route path="/marketplace" element={<Navigate to="/marketplace/dashboard" replace />} />
