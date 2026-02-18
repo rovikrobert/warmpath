@@ -1753,26 +1753,30 @@ class TestWhatsAppCommands:
         state_path = tmp_path / "cos_state.json"
         wa_dir = tmp_path / "whatsapp"
         wa_dir.mkdir()
+        tg_dir = tmp_path / "telegram"
+        tg_dir.mkdir()
         with (
             patch("agents.chief_of_staff.cos_learning._STATE_PATH", state_path),
             patch("agents.chief_of_staff.cos_agent.WHATSAPP_DIR", wa_dir),
+            patch("agents.chief_of_staff.cos_agent.TELEGRAM_DIR", tg_dir),
         ):
             self._wa_dir = wa_dir
+            self._tg_dir = tg_dir
             yield
 
     def test_process_no_replies(self):
-        from agents.chief_of_staff.cos_agent import _process_whatsapp_commands
+        from agents.chief_of_staff.cos_agent import _process_async_commands
 
-        results = _process_whatsapp_commands()
+        results = _process_async_commands()
         assert results == []
 
     def test_process_status_command(self):
-        from agents.chief_of_staff.cos_agent import _process_whatsapp_commands
+        from agents.chief_of_staff.cos_agent import _process_async_commands
 
         reply = self._wa_dir / "whatsapp-reply-001.txt"
         reply.write_text("status", encoding="utf-8")
 
-        results = _process_whatsapp_commands()
+        results = _process_async_commands()
         assert len(results) == 1
         assert results[0].get("command") == "status"
         # File should be renamed to .processed
@@ -1780,31 +1784,44 @@ class TestWhatsAppCommands:
         assert reply.with_suffix(".processed").exists()
 
     def test_process_approve_command(self):
-        from agents.chief_of_staff.cos_agent import _process_whatsapp_commands
+        from agents.chief_of_staff.cos_agent import _process_async_commands
 
         reply = self._wa_dir / "whatsapp-reply-002.txt"
         reply.write_text("1=yes", encoding="utf-8")
 
-        results = _process_whatsapp_commands()
+        results = _process_async_commands()
         assert len(results) == 1
 
     def test_process_empty_reply(self):
-        from agents.chief_of_staff.cos_agent import _process_whatsapp_commands
+        from agents.chief_of_staff.cos_agent import _process_async_commands
 
         reply = self._wa_dir / "whatsapp-reply-003.txt"
         reply.write_text("", encoding="utf-8")
 
-        results = _process_whatsapp_commands()
+        results = _process_async_commands()
         assert results == []
 
     def test_process_multiple_replies(self):
-        from agents.chief_of_staff.cos_agent import _process_whatsapp_commands
+        from agents.chief_of_staff.cos_agent import _process_async_commands
 
         (self._wa_dir / "whatsapp-reply-001.txt").write_text("status", encoding="utf-8")
         (self._wa_dir / "whatsapp-reply-002.txt").write_text("cost", encoding="utf-8")
 
-        results = _process_whatsapp_commands()
+        results = _process_async_commands()
         assert len(results) == 2
+
+    def test_process_telegram_reply(self):
+        from agents.chief_of_staff.cos_agent import _process_async_commands
+
+        reply = self._tg_dir / "telegram-reply-001.txt"
+        reply.write_text("status", encoding="utf-8")
+
+        results = _process_async_commands()
+        assert len(results) == 1
+        assert results[0]["command"] == "status"
+        assert results[0]["source"] == "telegram"
+        assert not reply.exists()
+        assert reply.with_suffix(".processed").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -1822,6 +1839,8 @@ class TestCosWiringIntegration:
         state_path = tmp_path / "cos_state.json"
         wa_dir = tmp_path / "whatsapp"
         wa_dir.mkdir()
+        tg_dir = tmp_path / "telegram"
+        tg_dir.mkdir()
 
         with (
             patch("agents.chief_of_staff.cos_agent.REPORTS_DIR", reports_dir),
@@ -1844,9 +1863,12 @@ class TestCosWiringIntegration:
             ),
             patch("agents.chief_of_staff.cos_learning._STATE_PATH", state_path),
             patch("agents.chief_of_staff.cos_agent.WHATSAPP_DIR", wa_dir),
+            patch("agents.chief_of_staff.cos_agent.TELEGRAM_DIR", tg_dir),
+            patch("agents.chief_of_staff.telegram_bridge.TELEGRAM_DIR", tg_dir),
         ):
             self._reports_dir = reports_dir
             self._wa_dir = wa_dir
+            self._tg_dir = tg_dir
             yield
 
     def _write_report(self, report: AgentReport) -> None:
@@ -1914,6 +1936,15 @@ class TestCosWiringIntegration:
         result = run_weekly()
         assert "# Weekly Synthesis" in result
         # Org evaluation runs but may or may not produce triggers
+
+    def test_run_daily_sends_telegram(self):
+        from agents.chief_of_staff.cos_agent import run_daily
+
+        self._write_report(_make_report("architect"))
+        result = run_daily()
+        assert "# Founder Daily Brief" in result
+        tg_files = list(self._tg_dir.glob("telegram-daily-*.txt"))
+        assert len(tg_files) >= 1
 
 
 # ---------------------------------------------------------------------------
