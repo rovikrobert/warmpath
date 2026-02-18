@@ -34,7 +34,7 @@ COPY gtm_team/ ./gtm_team/
 COPY ops_team/ ./ops_team/
 
 # Copy project docs (agents read CLAUDE.md for strategy context)
-COPY CLAUDE.md ARCHITECTURE.md ./
+COPY CLAUDE.md ARCHITECTURE.md COMPETITIVE_STRATEGY.md ./
 
 # Copy built frontend
 COPY --from=frontend-build /build/dist ./frontend/dist
