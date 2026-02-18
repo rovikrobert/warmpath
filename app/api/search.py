@@ -512,7 +512,7 @@ async def smart_search(
         search_req.results_data = results
         search_req.last_run_at = datetime.now(timezone.utc)
 
-        # Funnel instrumentation: first_search
+        # Funnel instrumentation: search + first_search
         from app.models.enrichment import UsageLog
 
         db.add(
@@ -523,6 +523,25 @@ async def smart_search(
                 metadata_={"scope": scope, "companies": body.company_names[:5]},
             )
         )
+
+        # Track first_search milestone (only fires once per user)
+        prior = await db.execute(
+            select(func.count()).where(
+                SearchRequest.user_id == current_user.id,
+                SearchRequest.status == "completed",
+                SearchRequest.id != search_id,
+            )
+        )
+        if (prior.scalar() or 0) == 0:
+            db.add(
+                UsageLog(
+                    user_id=current_user.id,
+                    action="first_search",
+                    resource_id=search_id,
+                    metadata_={"scope": scope, "companies": body.company_names[:5]},
+                )
+            )
+
         await db.commit()
 
         return {
