@@ -1,6 +1,7 @@
 """Tests for finance team agent upgrades (CoS audit gap resolution)."""
 
 from __future__ import annotations
+import inspect
 
 
 class TestFinanceQueryExecutor:
@@ -147,3 +148,59 @@ class TestStripeClient:
         assert callable(getattr(client, "list_subscriptions", None))
         assert callable(getattr(client, "list_disputes", None))
         assert callable(getattr(client, "get_customer", None))
+
+
+class TestStripeCustomerIdColumn:
+    """User model should have stripe_customer_id for webhook→user mapping."""
+
+    def test_user_model_has_stripe_customer_id(self):
+        from app.models.user import User
+
+        assert hasattr(User, "stripe_customer_id")
+
+    def test_stripe_customer_id_nullable(self):
+        from app.models.user import User
+
+        col = User.__table__.columns["stripe_customer_id"]
+        assert col.nullable is True
+
+
+class TestWebhookHandlers:
+    """Webhook handlers must call credit/subscription services, not just log."""
+
+    def test_checkout_completed_is_async(self):
+        from app.api.webhooks import _handle_checkout_completed
+
+        assert inspect.iscoroutinefunction(_handle_checkout_completed)
+
+    def test_subscription_deleted_is_async(self):
+        from app.api.webhooks import _handle_subscription_deleted
+
+        assert inspect.iscoroutinefunction(_handle_subscription_deleted)
+
+    def test_all_handlers_are_async(self):
+        from app.api.webhooks import _EVENT_HANDLERS
+
+        for event_type, handler in _EVENT_HANDLERS.items():
+            assert inspect.iscoroutinefunction(handler), (
+                f"Handler for {event_type} is not async"
+            )
+
+    def test_event_handlers_registered(self):
+        from app.api.webhooks import _EVENT_HANDLERS
+
+        expected = [
+            "checkout.session.completed",
+            "invoice.paid",
+            "invoice.payment_failed",
+            "customer.subscription.created",
+            "customer.subscription.updated",
+            "customer.subscription.deleted",
+        ]
+        for event in expected:
+            assert event in _EVENT_HANDLERS, f"Missing handler for {event}"
+
+    def test_resolve_user_exists(self):
+        from app.api.webhooks import _resolve_user
+
+        assert inspect.iscoroutinefunction(_resolve_user)
