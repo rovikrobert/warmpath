@@ -8,6 +8,8 @@ from collections.abc import AsyncGenerator
 os.environ["AI_MOCK_MODE"] = "true"
 # Disable async CSV processing so uploads complete inline during tests
 os.environ["CSV_ASYNC_PROCESSING"] = "false"
+# Disable Resend in tests — prevents real email sends
+os.environ["RESEND_API_KEY"] = ""
 
 # Enable encryption in tests — validates the full encrypt/decrypt cycle
 from cryptography.fernet import Fernet
