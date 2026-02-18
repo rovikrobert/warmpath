@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
-from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -205,6 +203,26 @@ class TestSchemas:
         )
         assert r.escalated is False
         assert r.founder_agreed is None
+
+    def test_founder_brief_team_summaries(self):
+        from agents.chief_of_staff.schemas import FounderBrief
+
+        brief = FounderBrief(
+            date="2025-01-01",
+            team_summaries=[
+                {"team": "engineering", "health": "green", "summary": "All clear", "agent_count": 5, "finding_count": 0},
+                {"team": "data", "health": "yellow", "summary": "Pipeline stale", "agent_count": 4, "finding_count": 2},
+            ],
+        )
+        assert len(brief.team_summaries) == 2
+        assert brief.team_summaries[0]["team"] == "engineering"
+        assert brief.team_summaries[1]["health"] == "yellow"
+
+    def test_founder_brief_team_summaries_default_empty(self):
+        from agents.chief_of_staff.schemas import FounderBrief
+
+        brief = FounderBrief(date="2025-01-01")
+        assert brief.team_summaries == []
 
 
 # ---------------------------------------------------------------------------
@@ -512,6 +530,53 @@ class TestSynthesizer:
         status = synthesize_status(sample_reports)
         assert "security:" in status
         assert "architect:" in status
+
+    def test_summarize_team_green(self, sample_reports):
+        from agents.chief_of_staff.synthesizer import summarize_team
+
+        # sample_reports[4] is architect with 0 findings
+        result = summarize_team("engineering", [sample_reports[4]])
+        assert result["team"] == "engineering"
+        assert result["health"] == "green"
+        assert result["agent_count"] == 1
+        assert result["finding_count"] == 0
+        assert isinstance(result["summary"], str)
+
+    def test_summarize_team_red(self, sample_reports):
+        from agents.chief_of_staff.synthesizer import summarize_team
+
+        # sample_reports[0] has critical + high findings
+        result = summarize_team("engineering", [sample_reports[0]])
+        assert result["health"] == "red"
+        assert result["finding_count"] == 2
+
+    def test_summarize_team_yellow(self):
+        from agents.chief_of_staff.synthesizer import summarize_team
+
+        report = _make_report("pipeline", [_make_finding("D1", "medium", "data")])
+        result = summarize_team("data", [report])
+        assert result["health"] == "yellow"
+        assert result["finding_count"] == 1
+
+    def test_summarize_team_empty(self):
+        from agents.chief_of_staff.synthesizer import summarize_team
+
+        result = summarize_team("ops", [])
+        assert result["team"] == "ops"
+        assert result["health"] == "green"
+        assert result["agent_count"] == 0
+
+    def test_synthesize_daily_includes_team_summaries(self, sample_reports):
+        from agents.chief_of_staff.synthesizer import synthesize_daily
+
+        brief_text, brief_data = synthesize_daily(sample_reports)
+        assert "team_summaries" in brief_data
+        summaries = brief_data["team_summaries"]
+        assert len(summaries) >= 1
+        eng = next((s for s in summaries if s["team"] == "engineering"), None)
+        assert eng is not None
+        assert eng["health"] in ("green", "yellow", "red")
+        assert eng["agent_count"] > 0
 
 
 # ---------------------------------------------------------------------------
@@ -1120,9 +1185,7 @@ class TestOrgEvaluator:
         from agents.chief_of_staff.org_evaluator import evaluate_triggers
 
         # Create 7 reports from engineering agents
-        reports = [
-            _make_report(f"agent_{i}") for i in range(7)
-        ]
+        reports = [_make_report(f"agent_{i}") for i in range(7)]
         triggers = evaluate_triggers(reports, {})
         structural = [t for t in triggers if t.category == "structural"]
         assert any(">6" in t.trigger for t in structural)
@@ -1203,7 +1266,9 @@ class TestOrgEvaluator:
         from agents.chief_of_staff.schemas import OrgTrigger
 
         triggers = [
-            OrgTrigger(category="cost", trigger="Critical overrun", severity="critical"),
+            OrgTrigger(
+                category="cost", trigger="Critical overrun", severity="critical"
+            ),
         ]
         result = generate_restructuring_proposal(triggers)
         assert "founder review" in result.lower()
@@ -1319,7 +1384,6 @@ class TestPodManager:
 
     def test_update_exit_criteria(self):
         from agents.chief_of_staff.pod_manager import (
-            check_pod_health,
             create_pod,
             get_active_pods,
             update_exit_criteria,
@@ -1457,11 +1521,13 @@ class TestRequestRouting:
             route_and_track_request,
         )
 
-        tracked = route_and_track_request({
-            "source_agent": "pipeline",
-            "request": "Need schema migration review",
-            "urgency": "medium",
-        })
+        tracked = route_and_track_request(
+            {
+                "source_agent": "pipeline",
+                "request": "Need schema migration review",
+                "urgency": "medium",
+            }
+        )
         resolve_request(tracked.id)
         assert len(get_open_requests()) == 0
 
@@ -1472,13 +1538,18 @@ class TestRequestRouting:
             resolve_request("req-nonexistent")
 
     def test_stale_requests(self):
-        from agents.chief_of_staff.router import get_stale_requests, route_and_track_request
+        from agents.chief_of_staff.router import (
+            get_stale_requests,
+            route_and_track_request,
+        )
 
-        tracked = route_and_track_request({
-            "source_agent": "architect",
-            "request": "Old request",
-            "urgency": "low",
-        })
+        tracked = route_and_track_request(
+            {
+                "source_agent": "architect",
+                "request": "Old request",
+                "urgency": "low",
+            }
+        )
         # Stale detection with days=0 should catch even fresh requests
         stale = get_stale_requests(days=0)
         assert len(stale) == 1
@@ -1494,11 +1565,13 @@ class TestRequestRouting:
             route_and_track_request,
         )
 
-        route_and_track_request({
-            "source_agent": "security",
-            "request": "Need privacy audit for marketplace",
-            "urgency": "critical",
-        })
+        route_and_track_request(
+            {
+                "source_agent": "security",
+                "request": "Need privacy audit for marketplace",
+                "urgency": "critical",
+            }
+        )
         report = get_request_tracking_report()
         assert "Cross-Team Requests" in report
         assert "1 open" in report
@@ -1511,11 +1584,13 @@ class TestRequestRouting:
         )
 
         for i in range(5):
-            route_and_track_request({
-                "source_agent": f"agent_{i}",
-                "request": f"Request {i} about database migration",
-                "urgency": "medium",
-            })
+            route_and_track_request(
+                {
+                    "source_agent": f"agent_{i}",
+                    "request": f"Request {i} about database migration",
+                    "urgency": "medium",
+                }
+            )
         assert len(get_open_requests()) == 5
 
 
@@ -1570,7 +1645,9 @@ class TestBudgetEnforcer:
             "agent_breakdown": {},
         }
         actions = enforce_budget(costs)
-        total_throttle = [a for a in actions if a.team == "all" and a.action == "throttle"]
+        total_throttle = [
+            a for a in actions if a.team == "all" and a.action == "throttle"
+        ]
         assert len(total_throttle) == 1
         assert "Skip non-critical scans" in total_throttle[0].recommendation
 
@@ -1603,15 +1680,19 @@ class TestBudgetEnforcer:
         from agents.chief_of_staff.schemas import BudgetAction
 
         # First throttle
-        update_throttle_status([
-            BudgetAction(team="data", action="throttle", reason="Over"),
-        ])
+        update_throttle_status(
+            [
+                BudgetAction(team="data", action="throttle", reason="Over"),
+            ]
+        )
         assert should_throttle_team("data") is True
 
         # Then clear
-        update_throttle_status([
-            BudgetAction(team="data", action="ok", reason="Back in budget"),
-        ])
+        update_throttle_status(
+            [
+                BudgetAction(team="data", action="ok", reason="Back in budget"),
+            ]
+        )
         assert should_throttle_team("data") is False
 
     def test_budget_enforcement_report_empty(self):
@@ -1725,11 +1806,23 @@ class TestCosWiringIntegration:
 
         with (
             patch("agents.chief_of_staff.cos_agent.REPORTS_DIR", reports_dir),
-            patch("agents.chief_of_staff.cos_agent.DATA_TEAM_REPORTS_DIR", tmp_path / "d"),
-            patch("agents.chief_of_staff.cos_agent.PRODUCT_TEAM_REPORTS_DIR", tmp_path / "p"),
-            patch("agents.chief_of_staff.cos_agent.OPS_TEAM_REPORTS_DIR", tmp_path / "o"),
-            patch("agents.chief_of_staff.cos_agent.FINANCE_TEAM_REPORTS_DIR", tmp_path / "f"),
-            patch("agents.chief_of_staff.cos_agent.GTM_TEAM_REPORTS_DIR", tmp_path / "g"),
+            patch(
+                "agents.chief_of_staff.cos_agent.DATA_TEAM_REPORTS_DIR", tmp_path / "d"
+            ),
+            patch(
+                "agents.chief_of_staff.cos_agent.PRODUCT_TEAM_REPORTS_DIR",
+                tmp_path / "p",
+            ),
+            patch(
+                "agents.chief_of_staff.cos_agent.OPS_TEAM_REPORTS_DIR", tmp_path / "o"
+            ),
+            patch(
+                "agents.chief_of_staff.cos_agent.FINANCE_TEAM_REPORTS_DIR",
+                tmp_path / "f",
+            ),
+            patch(
+                "agents.chief_of_staff.cos_agent.GTM_TEAM_REPORTS_DIR", tmp_path / "g"
+            ),
             patch("agents.chief_of_staff.cos_learning._STATE_PATH", state_path),
             patch("agents.chief_of_staff.cos_agent.WHATSAPP_DIR", wa_dir),
         ):
@@ -1744,9 +1837,14 @@ class TestCosWiringIntegration:
     def test_run_daily_includes_budget_enforcement(self):
         from agents.chief_of_staff.cos_agent import run_daily
 
-        self._write_report(_make_report("architect", [
-            _make_finding("F1", "high", "security", "Issue"),
-        ]))
+        self._write_report(
+            _make_report(
+                "architect",
+                [
+                    _make_finding("F1", "high", "security", "Issue"),
+                ],
+            )
+        )
         result = run_daily()
         # Brief should be generated (even if no budget issues)
         assert "# Founder Daily Brief" in result
@@ -1772,11 +1870,13 @@ class TestCosWiringIntegration:
         # (separate file so AgentReport.from_dict doesn't fail on extra key)
         report2 = _make_report("test_engineer")
         data = json.loads(report2.serialize())
-        data["cross_team_requests"] = [{
-            "request": "Need database migration review",
-            "urgency": "high",
-            "blocking": "data",
-        }]
+        data["cross_team_requests"] = [
+            {
+                "request": "Need database migration review",
+                "urgency": "high",
+                "blocking": "data",
+            }
+        ]
         # Remove the extra key before AgentReport.from_dict processes it,
         # but _load_dir extracts cross_team_requests before from_dict
         path = self._reports_dir / "test_engineer_latest.json"
