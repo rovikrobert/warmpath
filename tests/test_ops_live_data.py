@@ -84,3 +84,144 @@ class TestKeevsLiveCoaching:
 
         assert "live_coaching_avg_response_length" in metrics
         assert metrics["live_coaching_avg_response_length"] > 0
+
+
+class TestTrebLiveFunnel:
+    """Treb live NH activation funnel — queries users/uploads/prefs."""
+
+    def test_funnel_without_db(self, monkeypatch):
+        """Without DATABASE_URL, funnel check adds info finding and skips."""
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import importlib
+        import ops_team.shared.db as db_mod
+        importlib.reload(db_mod)
+
+        from ops_team.treb.treb import _check_live_nh_funnel
+        from agents.shared.report import Finding
+        from ops_team.shared.report import OpsInsight
+
+        findings: list[Finding] = []
+        insights: list[OpsInsight] = []
+        metrics: dict = {}
+        _check_live_nh_funnel(findings, insights, metrics)
+
+        assert any("unavailable" in f.title.lower() or "DATABASE_URL" in f.detail for f in findings)
+
+    def test_funnel_metrics_not_populated_without_db(self, monkeypatch):
+        """Without DB, no funnel metrics should be set."""
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import importlib
+        import ops_team.shared.db as db_mod
+        importlib.reload(db_mod)
+
+        from ops_team.treb.treb import _check_live_nh_funnel
+        from agents.shared.report import Finding
+        from ops_team.shared.report import OpsInsight
+
+        findings: list[Finding] = []
+        insights: list[OpsInsight] = []
+        metrics: dict = {}
+        _check_live_nh_funnel(findings, insights, metrics)
+
+        assert "live_nh_signup_count" not in metrics
+
+
+class TestTrebLiveReferral:
+    """Treb live referral bonus capture — checks intro->credit->reputation chain."""
+
+    def test_referral_without_db(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import importlib
+        import ops_team.shared.db as db_mod
+        importlib.reload(db_mod)
+
+        from ops_team.treb.treb import _check_live_referral_workflow
+        from agents.shared.report import Finding
+        from ops_team.shared.report import OpsInsight
+
+        findings: list[Finding] = []
+        insights: list[OpsInsight] = []
+        metrics: dict = {}
+        _check_live_referral_workflow(findings, insights, metrics)
+
+        assert any("unavailable" in f.title.lower() or "DATABASE_URL" in f.detail for f in findings)
+
+    def test_referral_metrics_not_populated_without_db(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import importlib
+        import ops_team.shared.db as db_mod
+        importlib.reload(db_mod)
+
+        from ops_team.treb.treb import _check_live_referral_workflow
+        from agents.shared.report import Finding
+        from ops_team.shared.report import OpsInsight
+
+        findings: list[Finding] = []
+        insights: list[OpsInsight] = []
+        metrics: dict = {}
+        _check_live_referral_workflow(findings, insights, metrics)
+
+        assert "live_referral_completed_count" not in metrics
+
+
+class TestNaivLiveSatisfaction:
+    """Naiv live satisfaction — queries user_feedback table."""
+
+    def test_satisfaction_without_db(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import importlib
+        import ops_team.shared.db as db_mod
+        importlib.reload(db_mod)
+
+        from ops_team.naiv.naiv import _check_live_satisfaction
+        from agents.shared.report import Finding
+        from ops_team.shared.report import SatisfactionFinding
+
+        findings: list[Finding] = []
+        sat_findings: list[SatisfactionFinding] = []
+        metrics: dict = {}
+        _check_live_satisfaction(findings, sat_findings, metrics)
+
+        assert any("unavailable" in f.title.lower() or "DATABASE_URL" in f.detail for f in findings)
+
+
+class TestNaivLiveErrors:
+    """Naiv live error telemetry — queries usage_logs + audit_logs."""
+
+    def test_error_telemetry_without_db(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import importlib
+        import ops_team.shared.db as db_mod
+        importlib.reload(db_mod)
+
+        from ops_team.naiv.naiv import _check_live_error_telemetry
+        from agents.shared.report import Finding
+        from ops_team.shared.report import SatisfactionFinding
+
+        findings: list[Finding] = []
+        sat_findings: list[SatisfactionFinding] = []
+        metrics: dict = {}
+        _check_live_error_telemetry(findings, sat_findings, metrics)
+
+        assert any("unavailable" in f.title.lower() or "DATABASE_URL" in f.detail for f in findings)
+
+
+class TestNaivLiveEmail:
+    """Naiv live email engagement — queries email_campaign_logs."""
+
+    def test_email_engagement_without_db(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        import importlib
+        import ops_team.shared.db as db_mod
+        importlib.reload(db_mod)
+
+        from ops_team.naiv.naiv import _check_live_email_engagement
+        from agents.shared.report import Finding
+        from ops_team.shared.report import SatisfactionFinding
+
+        findings: list[Finding] = []
+        sat_findings: list[SatisfactionFinding] = []
+        metrics: dict = {}
+        _check_live_email_engagement(findings, sat_findings, metrics)
+
+        assert any("unavailable" in f.title.lower() or "DATABASE_URL" in f.detail for f in findings)
