@@ -42,7 +42,7 @@ from app.services.email_engagement import (
 
 def _make_user(
     email: str | None = None,
-    user_type: str = "job_seeker",
+    intent: str | None = "find_referrals",
     created_at: datetime | None = None,
     marketing_opt_out: bool = False,
 ) -> User:
@@ -51,7 +51,7 @@ def _make_user(
         email=email or f"{uuid.uuid4().hex[:8]}@test.com",
         password_hash="hashed",
         full_name="Test User",
-        user_type=user_type,
+        intent=intent,
         created_at=created_at or datetime.now(timezone.utc),
         marketing_opt_out=marketing_opt_out,
     )
@@ -148,7 +148,7 @@ async def test_welcome_email_js(mock_send: object, db: AsyncSession) -> None:
 @pytest.mark.asyncio
 @patch("app.services.email_engagement._send_email")
 async def test_welcome_email_nh(mock_send: object, db: AsyncSession) -> None:
-    user = _make_user(user_type="network_holder")
+    user = _make_user(intent="sha[RESEND_KEY_REDACTED]")
     db.add(user)
     await db.flush()
 
@@ -269,7 +269,7 @@ async def test_nh_sharing_reminder_finds_eligible(
     mock_send: object, db: AsyncSession
 ) -> None:
     user = _make_user(
-        user_type="network_holder",
+        intent="sha[RESEND_KEY_REDACTED]",
         created_at=datetime.now(timezone.utc) - timedelta(hours=72),
     )
     db.add(user)
@@ -289,7 +289,7 @@ async def test_nh_sharing_reminder_skips_opted_in(
     mock_send: object, db: AsyncSession
 ) -> None:
     user = _make_user(
-        user_type="network_holder",
+        intent="sha[RESEND_KEY_REDACTED]",
         created_at=datetime.now(timezone.utc) - timedelta(hours=72),
     )
     db.add(user)
@@ -356,8 +356,8 @@ async def test_intro_pending_reminder(mock_send: object, db: AsyncSession) -> No
     from app.models.company import Company
     from app.models.contact import Contact
 
-    nh = _make_user(user_type="network_holder")
-    js = _make_user(user_type="job_seeker")
+    nh = _make_user(intent="sha[RESEND_KEY_REDACTED]")
+    js = _make_user(intent="find_referrals")
     db.add_all([nh, js])
     await db.flush()
 

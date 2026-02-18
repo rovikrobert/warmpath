@@ -45,9 +45,6 @@ class User(Base):
     plan_tier: Mapped[str] = mapped_column(
         String(50), nullable=False, server_default="free"
     )
-    user_type: Mapped[str] = mapped_column(
-        String(20), nullable=False, server_default="job_seeker"
-    )
     intent: Mapped[str | None] = mapped_column(
         String(20), nullable=True, default=None
     )

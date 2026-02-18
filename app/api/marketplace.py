@@ -93,17 +93,13 @@ def _build_seeker_profile_snapshot(user: User, visibility: str) -> dict:
         return {
             "full_name": user.full_name,
             "email": user.email,
-            "user_type": user.user_type,
         }
     elif visibility == "summary":
         return {
             "full_name": user.full_name,
-            "user_type": user.user_type,
         }
     else:  # minimal
-        return {
-            "user_type": user.user_type,
-        }
+        return {}
 
 
 # ---------------------------------------------------------------------------
@@ -686,7 +682,7 @@ async def get_sharing_preferences(
     if prefs is None:
         # For NH/both users, lazily create a default row so checklist
         # recognises sharing as configured after first visit to settings.
-        if current_user.intent in ("sha[RESEND_KEY_REDACTED]", "explore") or current_user.user_type in ("network_holder", "both"):
+        if current_user.intent in ("sha[RESEND_KEY_REDACTED]", "explore"):
             prefs = NetworkSharingPreferences(
                 user_id=current_user.id,
                 opt_in_marketplace=False,

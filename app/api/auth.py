@@ -37,7 +37,6 @@ from app.schemas.user import (
     UserCreate,
     UserLogin,
     UserResponse,
-    UserTypeUpdate,
 )
 from app.services.audit_logger import log_event
 from app.services.credits import earn_credits
@@ -529,28 +528,6 @@ async def get_me(
     response = UserResponse.model_validate(current_user).model_dump(mode="json")
     response["capabilities"] = caps.model_dump()
     return {"data": response, "meta": {}}
-
-
-@router.patch("/user-type")
-async def update_user_type(
-    body: UserTypeUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> dict:
-    """Update the user's role type (job seeker, network holder, or both)."""
-    valid_types = {"job_seeker", "network_holder", "both"}
-    if body.user_type not in valid_types:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=f"user_type must be one of: {', '.join(sorted(valid_types))}",
-        )
-    current_user.user_type = body.user_type
-    await db.commit()
-    await db.refresh(current_user)
-    return {
-        "data": {"user_type": current_user.user_type},
-        "meta": {},
-    }
 
 
 @router.patch("/intent")

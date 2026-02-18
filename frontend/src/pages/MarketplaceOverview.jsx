@@ -164,9 +164,6 @@ export default function MarketplaceOverview() {
                       <p className="mt-1 text-sm font-medium text-slate-50">
                         {req.job_seeker_profile_snapshot?.full_name || 'Anonymous'}
                       </p>
-                      {req.job_seeker_profile_snapshot?.user_type && (
-                        <p className="text-xs text-slate-400">{req.job_seeker_profile_snapshot.user_type}</p>
-                      )}
                       {req.job_seeker_profile_snapshot?.email && (
                         <p className="text-xs text-slate-400">{req.job_seeker_profile_snapshot.email}</p>
                       )}

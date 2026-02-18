@@ -129,8 +129,6 @@ export const auth = {
   login: (body) => api('/api/v1/auth/login', { method: 'POST', body }),
   me: () => api('/api/v1/auth/me'),
   upsertProfile: (body) => api('/api/v1/auth/profile', { method: 'POST', body }),
-  updateUserType: (userType) =>
-    api('/api/v1/auth/user-type', { method: 'PATCH', body: { user_type: userType } }),
   updateIntent: (intent) =>
     api('/api/v1/auth/intent', { method: 'PATCH', body: { intent } }),
   resendVerification: () =>
