@@ -8,6 +8,7 @@ from app.utils.performance import timed
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Cookie,
     Depends,
     HTTPException,
@@ -201,6 +202,7 @@ async def signup(
 async def login(
     body: UserLogin,
     response: Response,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Authenticate a user and return access tokens."""
@@ -279,6 +281,11 @@ async def login(
 
     await log_event(db, "login_success", user_id=user.id)
     await db.commit()
+
+    # Pre-warm job cache in background so Find Referrals loads instantly
+    from app.services.job_recommendations import warm_job_cache_for_user
+
+    background_tasks.add_task(warm_job_cache_for_user, str(user.id))
 
     return {
         "data": TokenResponse(access_token=access_token).model_dump(),

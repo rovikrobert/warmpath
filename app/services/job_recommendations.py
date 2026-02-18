@@ -276,3 +276,63 @@ async def get_recommendations(
             "fresh_scans": fresh_scanned,
         },
     }
+
+
+async def warm_job_cache_for_user(user_id: str) -> None:
+    """Pre-fetch and cache job listings for a user's target locations.
+
+    Called as a background task on login so the recommendations endpoint
+    can serve from cache instantly when the user visits Find Referrals.
+    """
+    from app.database import _get_session_factory
+    from app.models.job import UserJobPreferences
+
+    try:
+        async with _get_session_factory()() as db:
+            result = await db.execute(
+                select(UserJobPreferences).where(
+                    UserJobPreferences.user_id == user_id
+                )
+            )
+            prefs = result.scalar_one_or_none()
+            if not prefs or not prefs.target_role:
+                return
+
+            locations = prefs.target_locations if prefs.target_locations else None
+            candidates = companies_for_locations(locations)
+
+            # Only warm uncached companies
+            to_warm: list[str] = []
+            for key in candidates:
+                cached = await get_cached_jobs(key, db)
+                if cached is None:
+                    to_warm.append(key)
+
+            if not to_warm:
+                logger.debug("Job cache already warm for user %s", user_id)
+                return
+
+            # Limit to avoid excessive fetching
+            to_warm = to_warm[: settings.RECOMMENDATION_MAX_SCAN]
+
+            fetcher = JobFetcher()
+            semaphore = asyncio.Semaphore(5)
+            tasks = [
+                _fetch_jobs(key, BOARD_REGISTRY.get(key, {}), fetcher, semaphore)
+                for key in to_warm
+            ]
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            cached_count = 0
+            for key, jobs in zip(to_warm, results):
+                if isinstance(jobs, list) and jobs:
+                    await set_cached_jobs(key, jobs, db)
+                    cached_count += 1
+
+            await db.commit()
+            logger.info(
+                "Warmed job cache for user %s: %d/%d companies cached",
+                user_id, cached_count, len(to_warm),
+            )
+    except Exception:
+        logger.debug("Background job cache warm failed for user %s", user_id)
