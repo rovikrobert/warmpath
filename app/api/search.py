@@ -345,6 +345,9 @@ async def get_search_results(
     all_relevance: list[float] = []
     all_warm: list[float] = []
     score_dist = {"90-100": 0, "70-89": 0, "50-69": 0, "20-49": 0}
+    # Pre-computed averages from SQL (set in no-company path only)
+    avg_rel: float | None = None
+    avg_warm: float | None = None
 
     if company is not None:
         # Stats from already-filtered in-memory rows (includes company filter)
@@ -424,8 +427,6 @@ async def get_search_results(
             "20-49": int(agg_row.b20 or 0),
         }
         stats_pairs = []
-        all_relevance = [avg_rel] * cnt if cnt else []
-        all_warm = [avg_warm] * cnt if cnt else []
 
     for rel, warm_val in stats_pairs:
         r = float(rel)
@@ -483,8 +484,10 @@ async def get_search_results(
             "shown": len(data),
             "avg_relevance": round(sum(all_relevance) / len(all_relevance), 1)
             if all_relevance
-            else 0,
-            "avg_warm": round(sum(all_warm) / len(all_warm), 1) if all_warm else 0,
+            else round(avg_rel, 1) if avg_rel else 0,
+            "avg_warm": round(sum(all_warm) / len(all_warm), 1)
+            if all_warm
+            else round(avg_warm, 1) if avg_warm else 0,
             "score_distribution": score_dist,
         },
     }

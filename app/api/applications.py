@@ -331,25 +331,24 @@ async def get_application_stats(
     responded_count = int(agg_row.responded_count or 0)
     interview_count = int(agg_row.interview_count or 0)
 
-    # Avg days to response (only where both sent_at and responded_at set)
-    avg_days_query = select(
-        func.avg(
-            func.extract(
-                "epoch", Application.responded_at - Application.sent_at
-            )
-            / 86400
-        ).label("avg_days")
+    # Avg days to response — compute in Python for SQLite compatibility
+    resp_query = select(
+        Application.sent_at, Application.responded_at
     ).where(
         *base,
         Application.sent_at.isnot(None),
         Application.responded_at.isnot(None),
     )
-    avg_days_row = (await db.execute(avg_days_query)).one()
-    avg_days = (
-        round(float(avg_days_row.avg_days), 1)
-        if avg_days_row.avg_days is not None
-        else None
-    )
+    resp_rows = (await db.execute(resp_query)).all()
+    if resp_rows:
+        response_days = []
+        for sent_at, responded_at in resp_rows:
+            s = sent_at if sent_at.tzinfo else sent_at.replace(tzinfo=timezone.utc)
+            r = responded_at if responded_at.tzinfo else responded_at.replace(tzinfo=timezone.utc)
+            response_days.append((r - s).total_seconds() / 86400)
+        avg_days = round(sum(response_days) / len(response_days), 1)
+    else:
+        avg_days = None
 
     # Channel stats: sent and responded per channel
     ch_sent = case((Application.status != "draft", 1), else_=0)
