@@ -60,6 +60,11 @@ gtm_team/reports/*.json
 gtm_team/shared/intel_cache.json
 gtm_team/*/state.json
 gtm_team/cross_team_requests/*.json
+# Shared agent caches
+agents/shared/.web_cache/
+agents/shared/shared_insights.json
+agents/shared/resolved_registry.json
+
 coverage.json
 .coverage
 junit.xml

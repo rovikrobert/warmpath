@@ -715,14 +715,15 @@ async def _process_company(
         if hasattr(matches, "__await__"):
             matches = await matches
 
+        # Pre-build contact map for O(1) lookups (avoids O(n²) next() scan)
+        contact_map = {c.id: c for c in company_contacts}
+
         for match in matches:
             if match.relevance_score < 20:
                 continue
 
             # Find the contact object for enrichment
-            contact = next(
-                (c for c in company_contacts if c.id == match.contact_id), None
-            )
+            contact = contact_map.get(match.contact_id)
             if contact is None:
                 continue
 
