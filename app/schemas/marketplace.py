@@ -13,6 +13,11 @@ class MarketplaceSearchBody(BaseModel):
     company_names: list[str]
     role_levels: list[str] | None = None
     departments: list[str] | None = None
+    friend_filter: str | None = Field(
+        default=None,
+        pattern="^(all|friends_only|friends_and_fof)$",
+        description="Filter by friend connections: all (default), friends_only, friends_and_fof",
+    )
 
 
 class MarketplaceSearchResult(BaseModel):

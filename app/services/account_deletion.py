@@ -24,6 +24,7 @@ from app.models.privacy import ArchivedCreditTransaction, ConsentRecord, DataReq
 from app.models.search_request import SearchRequest
 from app.models.user import ConnectorProfile, User
 from app.services.audit_logger import log_event
+from app.services.friendship_service import delete_user_friendships
 from app.services.suppression import add_to_suppression
 
 
@@ -81,7 +82,12 @@ async def delete_user_data(
         )
 
     # 3. Delete user-owned data (order matters for FK constraints)
-    # Marketplace listings first (depends on contacts)
+    # Friendships and blocks first (hard-delete, no audit requirement for social)
+    friendship_counts = await delete_user_friendships(user_id, db)
+    counts["friendships"] = friendship_counts["friendships"]
+    counts["blocks"] = friendship_counts["blocks"]
+
+    # Marketplace listings (depends on contacts)
     r = await db.execute(
         delete(MarketplaceListing).where(
             MarketplaceListing.network_holder_id == user_id
