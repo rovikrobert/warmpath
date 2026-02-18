@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { search as searchApi, credits as creditsApi, matches as matchesApi } from '../api/client';
 import RequestIntroModal from '../components/RequestIntroModal';
+import FeedbackModal from '../components/FeedbackModal';
 
 /* ------------------------------------------------------------------ */
 /* Warm Score legend + badge                                          */
@@ -355,6 +356,7 @@ export default function ReferralResults() {
   const [introLoading, setIntroLoading] = useState(null);
   const [draftModal, setDraftModal] = useState(null);
   const [alsoHiring, setAlsoHiring] = useState([]);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -387,6 +389,8 @@ export default function ReferralResults() {
     searchApi.recommendations({ exclude: searched.join(','), limit: 6 })
       .then((r) => setAlsoHiring(r.data?.recommendations ?? []))
       .catch(() => {});
+    const timer = setTimeout(() => setShowFeedback(true), 5000);
+    return () => clearTimeout(timer);
   }, [data]);
 
   const handleDraftIntro = async (contactId) => {
@@ -503,6 +507,14 @@ export default function ReferralResults() {
       )}
 
       {draftModal && <IntroModal intro={draftModal} onClose={() => setDraftModal(null)} />}
+
+      {showFeedback && (
+        <FeedbackModal
+          feature="referral_search"
+          resourceId={id}
+          onClose={() => setShowFeedback(false)}
+        />
+      )}
     </div>
   );
 }

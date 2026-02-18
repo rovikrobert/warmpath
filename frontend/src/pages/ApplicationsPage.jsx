@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { applications as appsApi } from '../api/client';
+import FeedbackModal from '../components/FeedbackModal';
 
 const PIPELINE_STAGES = [
   { key: 'draft', label: 'Draft', color: 'bg-slate-100 text-slate-600' },
@@ -112,6 +113,7 @@ export default function ApplicationsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [newApp, setNewApp] = useState({ company_name: '', role_title: '', channel: '', notes: '' });
   const [creating, setCreating] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const load = async () => {
     try {
@@ -135,6 +137,7 @@ export default function ApplicationsPage() {
     try {
       await appsApi.update(id, { status });
       await load();
+      setTimeout(() => setShowFeedback(true), 5000);
     } catch (err) {
       console.error(err);
     } finally {
@@ -327,6 +330,13 @@ export default function ApplicationsPage() {
             })}
           </div>
         </div>
+      )}
+
+      {showFeedback && (
+        <FeedbackModal
+          feature="application_tracker"
+          onClose={() => setShowFeedback(false)}
+        />
       )}
     </div>
   );

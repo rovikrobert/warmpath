@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { coach as coachApi } from '../api/client';
+import FeedbackModal from '../components/FeedbackModal';
 
 /**
  * Render text with markdown-style links [text](/path) as React Router <Link>s.
@@ -49,6 +50,7 @@ export default function Dashboard() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -78,7 +80,10 @@ export default function Dashboard() {
         }]);
         setSuggestedPrompts(['How do I get started?', 'What should I focus on today?']);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setTimeout(() => { if (!cancelled) setShowFeedback(true); }, 5000);
+        }
       }
     })();
     return () => { cancelled = true; };
@@ -256,6 +261,13 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {showFeedback && (
+        <FeedbackModal
+          feature="coach_briefing"
+          onClose={() => setShowFeedback(false)}
+        />
+      )}
     </div>
   );
 }

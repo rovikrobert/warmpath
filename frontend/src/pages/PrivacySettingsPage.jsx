@@ -1,0 +1,386 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { privacy as privacyApi, auth as authApi } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+
+const REGULATION_OPTIONS = ['GDPR', 'CCPA', 'PDPA', 'Other'];
+const REQUEST_TYPES = [
+  { value: 'access', label: 'Access my data' },
+  { value: 'deletion', label: 'Delete my data' },
+  { value: 'rectification', label: 'Correct my data' },
+  { value: 'portability', label: 'Data portability' },
+];
+
+export default function PrivacySettingsPage() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const [loading, setLoading] = useState(true);
+  const [restricted, setRestricted] = useState(false);
+  const [marketingOptedOut, setMarketingOptedOut] = useState(false);
+  const [consentRecords, setConsentRecords] = useState([]);
+  const [togglingRestrict, setTogglingRestrict] = useState(false);
+  const [togglingMarketing, setTogglingMarketing] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportDone, setExportDone] = useState(false);
+  const [error, setError] = useState('');
+
+  // Data request form
+  const [requestType, setRequestType] = useState('access');
+  const [requestDetails, setRequestDetails] = useState('');
+  const [requestRegulation, setRequestRegulation] = useState('GDPR');
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [requestSuccess, setRequestSuccess] = useState('');
+
+  // Delete account
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const consentRes = await privacyApi.listConsent().catch(() => ({ data: [] }));
+        setConsentRecords(consentRes.data || []);
+
+        // Derive toggle states from user or consent records
+        setRestricted(user?.processing_restricted || false);
+        setMarketingOptedOut(user?.marketing_opt_out || false);
+      } catch {
+        // non-critical
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [user]);
+
+  const handleExport = async () => {
+    setExporting(true);
+    setError('');
+    try {
+      const res = await privacyApi.exportData();
+      // Download as JSON file
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'warmpath-data-export.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      setExportDone(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleToggleRestrict = async () => {
+    setTogglingRestrict(true);
+    setError('');
+    try {
+      if (restricted) {
+        await privacyApi.unrestrictProcessing();
+        setRestricted(false);
+      } else {
+        await privacyApi.restrictProcessing();
+        setRestricted(true);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setTogglingRestrict(false);
+    }
+  };
+
+  const handleToggleMarketing = async () => {
+    setTogglingMarketing(true);
+    setError('');
+    try {
+      if (marketingOptedOut) {
+        await privacyApi.marketingOptIn();
+        setMarketingOptedOut(false);
+      } else {
+        await privacyApi.marketingOptOut();
+        setMarketingOptedOut(true);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setTogglingMarketing(false);
+    }
+  };
+
+  const handleDataRequest = async (e) => {
+    e.preventDefault();
+    setSubmittingRequest(true);
+    setError('');
+    setRequestSuccess('');
+    try {
+      await privacyApi.dataRequest({
+        request_type: requestType,
+        details: requestDetails.trim() || undefined,
+        regulation: requestRegulation,
+      });
+      setRequestSuccess('Your request has been submitted. We will respond within the regulatory deadline.');
+      setRequestDetails('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirm !== 'DELETE') return;
+    setDeleting(true);
+    setError('');
+    try {
+      await authApi.deleteAccount({ confirm: true });
+      logout();
+      navigate('/');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20" role="main" aria-live="polite" aria-busy="true">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading privacy settings" />
+      </div>
+    );
+  }
+
+  const inputClass = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
+
+  return (
+    <div className="mx-auto max-w-3xl" role="main">
+      <h1 className="mb-6 text-xl font-bold text-slate-900">Privacy Settings</h1>
+
+      {error && (
+        <div role="alert" aria-live="polite" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+          {error}
+        </div>
+      )}
+
+      {/* Data Export */}
+      <section className="mb-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-label="Data export">
+        <h2 className="mb-1 text-base font-semibold text-slate-900">Download My Data</h2>
+        <p className="mb-3 text-sm text-slate-500">
+          Export all your personal data as a JSON file. This includes your profile, contacts, search history, and credit transactions.
+        </p>
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+        >
+          {exporting ? 'Preparing...' : exportDone ? 'Download Again' : 'Download My Data'}
+        </button>
+        {exportDone && (
+          <p className="mt-2 text-xs text-green-600" role="status">Download started.</p>
+        )}
+      </section>
+
+      {/* Processing Restriction */}
+      <section className="mb-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-label="Processing restriction">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Restrict Processing</h2>
+            <p className="text-sm text-slate-500">
+              Limit how we process your data. Your account will remain active but some features may be unavailable.
+            </p>
+          </div>
+          <button
+            onClick={handleToggleRestrict}
+            disabled={togglingRestrict}
+            role="switch"
+            aria-checked={restricted}
+            aria-label="Restrict data processing"
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${
+              restricted ? 'bg-amber-500' : 'bg-slate-300'
+            } disabled:opacity-50`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                restricted ? 'translate-x-5' : 'translate-x-0.5'
+              } mt-0.5`}
+            />
+          </button>
+        </div>
+      </section>
+
+      {/* Marketing Preferences */}
+      <section className="mb-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-label="Marketing preferences">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Marketing Communications</h2>
+            <p className="text-sm text-slate-500">
+              {marketingOptedOut
+                ? 'You have opted out of marketing emails. Toggle to opt back in.'
+                : 'Receive product updates and tips. Toggle off to opt out.'}
+            </p>
+          </div>
+          <button
+            onClick={handleToggleMarketing}
+            disabled={togglingMarketing}
+            role="switch"
+            aria-checked={!marketingOptedOut}
+            aria-label="Marketing communications"
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${
+              !marketingOptedOut ? 'bg-amber-500' : 'bg-slate-300'
+            } disabled:opacity-50`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                !marketingOptedOut ? 'translate-x-5' : 'translate-x-0.5'
+              } mt-0.5`}
+            />
+          </button>
+        </div>
+      </section>
+
+      {/* Consent Records */}
+      <section className="mb-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-label="Consent records">
+        <h2 className="mb-3 text-base font-semibold text-slate-900">Consent Records</h2>
+        {consentRecords.length === 0 ? (
+          <p className="text-sm text-slate-500">No consent records on file.</p>
+        ) : (
+          <div className="space-y-2">
+            {consentRecords.map((record, i) => (
+              <div key={record.id || i} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
+                <div>
+                  <p className="text-sm font-medium text-slate-900">{record.processing_activity || record.activity}</p>
+                  <p className="text-xs text-slate-400">
+                    {record.status || (record.consented ? 'Consented' : 'Withdrawn')}
+                    {record.created_at && ` — ${new Date(record.created_at).toLocaleDateString()}`}
+                  </p>
+                </div>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  record.consented || record.status === 'granted'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {record.consented || record.status === 'granted' ? 'Active' : 'Withdrawn'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Formal Data Request */}
+      <section className="mb-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-label="Formal data request">
+        <h2 className="mb-1 text-base font-semibold text-slate-900">Formal Data Request</h2>
+        <p className="mb-3 text-sm text-slate-500">
+          Submit a formal data subject access request (DSAR). We will respond within the regulatory deadline.
+        </p>
+
+        <form onSubmit={handleDataRequest} className="space-y-3">
+          <div>
+            <label htmlFor="request-type" className="mb-1 block text-sm font-medium text-slate-700">Request type</label>
+            <select
+              id="request-type"
+              value={requestType}
+              onChange={(e) => setRequestType(e.target.value)}
+              className={inputClass}
+            >
+              {REQUEST_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="request-details" className="mb-1 block text-sm font-medium text-slate-700">
+              Details <span className="text-slate-400">(optional)</span>
+            </label>
+            <textarea
+              id="request-details"
+              value={requestDetails}
+              onChange={(e) => setRequestDetails(e.target.value)}
+              placeholder="Any specific details about your request..."
+              rows={3}
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="request-regulation" className="mb-1 block text-sm font-medium text-slate-700">Regulation</label>
+            <select
+              id="request-regulation"
+              value={requestRegulation}
+              onChange={(e) => setRequestRegulation(e.target.value)}
+              className={inputClass}
+            >
+              {REGULATION_OPTIONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+
+          {requestSuccess && (
+            <p role="status" className="rounded-md bg-green-50 p-2 text-sm text-green-600">{requestSuccess}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={submittingRequest}
+            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+          >
+            {submittingRequest ? 'Submitting...' : 'Submit Request'}
+          </button>
+        </form>
+      </section>
+
+      {/* Delete Account — Danger Zone */}
+      <section className="rounded-xl border-2 border-red-200 bg-white p-5" aria-label="Delete account">
+        <h2 className="mb-1 text-base font-semibold text-red-700">Delete Account</h2>
+        <p className="mb-3 text-sm text-slate-500">
+          Permanently delete your account, contacts, search history, and all associated data. This action cannot be undone.
+        </p>
+
+        {!showDelete ? (
+          <button
+            onClick={() => setShowDelete(true)}
+            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+          >
+            Delete My Account
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-red-600">
+              Type <strong>DELETE</strong> to confirm permanent deletion:
+            </p>
+            <input
+              type="text"
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              placeholder="Type DELETE"
+              aria-label="Type DELETE to confirm"
+              className="w-full rounded-lg border border-red-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting || deleteConfirm !== 'DELETE'}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Permanently Delete'}
+              </button>
+              <button
+                onClick={() => { setShowDelete(false); setDeleteConfirm(''); }}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
