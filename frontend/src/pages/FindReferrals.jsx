@@ -58,6 +58,7 @@ export default function FindReferrals() {
   const [error, setError] = useState('');
   const [recommendations, setRecommendations] = useState([]);
   const [loadingRecs, setLoadingRecs] = useState(false);
+  const [recsStale, setRecsStale] = useState(false);
 
   useEffect(() => {
     creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
@@ -69,10 +70,21 @@ export default function FindReferrals() {
   useEffect(() => {
     if (hasPrefs !== true) return;
     setLoadingRecs(true);
+    setRecsStale(false);
+
+    // Show "still loading" message after 3 seconds
+    const staleTimer = setTimeout(() => setRecsStale(true), 3000);
+
     searchApi.recommendations({ limit: 8 })
       .then((r) => setRecommendations(r.data?.recommendations ?? []))
       .catch(() => {})
-      .finally(() => setLoadingRecs(false));
+      .finally(() => {
+        clearTimeout(staleTimer);
+        setLoadingRecs(false);
+        setRecsStale(false);
+      });
+
+    return () => clearTimeout(staleTimer);
   }, [hasPrefs]);
 
   const handleAddRec = (name) => {
@@ -170,6 +182,11 @@ export default function FindReferrals() {
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">
             Hiring for Your Role
           </h2>
+          {loadingRecs && recsStale && (
+            <p className="mb-2 text-xs text-slate-400" aria-live="polite">
+              Scanning job boards — this may take a moment...
+            </p>
+          )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {loadingRecs
               ? Array.from({ length: 4 }).map((_, i) => <ShimmerCard key={i} />)
