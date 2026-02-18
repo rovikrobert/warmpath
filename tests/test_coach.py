@@ -7,8 +7,14 @@ import pytest_asyncio
 from httpx import AsyncClient
 
 from ops_team.keevs.coach_service import (
+    STAGE_ACTIVE_SEARCH,
+    STAGE_NETWORK_BUILDING,
+    STAGE_ONBOARDING,
+    STAGE_STALLED,
     _assemble_context,
     _build_chat_messages,
+    _detect_topic,
+    _determine_coaching_stage,
     _mock_briefing,
     _mock_chat_response,
 )
@@ -336,9 +342,10 @@ class TestMockResponses:
             "credits": 0,
             "market": None,
         }
-        response = _mock_chat_response("Tell me about my network", context)
-        assert "50" in response
-        assert "Google" in response
+        response_text, topic = _mock_chat_response("Tell me about my network", context)
+        assert "50" in response_text
+        assert "Google" in response_text
+        assert topic == "network"
 
     def test_build_chat_messages_structure(self):
         context = {
@@ -427,3 +434,317 @@ class TestCoachChatStreamEndpoint:
         assert resp.status_code == 200
         # Server assembles its own context; user has 50 credits from signup bonus
         assert "credit" in resp.text.lower()
+
+
+# ---------------------------------------------------------------------------
+# TestCoachingStages (P1)
+# ---------------------------------------------------------------------------
+
+
+class TestCoachingStages:
+    def _base_context(self, **overrides) -> dict:
+        ctx = {
+            "user": {"name": "Test", "title": None, "company": None, "location": None},
+            "preferences": None,
+            "network": None,
+            "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
+            "recent_searches": [],
+            "credits": 0,
+            "market": None,
+        }
+        ctx.update(overrides)
+        return ctx
+
+    def test_onboarding_no_contacts(self):
+        ctx = self._base_context()
+        assert _determine_coaching_stage(ctx) == STAGE_ONBOARDING
+
+    def test_network_building_has_contacts_no_prefs(self):
+        ctx = self._base_context(
+            network={"total_contacts": 50, "top_companies": []},
+        )
+        assert _determine_coaching_stage(ctx) == STAGE_NETWORK_BUILDING
+
+    def test_stalled_has_contacts_prefs_but_no_activity(self):
+        ctx = self._base_context(
+            network={"total_contacts": 50, "top_companies": []},
+            preferences={"target_role": "SWE"},
+        )
+        assert _determine_coaching_stage(ctx) == STAGE_STALLED
+
+    def test_active_search(self):
+        ctx = self._base_context(
+            network={"total_contacts": 50, "top_companies": []},
+            preferences={"target_role": "SWE"},
+            pipeline={"status_counts": {"applied": 2}, "follow_ups_needed": 0, "total": 2},
+        )
+        assert _determine_coaching_stage(ctx) == STAGE_ACTIVE_SEARCH
+
+    def test_active_search_via_recent_searches(self):
+        ctx = self._base_context(
+            network={"total_contacts": 50, "top_companies": []},
+            preferences={"target_role": "SWE"},
+            recent_searches=[{"name": "Google", "status": "completed"}],
+        )
+        assert _determine_coaching_stage(ctx) == STAGE_ACTIVE_SEARCH
+
+
+# ---------------------------------------------------------------------------
+# TestSessionBranching (P2)
+# ---------------------------------------------------------------------------
+
+
+class TestSessionBranching:
+    def _base_context(self) -> dict:
+        return {
+            "user": {"name": "Alice Smith", "title": None, "company": None, "location": None},
+            "preferences": None,
+            "network": None,
+            "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
+            "recent_searches": [],
+            "credits": 0,
+            "market": None,
+        }
+
+    def test_session_1_welcome(self):
+        briefing = _mock_briefing(self._base_context(), session_number=1)
+        assert "Welcome" in briefing
+
+    def test_session_2_returnee(self):
+        briefing = _mock_briefing(self._base_context(), session_number=2)
+        assert "again" in briefing.lower()
+
+    def test_session_4_momentum(self):
+        briefing = _mock_briefing(self._base_context(), session_number=4)
+        assert "#4" in briefing
+
+    def test_session_10_welcome_back(self):
+        briefing = _mock_briefing(self._base_context(), session_number=10)
+        assert "#10" in briefing
+
+
+# ---------------------------------------------------------------------------
+# TestDynamicBriefingSections (P3)
+# ---------------------------------------------------------------------------
+
+
+class TestDynamicBriefingSections:
+    def test_onboarding_session1_shows_explanation(self):
+        ctx = {
+            "user": {"name": "New User", "title": None, "company": None, "location": None},
+            "preferences": None,
+            "network": None,
+            "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
+            "recent_searches": [],
+            "credits": 0,
+            "market": None,
+        }
+        briefing = _mock_briefing(ctx, session_number=1, stage=STAGE_ONBOARDING)
+        assert "how warmpath works" in briefing.lower()
+
+    def test_onboarding_late_session_nudge(self):
+        ctx = {
+            "user": {"name": "Lazy User", "title": None, "company": None, "location": None},
+            "preferences": None,
+            "network": None,
+            "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
+            "recent_searches": [],
+            "credits": 0,
+            "market": None,
+        }
+        briefing = _mock_briefing(ctx, session_number=5, stage=STAGE_ONBOARDING)
+        assert "still haven't uploaded" in briefing.lower()
+
+    def test_pipeline_shown_when_apps_exist(self):
+        ctx = {
+            "user": {"name": "Active User", "title": None, "company": None, "location": None},
+            "preferences": {"target_role": "SWE"},
+            "network": {"total_contacts": 50, "top_companies": [{"company": "Google", "count": 10}]},
+            "pipeline": {
+                "status_counts": {"applied": 2, "message_sent": 1},
+                "follow_ups_needed": 0,
+                "total": 3,
+            },
+            "recent_searches": [],
+            "credits": 100,
+            "market": None,
+        }
+        briefing = _mock_briefing(ctx, session_number=3, stage=STAGE_ACTIVE_SEARCH)
+        assert "active application" in briefing.lower()
+
+    def test_stalled_user_gets_nudge(self):
+        ctx = {
+            "user": {"name": "Stalled User", "title": None, "company": None, "location": None},
+            "preferences": {"target_role": "PM"},
+            "network": {"total_contacts": 100, "top_companies": []},
+            "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
+            "recent_searches": [],
+            "credits": 50,
+            "market": None,
+        }
+        briefing = _mock_briefing(ctx, session_number=5, stage=STAGE_STALLED)
+        assert "slowed down" in briefing.lower()
+
+    def test_follow_ups_shown_when_due(self):
+        ctx = {
+            "user": {"name": "Busy User", "title": None, "company": None, "location": None},
+            "preferences": {"target_role": "SWE"},
+            "network": None,
+            "pipeline": {
+                "status_counts": {"message_sent": 3},
+                "follow_ups_needed": 3,
+                "total": 3,
+            },
+            "recent_searches": [],
+            "credits": 0,
+            "market": None,
+        }
+        briefing = _mock_briefing(ctx, session_number=3, stage=STAGE_ACTIVE_SEARCH)
+        assert "follow-up" in briefing.lower()
+        assert "3" in briefing
+
+
+# ---------------------------------------------------------------------------
+# TestTopicDetection (P4)
+# ---------------------------------------------------------------------------
+
+
+class TestTopicDetection:
+    def test_detects_follow_ups(self):
+        assert _detect_topic("How should I follow up with Google?") == "follow_ups"
+
+    def test_detects_network(self):
+        assert _detect_topic("Tell me about my network") == "network"
+
+    def test_detects_targeting(self):
+        assert _detect_topic("Which companies should I target?") == "targeting"
+
+    def test_detects_credits(self):
+        assert _detect_topic("How do I use my credits?") == "credits"
+
+    def test_detects_getting_started(self):
+        assert _detect_topic("How do I get started?") == "getting_started"
+
+    def test_detects_pipeline(self):
+        assert _detect_topic("How's my pipeline looking?") == "pipeline"
+
+    def test_returns_none_for_unknown(self):
+        assert _detect_topic("What's the weather like?") is None
+
+
+# ---------------------------------------------------------------------------
+# TestAntiRepetition (P4)
+# ---------------------------------------------------------------------------
+
+
+class TestAntiRepetition:
+    def _base_context(self) -> dict:
+        return {
+            "user": {"name": "Test", "title": None, "company": None, "location": None},
+            "preferences": {"target_role": "SWE"},
+            "network": {
+                "total_contacts": 50,
+                "top_companies": [{"company": "Google", "count": 10}],
+            },
+            "pipeline": {
+                "status_counts": {"applied": 2},
+                "follow_ups_needed": 1,
+                "total": 2,
+            },
+            "recent_searches": [],
+            "credits": 100,
+            "market": None,
+        }
+
+    def test_fresh_topic_response(self):
+        text, topic = _mock_chat_response(
+            "Tell me about my network", self._base_context(), recent_topics=set()
+        )
+        assert "50" in text
+        assert topic == "network"
+
+    def test_repeated_topic_gives_varied_response(self):
+        fresh_text, _ = _mock_chat_response(
+            "Tell me about my network", self._base_context(), recent_topics=set()
+        )
+        varied_text, _ = _mock_chat_response(
+            "Tell me about my network", self._base_context(), recent_topics={"network"}
+        )
+        # Responses should differ when topic was recently discussed
+        assert fresh_text != varied_text
+
+    def test_credits_anti_repetition(self):
+        fresh, _ = _mock_chat_response(
+            "How do I use credits?", self._base_context(), recent_topics=set()
+        )
+        varied, _ = _mock_chat_response(
+            "How do I use credits?", self._base_context(), recent_topics={"credits"}
+        )
+        assert fresh != varied
+
+    def test_targeting_anti_repetition(self):
+        fresh, _ = _mock_chat_response(
+            "Which companies should I target?", self._base_context(), recent_topics=set()
+        )
+        varied, _ = _mock_chat_response(
+            "Which companies should I target?", self._base_context(), recent_topics={"targeting"}
+        )
+        assert fresh != varied
+
+    def test_follow_ups_anti_repetition(self):
+        fresh, _ = _mock_chat_response(
+            "What follow-ups do I have?", self._base_context(), recent_topics=set()
+        )
+        varied, _ = _mock_chat_response(
+            "What follow-ups do I have?", self._base_context(), recent_topics={"follow_ups"}
+        )
+        assert fresh != varied
+
+    def test_getting_started_anti_repetition(self):
+        fresh, _ = _mock_chat_response(
+            "How do I get started?", self._base_context(), recent_topics=set()
+        )
+        varied, _ = _mock_chat_response(
+            "How do I get started?", self._base_context(), recent_topics={"getting_started"}
+        )
+        assert fresh != varied
+
+    def test_pipeline_anti_repetition(self):
+        fresh, _ = _mock_chat_response(
+            "How's my pipeline?", self._base_context(), recent_topics=set()
+        )
+        varied, _ = _mock_chat_response(
+            "How's my pipeline?", self._base_context(), recent_topics={"pipeline"}
+        )
+        assert fresh != varied
+
+    def test_fallback_returns_none_topic(self):
+        text, topic = _mock_chat_response(
+            "What's the weather?", self._base_context()
+        )
+        assert topic is None
+        assert len(text) > 20
+
+
+# ---------------------------------------------------------------------------
+# TestSessionTracking (integration)
+# ---------------------------------------------------------------------------
+
+
+class TestSessionTracking:
+    async def test_briefing_includes_session_fields(
+        self, client: AsyncClient, auth_headers: dict
+    ):
+        """Briefing response should include session_number and coaching_stage."""
+        resp = await client.get("/api/v1/coach/briefing", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert "session_number" in data
+        assert "coaching_stage" in data
+        assert data["session_number"] >= 1
+        assert data["coaching_stage"] in (
+            STAGE_ONBOARDING,
+            STAGE_NETWORK_BUILDING,
+            STAGE_ACTIVE_SEARCH,
+            STAGE_STALLED,
+        )
