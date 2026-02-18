@@ -23,16 +23,28 @@ _COMMANDS: dict[str, list[str]] = {
     "cos-daily": ["python3", "-m", "agents.orchestrator", "--cos-daily"],
     "cos-weekly": ["python3", "-m", "agents.orchestrator", "--cos-weekly"],
     "engineering": ["python3", "-m", "agents.orchestrator", "--all"],
+    "engineering-skip-tests": ["python3", "-m", "agents.orchestrator", "--all", "--skip-tests"],
+    "engineering-weekly": ["python3", "-m", "agents.orchestrator", "--weekly"],
     "data": ["python3", "-m", "data_team.orchestrator", "--all"],
+    "data-weekly": ["python3", "-m", "data_team.orchestrator", "--weekly"],
+    "data-monthly": ["python3", "-m", "data_team.orchestrator", "--monthly"],
     "product": ["python3", "-m", "product_team.orchestrator", "--all"],
+    "product-weekly": ["python3", "-m", "product_team.orchestrator", "--weekly"],
+    "product-monthly": ["python3", "-m", "product_team.orchestrator", "--monthly"],
     "ops": ["python3", "-m", "ops_team.orchestrator", "--all"],
+    "ops-weekly": ["python3", "-m", "ops_team.orchestrator", "--weekly"],
+    "ops-monthly": ["python3", "-m", "ops_team.orchestrator", "--monthly"],
     "finance": ["python3", "-m", "finance_team.orchestrator", "--all"],
+    "finance-weekly": ["python3", "-m", "finance_team.orchestrator", "--weekly"],
+    "finance-monthly": ["python3", "-m", "finance_team.orchestrator", "--monthly"],
     "gtm": ["python3", "-m", "gtm_team.orchestrator", "--all"],
+    "gtm-weekly": ["python3", "-m", "gtm_team.orchestrator", "--weekly"],
+    "gtm-monthly": ["python3", "-m", "gtm_team.orchestrator", "--monthly"],
 }
 
 # Full scan runs all teams then CoS — one trigger does everything
 _FULL_SCAN_ORDER = [
-    "engineering",
+    "engineering-skip-tests",
     "data",
     "product",
     "ops",
@@ -41,16 +53,52 @@ _FULL_SCAN_ORDER = [
     "cos-daily",
 ]
 
+# Weekly: team scans → team weekly briefs → CoS weekly
+_WEEKLY_SCAN_ORDER = [
+    "engineering-skip-tests",
+    "data",
+    "product",
+    "ops",
+    "finance",
+    "gtm",
+    "engineering-weekly",
+    "data-weekly",
+    "product-weekly",
+    "ops-weekly",
+    "finance-weekly",
+    "gtm-weekly",
+    "cos-weekly",
+]
+
+# Monthly: team scans → team monthly briefs → CoS weekly (as synthesis)
+_MONTHLY_SCAN_ORDER = [
+    "engineering-skip-tests",
+    "data",
+    "product",
+    "ops",
+    "finance",
+    "gtm",
+    "data-monthly",
+    "product-monthly",
+    "ops-monthly",
+    "finance-monthly",
+    "gtm-monthly",
+    "cos-weekly",
+]
+
 RunMode = Literal[
     "cos-daily",
     "cos-weekly",
     "engineering",
+    "engineering-skip-tests",
     "data",
     "product",
     "ops",
     "finance",
     "gtm",
     "full-scan",
+    "full-scan-weekly",
+    "full-scan-monthly",
 ]
 
 # Track active/recent runs for status endpoint
@@ -131,6 +179,50 @@ def _run_full_scan() -> None:
     _log(f"[full-scan] Done in {elapsed:.1f}s — {completed}/{len(results)} succeeded")
 
 
+def _run_full_scan_weekly() -> None:
+    """Run all teams, their weekly briefs, then CoS weekly."""
+    _log(
+        f"[full-scan-weekly] Starting ({len(_WEEKLY_SCAN_ORDER)} steps: {' → '.join(_WEEKLY_SCAN_ORDER)})"
+    )
+    start = time.monotonic()
+    results = []
+
+    for i, mode in enumerate(_WEEKLY_SCAN_ORDER, 1):
+        _log(f"[full-scan-weekly] Step {i}/{len(_WEEKLY_SCAN_ORDER)}: {mode}")
+        result = _run_agent(mode)
+        results.append(result)
+        if result["status"] != "completed":
+            _log(f"[full-scan-weekly] {mode} → {result['status']} — continuing")
+
+    elapsed = time.monotonic() - start
+    completed = sum(1 for r in results if r["status"] == "completed")
+    _log(
+        f"[full-scan-weekly] Done in {elapsed:.1f}s — {completed}/{len(results)} succeeded"
+    )
+
+
+def _run_full_scan_monthly() -> None:
+    """Run all teams, their monthly briefs, then CoS weekly synthesis."""
+    _log(
+        f"[full-scan-monthly] Starting ({len(_MONTHLY_SCAN_ORDER)} steps: {' → '.join(_MONTHLY_SCAN_ORDER)})"
+    )
+    start = time.monotonic()
+    results = []
+
+    for i, mode in enumerate(_MONTHLY_SCAN_ORDER, 1):
+        _log(f"[full-scan-monthly] Step {i}/{len(_MONTHLY_SCAN_ORDER)}: {mode}")
+        result = _run_agent(mode)
+        results.append(result)
+        if result["status"] != "completed":
+            _log(f"[full-scan-monthly] {mode} → {result['status']} — continuing")
+
+    elapsed = time.monotonic() - start
+    completed = sum(1 for r in results if r["status"] == "completed")
+    _log(
+        f"[full-scan-monthly] Done in {elapsed:.1f}s — {completed}/{len(results)} succeeded"
+    )
+
+
 def _verify_secret(x_agent_secret: str) -> None:
     """Verify the agent run secret."""
     if not settings.AGENT_RUN_SECRET:
@@ -151,6 +243,8 @@ async def run_agents(
         - engineering/data/product/ops/finance/gtm: run one team scan
         - cos-daily/cos-weekly: synthesize existing reports into founder brief
         - full-scan: run ALL teams then CoS daily (one trigger does everything)
+        - full-scan-weekly: all teams + weekly briefs + CoS weekly
+        - full-scan-monthly: all teams + monthly briefs + CoS weekly synthesis
 
     Protected by AGENT_RUN_SECRET header. Returns immediately.
     """
@@ -158,6 +252,10 @@ async def run_agents(
 
     if mode == "full-scan":
         background_tasks.add_task(_run_full_scan)
+    elif mode == "full-scan-weekly":
+        background_tasks.add_task(_run_full_scan_weekly)
+    elif mode == "full-scan-monthly":
+        background_tasks.add_task(_run_full_scan_monthly)
     else:
         background_tasks.add_task(_run_agent, mode)
 
