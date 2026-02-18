@@ -670,7 +670,12 @@ async def get_sharing_preferences(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Get current sharing preferences."""
+    """Get current sharing preferences.
+
+    For NH/both users who went through onboarding but never had a row
+    created (e.g. unchecked opt-in checkbox), auto-creates a default
+    row so the onboarding checklist can mark the step as configured.
+    """
     result = await db.execute(
         select(NetworkSharingPreferences).where(
             NetworkSharingPreferences.user_id == current_user.id
@@ -679,6 +684,22 @@ async def get_sharing_preferences(
     prefs = result.scalar_one_or_none()
 
     if prefs is None:
+        # For NH/both users, lazily create a default row so checklist
+        # recognises sharing as configured after first visit to settings.
+        if current_user.user_type in ("network_holder", "both"):
+            prefs = NetworkSharingPreferences(
+                user_id=current_user.id,
+                opt_in_marketplace=False,
+            )
+            db.add(prefs)
+            await db.commit()
+            await db.refresh(prefs)
+            data = NetworkSharingPreferencesResponse.model_validate(
+                prefs
+            ).model_dump(mode="json")
+            data["is_configured"] = True
+            return {"data": data, "meta": {}}
+
         return {
             "data": {
                 "opt_in_marketplace": False,

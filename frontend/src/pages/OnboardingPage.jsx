@@ -280,8 +280,10 @@ export default function OnboardingPage() {
     try {
       const res = await contactsApi.upload(file);
       setUploadResult(res.data);
-      if (optInMarketplace) {
-        await marketplace.updateSharingPrefs({ opt_in_marketplace: true });
+      // Always save sharing prefs for NH/both users so the checklist
+      // can detect that onboarding sharing was completed.
+      if (isHolder) {
+        await marketplace.updateSharingPrefs({ opt_in_marketplace: optInMarketplace });
       }
     } catch (err) {
       setError(err.message);
