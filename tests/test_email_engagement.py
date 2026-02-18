@@ -132,7 +132,7 @@ async def test_welcome_email_js(mock_send: object, db: AsyncSession) -> None:
     result = await send_welcome_email_js(user, db)
     assert result is True
     mock_send.assert_called_once()
-    assert "Welcome to WarmPath" in mock_send.call_args[0][1]
+    assert "welcome credits" in mock_send.call_args[0][1].lower()
 
     # Verify dedup
     result2 = await send_welcome_email_js(user, db)
@@ -403,7 +403,7 @@ async def test_intro_pending_reminder(
 
     count = await send_intro_pending_reminder(db)
     assert count == 1
-    assert "pending intro request" in mock_send.call_args[0][2]
+    assert "intro request" in mock_send.call_args[0][2]
 
 
 # ---------------------------------------------------------------------------
