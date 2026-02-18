@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { marketplace } from '../api/client';
+import { trackEvent } from '../utils/analytics';
 
 export default function RequestIntroModal({ listing, creditBalance, onClose, onSuccess }) {
   const [message, setMessage] = useState('');
@@ -18,6 +19,7 @@ export default function RequestIntroModal({ listing, creditBalance, onClose, onS
         message_to_holder: message || null,
         profile_visibility: visibility,
       });
+      trackEvent('intro_requested');
       onSuccess();
     } catch (err) {
       setError(err.message);

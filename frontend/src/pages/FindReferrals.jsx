@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { search as searchApi, credits as creditsApi, preferences as prefsApi } from '../api/client';
 import TagInput from '../components/TagInput';
+import { trackEvent } from '../utils/analytics';
 
 function ShimmerCard() {
   return (
@@ -99,6 +100,7 @@ export default function FindReferrals() {
     setError('');
     try {
       const res = await searchApi.smart({ company_names: companies, scope });
+      trackEvent('search_performed');
       navigate(`/referrals/${res.data.id}`);
     } catch (err) {
       setError(err.message);

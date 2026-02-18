@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { auth as authApi, referrals as referralsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import PasswordStrength from '../components/PasswordStrength';
+import { trackEvent } from '../utils/analytics';
 
 export default function AuthPage() {
   const { login, signup } = useAuth();
@@ -30,6 +31,7 @@ export default function AuthPage() {
     try {
       if (isSignup) {
         await signup({ email: form.email, password: form.password, full_name: form.full_name });
+        trackEvent('signup_completed');
         // Redeem referral code after signup (non-blocking)
         if (form.referral_code.trim()) {
           referralsApi.redeem({ code: form.referral_code.trim() }).catch(() => {});
