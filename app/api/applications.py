@@ -331,7 +331,8 @@ async def get_application_stats(
     responded_count = int(agg_row.responded_count or 0)
     interview_count = int(agg_row.interview_count or 0)
 
-    # Avg days to response — compute in Python for SQLite compatibility
+    # Avg days to response — computed in Python (SQLite/Postgres portable; no
+    # func.extract('epoch', ...) in SQL)
     resp_query = select(
         Application.sent_at, Application.responded_at
     ).where(
