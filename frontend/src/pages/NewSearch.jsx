@@ -4,6 +4,7 @@ import { search as searchApi } from '../api/client';
 import TagInput from '../components/TagInput';
 import ScoreExplainer from '../components/ScoreExplainer';
 import { MATCH_TIERS } from '../utils/scores';
+import { trackEvent } from '../utils/analytics';
 
 export default function NewSearch() {
   const navigate = useNavigate();
@@ -42,6 +43,7 @@ export default function NewSearch() {
 
       // Immediately run it
       await searchApi.run(searchId);
+      trackEvent('search_performed');
 
       // Navigate to results
       navigate(`/search/${searchId}`);

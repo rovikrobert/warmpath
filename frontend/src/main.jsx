@@ -6,12 +6,14 @@ import { AuthProvider } from './context/AuthContext';
 import App from './App.jsx';
 import './index.css';
 
-// Initialize PostHog (no-op when env vars are not set)
-const phKey = import.meta.env.VITE_POSTHOG_KEY;
-const phHost = import.meta.env.VITE_POSTHOG_HOST;
-if (phKey && phHost) {
-  posthog.init(phKey, {
-    api_host: phHost,
+// Initialize PostHog (no-op when VITE_POSTHOG_KEY is not set)
+const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY;
+const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || 'https://app.posthog.com';
+
+if (POSTHOG_KEY) {
+  posthog.init(POSTHOG_KEY, {
+    api_host: POSTHOG_HOST,
+    autocapture: true,
     capture_pageview: true,
     capture_pageleave: true,
   });

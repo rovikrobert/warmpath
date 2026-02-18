@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { auth as authApi, setAuthFailureHandler, setTokenGetter, setTokenSetter } from '../api/client';
+import { identifyUser, resetAnalytics } from '../utils/analytics';
 
 const AuthContext = createContext(null);
 
@@ -58,6 +59,7 @@ export function AuthProvider({ children }) {
     if (token && !user) {
       authApi.me().then(res => {
         setUser(res.data);
+        identifyUser(res.data.id, { email: res.data.email });
         setLoading(false);
       }).catch(() => {
         setToken(null);
@@ -81,6 +83,7 @@ export function AuthProvider({ children }) {
     setTokenGetter(() => newToken);
     const me = await authApi.me();
     setUser(me.data);
+    identifyUser(me.data.id, { email: me.data.email });
     setJustSignedUp(false);
     return me.data;
   }, []);
@@ -92,6 +95,7 @@ export function AuthProvider({ children }) {
     setTokenGetter(() => newToken);
     const me = await authApi.me();
     setUser(me.data);
+    identifyUser(me.data.id, { email: me.data.email });
     setJustSignedUp(true);
     return me.data;
   }, []);
@@ -102,6 +106,7 @@ export function AuthProvider({ children }) {
     setTokenGetter(() => newToken);
     const me = await authApi.me();
     setUser(me.data);
+    identifyUser(me.data.id, { email: me.data.email });
     setJustSignedUp(tokenData.is_new_user);
     return me.data;
   }, []);
@@ -110,6 +115,7 @@ export function AuthProvider({ children }) {
     setToken(null);
     setUser(null);
     setJustSignedUp(false);
+    resetAnalytics();
   }, []);
 
   return (

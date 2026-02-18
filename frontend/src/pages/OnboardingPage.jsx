@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { auth as authApi, contacts as contactsApi, preferences, marketplace } from '../api/client';
 import TagInput from '../components/TagInput';
+import { trackEvent } from '../utils/analytics';
 
 function ResumePreviewModal({ data, onApply, onClose }) {
   if (!data) return null;
@@ -280,6 +281,7 @@ export default function OnboardingPage() {
     try {
       const res = await contactsApi.upload(file);
       setUploadResult(res.data);
+      trackEvent('csv_uploaded', { contact_count: res.data?.processed_count ?? res.data?.row_count ?? 0 });
       // Always save sharing prefs for NH/both users so the checklist
       // can detect that onboarding sharing was completed.
       if (isHolder) {
