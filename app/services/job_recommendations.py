@@ -234,12 +234,13 @@ async def get_recommendations(
 
     cache_hits = len(cached_results)
 
-    # Phase 2: Match cached results immediately (no external I/O)
-    recommendations: list[dict] = []
-    for key, jobs in cached_results.items():
-        rec = await _match_and_build(fetcher, key, jobs, target_role, target_seniority)
-        if rec:
-            recommendations.append(rec)
+    # Phase 2: Match cached results in parallel (no DB access needed)
+    match_tasks = [
+        _match_and_build(fetcher, key, jobs, target_role, target_seniority)
+        for key, jobs in cached_results.items()
+    ]
+    match_results = await asyncio.gather(*match_tasks)
+    recommendations = [r for r in match_results if r is not None]
 
     # Phase 3: Only fetch fresh data if we don't have enough results.
     # Use a tight timeout so we never block longer than _FETCH_TIMEOUT.
@@ -259,14 +260,19 @@ async def get_recommendations(
                 tasks.append(_fetch_jobs(key, boards, fetcher, semaphore))
 
             results = await asyncio.gather(*tasks)
+
+            # Sequential: write to cache (needs DB session)
             for key, jobs in zip(to_fetch, results):
                 if jobs:
                     await set_cached_jobs(key, jobs, db)
-                rec = await _match_and_build(
-                    fetcher, key, jobs, target_role, target_seniority
-                )
-                if rec:
-                    batch_recs.append(rec)
+
+            # Parallel: match all fetched results (no DB needed)
+            match_tasks = [
+                _match_and_build(fetcher, key, jobs, target_role, target_seniority)
+                for key, jobs in zip(to_fetch, results)
+                if jobs
+            ]
+            batch_recs = [r for r in await asyncio.gather(*match_tasks) if r]
             return batch_recs
 
         try:
@@ -322,12 +328,9 @@ async def warm_job_cache_for_user(user_id: str) -> None:
             locations = prefs.target_locations if prefs.target_locations else None
             candidates = companies_for_locations(locations)
 
-            # Only warm uncached companies
-            to_warm: list[str] = []
-            for key in candidates:
-                cached = await get_cached_jobs(key, db)
-                if cached is None:
-                    to_warm.append(key)
+            # Only warm uncached companies (single batch query)
+            cached = await get_cached_jobs_batch(candidates, db)
+            to_warm = [k for k in candidates if k not in cached]
 
             if not to_warm:
                 logger.debug("Job cache already warm for user %s", user_id)
