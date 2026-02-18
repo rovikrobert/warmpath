@@ -345,7 +345,9 @@ async def get_search_results(
     all_relevance: list[float] = []
     all_warm: list[float] = []
     score_dist = {"90-100": 0, "70-89": 0, "50-69": 0, "20-49": 0}
-    # Pre-computed averages from SQL (set in no-company path only)
+    # Pre-computed averages from SQL (no-company path only). We never fabricate
+    # per-row arrays — only avg_relevance/avg_warm and score_distribution are
+    # exposed; no percentiles/stddev from raw values.
     avg_rel: float | None = None
     avg_warm: float | None = None
 
@@ -484,10 +486,10 @@ async def get_search_results(
             "shown": len(data),
             "avg_relevance": round(sum(all_relevance) / len(all_relevance), 1)
             if all_relevance
-            else round(avg_rel, 1) if avg_rel else 0,
+            else (round(avg_rel, 1) if avg_rel is not None else 0),
             "avg_warm": round(sum(all_warm) / len(all_warm), 1)
             if all_warm
-            else round(avg_warm, 1) if avg_warm else 0,
+            else (round(avg_warm, 1) if avg_warm is not None else 0),
             "score_distribution": score_dist,
         },
     }
