@@ -164,6 +164,17 @@ async def signup(
     # Send verification email
     await send_verification_email(user, db)
 
+    # Send welcome email (JS or NH variant)
+    from app.services.email_engagement import (
+        send_welcome_email_js,
+        send_welcome_email_nh,
+    )
+
+    if getattr(body, "user_type", "job_seeker") in ("network_holder",):
+        await send_welcome_email_nh(user, db)
+    else:
+        await send_welcome_email_js(user, db)
+
     # Track funnel step
     from app.models.enrichment import UsageLog
 
