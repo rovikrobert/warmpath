@@ -682,14 +682,17 @@ async def get_sharing_preferences(
                 "category_filters": None,
                 "excluded_contact_ids": None,
                 "is_paused": False,
+                "is_configured": False,
             },
             "meta": {},
         }
 
+    data = NetworkSharingPreferencesResponse.model_validate(prefs).model_dump(
+        mode="json"
+    )
+    data["is_configured"] = True
     return {
-        "data": NetworkSharingPreferencesResponse.model_validate(prefs).model_dump(
-            mode="json"
-        ),
+        "data": data,
         "meta": {},
     }
 
