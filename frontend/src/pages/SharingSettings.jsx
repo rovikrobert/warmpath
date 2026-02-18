@@ -116,8 +116,8 @@ export default function SharingSettings() {
             <h2 className="text-base font-semibold text-slate-900">Share my network on the marketplace</h2>
             <p className="text-sm text-slate-500">
               {prefs?.opt_in_marketplace
-                ? 'Your contacts are visible (anonymized) to job seekers.'
-                : 'Enable sharing to help others get referred and earn credits.'}
+                ? 'Your contacts are visible (anonymized) to job seekers. When a hire happens, the referral bonus ($2-10K) goes to you.'
+                : 'Enable sharing to capture referral bonuses ($2-10K per hire) and earn credits.'}
             </p>
           </div>
           <button

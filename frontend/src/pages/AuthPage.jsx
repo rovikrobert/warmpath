@@ -85,6 +85,9 @@ export default function AuthPage() {
             Employee referrals convert at 40% vs 1% for cold applications.
             Stop applying into the black hole.
           </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Already employed? Share your network and capture $2-10K referral bonuses.
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} aria-label={isSignup ? 'Sign up form' : 'Log in form'} className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">

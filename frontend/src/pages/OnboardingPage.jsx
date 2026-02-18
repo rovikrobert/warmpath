@@ -48,12 +48,13 @@ const EMPTY_WORK = { company: '', title: '', start_date: '', end_date: '', is_cu
 
 const SENIORITY_OPTIONS = ['Staff / Principal', 'Manager', 'Director', 'VP', 'C-Suite'];
 
-const TOTAL_STEPS = 8;
+// Steps vary by user type — NHs skip job prefs (step 1), get bonus pitch instead
+const TOTAL_STEPS = 9;
 
-// Privacy step data (steps 3-6)
+// Privacy step data (steps 4-7)
 const PRIVACY_STEPS = [
   {
-    step: 3,
+    step: 4,
     title: 'Your Data Stays Private',
     text: 'Everything you upload lives in your Private Vault \u2014 encrypted and visible only to you. Your full contact data is never shared with other users.',
     icon: (
@@ -65,7 +66,7 @@ const PRIVACY_STEPS = [
     borderColor: 'border-amber-200',
   },
   {
-    step: 4,
+    step: 5,
     title: 'Contacts Are Protected',
     text: 'If you share contacts on the marketplace, only anonymised info is shown (company + role level). Names and emails are never revealed without your explicit approval.',
     icon: (
@@ -77,7 +78,7 @@ const PRIVACY_STEPS = [
     borderColor: 'border-green-200',
   },
   {
-    step: 5,
+    step: 6,
     title: "Your Employer Can't See You",
     text: 'Your job search activity is completely invisible. No employer \u2014 including yours \u2014 can discover you\'re looking for new opportunities.',
     icon: (
@@ -89,7 +90,7 @@ const PRIVACY_STEPS = [
     borderColor: 'border-purple-200',
   },
   {
-    step: 6,
+    step: 7,
     title: 'Anyone Can Opt Out',
     text: 'Any person can request removal from WarmPath at any time, even if they don\'t have an account. We maintain a permanent suppression list.',
     icon: (
@@ -239,7 +240,7 @@ export default function OnboardingPage() {
     }
   };
 
-  // Step 2 -> 3 (privacy steps)
+  // Step 2 -> 3 (NH bonus pitch) or 4 (privacy for job seekers)
   const handleUserType = async () => {
     if (!userType) return;
     setSaving(true);
@@ -247,7 +248,8 @@ export default function OnboardingPage() {
     try {
       await authApi.updateUserType(userType);
       await refreshUser();
-      setStep(3);
+      // NHs and "both" see the referral bonus pitch; pure job seekers skip to privacy
+      setStep(userType === 'job_seeker' ? 4 : 3);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -312,16 +314,20 @@ export default function OnboardingPage() {
 
         {/* Progress — clickable segments to jump back */}
         <div className="mb-6 flex items-center gap-1" role="progressbar" aria-valuenow={step} aria-valuemin={1} aria-valuemax={TOTAL_STEPS} aria-label={`Onboarding step ${step} of ${TOTAL_STEPS}`}>
-          {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
-            <button
-              key={s}
-              type="button"
-              aria-label={`Go to step ${s}`}
-              onClick={() => { if (s < step) { setError(''); setStep(s); } }}
-              disabled={s >= step}
-              className={`h-1.5 flex-1 rounded-full transition ${s <= step ? 'bg-amber-500' : 'bg-slate-200'} ${s < step ? 'cursor-pointer hover:bg-amber-400' : ''}`}
-            />
-          ))}
+          {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => {
+            // Job seekers skip step 3 (NH bonus pitch) — hide that segment
+            if (s === 3 && userType === 'job_seeker') return null;
+            return (
+              <button
+                key={s}
+                type="button"
+                aria-label={`Go to step ${s}`}
+                onClick={() => { if (s < step) { setError(''); setStep(s); } }}
+                disabled={s >= step}
+                className={`h-1.5 flex-1 rounded-full transition ${s <= step ? 'bg-amber-500' : 'bg-slate-200'} ${s < step ? 'cursor-pointer hover:bg-amber-400' : ''}`}
+              />
+            );
+          })}
         </div>
 
         <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
@@ -396,7 +402,7 @@ export default function OnboardingPage() {
               <div className="space-y-3">
                 {[
                   { value: 'job_seeker', title: "I'm job hunting", desc: 'Search networks, find referral paths, and get introduced to people at your target companies.' },
-                  { value: 'network_holder', title: 'I want to help others get referred', desc: 'Share your network anonymously and earn credits + referral bonuses when your contacts hire someone you referred.' },
+                  { value: 'network_holder', title: 'I want to help others get referred', desc: 'Share your network anonymously. Your employer pays $2-10K per referral hire \u2014 we send you pre-qualified candidates so you can capture those bonuses.' },
                   { value: 'both', title: 'Both!', desc: 'Search for referrals AND share your network. Most members choose this.' },
                 ].map((opt) => (
                   <button
@@ -432,7 +438,67 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Steps 3-6: Privacy Explainer */}
+          {/* Step 3: Referral Bonus Pitch (NH / both only) */}
+          {step === 3 && (
+            <div className="space-y-5">
+              <div className="text-center">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-400">Why share your network</p>
+                <h2 className="text-lg font-semibold text-slate-900">You're sitting on unclaimed referral bonuses</h2>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-100">
+                    <svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">$2,000 - $10,000 per successful hire</p>
+                    <p className="mt-0.5 text-sm text-slate-600">Most employers pay referral bonuses when you help them hire. WarmPath sends you pre-qualified candidates so you can capture those bonuses.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                    <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">Build your connector reputation</p>
+                    <p className="mt-0.5 text-sm text-slate-600">Every successful intro builds your public connector score. Top connectors get priority visibility and early access to high-quality candidates.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 rounded-xl border border-purple-200 bg-purple-50 p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-100">
+                    <svg className="h-5 w-5 text-purple-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">You stay in control</p>
+                    <p className="mt-0.5 text-sm text-slate-600">Only anonymized info is shown. You review every request and approve each intro personally. Nothing happens without your consent.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => { setError(''); setStep(2); }} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                  Back
+                </button>
+                <button
+                  onClick={() => setStep(4)}
+                  className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Steps 4-7: Privacy Explainer */}
           {privacyStep && (
             <div className="space-y-5">
               <div className="text-center">
@@ -448,7 +514,7 @@ export default function OnboardingPage() {
               </div>
 
               {/* Show privacy policy link on last privacy step */}
-              {step === 6 && (
+              {step === 7 && (
                 <p className="text-center text-sm text-slate-500">
                   Learn more in our{' '}
                   <Link to="/privacy" className="font-medium text-amber-600 hover:text-amber-700 hover:underline">
@@ -458,7 +524,11 @@ export default function OnboardingPage() {
               )}
 
               <div className="flex gap-3">
-                <button onClick={() => { setError(''); setStep(step - 1); }} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                <button onClick={() => {
+                  setError('');
+                  // From step 4, job seekers go back to step 2 (skip bonus pitch)
+                  setStep(step === 4 && userType === 'job_seeker' ? 2 : step - 1);
+                }} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
                   Back
                 </button>
                 <button
@@ -471,8 +541,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 7: Upload CSV */}
-          {step === 7 && !uploadResult && (
+          {/* Step 8: Upload CSV */}
+          {step === 8 && !uploadResult && (
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Upload your LinkedIn connections</h2>
@@ -538,7 +608,7 @@ export default function OnboardingPage() {
               )}
 
               <div className="flex gap-3">
-                <button onClick={() => { setError(''); setStep(6); }} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                <button onClick={() => { setError(''); setStep(7); }} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
                   Back
                 </button>
                 <button onClick={finish} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
@@ -551,8 +621,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 7 done — prompt for work history */}
-          {step === 7 && uploadResult && (
+          {/* Step 8 done — prompt for work history */}
+          {step === 8 && uploadResult && (
             <div className="space-y-4 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
                 <span className="text-xl text-green-600">&#10003;</span>
@@ -564,21 +634,21 @@ export default function OnboardingPage() {
                 Add your work history to improve referral matching — contacts at your former companies get boosted scores.
               </p>
               <div className="flex gap-3">
-                <button onClick={() => { setError(''); setStep(6); }} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                <button onClick={() => { setError(''); setStep(7); }} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
                   Back
                 </button>
                 <button onClick={finish} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
                   Skip for now
                 </button>
-                <button onClick={() => setStep(8)} className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600">
+                <button onClick={() => setStep(9)} className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600">
                   Add Work History
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 8: Work History */}
-          {step === 8 && (
+          {/* Step 9: Work History */}
+          {step === 9 && (
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Your work history</h2>
@@ -700,7 +770,7 @@ export default function OnboardingPage() {
               {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-50 p-2 text-sm text-red-600">{error}</p>}
 
               <div className="flex gap-3">
-                <button onClick={() => { setError(''); setStep(7); }} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                <button onClick={() => { setError(''); setStep(8); }} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
                   Back
                 </button>
                 <button onClick={finish} className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
