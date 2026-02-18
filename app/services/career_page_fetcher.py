@@ -13,7 +13,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-HTTPX_TIMEOUT = 15.0
+HTTPX_TIMEOUT = 3.0
 
 # Known career page URLs for companies not on Greenhouse/Lever.
 # Values are the base careers URL to scrape.
