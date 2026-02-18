@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { contacts as contactsApi, companies as companiesApi } from '../api/client';
+import MatchBadge from '../components/MatchBadge';
 
 const RELATIONSHIP_TYPES = [
   { value: '', label: 'All types' },
@@ -383,8 +384,10 @@ function ContactDetail({ contact, onUpdate }) {
           <p className="text-slate-900">{contact.email || '-'}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500">Warm Score</p>
-          <p className="text-slate-900">{contact.warm_score ?? '-'}</p>
+          <p className="text-xs text-slate-500">Connection Strength</p>
+          <p className="text-slate-900">
+            {contact.warm_score != null ? <MatchBadge score={contact.warm_score} type="warm" showScore /> : '-'}
+          </p>
         </div>
         <div>
           <label htmlFor={`rel-type-${contact.id}`} className="mb-1 text-xs text-slate-500">Relationship Type</label>
@@ -567,11 +570,7 @@ export default function ContactsPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   {c.warm_score != null && (
-                    <span className={`text-xs font-medium ${
-                      c.warm_score >= 70 ? 'text-green-600' : c.warm_score >= 40 ? 'text-amber-600' : 'text-slate-400'
-                    }`}>
-                      {c.warm_score}
-                    </span>
+                    <MatchBadge score={c.warm_score} type="warm" />
                   )}
                   <span className="text-xs text-slate-400">{expandedId === c.id ? '\u25B2' : '\u25BC'}</span>
                 </div>

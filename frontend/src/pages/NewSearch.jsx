@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { search as searchApi } from '../api/client';
 import TagInput from '../components/TagInput';
+import ScoreExplainer from '../components/ScoreExplainer';
+import { MATCH_TIERS } from '../utils/scores';
 
 export default function NewSearch() {
   const navigate = useNavigate();
@@ -124,25 +126,33 @@ export default function NewSearch() {
 
         <div>
           <label htmlFor="search-min-score" className="mb-1 block text-sm font-medium text-slate-700">
-            Minimum Score: {form.min_score}
+            Minimum Match Quality
+            <ScoreExplainer
+              title="Match Quality"
+              body="Only show contacts that meet this minimum combined score (relevance + warmth). Lower values show more results."
+              tiers={MATCH_TIERS}
+            />
           </label>
-          <input
-            id="search-min-score"
-            type="range"
-            min="0"
-            max="100"
-            step="5"
-            value={form.min_score}
-            onChange={(e) => setForm({ ...form, min_score: Number(e.target.value) })}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={form.min_score}
-            aria-label={`Minimum score: ${form.min_score}`}
-            className="w-full accent-amber-500"
-          />
-          <div className="flex justify-between text-xs text-slate-400">
-            <span>0 — Include all</span>
-            <span>100 — Only perfect matches</span>
+          <div className="flex items-center gap-3">
+            {[
+              { value: 0, label: 'Show all' },
+              { value: 40, label: 'Good+' },
+              { value: 60, label: 'Strong+' },
+              { value: 80, label: 'Excellent' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setForm({ ...form, min_score: opt.value })}
+                className={`rounded-lg border-2 px-3 py-1.5 text-xs font-medium transition ${
+                  form.min_score === opt.value
+                    ? 'border-amber-500 bg-amber-50 text-amber-700'
+                    : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
 

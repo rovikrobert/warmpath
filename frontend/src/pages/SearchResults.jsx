@@ -1,19 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { search as searchApi, matches as matchesApi } from '../api/client';
-
-function ScoreBadge({ score, max = 100 }) {
-  const pct = (score / max) * 100;
-  let color = 'bg-slate-200 text-slate-700';
-  if (pct >= 80) color = 'bg-green-100 text-green-700';
-  else if (pct >= 60) color = 'bg-amber-100 text-amber-700';
-  else if (pct >= 40) color = 'bg-orange-100 text-orange-700';
-  return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>
-      {score}
-    </span>
-  );
-}
+import MatchBadge from '../components/MatchBadge';
+import ScoreExplainer from '../components/ScoreExplainer';
+import { MATCH_TIERS } from '../utils/scores';
 
 function IntroModal({ intro, onClose }) {
   if (!intro) return null;
@@ -119,37 +109,31 @@ export default function SearchResults() {
 
       {/* Stats summary */}
       {meta.total_matches !== undefined && (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="mb-4 grid grid-cols-3 gap-3">
           <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
             <p className="text-xs text-slate-500">Total Matches</p>
             <p className="text-lg font-bold text-slate-900">{meta.total_matches}</p>
           </div>
           <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">Avg Relevance</p>
-            <p className="text-lg font-bold text-slate-900">{meta.avg_relevance}</p>
+            <p className="text-xs text-slate-500">
+              Avg Match Strength
+              <ScoreExplainer
+                title="Match Strength"
+                body="Combines role relevance (50%) and relationship warmth (50%)."
+                tiers={MATCH_TIERS}
+              />
+            </p>
+            <p className="text-lg font-bold text-slate-900">
+              {meta.avg_relevance != null && meta.avg_warm != null
+                ? Math.round((meta.avg_relevance + meta.avg_warm) / 2)
+                : meta.avg_relevance ?? '—'}
+            </p>
           </div>
           <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">Avg Warm</p>
-            <p className="text-lg font-bold text-slate-900">{meta.avg_warm}</p>
-          </div>
-          <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200 col-span-2">
-            <p className="mb-1 text-xs text-slate-500">Score Distribution</p>
-            <div className="flex items-end gap-1 h-8">
-              {[['90-100', 'bg-green-400'], ['70-89', 'bg-amber-400'], ['50-69', 'bg-orange-400'], ['20-49', 'bg-slate-300']].map(
-                ([range, color]) => {
-                  const count = dist[range] || 0;
-                  const maxCount = Math.max(...Object.values(dist), 1);
-                  const height = Math.max((count / maxCount) * 100, 8);
-                  return (
-                    <div key={range} className="flex flex-1 flex-col items-center gap-0.5">
-                      <span className="text-[10px] text-slate-500">{count}</span>
-                      <div className={`w-full rounded-sm ${color}`} style={{ height: `${height}%` }} />
-                      <span className="text-[9px] text-slate-400">{range}</span>
-                    </div>
-                  );
-                }
-              )}
-            </div>
+            <p className="text-xs text-slate-500">Strong+ Matches</p>
+            <p className="text-lg font-bold text-green-600">
+              {(dist['90-100'] || 0) + (dist['70-89'] || 0)}
+            </p>
           </div>
         </div>
       )}
@@ -157,34 +141,22 @@ export default function SearchResults() {
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-white p-3 ring-1 ring-slate-200" role="search" aria-label="Filter search results">
         <div>
-          <label htmlFor="filter-min-relevance" className="mb-1 block text-xs text-slate-500">Min Relevance</label>
+          <label htmlFor="filter-min-relevance" className="mb-1 block text-xs text-slate-500">
+            Min Match Strength
+            <ScoreExplainer title="Match Strength" body="Filters out contacts below this combined score (relevance + warmth)." />
+          </label>
           <input
             id="filter-min-relevance"
             type="range"
-            min="0" max="100" step="5"
+            min="0" max="100" step="10"
             value={filters.min_relevance}
             onChange={(e) => setFilter('min_relevance', Number(e.target.value))}
             aria-valuenow={filters.min_relevance}
             aria-valuemin={0}
             aria-valuemax={100}
-            className="w-24 accent-amber-500"
+            className="w-28 accent-amber-500"
           />
           <span className="ml-1 text-xs text-slate-600" aria-hidden="true">{filters.min_relevance}</span>
-        </div>
-        <div>
-          <label htmlFor="filter-min-warm" className="mb-1 block text-xs text-slate-500">Min Warm</label>
-          <input
-            id="filter-min-warm"
-            type="range"
-            min="0" max="100" step="5"
-            value={filters.min_warm || 0}
-            onChange={(e) => setFilter('min_warm', Number(e.target.value) || '')}
-            aria-valuenow={filters.min_warm || 0}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            className="w-24 accent-amber-500"
-          />
-          <span className="ml-1 text-xs text-slate-600" aria-hidden="true">{filters.min_warm || 0}</span>
         </div>
         <div>
           <label htmlFor="filter-match-type" className="mb-1 block text-xs text-slate-500">Match Type</label>
@@ -229,9 +201,10 @@ export default function SearchResults() {
               <tr>
                 <th className="px-4 py-3 font-medium text-slate-600">Contact</th>
                 <th className="hidden px-4 py-3 font-medium text-slate-600 md:table-cell">Company</th>
-                <th className="px-3 py-3 font-medium text-slate-600 text-center">Relevance</th>
-                <th className="px-3 py-3 font-medium text-slate-600 text-center">Warm</th>
-                <th className="px-3 py-3 font-medium text-slate-600 text-center">Combined</th>
+                <th className="px-3 py-3 font-medium text-slate-600 text-center">
+                  Match Strength
+                  <ScoreExplainer title="Match Strength" body="Combines role relevance (50%) and relationship warmth (50%)." tiers={MATCH_TIERS} />
+                </th>
                 <th className="hidden px-3 py-3 font-medium text-slate-600 text-center sm:table-cell">Type</th>
                 <th className="px-4 py-3 font-medium text-slate-600"></th>
               </tr>
@@ -245,10 +218,8 @@ export default function SearchResults() {
                     <p className="text-xs text-slate-400 md:hidden">{r.contact_company}</p>
                   </td>
                   <td className="hidden px-4 py-3 text-slate-600 md:table-cell">{r.contact_company}</td>
-                  <td className="px-3 py-3 text-center"><ScoreBadge score={r.relevance_score} /></td>
-                  <td className="px-3 py-3 text-center"><ScoreBadge score={r.warm_score ?? 0} /></td>
                   <td className="px-3 py-3 text-center">
-                    <span className="text-sm font-semibold text-slate-900">{r.combined_score}</span>
+                    <MatchBadge score={r.combined_score} showScore />
                   </td>
                   <td className="hidden px-3 py-3 text-center sm:table-cell">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${

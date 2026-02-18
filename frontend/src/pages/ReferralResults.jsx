@@ -1,74 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { search as searchApi, credits as creditsApi, matches as matchesApi } from '../api/client';
 import RequestIntroModal from '../components/RequestIntroModal';
 import FeedbackModal from '../components/FeedbackModal';
-
-/* ------------------------------------------------------------------ */
-/* Warm Score legend + badge                                          */
-/* ------------------------------------------------------------------ */
-
-const WARM_TIERS = [
-  { min: 70, label: 'Strong', color: 'bg-green-100 text-green-700', desc: 'Recent contact, strong relationship — ideal referral path' },
-  { min: 40, label: 'Moderate', color: 'bg-amber-100 text-amber-700', desc: 'Some connection — may need a warm-up message first' },
-  { min: 0, label: 'Weak', color: 'bg-slate-100 text-slate-600', desc: 'Distant or old connection — consider building rapport before asking' },
-];
-
-function warmTier(score) {
-  return WARM_TIERS.find((t) => score >= t.min) || WARM_TIERS[2];
-}
-
-function WarmBadge({ score }) {
-  const tier = warmTier(score);
-  return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${tier.color}`}>
-      {tier.label} ({score})
-    </span>
-  );
-}
-
-function WarmScoreLegend() {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative inline-block">
-      <button
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        aria-label="What are warm scores? Toggle explanation"
-        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-500 hover:bg-slate-50"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
-        </svg>
-        What are warm scores?
-      </button>
-      {open && (
-        <div className="absolute right-0 z-10 mt-1 w-72 rounded-lg border border-slate-200 bg-white p-4 shadow-lg" role="tooltip">
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-700">Warm Score Guide</h4>
-          <p className="mb-3 text-xs text-slate-500">
-            Measures how likely this person is to respond to your referral request, based on recency of contact, relationship strength, role relevance, and tenure.
-          </p>
-          <div className="space-y-2">
-            {WARM_TIERS.map((tier) => (
-              <div key={tier.label} className="flex items-start gap-2">
-                <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${tier.color}`}>
-                  {tier.min}+
-                </span>
-                <div>
-                  <span className="text-xs font-medium text-slate-700">{tier.label}</span>
-                  <p className="text-xs text-slate-400">{tier.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button onClick={() => setOpen(false)} aria-label="Close warm score guide" className="mt-3 text-xs text-amber-600 hover:text-amber-700">
-            Got it
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
+import MatchBadge from '../components/MatchBadge';
+import ScoreExplainer from '../components/ScoreExplainer';
+import { WARM_TIERS } from '../utils/scores';
 
 /* ------------------------------------------------------------------ */
 /* Channel + likelihood labels                                        */
@@ -91,9 +28,7 @@ function channelLabel(raw) {
 }
 
 function LikelihoodBadge({ level }) {
-  const map = { high: 'bg-green-100 text-green-700', medium: 'bg-amber-100 text-amber-700', low: 'bg-slate-100 text-slate-600' };
-  const labels = { high: 'High likelihood', medium: 'Medium likelihood', low: 'Low likelihood' };
-  return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${map[level] || map.low}`}>{labels[level] || level}</span>;
+  return <MatchBadge level={level} type="likelihood" />;
 }
 
 const REL_LABELS = {
@@ -149,8 +84,7 @@ function IntroModal({ intro, onClose }) {
 
 function FitBadge({ score }) {
   if (score == null) return null;
-  const color = score >= 80 ? 'bg-green-50 text-green-600' : score >= 50 ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-500';
-  return <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${color}`}>{score}</span>;
+  return <MatchBadge score={score} type="fit" />;
 }
 
 function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
@@ -275,10 +209,10 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
                       )}
                     </p>
                     <div className="mt-1 flex flex-wrap gap-2">
-                      <WarmBadge score={path.contact.warm_score} />
+                      <MatchBadge score={path.contact.warm_score} type="warm" showScore />
                       <LikelihoodBadge level={path.contact.referral_likelihood} />
                       {path.recommended_channel && (
-                        <span className="text-xs text-slate-400">Reach out via {channelLabel(path.recommended_channel)}</span>
+                        <span className="text-xs text-slate-400">via {channelLabel(path.recommended_channel)}</span>
                       )}
                     </div>
                   </div>
@@ -446,7 +380,15 @@ export default function ReferralResults() {
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <WarmScoreLegend />
+          <Link
+            to="/help/scores"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-500 hover:bg-slate-50"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
+            </svg>
+            How scores work
+          </Link>
           <button
             onClick={() => navigate('/referrals')}
             className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
