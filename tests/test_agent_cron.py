@@ -409,3 +409,219 @@ class TestCheckBetaFeedback:
         assert findings == []
         assert insights == []
         assert xtr == []
+
+
+# ---------------------------------------------------------------------------
+# Feature 3: CoS conflict detection and resolution wiring
+# ---------------------------------------------------------------------------
+
+
+class TestDetectConflicts:
+    """_detect_conflicts finds conflicts from cross-team requests."""
+
+    def test_no_conflicts_when_empty(self):
+        from agents.chief_of_staff.cos_agent import _detect_conflicts
+
+        assert _detect_conflicts([]) == []
+
+    def test_no_conflicts_single_request(self):
+        from agents.chief_of_staff.cos_agent import _detect_conflicts
+
+        reqs = [{"request": "Fix security issue", "urgency": "critical", "source_agent": "architect"}]
+        assert _detect_conflicts(reqs) == []
+
+    def test_no_conflict_same_team(self):
+        from agents.chief_of_staff.cos_agent import _detect_conflicts
+
+        reqs = [
+            {"request": "Fix security issue", "urgency": "critical", "source_agent": "architect"},
+            {"request": "Security audit needed", "urgency": "low", "source_agent": "architect"},
+        ]
+        assert _detect_conflicts(reqs) == []
+
+    def test_detects_urgency_gap_conflict(self):
+        from agents.chief_of_staff.cos_agent import _detect_conflicts
+
+        reqs = [
+            {"request": "Ship feature launch now", "urgency": "critical", "source_agent": "gtm_lead"},
+            {"request": "Feature launch blocked by shipping security review", "urgency": "low", "source_agent": "architect"},
+        ]
+        conflicts = _detect_conflicts(reqs)
+        assert len(conflicts) >= 1
+        c = conflicts[0]
+        assert len(c.teams) == 2
+        assert c.resolution_level == 1
+
+    def test_no_conflict_when_urgency_close(self):
+        from agents.chief_of_staff.cos_agent import _detect_conflicts
+
+        reqs = [
+            {"request": "Cost budget alert", "urgency": "high", "source_agent": "finance_lead"},
+            {"request": "Cost optimization needed", "urgency": "medium", "source_agent": "ops_lead"},
+        ]
+        # Gap of 1 (high=3, medium=2) < 2 threshold
+        assert _detect_conflicts(reqs) == []
+
+
+class TestResolutionWiring:
+    """Resolver produces valid Resolution objects."""
+
+    def test_context_resolution_one_side_no_evidence(self):
+        from agents.chief_of_staff.resolver import attempt_resolution
+        from agents.chief_of_staff.schemas import Conflict
+
+        conflict = Conflict(
+            id="test-001",
+            teams=["engineering", "gtm"],
+            description="Test conflict",
+            positions={"engineering": "Need security review", "gtm": "Ship now"},
+            evidence={"engineering": "CVE found in dependency", "gtm": ""},
+            resolution_level=1,
+        )
+        resolution = attempt_resolution(conflict)
+        assert resolution.conflict_id == "test-001"
+        assert resolution.strategy_used == "context_clarification"
+        assert not resolution.escalated
+        assert "engineering" in resolution.outcome
+
+    def test_escalation_when_both_have_evidence(self):
+        from agents.chief_of_staff.resolver import attempt_resolution
+        from agents.chief_of_staff.schemas import Conflict
+
+        conflict = Conflict(
+            id="test-002",
+            teams=["engineering", "gtm"],
+            description="Both have evidence",
+            positions={"engineering": "Technical elegance matters", "gtm": "Technical elegance also"},
+            evidence={"engineering": "Code review shows issues", "gtm": "Market data shows urgency"},
+            resolution_level=4,
+        )
+        resolution = attempt_resolution(conflict)
+        assert resolution.conflict_id == "test-002"
+        assert resolution.escalated
+
+    def test_tradeoff_resolution_safety_wins(self):
+        from agents.chief_of_staff.resolver import attempt_resolution
+        from agents.chief_of_staff.schemas import Conflict
+
+        conflict = Conflict(
+            id="test-003",
+            teams=["engineering", "gtm"],
+            description="Safety vs speed",
+            positions={
+                "engineering": "This is a privacy and security concern",
+                "gtm": "We need to optimize cost efficiency",
+            },
+            evidence={"engineering": "PII leak found", "gtm": "Budget overrun"},
+            resolution_level=2,
+        )
+        resolution = attempt_resolution(conflict)
+        assert resolution.conflict_id == "test-003"
+        assert resolution.strategy_used == "tradeoff_framing"
+        assert "engineering" in resolution.outcome
+
+
+class TestFounderBriefSchema:
+    """FounderBrief schema supports new fields."""
+
+    def test_founder_requests_field_exists(self):
+        from agents.chief_of_staff.schemas import FounderBrief
+
+        brief = FounderBrief(date="2026-01-01")
+        assert brief.founder_requests == []
+
+    def test_resolutions_field_exists(self):
+        from agents.chief_of_staff.schemas import FounderBrief
+
+        brief = FounderBrief(date="2026-01-01")
+        assert brief.resolutions == []
+
+    def test_founder_requests_populated(self):
+        from agents.chief_of_staff.schemas import FounderBrief
+
+        brief = FounderBrief(
+            date="2026-01-01",
+            founder_requests=[{"title": "Focus on NH onboarding", "priority": "P0"}],
+        )
+        assert len(brief.founder_requests) == 1
+        assert brief.founder_requests[0]["priority"] == "P0"
+
+    def test_resolutions_populated(self):
+        from agents.chief_of_staff.schemas import FounderBrief
+
+        brief = FounderBrief(
+            date="2026-01-01",
+            resolutions=[{
+                "conflict_id": "c-001",
+                "strategy_used": "context_clarification",
+                "outcome": "Resolved in favor of engineering",
+                "escalated": False,
+            }],
+        )
+        assert len(brief.resolutions) == 1
+        assert brief.resolutions[0]["strategy_used"] == "context_clarification"
+
+
+class TestDailyBriefRendering:
+    """synthesize_daily renders founder requests and resolutions."""
+
+    def test_founder_requests_section_rendered(self):
+        from agents.shared.report import AgentReport
+
+        from agents.chief_of_staff.synthesizer import synthesize_daily
+
+        report = AgentReport(agent="test", timestamp="2026-01-01T00:00:00Z")
+        brief_md, brief_data = synthesize_daily(
+            [report],
+            founder_requests=[{"title": "Test request", "priority": "P0"}],
+        )
+        assert "Founder Requests" in brief_md
+        assert "[P0]" in brief_md
+        assert "Test request" in brief_md
+        assert len(brief_data["founder_requests"]) == 1
+
+    def test_resolutions_section_rendered(self):
+        from agents.shared.report import AgentReport
+
+        from agents.chief_of_staff.synthesizer import synthesize_daily
+
+        report = AgentReport(agent="test", timestamp="2026-01-01T00:00:00Z")
+        brief_md, brief_data = synthesize_daily(
+            [report],
+            resolutions=[{
+                "conflict_id": "c-001",
+                "strategy_used": "compromise",
+                "outcome": "Sequence the work",
+                "escalated": False,
+            }],
+        )
+        assert "Conflict Resolutions" in brief_md
+        assert "[compromise]" in brief_md
+        assert "Sequence the work" in brief_md
+
+    def test_escalated_resolution_tagged(self):
+        from agents.shared.report import AgentReport
+
+        from agents.chief_of_staff.synthesizer import synthesize_daily
+
+        report = AgentReport(agent="test", timestamp="2026-01-01T00:00:00Z")
+        brief_md, _ = synthesize_daily(
+            [report],
+            resolutions=[{
+                "conflict_id": "c-002",
+                "strategy_used": "escalation",
+                "outcome": "Escalated to founder",
+                "escalated": True,
+            }],
+        )
+        assert "[ESCALATED]" in brief_md
+
+    def test_no_sections_when_empty(self):
+        from agents.shared.report import AgentReport
+
+        from agents.chief_of_staff.synthesizer import synthesize_daily
+
+        report = AgentReport(agent="test", timestamp="2026-01-01T00:00:00Z")
+        brief_md, _ = synthesize_daily([report])
+        assert "Founder Requests" not in brief_md
+        assert "Conflict Resolutions" not in brief_md
