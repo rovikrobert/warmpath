@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
+import Spinner from './components/ui/Spinner';
 import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
 import SearchResults from './pages/SearchResults';
@@ -28,8 +29,8 @@ function ProtectedRoute({ children }) {
   const { token, loading } = useAuth();
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+      <div className="flex h-screen items-center justify-center bg-slate-950">
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -48,8 +49,8 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+      <div className="flex h-screen items-center justify-center bg-slate-950">
+        <Spinner size="lg" />
       </div>
     );
   }

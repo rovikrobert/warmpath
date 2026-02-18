@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { coach as coachApi } from '../api/client';
 import FeedbackModal from '../components/FeedbackModal';
 import OnboardingChecklist from '../components/OnboardingChecklist';
+import Spinner from '../components/ui/Spinner';
 
 /**
  * Render text with markdown-style links [text](/path) as React Router <Link>s.
@@ -19,13 +20,13 @@ function renderWithLinks(text) {
       const [, label, href] = linkMatch;
       if (href.startsWith('/')) {
         return (
-          <Link key={i} to={href} className="font-medium text-amber-600 hover:text-amber-700 underline">
+          <Link key={i} to={href} className="font-medium text-amber-400 hover:text-amber-300 underline">
             {label}
           </Link>
         );
       }
       return (
-        <a key={i} href={href} className="font-medium text-amber-600 hover:text-amber-700 underline" target="_blank" rel="noopener noreferrer">
+        <a key={i} href={href} className="font-medium text-amber-400 hover:text-amber-300 underline" target="_blank" rel="noopener noreferrer">
           {label}
         </a>
       );
@@ -174,8 +175,8 @@ export default function Dashboard() {
     return (
       <div className="flex h-[calc(100vh-8rem)] items-center justify-center" role="main" aria-live="polite" aria-busy="true">
         <div className="text-center">
-          <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading" />
-          <p className="text-sm text-slate-500">Keevs is preparing your briefing...</p>
+          <Spinner size="lg" className="mx-auto mb-3" />
+          <p className="text-sm text-slate-400">Keevs is preparing your briefing...</p>
         </div>
       </div>
     );
@@ -187,12 +188,12 @@ export default function Dashboard() {
       <OnboardingChecklist />
 
       {/* Header */}
-      <div className="flex-none border-b border-slate-200 px-4 py-3">
+      <div className="flex-none border-b border-slate-700/50 px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white" aria-hidden="true">~</span>
           <div>
-            <h1 className="text-base font-semibold text-slate-900">Keevs</h1>
-            <p className="text-xs text-slate-500">AI Career Coach</p>
+            <h1 className="text-base font-semibold text-slate-50">Keevs</h1>
+            <p className="text-xs text-slate-400">AI Career Coach</p>
           </div>
         </div>
       </div>
@@ -208,7 +209,7 @@ export default function Dashboard() {
               className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 msg.role === 'user'
                   ? 'bg-amber-500 text-white'
-                  : 'bg-slate-100 text-slate-800'
+                  : 'bg-slate-800 text-slate-200'
               }`}
             >
               {msg.role === 'keevs'
@@ -230,7 +231,7 @@ export default function Dashboard() {
               <button
                 key={prompt}
                 onClick={() => sendMessage(prompt)}
-                className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+                className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition-colors"
               >
                 {prompt}
               </button>
@@ -242,7 +243,7 @@ export default function Dashboard() {
       </div>
 
       {/* Input area */}
-      <div className="flex-none border-t border-slate-200 bg-white px-4 py-3">
+      <div className="flex-none border-t border-slate-700/50 bg-slate-950 px-4 py-3">
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
@@ -253,13 +254,13 @@ export default function Dashboard() {
             aria-label="Message to Keevs"
             disabled={sending}
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="flex-1 resize-none rounded-xl border border-slate-700/50 bg-slate-800 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
           />
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || sending}
             aria-label="Send message"
-            className="rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Send
           </button>

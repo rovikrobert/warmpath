@@ -11,7 +11,7 @@ const BASE_STEPS = [
     cta: 'Upload CSV',
     href: '/contacts',
     credits: 100,
-    forUserTypes: null, // all users
+    forUserTypes: null,
   },
   {
     key: 'preferences',
@@ -20,7 +20,7 @@ const BASE_STEPS = [
     cta: 'Set Preferences',
     href: '/settings?tab=profile',
     credits: null,
-    forUserTypes: null, // all users
+    forUserTypes: null,
   },
   {
     key: 'sharing',
@@ -29,7 +29,7 @@ const BASE_STEPS = [
     cta: 'Configure Sharing',
     href: '/settings?tab=sharing',
     credits: null,
-    forUserTypes: ['network_holder', 'both'], // NH only
+    forUserTypes: ['network_holder', 'both'],
   },
 ];
 
@@ -41,7 +41,6 @@ export default function OnboardingChecklist() {
     () => localStorage.getItem('warmpath_checklist_dismissed') === 'true'
   );
 
-  // Filter steps by user type
   const userType = user?.user_type || 'job_seeker';
   const STEPS = BASE_STEPS.filter(
     (s) => !s.forUserTypes || s.forUserTypes.includes(userType)
@@ -60,17 +59,13 @@ export default function OnboardingChecklist() {
           mpApi.getSharingPrefs(),
         ]);
 
-        // Contacts: check if any exist
         if (contactsRes.status === 'fulfilled') {
           const total = contactsRes.value?.meta?.total ?? contactsRes.value?.data?.length ?? 0;
           done.contacts = total > 0;
         }
 
-        // Preferences: check if they exist (404 = not set)
         done.preferences = prefsRes.status === 'fulfilled' && prefsRes.value?.data?.target_role;
 
-        // Sharing: check if user has saved their sharing preferences
-        // Also consider it done if user is a job_seeker (sharing is NH-only)
         done.sharing = userType === 'job_seeker'
           || (sharingRes.status === 'fulfilled' && sharingRes.value?.data?.is_configured);
       } catch {
@@ -93,11 +88,11 @@ export default function OnboardingChecklist() {
   const progress = Math.round((completedCount / STEPS.length) * 100);
 
   return (
-    <div className="mb-4 rounded-xl bg-white shadow-sm ring-1 ring-slate-200" role="region" aria-label="Getting started checklist">
-      <div className="border-b border-slate-100 px-5 py-4">
+    <div className="mb-4 rounded-xl bg-slate-900 border border-slate-700/50" role="region" aria-label="Getting started checklist">
+      <div className="border-b border-slate-700/50 px-5 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">Get started with WarmPath</h2>
+            <h2 className="text-sm font-semibold text-slate-50">Get started with WarmPath</h2>
             <p className="text-xs text-slate-500">{completedCount} of {STEPS.length} steps complete</p>
           </div>
           <button
@@ -106,13 +101,13 @@ export default function OnboardingChecklist() {
               localStorage.setItem('warmpath_checklist_dismissed', 'true');
             }}
             aria-label="Dismiss checklist"
-            className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+            className="text-slate-500 hover:text-slate-300 text-lg leading-none"
           >
             &times;
           </button>
         </div>
         {/* Progress bar */}
-        <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100">
+        <div className="mt-2 h-1.5 w-full rounded-full bg-slate-800">
           <div
             className="h-1.5 rounded-full bg-amber-500 transition-all duration-500"
             style={{ width: `${progress}%` }}
@@ -124,13 +119,13 @@ export default function OnboardingChecklist() {
         </div>
       </div>
 
-      <div className="divide-y divide-slate-50">
+      <div className="divide-y divide-slate-700/50">
         {STEPS.map((step) => {
           const isDone = completed[step.key];
           return (
             <div key={step.key} className="flex items-center gap-4 px-5 py-3">
               {/* Checkbox icon */}
-              <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isDone ? 'bg-green-500' : 'border-2 border-slate-300'}`}>
+              <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isDone ? 'bg-emerald-500' : 'border-2 border-slate-600'}`}>
                 {isDone && (
                   <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth="3" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
@@ -139,10 +134,10 @@ export default function OnboardingChecklist() {
               </div>
 
               <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium ${isDone ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+                <p className={`text-sm font-medium ${isDone ? 'text-slate-500 line-through' : 'text-slate-50'}`}>
                   {step.label}
                   {step.credits && !isDone && (
-                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                    <span className="ml-2 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">
                       +{step.credits} credits
                     </span>
                   )}
@@ -155,7 +150,7 @@ export default function OnboardingChecklist() {
               {!isDone && (
                 <Link
                   to={step.href}
-                  className="shrink-0 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600"
+                  className="shrink-0 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-400"
                 >
                   {step.cta}
                 </Link>

@@ -39,21 +39,21 @@ export default function TagInput({ label, value = [], onChange, placeholder }) {
   return (
     <div>
       {label && (
-        <label className="mb-1 block text-sm font-medium text-slate-700">
+        <label className="mb-1 block text-sm font-medium text-slate-300">
           {label}
         </label>
       )}
-      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500">
         {value.map((tag, i) => (
           <span
             key={i}
-            className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-sm text-amber-800"
+            className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-sm text-amber-400"
           >
             {tag}
             <button
               type="button"
               onClick={() => remove(i)}
-              className="text-amber-500 hover:text-amber-700"
+              className="text-amber-500 hover:text-amber-300"
             >
               &times;
             </button>
@@ -66,10 +66,10 @@ export default function TagInput({ label, value = [], onChange, placeholder }) {
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           placeholder={value.length === 0 ? placeholder : ''}
-          className="min-w-[120px] flex-1 border-none bg-transparent text-sm outline-none placeholder:text-slate-400"
+          className="min-w-[120px] flex-1 border-none bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
         />
       </div>
-      <p className="mt-1 text-xs text-slate-400">Press Enter or comma to add</p>
+      <p className="mt-1 text-xs text-slate-500">Press Enter or comma to add</p>
     </div>
   );
 }

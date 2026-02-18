@@ -17,21 +17,21 @@ const SECTIONS = [
 
 function SectionHeading({ id, children }) {
   return (
-    <h2 id={id} className="scroll-mt-24 text-xl font-bold text-slate-900">
+    <h2 id={id} className="scroll-mt-24 text-xl font-bold text-slate-50">
       {children}
     </h2>
   );
 }
 
 function Paragraph({ children }) {
-  return <p className="text-sm leading-relaxed text-slate-600">{children}</p>;
+  return <p className="text-sm leading-relaxed text-slate-300">{children}</p>;
 }
 
 function BulletList({ items }) {
   return (
     <ul className="space-y-1.5 pl-5">
       {items.map((item, i) => (
-        <li key={i} className="list-disc text-sm leading-relaxed text-slate-600">
+        <li key={i} className="list-disc text-sm leading-relaxed text-slate-300">
           {item}
         </li>
       ))}
@@ -41,12 +41,12 @@ function BulletList({ items }) {
 
 function InfoCard({ icon, title, children }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+    <div className="rounded-lg border border-slate-700/50 bg-slate-800/50 p-4">
       <div className="mb-2 flex items-center gap-2">
         <span className="text-lg" aria-hidden="true">{icon}</span>
-        <h4 className="font-semibold text-slate-900">{title}</h4>
+        <h4 className="font-semibold text-slate-50">{title}</h4>
       </div>
-      <div className="text-sm leading-relaxed text-slate-600">{children}</div>
+      <div className="text-sm leading-relaxed text-slate-300">{children}</div>
     </div>
   );
 }
@@ -55,15 +55,15 @@ export default function PrivacyPage() {
   const [rightsTab, setRightsTab] = useState('gdpr');
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-950">
       {/* Minimal nav bar */}
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-slate-700/50 bg-slate-900">
         <nav className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3 sm:px-6" role="navigation" aria-label="Privacy page navigation">
-          <Link to="/" className="flex items-center gap-2 text-xl font-bold text-slate-900" aria-label="WarmPath home">
+          <Link to="/" className="flex items-center gap-2 text-xl font-bold text-slate-50" aria-label="WarmPath home">
             <span className="text-amber-500">~</span>
             <span>WarmPath</span>
           </Link>
-          <Link to="/" className="text-sm text-amber-600 hover:text-amber-700">
+          <Link to="/" className="text-sm text-amber-400 hover:text-amber-300">
             Back to app
           </Link>
         </nav>
@@ -72,8 +72,8 @@ export default function PrivacyPage() {
     <main className="mx-auto max-w-3xl space-y-8 px-4 py-8 pb-16 sm:px-6">
       {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold text-slate-900">Privacy Policy</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-slate-50">Privacy Policy</h1>
+        <p className="text-sm text-slate-400">
           WarmPath &mdash; operated by Majiq Pte Ltd, Singapore
         </p>
         <p className="text-xs text-slate-400">
@@ -82,14 +82,14 @@ export default function PrivacyPage() {
       </div>
 
       {/* Table of Contents */}
-      <nav className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-label="Table of contents">
-        <h3 className="mb-3 text-sm font-semibold text-slate-900">Contents</h3>
+      <nav className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Table of contents">
+        <h3 className="mb-3 text-sm font-semibold text-slate-50">Contents</h3>
         <ol className="grid gap-1.5 sm:grid-cols-2">
           {SECTIONS.map((s, i) => (
             <li key={s.id}>
               <a
                 href={`#${s.id}`}
-                className="text-sm text-amber-600 hover:text-amber-700 hover:underline"
+                className="text-sm text-amber-400 hover:text-amber-300 hover:underline"
               >
                 {i + 1}. {s.label}
               </a>
@@ -99,9 +99,9 @@ export default function PrivacyPage() {
       </nav>
 
       {/* 1. Our Privacy Commitment */}
-      <section className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <section className="space-y-4 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
         <SectionHeading id="commitment">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-sm text-amber-700">1</span>
+          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/10 text-sm text-amber-400">1</span>
           Our Privacy Commitment
         </SectionHeading>
         <Paragraph>
@@ -112,25 +112,25 @@ export default function PrivacyPage() {
           safeguards even though they have not created accounts.
         </Paragraph>
         <div className="grid gap-3 sm:grid-cols-2">
-          <InfoCard icon={<svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>} title="Private Vault">
+          <InfoCard icon={<svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>} title="Private Vault">
             Your full contact data is visible only to you. We never share it without your explicit consent.
           </InfoCard>
-          <InfoCard icon={<svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>} title="Consent Gates">
+          <InfoCard icon={<svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>} title="Consent Gates">
             Contact identity is revealed only through the network holder's explicit, active approval.
           </InfoCard>
-          <InfoCard icon={<svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" /></svg>} title="Never Sell Data">
+          <InfoCard icon={<svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" /></svg>} title="Never Sell Data">
             We never sell, rent, or trade your personal data or contact data to third parties.
           </InfoCard>
-          <InfoCard icon={<svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>} title="Data Minimisation">
+          <InfoCard icon={<svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>} title="Data Minimisation">
             We collect only what is necessary to deliver the service. CSV files are deleted after processing.
           </InfoCard>
         </div>
       </section>
 
       {/* 2. The Four Parties */}
-      <section className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <section className="space-y-4 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
         <SectionHeading id="four-parties">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-sm text-amber-700">2</span>
+          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/10 text-sm text-amber-400">2</span>
           The Four Parties
         </SectionHeading>
         <Paragraph>
@@ -139,22 +139,22 @@ export default function PrivacyPage() {
           simultaneously occupy multiple roles.
         </Paragraph>
         <div className="space-y-3">
-          <InfoCard icon={<svg className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>} title="Job Seekers">
+          <InfoCard icon={<svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>} title="Job Seekers">
             Your account, search activity, target companies, and application pipeline are private.
             You remain anonymous in the marketplace until you choose to request an introduction.
             No employer &mdash; including yours &mdash; can discover you're looking.
           </InfoCard>
-          <InfoCard icon={<svg className="h-5 w-5 text-purple-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" /></svg>} title="Network Holders">
+          <InfoCard icon={<svg className="h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" /></svg>} title="Network Holders">
             Marketplace participation is entirely opt-in. Your identity as a facilitator is not
             disclosed to third parties. You retain granular controls over which contacts are
             shared and can pause or withdraw at any time.
           </InfoCard>
-          <InfoCard icon={<svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>} title="Contacts Referenced">
+          <InfoCard icon={<svg className="h-5 w-5 text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>} title="Contacts Referenced">
             Protected through anonymisation in the marketplace (no names or emails in listings),
             consent gates (identity revealed only when network holder approves), and the
             suppression list (any person may request permanent removal).
           </InfoCard>
-          <InfoCard icon={<svg className="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" /></svg>} title="Companies">
+          <InfoCard icon={<svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" /></svg>} title="Companies">
             Employee directory information is aggregated to role level and department category
             in the marketplace &mdash; never specific titles, teams, or org charts.
           </InfoCard>
@@ -167,21 +167,21 @@ export default function PrivacyPage() {
       </section>
 
       {/* 3. Information We Collect */}
-      <section className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <section className="space-y-4 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
         <SectionHeading id="collect">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-sm text-amber-700">3</span>
+          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/10 text-sm text-amber-400">3</span>
           Information We Collect
         </SectionHeading>
         <div className="space-y-3">
           <div>
-            <h4 className="mb-1 font-semibold text-slate-800">Account Information</h4>
+            <h4 className="mb-1 font-semibold text-slate-200">Account Information</h4>
             <Paragraph>
               Name, email address, and password (hashed &mdash; we never store plaintext passwords).
               Optionally: job title, target roles, industries, and salary preferences.
             </Paragraph>
           </div>
           <div>
-            <h4 className="mb-1 font-semibold text-slate-800">Contact Data (CSV Upload)</h4>
+            <h4 className="mb-1 font-semibold text-slate-200">Contact Data (CSV Upload)</h4>
             <Paragraph>
               When you upload a LinkedIn connections CSV, we parse and store first name, last name,
               email address, company, position, and connection date. CSV files are deleted from
@@ -189,7 +189,7 @@ export default function PrivacyPage() {
             </Paragraph>
           </div>
           <div>
-            <h4 className="mb-1 font-semibold text-slate-800">Usage Data</h4>
+            <h4 className="mb-1 font-semibold text-slate-200">Usage Data</h4>
             <Paragraph>
               IP address, browser type, pages visited, feature usage, and diagnostic data.
               We track API calls, searches, and messages drafted to understand engagement and
@@ -197,7 +197,7 @@ export default function PrivacyPage() {
             </Paragraph>
           </div>
           <div>
-            <h4 className="mb-1 font-semibold text-slate-800">Cookies</h4>
+            <h4 className="mb-1 font-semibold text-slate-200">Cookies</h4>
             <Paragraph>
               Essential cookies for authentication and session management. Analytics cookies to
               understand service usage. We do not use advertising or remarketing cookies.
@@ -207,9 +207,9 @@ export default function PrivacyPage() {
       </section>
 
       {/* 4. How We Use Your Information */}
-      <section className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <section className="space-y-4 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
         <SectionHeading id="use">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-sm text-amber-700">4</span>
+          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/10 text-sm text-amber-400">4</span>
           How We Use Your Information
         </SectionHeading>
         <BulletList items={[
@@ -225,26 +225,26 @@ export default function PrivacyPage() {
       </section>
 
       {/* 5. Private Vault & Marketplace */}
-      <section className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <section className="space-y-4 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
         <SectionHeading id="vault">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-sm text-amber-700">5</span>
+          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/10 text-sm text-amber-400">5</span>
           Private Vault & Marketplace
         </SectionHeading>
         <Paragraph>
           WarmPath operates a two-tier data model designed to protect all parties:
         </Paragraph>
         <div className="space-y-4">
-          <div className="rounded-lg border-l-4 border-amber-400 bg-amber-50 p-4">
-            <h4 className="mb-1 font-semibold text-slate-900">Private Vault</h4>
-            <p className="text-sm text-slate-600">
+          <div className="rounded-lg border-l-4 border-amber-400 bg-amber-500/10 p-4">
+            <h4 className="mb-1 font-semibold text-slate-50">Private Vault</h4>
+            <p className="text-sm text-slate-300">
               All contact data you import is stored in your Private Vault &mdash; encrypted, scoped
               to your user account, and accessible only by you. We do not cross-reference data
               between users' vaults.
             </p>
           </div>
-          <div className="rounded-lg border-l-4 border-green-400 bg-green-50 p-4">
-            <h4 className="mb-1 font-semibold text-slate-900">Marketplace Index</h4>
-            <p className="text-sm text-slate-600">
+          <div className="rounded-lg border-l-4 border-emerald-400 bg-emerald-500/10 p-4">
+            <h4 className="mb-1 font-semibold text-slate-50">Marketplace Index</h4>
+            <p className="text-sm text-slate-300">
               If you opt in, an anonymised index is generated: company name, role level,
               department category, warm score range, and connection recency. No names, no
               emails, no specific titles cross the vault boundary.
@@ -252,7 +252,7 @@ export default function PrivacyPage() {
           </div>
         </div>
         <div>
-          <h4 className="mb-2 font-semibold text-slate-800">Consent-Gated Disclosure Flow</h4>
+          <h4 className="mb-2 font-semibold text-slate-200">Consent-Gated Disclosure Flow</h4>
           <ol className="space-y-2 pl-5">
             {[
               'Job seeker sees anonymous listing ("1 senior engineer at Stripe, strong connection").',
@@ -261,21 +261,21 @@ export default function PrivacyPage() {
               'Network holder actively approves or declines.',
               'Only upon approval is the contact\'s identity revealed \u2014 through the network holder\'s active choice.',
             ].map((step, i) => (
-              <li key={i} className="list-decimal text-sm leading-relaxed text-slate-600">
+              <li key={i} className="list-decimal text-sm leading-relaxed text-slate-300">
                 {step}
               </li>
             ))}
           </ol>
-          <p className="mt-2 text-sm font-medium text-slate-700">
+          <p className="mt-2 text-sm font-medium text-slate-300">
             At no point does WarmPath unilaterally reveal any contact's identity to another user.
           </p>
         </div>
       </section>
 
       {/* 6. Data Sharing */}
-      <section className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <section className="space-y-4 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
         <SectionHeading id="sharing">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-sm text-amber-700">6</span>
+          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/10 text-sm text-amber-400">6</span>
           Data Sharing
         </SectionHeading>
         <Paragraph>
@@ -286,8 +286,8 @@ export default function PrivacyPage() {
           'Marketplace participants \u2014 only when a network holder explicitly approves an introduction request.',
           'Legal authorities when required by law to comply with legal obligations or protect rights and safety.',
         ]} />
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <h4 className="mb-1 font-semibold text-red-900">What We Will Never Do</h4>
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+          <h4 className="mb-1 font-semibold text-red-400">What We Will Never Do</h4>
           <BulletList items={[
             'Sell your contact data to recruiters, advertisers, or data brokers.',
             'Share your job-seeking activity with your current employer.',
@@ -298,9 +298,9 @@ export default function PrivacyPage() {
       </section>
 
       {/* 7. Suppression List */}
-      <section className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <section className="space-y-4 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
         <SectionHeading id="suppression">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-sm text-amber-700">7</span>
+          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/10 text-sm text-amber-400">7</span>
           Suppression List
         </SectionHeading>
         <Paragraph>
@@ -308,7 +308,7 @@ export default function PrivacyPage() {
           from the platform.
         </Paragraph>
         <div className="space-y-2">
-          <h4 className="font-semibold text-slate-800">How It Works</h4>
+          <h4 className="font-semibold text-slate-200">How It Works</h4>
           <BulletList items={[
             'We match requests using SHA-256 hashing of normalised email addresses and/or name-plus-company combinations.',
             'Matching records are purged across all network holders\' private vaults.',
@@ -319,7 +319,7 @@ export default function PrivacyPage() {
         </div>
         <Paragraph>
           To request suppression, email{' '}
-          <a href="mailto:rovik@majiq.agency" className="font-medium text-amber-600 hover:text-amber-700">
+          <a href="mailto:rovik@majiq.agency" className="font-medium text-amber-400 hover:text-amber-300">
             rovik@majiq.agency
           </a>{' '}
           with the subject line &ldquo;Suppression Request.&rdquo;
@@ -327,9 +327,9 @@ export default function PrivacyPage() {
       </section>
 
       {/* 8. Your Rights */}
-      <section className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <section className="space-y-4 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
         <SectionHeading id="rights">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-sm text-amber-700">8</span>
+          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/10 text-sm text-amber-400">8</span>
           Your Rights
         </SectionHeading>
         <Paragraph>
@@ -337,7 +337,7 @@ export default function PrivacyPage() {
         </Paragraph>
 
         {/* Tabs */}
-        <div className="flex gap-1 rounded-lg bg-slate-100 p-1" role="tablist" aria-label="Privacy rights by jurisdiction">
+        <div className="flex gap-1 rounded-lg bg-slate-800 p-1" role="tablist" aria-label="Privacy rights by jurisdiction">
           {[
             { key: 'gdpr', label: 'GDPR (EU/EEA)' },
             { key: 'ccpa', label: 'CCPA (California)' },
@@ -352,8 +352,8 @@ export default function PrivacyPage() {
               onClick={() => setRightsTab(tab.key)}
               className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
                 rightsTab === tab.key
-                  ? 'bg-white text-amber-700 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'bg-slate-900 text-amber-400 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-300'
               }`}
             >
               {tab.label}
@@ -418,21 +418,21 @@ export default function PrivacyPage() {
 
         <Paragraph>
           To exercise any of these rights, contact us at{' '}
-          <a href="mailto:rovik@majiq.agency" className="font-medium text-amber-600 hover:text-amber-700">
+          <a href="mailto:rovik@majiq.agency" className="font-medium text-amber-400 hover:text-amber-300">
             rovik@majiq.agency
           </a>.
         </Paragraph>
       </section>
 
       {/* 9. AI & Automated Processing */}
-      <section className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <section className="space-y-4 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
         <SectionHeading id="ai">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-sm text-amber-700">9</span>
+          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/10 text-sm text-amber-400">9</span>
           AI & Automated Processing
         </SectionHeading>
         <div className="space-y-3">
           <div>
-            <h4 className="mb-1 font-semibold text-slate-800">Warm Score Computation</h4>
+            <h4 className="mb-1 font-semibold text-slate-200">Warm Score Computation</h4>
             <Paragraph>
               Our algorithm computes referral likelihood scores based on connection recency,
               relationship strength, role relevance, and company tenure. Scores are indicative
@@ -441,7 +441,7 @@ export default function PrivacyPage() {
             </Paragraph>
           </div>
           <div>
-            <h4 className="mb-1 font-semibold text-slate-800">AI Message Drafting</h4>
+            <h4 className="mb-1 font-semibold text-slate-200">AI Message Drafting</h4>
             <Paragraph>
               We use the Anthropic Claude API to generate personalised referral request messages.
               Anthropic processes this data solely to generate the output and does not retain it
@@ -450,7 +450,7 @@ export default function PrivacyPage() {
             </Paragraph>
           </div>
           <div>
-            <h4 className="mb-1 font-semibold text-slate-800">Cultural Context Engine</h4>
+            <h4 className="mb-1 font-semibold text-slate-200">Cultural Context Engine</h4>
             <Paragraph>
               Our system analyses location, company culture, and relationship type to recommend
               culturally appropriate communication approaches. This does not involve profiling
@@ -458,8 +458,8 @@ export default function PrivacyPage() {
             </Paragraph>
           </div>
         </div>
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-          <p className="text-sm font-medium text-green-900">
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
+          <p className="text-sm font-medium text-emerald-400">
             WarmPath does not make automated decisions that produce legal effects or similarly
             significant effects concerning you. All AI outputs are advisory &mdash; you retain
             full control over all actions.
@@ -468,20 +468,20 @@ export default function PrivacyPage() {
       </section>
 
       {/* 10. Data Retention */}
-      <section className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <section className="space-y-4 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
         <SectionHeading id="retention">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-sm text-amber-700">10</span>
+          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/10 text-sm text-amber-400">10</span>
           Data Retention
         </SectionHeading>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-3 py-2 font-semibold text-slate-700">Data Type</th>
-                <th className="px-3 py-2 font-semibold text-slate-700">Retention Period</th>
+              <tr className="border-b border-slate-700/50 bg-slate-800 text-left">
+                <th className="px-3 py-2 font-semibold text-slate-300">Data Type</th>
+                <th className="px-3 py-2 font-semibold text-slate-300">Retention Period</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-700/50">
               {[
                 ['Account data', 'While active. Deleted within 30 days of account deletion.'],
                 ['Contact data (vault)', 'While active. Deleted on account deletion or contact removal.'],
@@ -491,9 +491,9 @@ export default function PrivacyPage() {
                 ['Usage data', 'Identifiable logs: 12 months max. Aggregated data: retained indefinitely.'],
                 ['Suppression list entries', 'Indefinitely (by design, for ongoing protection).'],
               ].map(([type, period], i) => (
-                <tr key={i} className="hover:bg-amber-50/30">
-                  <td className="px-3 py-2 font-medium text-slate-800">{type}</td>
-                  <td className="px-3 py-2 text-slate-600">{period}</td>
+                <tr key={i} className="hover:bg-slate-800">
+                  <td className="px-3 py-2 font-medium text-slate-200">{type}</td>
+                  <td className="px-3 py-2 text-slate-400">{period}</td>
                 </tr>
               ))}
             </tbody>
@@ -502,9 +502,9 @@ export default function PrivacyPage() {
       </section>
 
       {/* 11. Contact Us */}
-      <section className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <section className="space-y-4 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
         <SectionHeading id="contact">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-sm text-amber-700">11</span>
+          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/10 text-sm text-amber-400">11</span>
           Contact Us
         </SectionHeading>
         <div className="space-y-2">
@@ -515,16 +515,16 @@ export default function PrivacyPage() {
               ['Suppression requests', 'privacy@warmpath.com'],
               ['Data Subject Access Requests', 'privacy@warmpath.com'],
             ].map(([label, email], i) => (
-              <div key={i} className="rounded-lg border border-slate-200 p-3">
-                <p className="text-xs font-medium text-slate-500">{label}</p>
-                <p className="text-sm font-medium text-slate-900">{email}</p>
+              <div key={i} className="rounded-lg border border-slate-700/50 p-3">
+                <p className="text-xs font-medium text-slate-400">{label}</p>
+                <p className="text-sm font-medium text-slate-50">{email}</p>
               </div>
             ))}
           </div>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-            <p className="text-sm text-amber-800">
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+            <p className="text-sm text-amber-400">
               During the beta period, all enquiries should be directed to{' '}
-              <a href="mailto:rovik@majiq.agency" className="font-medium text-amber-700 hover:underline">
+              <a href="mailto:rovik@majiq.agency" className="font-medium text-amber-300 hover:underline">
                 rovik@majiq.agency
               </a>.
             </p>
@@ -537,7 +537,7 @@ export default function PrivacyPage() {
 
       {/* Back to top */}
       <div className="text-center">
-        <a href="#" className="text-sm text-amber-600 hover:text-amber-700" aria-label="Back to top of page">
+        <a href="#" className="text-sm text-amber-400 hover:text-amber-300" aria-label="Back to top of page">
           Back to top
         </a>
       </div>

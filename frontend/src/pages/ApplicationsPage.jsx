@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
 import { applications as appsApi } from '../api/client';
 import FeedbackModal from '../components/FeedbackModal';
+import Button from '../components/ui/Button';
 
 const PIPELINE_STAGES = [
-  { key: 'draft', label: 'Draft', color: 'bg-slate-100 text-slate-600' },
-  { key: 'message_sent', label: 'Sent', color: 'bg-blue-100 text-blue-700' },
-  { key: 'responded', label: 'Responded', color: 'bg-amber-100 text-amber-700' },
-  { key: 'interview_scheduled', label: 'Interview', color: 'bg-purple-100 text-purple-700' },
-  { key: 'interviewed', label: 'Interviewed', color: 'bg-purple-100 text-purple-700' },
-  { key: 'offer_received', label: 'Offer', color: 'bg-green-100 text-green-700' },
-  { key: 'offer_accepted', label: 'Accepted', color: 'bg-green-200 text-green-800' },
-  { key: 'rejected', label: 'Rejected', color: 'bg-red-100 text-red-700' },
-  { key: 'withdrawn', label: 'Withdrawn', color: 'bg-slate-100 text-slate-500' },
-  { key: 'no_response', label: 'No Response', color: 'bg-slate-100 text-slate-400' },
+  { key: 'draft', label: 'Draft', color: 'bg-slate-700/50 text-slate-400' },
+  { key: 'message_sent', label: 'Sent', color: 'bg-blue-500/10 text-blue-400' },
+  { key: 'responded', label: 'Responded', color: 'bg-amber-500/10 text-amber-400' },
+  { key: 'interview_scheduled', label: 'Interview', color: 'bg-purple-500/10 text-purple-400' },
+  { key: 'interviewed', label: 'Interviewed', color: 'bg-purple-500/10 text-purple-400' },
+  { key: 'offer_received', label: 'Offer', color: 'bg-emerald-500/10 text-emerald-400' },
+  { key: 'offer_accepted', label: 'Accepted', color: 'bg-emerald-500/20 text-emerald-300' },
+  { key: 'rejected', label: 'Rejected', color: 'bg-red-500/10 text-red-400' },
+  { key: 'withdrawn', label: 'Withdrawn', color: 'bg-slate-700/50 text-slate-400' },
+  { key: 'no_response', label: 'No Response', color: 'bg-slate-700/50 text-slate-500' },
 ];
 
 const KANBAN_COLUMNS = [
@@ -27,7 +28,7 @@ const KANBAN_COLUMNS = [
 function StatusBadge({ status }) {
   const stage = PIPELINE_STAGES.find((s) => s.key === status);
   return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${stage?.color || 'bg-slate-100 text-slate-600'}`}>
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${stage?.color || 'bg-slate-700/50 text-slate-400'}`}>
       {stage?.label || status}
     </span>
   );
@@ -38,16 +39,16 @@ function AppCard({ app, onStatusChange, updating }) {
   const nextStatuses = getNextStatuses(app.status);
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="rounded-lg bg-slate-900 border border-slate-700/50 p-3">
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-slate-900">{app.company_name}</p>
+          <p className="truncate text-sm font-medium text-slate-50">{app.company_name}</p>
           {app.role_title && (
-            <p className="truncate text-xs text-slate-500">{app.role_title}</p>
+            <p className="truncate text-xs text-slate-400">{app.role_title}</p>
           )}
         </div>
         {isMarketplace && (
-          <span className="ml-2 shrink-0 rounded bg-purple-50 px-1.5 py-0.5 text-xs font-medium text-purple-600">
+          <span className="ml-2 shrink-0 rounded bg-purple-500/10 px-1.5 py-0.5 text-xs font-medium text-purple-400">
             Via Marketplace
           </span>
         )}
@@ -64,7 +65,7 @@ function AppCard({ app, onStatusChange, updating }) {
       )}
 
       {app.days_since_sent != null && app.status === 'message_sent' && (
-        <p className={`mt-1 text-xs ${app.needs_follow_up ? 'font-medium text-amber-600' : 'text-slate-400'}`}>
+        <p className={`mt-1 text-xs ${app.needs_follow_up ? 'font-medium text-amber-400' : 'text-slate-400'}`}>
           {app.days_since_sent}d since sent{app.needs_follow_up ? ' — follow up?' : ''}
         </p>
       )}
@@ -79,7 +80,7 @@ function AppCard({ app, onStatusChange, updating }) {
             onChange={(e) => onStatusChange(app.id, e.target.value)}
             disabled={updating === app.id}
             aria-label={`Change status for ${app.company_name}`}
-            className="rounded border border-slate-200 px-1 py-0.5 text-xs text-slate-600 focus:border-amber-500 focus:outline-none"
+            className="rounded border border-slate-700/50 bg-slate-800 px-1 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
           >
             <option value="" disabled>Move to...</option>
             {nextStatuses.map((s) => {
@@ -182,49 +183,48 @@ export default function ApplicationsPage() {
   return (
     <div role="main">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-900">My Applications</h1>
-        <button
+        <h1 className="text-xl font-bold text-slate-50">My Applications</h1>
+        <Button
           onClick={() => setShowCreate(!showCreate)}
           aria-expanded={showCreate}
           aria-controls="create-application-form"
-          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600"
         >
           {showCreate ? 'Cancel' : 'Track Application'}
-        </button>
+        </Button>
       </div>
 
       {/* Stats */}
       {stats && (
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">Total</p>
-            <p className="text-xl font-bold text-slate-900">{stats.total}</p>
+          <div className="rounded-lg bg-slate-900 p-3 border border-slate-700/50">
+            <p className="text-xs text-slate-400">Total</p>
+            <p className="text-xl font-bold font-mono text-slate-50">{stats.total}</p>
           </div>
-          <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">Response Rate</p>
-            <p className="text-xl font-bold text-slate-900">{Math.round(stats.response_rate * 100)}%</p>
+          <div className="rounded-lg bg-slate-900 p-3 border border-slate-700/50">
+            <p className="text-xs text-slate-400">Response Rate</p>
+            <p className="text-xl font-bold font-mono text-slate-50">{Math.round(stats.response_rate * 100)}%</p>
           </div>
-          <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">Interview Rate</p>
-            <p className="text-xl font-bold text-slate-900">{Math.round(stats.interview_rate * 100)}%</p>
+          <div className="rounded-lg bg-slate-900 p-3 border border-slate-700/50">
+            <p className="text-xs text-slate-400">Interview Rate</p>
+            <p className="text-xl font-bold font-mono text-slate-50">{Math.round(stats.interview_rate * 100)}%</p>
           </div>
-          <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">Avg Response</p>
-            <p className="text-xl font-bold text-slate-900">
+          <div className="rounded-lg bg-slate-900 p-3 border border-slate-700/50">
+            <p className="text-xs text-slate-400">Avg Response</p>
+            <p className="text-xl font-bold font-mono text-slate-50">
               {stats.avg_days_to_response != null ? `${Math.round(stats.avg_days_to_response)}d` : '—'}
             </p>
           </div>
-          <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">Best Channel</p>
-            <p className="text-xl font-bold text-slate-900">{stats.best_channel || '—'}</p>
+          <div className="rounded-lg bg-slate-900 p-3 border border-slate-700/50">
+            <p className="text-xs text-slate-400">Best Channel</p>
+            <p className="text-xl font-bold font-mono text-slate-50">{stats.best_channel || '—'}</p>
           </div>
         </div>
       )}
 
       {/* Create form */}
       {showCreate && (
-        <form id="create-application-form" onSubmit={handleCreate} aria-label="Track a new application" className="mb-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <h2 className="mb-3 text-base font-semibold text-slate-900">Track a New Application</h2>
+        <form id="create-application-form" onSubmit={handleCreate} aria-label="Track a new application" className="mb-6 rounded-xl bg-slate-900 p-5 border border-slate-700/50">
+          <h2 className="mb-3 text-base font-semibold text-slate-50">Track a New Application</h2>
           <div className="grid grid-cols-2 gap-3">
             <input
               id="new-app-company"
@@ -235,7 +235,7 @@ export default function ApplicationsPage() {
               aria-label="Company name"
               required
               aria-required="true"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
             <input
               id="new-app-role"
@@ -244,14 +244,14 @@ export default function ApplicationsPage() {
               onChange={(e) => setNewApp({ ...newApp, role_title: e.target.value })}
               placeholder="Role title"
               aria-label="Role title"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
             <select
               id="new-app-channel"
               value={newApp.channel}
               onChange={(e) => setNewApp({ ...newApp, channel: e.target.value })}
               aria-label="Application channel"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
             >
               <option value="">Channel</option>
               <option value="linkedin">LinkedIn</option>
@@ -267,35 +267,36 @@ export default function ApplicationsPage() {
               onChange={(e) => setNewApp({ ...newApp, notes: e.target.value })}
               placeholder="Notes"
               aria-label="Notes"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
           </div>
-          <button
+          <Button
             type="submit"
             disabled={creating || !newApp.company_name.trim()}
-            className="mt-3 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+            loading={creating}
+            className="mt-3"
           >
-            {creating ? 'Adding...' : 'Add Application'}
-          </button>
+            Add Application
+          </Button>
         </form>
       )}
 
       {/* Kanban board */}
       {apps.length === 0 ? (
-        <div className="rounded-xl bg-white p-12 text-center ring-1 ring-slate-200">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+        <div className="rounded-xl bg-slate-900 p-12 text-center border border-slate-700/50">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800">
             <span className="text-xl text-slate-400">~</span>
           </div>
-          <h2 className="mb-2 text-base font-semibold text-slate-900">No applications yet</h2>
-          <p className="mx-auto mb-4 max-w-sm text-sm text-slate-500">
+          <h2 className="mb-2 text-base font-semibold text-slate-50">No applications yet</h2>
+          <p className="mx-auto mb-4 max-w-sm text-sm text-slate-400">
             Track your job applications here. Applications from marketplace intros will appear automatically.
           </p>
-          <button
+          <Button
             onClick={() => setShowCreate(true)}
-            className="rounded-lg bg-amber-500 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-600"
+            size="lg"
           >
             Track Your First Application
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="overflow-x-auto pb-4">
@@ -305,9 +306,9 @@ export default function ApplicationsPage() {
               return (
                 <div key={col.key} className="w-56 shrink-0">
                   <div className="mb-2 flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-slate-700">{col.label}</h3>
+                    <h3 className="text-sm font-semibold text-slate-300">{col.label}</h3>
                     {colApps.length > 0 && (
-                      <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">{colApps.length}</span>
+                      <span className="rounded-full bg-slate-700 px-1.5 py-0.5 text-xs text-slate-400">{colApps.length}</span>
                     )}
                   </div>
                   <div className="space-y-2">
@@ -320,7 +321,7 @@ export default function ApplicationsPage() {
                       />
                     ))}
                     {colApps.length === 0 && (
-                      <div className="rounded-lg border-2 border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
+                      <div className="rounded-lg border-2 border-dashed border-slate-700 bg-slate-800/30 p-4 text-center text-xs text-slate-500">
                         No applications
                       </div>
                     )}

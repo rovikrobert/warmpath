@@ -22,7 +22,7 @@ export default function PasswordStrength({ password }) {
           <div
             key={i}
             className={`h-1.5 flex-1 rounded-full transition-colors ${
-              i < passed ? barColor : 'bg-slate-200'
+              i < passed ? barColor : 'bg-slate-700'
             }`}
           />
         ))}
@@ -31,7 +31,7 @@ export default function PasswordStrength({ password }) {
         {rules.map((r) => (
           <li
             key={r.label}
-            className={`text-xs ${r.test(password) ? 'text-green-600' : 'text-slate-400'}`}
+            className={`text-xs ${r.test(password) ? 'text-emerald-400' : 'text-slate-500'}`}
           >
             {r.test(password) ? '\u2713' : '\u2022'} {r.label}
           </li>

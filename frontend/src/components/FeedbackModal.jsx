@@ -34,22 +34,22 @@ export default function FeedbackModal({ feature, resourceId, onClose }) {
 
   return (
     <div
-      className="fixed bottom-6 right-6 z-50 w-72 rounded-xl bg-white shadow-lg ring-1 ring-slate-200"
+      className="fixed bottom-6 right-6 z-50 w-72 rounded-xl bg-slate-900 border border-slate-700/50 shadow-lg"
       role="dialog"
       aria-label="Feedback"
     >
       {submitted ? (
         <div className="px-5 py-4 text-center">
-          <p className="text-sm font-medium text-slate-700">Thanks for the feedback!</p>
+          <p className="text-sm font-medium text-slate-300">Thanks for the feedback!</p>
         </div>
       ) : (
         <div className="px-5 py-4">
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-700">How was this?</p>
+            <p className="text-sm font-medium text-slate-200">How was this?</p>
             <button
               onClick={onClose}
               aria-label="Dismiss feedback"
-              className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+              className="text-slate-500 hover:text-slate-300 text-lg leading-none"
             >
               &times;
             </button>
@@ -64,8 +64,8 @@ export default function FeedbackModal({ feature, resourceId, onClose }) {
                 aria-pressed={rating === r.value}
                 className={`flex h-10 w-10 items-center justify-center rounded-lg text-lg transition ${
                   rating === r.value
-                    ? 'bg-amber-100 ring-2 ring-amber-400'
-                    : 'bg-slate-100 hover:bg-slate-200'
+                    ? 'bg-amber-500/10 ring-2 ring-amber-500'
+                    : 'bg-slate-800 hover:bg-slate-700'
                 }`}
               >
                 {r.icon}
@@ -81,12 +81,12 @@ export default function FeedbackModal({ feature, resourceId, onClose }) {
                 placeholder="Any details? (optional)"
                 aria-label="Feedback comment"
                 rows={2}
-                className="mb-3 w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                className="mb-3 w-full resize-none rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
               />
               <button
                 onClick={handleSubmit}
                 disabled={sending}
-                className="w-full rounded-lg bg-amber-500 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+                className="w-full rounded-lg bg-amber-500 py-2 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50"
               >
                 {sending ? 'Sending...' : 'Submit'}
               </button>

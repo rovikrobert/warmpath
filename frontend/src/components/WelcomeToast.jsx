@@ -5,13 +5,11 @@ export default function WelcomeToast({ onDismiss }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // Delay entry for smooth appearance
     const timer = setTimeout(() => setVisible(true), 500);
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    // Auto-dismiss after 12 seconds
     const timer = setTimeout(() => {
       setVisible(false);
       setTimeout(onDismiss, 300);
@@ -21,7 +19,7 @@ export default function WelcomeToast({ onDismiss }) {
 
   return (
     <div
-      className={`fixed bottom-6 left-6 z-50 w-80 rounded-xl bg-white shadow-lg ring-1 ring-slate-200 transition-all duration-300 ${
+      className={`fixed bottom-6 left-6 z-50 w-80 rounded-xl bg-slate-900 border border-slate-700/50 shadow-lg transition-all duration-300 ${
         visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
       }`}
       role="status"
@@ -31,14 +29,14 @@ export default function WelcomeToast({ onDismiss }) {
         <div className="flex items-start gap-3">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white" aria-hidden="true">~</span>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-slate-900">Welcome to WarmPath!</p>
-            <p className="mt-1 text-xs text-slate-600">
-              You've got <span className="font-semibold text-amber-600">50 credits</span> to get started.
-              Upload your LinkedIn CSV to earn <span className="font-semibold text-amber-600">100 more</span>.
+            <p className="text-sm font-semibold text-slate-50">Welcome to WarmPath!</p>
+            <p className="mt-1 text-xs text-slate-400">
+              You've got <span className="font-semibold text-amber-400">50 credits</span> to get started.
+              Upload your LinkedIn CSV to earn <span className="font-semibold text-amber-400">100 more</span>.
             </p>
             <Link
               to="/contacts"
-              className="mt-2 inline-block rounded-md bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600"
+              className="mt-2 inline-block rounded-md bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-400"
             >
               Upload CSV
             </Link>
@@ -49,7 +47,7 @@ export default function WelcomeToast({ onDismiss }) {
               setTimeout(onDismiss, 300);
             }}
             aria-label="Dismiss welcome message"
-            className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+            className="text-slate-500 hover:text-slate-300 text-lg leading-none"
           >
             &times;
           </button>

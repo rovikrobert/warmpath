@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { privacy as privacyApi, auth as authApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import Spinner from '../components/ui/Spinner';
 
 const REGULATION_OPTIONS = ['GDPR', 'CCPA', 'PDPA', 'Other'];
 const REQUEST_TYPES = [
@@ -150,47 +151,47 @@ export default function PrivacySettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20" role="main" aria-live="polite" aria-busy="true">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading privacy settings" />
+        <Spinner size="lg" />
       </div>
     );
   }
 
-  const inputClass = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
+  const inputClass = 'w-full rounded-lg border border-slate-700/50 bg-slate-800 text-slate-100 placeholder-slate-500 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
 
   return (
     <div className="mx-auto max-w-3xl" role="main">
-      <h1 className="mb-6 text-xl font-bold text-slate-900">Privacy Settings</h1>
+      <h1 className="mb-6 text-xl font-bold text-slate-50">Privacy Settings</h1>
 
       {error && (
-        <div role="alert" aria-live="polite" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+        <div role="alert" aria-live="polite" className="mb-4 rounded-lg bg-red-500/10 p-3 text-sm text-red-400">
           {error}
         </div>
       )}
 
       {/* Data Export */}
-      <section className="mb-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-label="Data export">
-        <h2 className="mb-1 text-base font-semibold text-slate-900">Download My Data</h2>
-        <p className="mb-3 text-sm text-slate-500">
+      <section className="mb-6 rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Data export">
+        <h2 className="mb-1 text-base font-semibold text-slate-50">Download My Data</h2>
+        <p className="mb-3 text-sm text-slate-400">
           Export all your personal data as a JSON file. This includes your profile, contacts, search history, and credit transactions.
         </p>
         <button
           onClick={handleExport}
           disabled={exporting}
-          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50"
         >
           {exporting ? 'Preparing...' : exportDone ? 'Download Again' : 'Download My Data'}
         </button>
         {exportDone && (
-          <p className="mt-2 text-xs text-green-600" role="status">Download started.</p>
+          <p className="mt-2 text-xs text-emerald-400" role="status">Download started.</p>
         )}
       </section>
 
       {/* Processing Restriction */}
-      <section className="mb-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-label="Processing restriction">
+      <section className="mb-6 rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Processing restriction">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Restrict Processing</h2>
-            <p className="text-sm text-slate-500">
+            <h2 className="text-base font-semibold text-slate-50">Restrict Processing</h2>
+            <p className="text-sm text-slate-400">
               Limit how we process your data. Your account will remain active but some features may be unavailable.
             </p>
           </div>
@@ -201,7 +202,7 @@ export default function PrivacySettingsPage() {
             aria-checked={restricted}
             aria-label="Restrict data processing"
             className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${
-              restricted ? 'bg-amber-500' : 'bg-slate-300'
+              restricted ? 'bg-amber-500' : 'bg-slate-600'
             } disabled:opacity-50`}
           >
             <span
@@ -214,11 +215,11 @@ export default function PrivacySettingsPage() {
       </section>
 
       {/* Marketing Preferences */}
-      <section className="mb-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-label="Marketing preferences">
+      <section className="mb-6 rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Marketing preferences">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Marketing Communications</h2>
-            <p className="text-sm text-slate-500">
+            <h2 className="text-base font-semibold text-slate-50">Marketing Communications</h2>
+            <p className="text-sm text-slate-400">
               {marketingOptedOut
                 ? 'You have opted out of marketing emails. Toggle to opt back in.'
                 : 'Receive product updates and tips. Toggle off to opt out.'}
@@ -231,7 +232,7 @@ export default function PrivacySettingsPage() {
             aria-checked={!marketingOptedOut}
             aria-label="Marketing communications"
             className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${
-              !marketingOptedOut ? 'bg-amber-500' : 'bg-slate-300'
+              !marketingOptedOut ? 'bg-amber-500' : 'bg-slate-600'
             } disabled:opacity-50`}
           >
             <span
@@ -244,16 +245,16 @@ export default function PrivacySettingsPage() {
       </section>
 
       {/* Consent Records */}
-      <section className="mb-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-label="Consent records">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">Consent Records</h2>
+      <section className="mb-6 rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Consent records">
+        <h2 className="mb-3 text-base font-semibold text-slate-50">Consent Records</h2>
         {consentRecords.length === 0 ? (
-          <p className="text-sm text-slate-500">No consent records on file.</p>
+          <p className="text-sm text-slate-400">No consent records on file.</p>
         ) : (
           <div className="space-y-2">
             {consentRecords.map((record, i) => (
-              <div key={record.id || i} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
+              <div key={record.id || i} className="flex items-center justify-between rounded-lg border border-slate-700/50 p-3">
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{record.processing_activity || record.activity}</p>
+                  <p className="text-sm font-medium text-slate-50">{record.processing_activity || record.activity}</p>
                   <p className="text-xs text-slate-400">
                     {record.status || (record.consented ? 'Consented' : 'Withdrawn')}
                     {record.created_at && ` — ${new Date(record.created_at).toLocaleDateString()}`}
@@ -261,8 +262,8 @@ export default function PrivacySettingsPage() {
                 </div>
                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                   record.consented || record.status === 'granted'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-slate-100 text-slate-500'
+                    ? 'bg-emerald-500/10 text-emerald-400'
+                    : 'bg-slate-700/50 text-slate-400'
                 }`}>
                   {record.consented || record.status === 'granted' ? 'Active' : 'Withdrawn'}
                 </span>
@@ -273,15 +274,15 @@ export default function PrivacySettingsPage() {
       </section>
 
       {/* Formal Data Request */}
-      <section className="mb-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-label="Formal data request">
-        <h2 className="mb-1 text-base font-semibold text-slate-900">Formal Data Request</h2>
-        <p className="mb-3 text-sm text-slate-500">
+      <section className="mb-6 rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Formal data request">
+        <h2 className="mb-1 text-base font-semibold text-slate-50">Formal Data Request</h2>
+        <p className="mb-3 text-sm text-slate-400">
           Submit a formal data subject access request (DSAR). We will respond within the regulatory deadline.
         </p>
 
         <form onSubmit={handleDataRequest} className="space-y-3">
           <div>
-            <label htmlFor="request-type" className="mb-1 block text-sm font-medium text-slate-700">Request type</label>
+            <label htmlFor="request-type" className="mb-1 block text-sm font-medium text-slate-300">Request type</label>
             <select
               id="request-type"
               value={requestType}
@@ -295,8 +296,8 @@ export default function PrivacySettingsPage() {
           </div>
 
           <div>
-            <label htmlFor="request-details" className="mb-1 block text-sm font-medium text-slate-700">
-              Details <span className="text-slate-400">(optional)</span>
+            <label htmlFor="request-details" className="mb-1 block text-sm font-medium text-slate-300">
+              Details <span className="text-slate-500">(optional)</span>
             </label>
             <textarea
               id="request-details"
@@ -309,7 +310,7 @@ export default function PrivacySettingsPage() {
           </div>
 
           <div>
-            <label htmlFor="request-regulation" className="mb-1 block text-sm font-medium text-slate-700">Regulation</label>
+            <label htmlFor="request-regulation" className="mb-1 block text-sm font-medium text-slate-300">Regulation</label>
             <select
               id="request-regulation"
               value={requestRegulation}
@@ -323,13 +324,13 @@ export default function PrivacySettingsPage() {
           </div>
 
           {requestSuccess && (
-            <p role="status" className="rounded-md bg-green-50 p-2 text-sm text-green-600">{requestSuccess}</p>
+            <p role="status" className="rounded-md bg-emerald-500/10 p-2 text-sm text-emerald-400">{requestSuccess}</p>
           )}
 
           <button
             type="submit"
             disabled={submittingRequest}
-            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50"
           >
             {submittingRequest ? 'Submitting...' : 'Submit Request'}
           </button>
@@ -337,22 +338,22 @@ export default function PrivacySettingsPage() {
       </section>
 
       {/* Delete Account — Danger Zone */}
-      <section className="rounded-xl border-2 border-red-200 bg-white p-5" aria-label="Delete account">
-        <h2 className="mb-1 text-base font-semibold text-red-700">Delete Account</h2>
-        <p className="mb-3 text-sm text-slate-500">
+      <section className="rounded-xl border-2 border-red-500/30 bg-red-500/10 p-5" aria-label="Delete account">
+        <h2 className="mb-1 text-base font-semibold text-red-400">Delete Account</h2>
+        <p className="mb-3 text-sm text-slate-400">
           Permanently delete your account, contacts, search history, and all associated data. This action cannot be undone.
         </p>
 
         {!showDelete ? (
           <button
             onClick={() => setShowDelete(true)}
-            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+            className="rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20"
           >
             Delete My Account
           </button>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-red-600">
+            <p className="text-sm text-red-400">
               Type <strong>DELETE</strong> to confirm permanent deletion:
             </p>
             <input
@@ -361,7 +362,7 @@ export default function PrivacySettingsPage() {
               onChange={(e) => setDeleteConfirm(e.target.value)}
               placeholder="Type DELETE"
               aria-label="Type DELETE to confirm"
-              className="w-full rounded-lg border border-red-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+              className="w-full rounded-lg border border-red-500/30 bg-slate-800 text-slate-100 placeholder-slate-500 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
             />
             <div className="flex gap-2">
               <button
@@ -373,7 +374,7 @@ export default function PrivacySettingsPage() {
               </button>
               <button
                 onClick={() => { setShowDelete(false); setDeleteConfirm(''); }}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                className="rounded-lg border border-slate-700/50 px-4 py-2 text-sm text-slate-400 hover:bg-slate-800"
               >
                 Cancel
               </button>
