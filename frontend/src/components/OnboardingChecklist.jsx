@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { contacts as contactsApi, preferences as prefsApi, marketplace as mpApi } from '../api/client';
 
-const STEPS = [
+const BASE_STEPS = [
   {
     key: 'contacts',
     label: 'Upload your contacts',
@@ -10,6 +11,7 @@ const STEPS = [
     cta: 'Upload CSV',
     href: '/contacts',
     credits: 100,
+    forUserTypes: null, // all users
   },
   {
     key: 'preferences',
@@ -18,6 +20,7 @@ const STEPS = [
     cta: 'Set Preferences',
     href: '/settings?tab=profile',
     credits: null,
+    forUserTypes: null, // all users
   },
   {
     key: 'sharing',
@@ -26,14 +29,22 @@ const STEPS = [
     cta: 'Configure Sharing',
     href: '/settings?tab=sharing',
     credits: null,
+    forUserTypes: ['network_holder', 'both'], // NH only
   },
 ];
 
 export default function OnboardingChecklist() {
+  const { user } = useAuth();
   const [completed, setCompleted] = useState({});
   const [loading, setLoading] = useState(true);
   const [dismissed, setDismissed] = useState(
     () => localStorage.getItem('warmpath_checklist_dismissed') === 'true'
+  );
+
+  // Filter steps by user type
+  const userType = user?.user_type || 'job_seeker';
+  const STEPS = BASE_STEPS.filter(
+    (s) => !s.forUserTypes || s.forUserTypes.includes(userType)
   );
 
   useEffect(() => {
@@ -59,7 +70,9 @@ export default function OnboardingChecklist() {
         done.preferences = prefsRes.status === 'fulfilled' && prefsRes.value?.data?.target_role;
 
         // Sharing: check if user has saved their sharing preferences
-        done.sharing = sharingRes.status === 'fulfilled' && sharingRes.value?.data?.is_configured;
+        // Also consider it done if user is a job_seeker (sharing is NH-only)
+        done.sharing = userType === 'job_seeker'
+          || (sharingRes.status === 'fulfilled' && sharingRes.value?.data?.is_configured);
       } catch {
         // If API calls fail, don't block the UI
       }
@@ -70,7 +83,7 @@ export default function OnboardingChecklist() {
       }
     })();
     return () => { cancelled = true; };
-  }, [dismissed]);
+  }, [dismissed, userType]);
 
   if (dismissed || loading) return null;
 
