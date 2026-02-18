@@ -12,7 +12,7 @@ Endpoints:
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_, select
@@ -309,6 +309,7 @@ async def request_intro(
         marketplace_listing_id=listing.id,
         status="requested",
         job_seeker_profile_snapshot=snapshot,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
     )
     db.add(facilitation)
     await db.flush()

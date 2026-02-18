@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { auth as authApi, credits as creditsApi, onUsageWarning } from '../api/client';
+import WelcomeToast from './WelcomeToast';
+import BetaFeedbackButton from './BetaFeedbackButton';
 
 export default function Layout() {
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshUser, justSignedUp, setJustSignedUp } = useAuth();
   const navigate = useNavigate();
   const [balance, setBalance] = useState(null);
   const [mobileNav, setMobileNav] = useState(false);
@@ -14,6 +16,7 @@ export default function Layout() {
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState('');
   const [verifyDismissed, setVerifyDismissed] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(justSignedUp);
 
   useEffect(() => {
     creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
@@ -237,6 +240,14 @@ export default function Layout() {
           </Link>
         </div>
       </footer>
+
+      {/* Welcome toast for new signups */}
+      {showWelcome && (
+        <WelcomeToast onDismiss={() => { setShowWelcome(false); setJustSignedUp(false); }} />
+      )}
+
+      {/* Beta feedback button */}
+      {import.meta.env.VITE_BETA_MODE === 'true' && <BetaFeedbackButton />}
     </div>
   );
 }

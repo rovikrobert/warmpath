@@ -400,7 +400,23 @@ export default function ReferralResults() {
 
       {companies.length === 0 ? (
         <div className="rounded-xl bg-white p-12 text-center ring-1 ring-slate-200">
-          <p className="text-sm text-slate-500">No results found. Try different companies or expand to marketplace scope.</p>
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100" aria-hidden="true">
+            <svg className="h-7 w-7 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+          </div>
+          <h2 className="mb-2 text-base font-semibold text-slate-900">No referral paths found</h2>
+          <p className="mx-auto mb-4 max-w-sm text-sm text-slate-500">
+            We couldn't find connections at these companies yet. This is a growing network — try different companies, or help grow it by sharing your own network.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <Link to="/referrals" className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600">
+              Try Different Companies
+            </Link>
+            <Link to="/marketplace/settings" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+              Share Your Network
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
