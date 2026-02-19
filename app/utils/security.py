@@ -1,160 +1,83 @@
-import uuid
-from datetime import datetime, timedelta, timezone
+"""Clerk JWT verification and FastAPI auth dependencies.
 
+Replaces the old custom JWT system (jose + passlib) with Clerk's
+RS256 JWKS-based verification. Tokens are issued by Clerk's frontend
+SDK and verified here against Clerk's public JWKS endpoint.
+"""
+
+from functools import lru_cache
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer()
 
-ALGORITHM = "HS256"
+
+@lru_cache()
+def _get_jwks_client():
+    """Return a cached PyJWKClient for Clerk's JWKS endpoint."""
+    from jwt import PyJWKClient
+
+    jwks_url = f"https://{settings.CLERK_DOMAIN}/.well-known/jwks.json"
+    jwks_client = PyJWKClient(jwks_url)
+    return jwks_client
 
 
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+def verify_clerk_token(token: str) -> dict:
+    """Verify a Clerk-issued JWT via JWKS (RS256).
 
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-# ---------------------------------------------------------------------------
-# Token creation
-# ---------------------------------------------------------------------------
-
-
-def create_access_token(user_id: uuid.UUID, token_version: int = 0) -> str:
-    """Create a short-lived access token (15 minutes) with token_version."""
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-    )
-    payload = {
-        "sub": str(user_id),
-        "exp": expire,
-        "ver": token_version,
-        "type": "access",
-    }
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
-
-
-def create_refresh_token(user_id: uuid.UUID, token_version: int = 0) -> str:
-    """Create a long-lived refresh token (7 days) with token_version."""
-    expire = datetime.now(timezone.utc) + timedelta(
-        days=settings.REFRESH_TOKEN_EXPIRE_DAYS
-    )
-    payload = {
-        "sub": str(user_id),
-        "exp": expire,
-        "ver": token_version,
-        "type": "refresh",
-        "jti": str(uuid.uuid4()),  # unique ID for rotation detection
-    }
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
-
-
-# ---------------------------------------------------------------------------
-# Token decoding
-# ---------------------------------------------------------------------------
-
-
-def decode_token(token: str, expected_type: str = "access") -> dict:
-    """Decode and validate a JWT token.
-
-    Returns dict with 'sub' (user_id string), 'ver' (token version).
-    Raises HTTPException on invalid/expired/wrong type.
+    Returns the decoded payload dict on success.
+    Raises HTTPException 401 on any verification failure.
     """
+    import jwt as pyjwt
+
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError:
+        client = _get_jwks_client()
+        signing_key = client.get_signing_key_from_jwt(token)
+        payload = pyjwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            issuer=f"https://{settings.CLERK_DOMAIN}",
+        )
+        return payload
+    except pyjwt.PyJWTError:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
         ) from None
-
-    user_id = payload.get("sub")
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token: missing subject",
-        )
-
-    token_type = payload.get("type", "access")
-    if token_type != expected_type:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Expected {expected_type} token, got {token_type}",
-        )
-
-    return {
-        "sub": user_id,
-        "ver": payload.get("ver", 0),
-    }
-
-
-def decode_access_token(token: str) -> uuid.UUID:
-    """Legacy compat — decode access token and return user_id UUID."""
-    data = decode_token(token, expected_type="access")
-    return uuid.UUID(data["sub"])
-
-
-# ---------------------------------------------------------------------------
-# Current user dependency
-# ---------------------------------------------------------------------------
 
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Decode access token, verify token_version against DB, return user."""
-    data = decode_token(credentials.credentials, expected_type="access")
-    user_id = uuid.UUID(data["sub"])
-    token_version = data["ver"]
-
+    """Verify Clerk JWT, look up user by clerk_user_id, return User."""
+    payload = verify_clerk_token(credentials.credentials)
+    clerk_user_id = payload.get("sub")
+    if not clerk_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token: missing subject",
+        )
     result = await db.execute(
-        select(User).where(User.id == user_id, User.deleted_at.is_(None))
+        select(User).where(
+            User.clerk_user_id == clerk_user_id, User.deleted_at.is_(None)
+        )
     )
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
         )
     if not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is deactivated",
-        )
-    # Check token version — reject if user has invalidated sessions
-    if token_version != user.token_version:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has been revoked",
+            status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated"
         )
     return user
-
-
-def validate_password_strength(password: str) -> None:
-    """Raise ValueError if password doesn't meet requirements."""
-    errors = []
-    if len(password) < 8:
-        errors.append("at least 8 characters")
-    if not any(c.isupper() for c in password):
-        errors.append("one uppercase letter")
-    if not any(c.islower() for c in password):
-        errors.append("one lowercase letter")
-    if not any(c.isdigit() for c in password):
-        errors.append("one number")
-    if errors:
-        raise ValueError(f"Password must contain: {', '.join(errors)}")
 
 
 async def requi[RESEND_KEY_REDACTED](
@@ -172,3 +95,31 @@ async def requi[RESEND_KEY_REDACTED](
             detail="Please verify your email to access marketplace features",
         )
     return current_user
+
+
+def hash_password(password: str) -> str:
+    raise RuntimeError("Legacy auth removed -- use Clerk")
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    raise RuntimeError("Legacy auth removed -- use Clerk")
+
+
+def validate_password_strength(password: str) -> None:
+    raise RuntimeError("Legacy auth removed -- use Clerk")
+
+
+def create_access_token(user_id, token_version: int = 0) -> str:
+    raise RuntimeError("Legacy auth removed -- use Clerk")
+
+
+def create_refresh_token(user_id, token_version: int = 0) -> str:
+    raise RuntimeError("Legacy auth removed -- use Clerk")
+
+
+def decode_token(token: str, expected_type: str = "access") -> dict:
+    raise RuntimeError("Legacy auth removed -- use Clerk")
+
+
+def decode_access_token(token: str):
+    raise RuntimeError("Legacy auth removed -- use Clerk")
