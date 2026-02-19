@@ -526,9 +526,7 @@ async def _signup_and_get_token(
 ) -> str:
     """Create a test user and return auth token."""
     async with TestSessionLocal() as db:
-        _, headers = await create_test_user_in_db(
-            db, email=email, full_name="WS User"
-        )
+        _, headers = await create_test_user_in_db(db, email=email, full_name="WS User")
     return headers["Authorization"].split(" ")[1]
 
 

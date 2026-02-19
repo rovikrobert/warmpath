@@ -136,4 +136,3 @@ class TestResumeUpload:
             log = result.scalar_one_or_none()
             assert log is not None
             assert log.action == "resume_parse"
-

@@ -105,7 +105,10 @@ async def _signup_verified(
     """Create a verified test user with welcome bonus, return headers dict."""
     async with TestSessionLocal() as db:
         user, headers = await create_test_user_in_db(
-            db, email=email, full_name=full_name, email_verified=True,
+            db,
+            email=email,
+            full_name=full_name,
+            email_verified=True,
         )
         # Award welcome bonus (normally done by Clerk webhook)
         await earn_credits(user.id, 50, "welcome_bonus", db)
@@ -672,7 +675,9 @@ async def test_marketplace_anonymization_no_pii(client: AsyncClient):
     holder_headers = await _signup_verified(
         client, "anon_holder@example.com", full_name="Anon Holder"
     )
-    await client.post("/api/v1/contacts/upload", headers=holder_headers, files=_csv_file())
+    await client.post(
+        "/api/v1/contacts/upload", headers=holder_headers, files=_csv_file()
+    )
     await client.put(
         "/api/v1/marketplace/sharing-preferences",
         headers=holder_headers,
@@ -713,7 +718,9 @@ async def test_consent_gate_hides_identity_until_approval(client: AsyncClient):
     holder_headers = await _signup_verified(
         client, "gate_holder@example.com", full_name="Gate Holder"
     )
-    await client.post("/api/v1/contacts/upload", headers=holder_headers, files=_csv_file())
+    await client.post(
+        "/api/v1/contacts/upload", headers=holder_headers, files=_csv_file()
+    )
     await client.put(
         "/api/v1/marketplace/sharing-preferences",
         headers=holder_headers,
@@ -742,13 +749,17 @@ async def test_consent_gate_hides_identity_until_approval(client: AsyncClient):
     )
 
     # Seeker's my-requests: no contact PII
-    my_reqs = await client.get("/api/v1/marketplace/my-requests", headers=seeker_headers)
+    my_reqs = await client.get(
+        "/api/v1/marketplace/my-requests", headers=seeker_headers
+    )
     for r in my_reqs.json()["data"]:
         assert r.get("contact_name") is None
         assert r.get("contact_email") is None
 
     # Holder approves
-    inc = await client.get("/api/v1/marketplace/incoming-requests", headers=holder_headers)
+    inc = await client.get(
+        "/api/v1/marketplace/incoming-requests", headers=holder_headers
+    )
     fid = inc.json()["data"][0]["id"]
     await client.patch(
         f"/api/v1/marketplace/requests/{fid}",
@@ -757,13 +768,17 @@ async def test_consent_gate_hides_identity_until_approval(client: AsyncClient):
     )
 
     # Seeker still sees no contact PII after approval
-    my_reqs2 = await client.get("/api/v1/marketplace/my-requests", headers=seeker_headers)
+    my_reqs2 = await client.get(
+        "/api/v1/marketplace/my-requests", headers=seeker_headers
+    )
     for r in my_reqs2.json()["data"]:
         assert r.get("contact_name") is None
         assert r.get("contact_email") is None
 
     # Holder DOES see their own contact info (it's their data)
-    inc2 = await client.get("/api/v1/marketplace/incoming-requests", headers=holder_headers)
+    inc2 = await client.get(
+        "/api/v1/marketplace/incoming-requests", headers=holder_headers
+    )
     approved = [r for r in inc2.json()["data"] if r["status"] == "approved"]
     assert len(approved) >= 1
     assert approved[0].get("contact_name") is not None
@@ -776,7 +791,9 @@ async def test_unverified_user_blocked_from_marketplace(client: AsyncClient):
     # Create user WITHOUT verifying email
     async with TestSessionLocal() as db:
         _, headers = await create_test_user_in_db(
-            db, email="unverified@example.com", full_name="Unverified User",
+            db,
+            email="unverified@example.com",
+            full_name="Unverified User",
             email_verified=False,
         )
 
@@ -819,7 +836,9 @@ async def test_cross_vault_marketplace_isolation(client: AsyncClient):
     holder_headers = await _signup_verified(
         client, "vault_holder@example.com", full_name="Vault Holder"
     )
-    await client.post("/api/v1/contacts/upload", headers=holder_headers, files=_csv_file())
+    await client.post(
+        "/api/v1/contacts/upload", headers=holder_headers, files=_csv_file()
+    )
     await client.put(
         "/api/v1/marketplace/sharing-preferences",
         headers=holder_headers,

@@ -13,14 +13,10 @@ pytestmark = pytest.mark.anyio
 # ---------------------------------------------------------------------------
 
 
-async def _signup(
-    client: AsyncClient, email: str, name: str = "Test User"
-) -> dict:
+async def _signup(client: AsyncClient, email: str, name: str = "Test User") -> dict:
     """Create a test user and return auth data dict."""
     async with TestSessionLocal() as db:
-        user, headers = await create_test_user_in_db(
-            db, email=email, full_name=name
-        )
+        user, headers = await create_test_user_in_db(db, email=email, full_name=name)
     token = headers["Authorization"].split(" ")[1]
     return {"access_token": token, "user": {"id": str(user.id), "email": email}}
 

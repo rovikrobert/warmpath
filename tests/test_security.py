@@ -31,14 +31,10 @@ def _make_csv(rows: list[list[str]]) -> bytes:
     return buf.getvalue().encode("utf-8")
 
 
-async def _get_auth_token(
-    client: AsyncClient, email: str = "csv@example.com"
-) -> str:
+async def _get_auth_token(client: AsyncClient, email: str = "csv@example.com") -> str:
     """Create a test user and return auth token."""
     async with TestSessionLocal() as db:
-        _, headers = await create_test_user_in_db(
-            db, email=email, full_name="CSV User"
-        )
+        _, headers = await create_test_user_in_db(db, email=email, full_name="CSV User")
     return headers["Authorization"].split(" ")[1]
 
 
@@ -382,5 +378,3 @@ class TestStripeWebhook:
             assert "Missing" in resp.json()["detail"]
         finally:
             settings.STRIPE_WEBHOOK_SECRET = original
-
-

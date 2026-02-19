@@ -4,7 +4,11 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.models.user import User
-from tests.conftest import TestSessionLocal, create_test_user_in_db, create_test_clerk_token
+from tests.conftest import (
+    TestSessionLocal,
+    create_test_user_in_db,
+    create_test_clerk_token,
+)
 
 
 async def test_me_returns_profile_and_capabilities(client: AsyncClient):
