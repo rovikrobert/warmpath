@@ -288,6 +288,7 @@ class TestMarketplaceSearch:
             headers=seeker_auth["headers"],
         )
         assert resp.status_code == 402
+        assert "detail" in resp.json()
 
     async def test_search_no_opted_in_holders(
         self, client: AsyncClient, seeker_with_credits
@@ -407,6 +408,7 @@ class TestIntroRequestFlow:
             headers=seeker_auth["headers"],
         )
         assert resp.status_code == 402
+        assert "detail" in resp.json()
 
     async def test_request_intro_nonexistent_listing(
         self, client: AsyncClient, seeker_with_credits
@@ -452,6 +454,7 @@ class TestIntroRequestFlow:
             headers=holder_auth["headers"],
         )
         assert resp.status_code == 400
+        assert "detail" in resp.json()
 
 
 # ---------------------------------------------------------------------------
@@ -745,17 +748,19 @@ class TestApproveDecline:
         fac_id = await self._create_request(
             client, seeker_with_credits, marketplace_data
         )
-        await client.patch(
+        approve_resp = await client.patch(
             f"/api/v1/marketplace/requests/{fac_id}",
             json={"action": "approve"},
             headers=holder_auth["headers"],
         )
+        assert approve_resp.status_code == 200
         resp = await client.patch(
             f"/api/v1/marketplace/requests/{fac_id}",
             json={"action": "decline"},
             headers=holder_auth["headers"],
         )
         assert resp.status_code == 400
+        assert "detail" in resp.json()
 
     async def test_invalid_action(
         self, client: AsyncClient, seeker_with_credits, holder_auth, marketplace_data
@@ -1017,6 +1022,7 @@ class TestSmartSearchMarketplace:
             headers=seeker_auth["headers"],
         )
         assert resp.status_code == 402
+        assert "detail" in resp.json()
 
     async def test_own_network_scope_is_free(self, client: AsyncClient, seeker_auth):
         """Own-network scope doesn't require credits."""
