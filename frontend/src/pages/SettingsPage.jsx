@@ -728,14 +728,15 @@ function AccountTab() {
       {/* Security — managed by Clerk */}
       <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Security">
         <h2 className="mb-3 text-base font-semibold text-slate-50">Security</h2>
-        <div className="[&_.cl-rootBox]:w-full [&_.cl-card]:bg-transparent [&_.cl-card]:shadow-none [&_.cl-card]:p-0 [&_.cl-navbar]:hidden [&_.cl-headerTitle]:hidden [&_.cl-headerSubtitle]:hidden [&_.cl-profilePage]:p-0">
+        <div className="overflow-hidden rounded-lg [&_.cl-rootBox]:w-full [&_.cl-card]:bg-transparent [&_.cl-card]:shadow-none [&_.cl-card]:p-0 [&_.cl-card]:border-none [&_.cl-navbar]:hidden [&_.cl-headerTitle]:hidden [&_.cl-headerSubtitle]:hidden [&_.cl-profilePage]:p-0 [&_.cl-pageScrollBox]:p-0 [&_.cl-profileSection__activeDevices]:hidden">
           <UserProfile
             appearance={{
               elements: {
-                rootBox: 'w-full',
-                card: 'bg-transparent shadow-none border-none p-0',
+                rootBox: 'w-full max-w-full',
+                card: 'bg-transparent shadow-none border-none p-0 max-w-full',
                 navbar: 'hidden',
-                pageScrollBox: 'p-0',
+                pageScrollBox: 'p-0 max-w-full',
+                page: 'max-w-full',
               },
             }}
           />

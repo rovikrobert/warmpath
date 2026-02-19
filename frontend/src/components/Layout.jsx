@@ -168,7 +168,7 @@ export default function Layout() {
                 {balance ?? '—'} credits
               </Link>
               <div className="flex items-center gap-2">
-                <UserButton afterSignOutUrl="/" />
+                <UserButton signInUrl="/" />
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm font-medium text-slate-200">{user?.full_name}</p>
                 </div>
@@ -177,7 +177,7 @@ export default function Layout() {
           )}
           {collapsed && (
             <div className="flex flex-col items-center gap-2">
-              <UserButton afterSignOutUrl="/" />
+              <UserButton signInUrl="/" />
             </div>
           )}
         </div>
@@ -262,7 +262,7 @@ export default function Layout() {
               </NavLink>
               <div className="mx-4 my-2 border-t border-slate-700/50" />
               <div className="flex items-center gap-3 px-4 py-2.5">
-                <UserButton afterSignOutUrl="/" />
+                <UserButton signInUrl="/" />
                 <span className="text-sm text-slate-400">Account</span>
               </div>
             </nav>

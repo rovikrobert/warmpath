@@ -23,7 +23,7 @@ export default function AuthPage() {
           {isSignup ? (
             <SignUp
               routing="hash"
-              afterSignUpUrl="/onboarding"
+              fallbackRedirectUrl="/onboarding"
               signInUrl="/"
               appearance={{
                 elements: {
@@ -35,7 +35,7 @@ export default function AuthPage() {
           ) : (
             <SignIn
               routing="hash"
-              afterSignInUrl="/coach"
+              fallbackRedirectUrl="/coach"
               signUpUrl="/#sign-up"
               appearance={{
                 elements: {
