@@ -41,9 +41,8 @@ def verify_clerk_token(token: str) -> dict:
     import jwt as pyjwt
 
     try:
-        # Debug: log token shape to diagnose auth failures
         parts = token.split(".") if token else []
-        logger.info(
+        logger.warning(
             "JWT debug: len=%d parts=%d first20=%r",
             len(token) if token else 0,
             len(parts),
