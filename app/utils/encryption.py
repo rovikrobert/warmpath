@@ -7,17 +7,27 @@ sees plaintext; the database stores ciphertext.
 compute_blind_index() — HMAC-SHA256 deterministic hash for exact-match
 lookups on encrypted columns (suppression system, dedup).
 """
+
 import hashlib
 import hmac
 import logging
+
 from cryptography.fernet import Fernet
 from sqlalchemy import Text
 from sqlalchemy.types import TypeDecorator
+
 from app.config import settings
 from app.utils.hashing import hash_for_suppression
+
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Cached Fernet singleton — avoids creating a new instance per value
+# ---------------------------------------------------------------------------
+
 _fernet: Fernet | None = None
 _fernet_checked = False
+
 
 def _get_fernet() -> Fernet | None:
     """Return the cached Fernet instance, or None if ENCRYPTION_KEY is empty."""
@@ -25,12 +35,13 @@ def _get_fernet() -> Fernet | None:
     if not _fernet_checked:
         key = settings.ENCRYPTION_KEY
         if not key:
-            logger.warning('ENCRYPTION_KEY not set — PII stored as plaintext')
+            logger.warning("ENCRYPTION_KEY not set — PII stored as plaintext")
             _fernet = None
         else:
             _fernet = Fernet(key.encode())
         _fernet_checked = True
     return _fernet
+
 
 class EncryptedString(TypeDecorator):
     """VARCHAR replacement that Fernet-encrypts on bind and decrypts on load.
@@ -38,6 +49,7 @@ class EncryptedString(TypeDecorator):
     Stores as TEXT because ciphertext is longer than the original value.
     When ENCRYPTION_KEY is empty the column behaves like plain Text().
     """
+
     impl = Text
     cache_ok = True
 
@@ -58,10 +70,15 @@ class EncryptedString(TypeDecorator):
         try:
             return f.decrypt(value.encode()).decode()
         except Exception:
+            # Graceful fallback: pre-encryption plaintext rows survive migration.
+            # Fernet tokens always start with "gAAAAA" so real plaintext will
+            # fail decryption and fall through here.
             return value
+
 
 class EncryptedText(TypeDecorator):
     """Text replacement for longer fields (notes, how_you_know)."""
+
     impl = Text
     cache_ok = True
 
@@ -78,11 +95,12 @@ class EncryptedText(TypeDecorator):
             return None
         f = _get_fernet()
         if f is None:
-            return None
+            return value
         try:
             return f.decrypt(value.encode()).decode()
         except Exception:
             return value
+
 
 def compute_blind_index(value: str) -> str:
     """HMAC-SHA256 deterministic hash for exact-match lookups.
@@ -93,4 +111,6 @@ def compute_blind_index(value: str) -> str:
     key = settings.BLIND_INDEX_KEY
     if not key:
         return hash_for_suppression(value)
-    return hmac.new(key.encode(), value.lower().strip().encode(), hashlib.sha256).hexdigest()
+    return hmac.new(
+        key.encode(), value.lower().strip().encode(), hashlib.sha256
+    ).hexdigest()

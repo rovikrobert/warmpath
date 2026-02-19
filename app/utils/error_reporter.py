@@ -113,6 +113,10 @@ def _send_via_telegram(message: str) -> None:
                 payload = {"chat_id": chat_id, "text": chunk}
                 response = client.post(url, json=payload)
                 response.raise_for_status()
-        logger.info("Error alert sent via Telegram (%d part%s)", len(chunks), "s" if len(chunks) > 1 else "")
+        logger.info(
+            "Error alert sent via Telegram (%d part%s)",
+            len(chunks),
+            "s" if len(chunks) > 1 else "",
+        )
     except Exception:
         logger.warning("Telegram error alert failed", exc_info=True)
