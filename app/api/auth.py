@@ -9,7 +9,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -163,6 +163,81 @@ async def update_intent(
         "data": {"intent": current_user.intent},
         "meta": {},
     }
+
+
+@router.post("/onboarding-complete")
+async def complete_onboarding(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Validate all onboarding steps and stamp completion timestamp."""
+    from app.models.contact import Contact
+    from app.models.job import UserJobPreferences
+    from app.services.capabilities import compute_user_capabilities
+
+    # Already completed — idempotent
+    if current_user.onboarding_completed_at is not None:
+        caps = await compute_user_capabilities(current_user.id, db)
+        response = UserResponse.model_validate(current_user).model_dump(mode="json")
+        response["onboarding_complete"] = True
+        response["capabilities"] = caps.model_dump()
+        return {"data": response, "meta": {}}
+
+    # Validate all required steps
+    missing = []
+
+    # Step 2: intent
+    if not current_user.intent:
+        missing.append("Intent not set (step 2)")
+
+    # Step 1: job preferences with target_role
+    prefs = (
+        await db.execute(
+            select(UserJobPreferences).where(
+                UserJobPreferences.user_id == current_user.id
+            )
+        )
+    ).scalar_one_or_none()
+    if not prefs or not prefs.target_role:
+        missing.append("Job preferences with target role not set (step 1)")
+
+    # Step 8: at least one contact
+    contact_count = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Contact)
+            .where(Contact.user_id == current_user.id)
+        )
+        or 0
+    )
+    if contact_count == 0:
+        missing.append("No contacts uploaded (step 8)")
+
+    # Step 9: connector profile with work history
+    profile = (
+        await db.execute(
+            select(ConnectorProfile).where(ConnectorProfile.user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
+    if not profile or not profile.work_history:
+        missing.append("Work history not added (step 9)")
+
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Onboarding incomplete: {'; '.join(missing)}",
+        )
+
+    # Stamp completion
+    current_user.onboarding_completed_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(current_user)
+
+    caps = await compute_user_capabilities(current_user.id, db)
+    response = UserResponse.model_validate(current_user).model_dump(mode="json")
+    response["onboarding_complete"] = True
+    response["capabilities"] = caps.model_dump()
+    return {"data": response, "meta": {}}
 
 
 @router.post("/profile")

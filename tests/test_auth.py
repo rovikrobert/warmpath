@@ -93,7 +93,9 @@ async def test_intent_update_with_full_name(client: AsyncClient):
     assert me_resp.json()["data"]["full_name"] == "Jane Doe"
 
 
-async def test_intent_update_without_full_name_leaves_name_unchanged(client: AsyncClient):
+async def test_intent_update_without_full_name_leaves_name_unchanged(
+    client: AsyncClient,
+):
     """PATCH /intent without full_name does not change existing name."""
     async with TestSessionLocal() as db:
         user, headers = await create_test_user_in_db(
@@ -186,7 +188,12 @@ async def test_onboarding_complete_rejects_when_no_contacts(client: AsyncClient)
             db, email="nocontacts@test.com", full_name="No Contacts"
         )
         user.intent = "find_referrals"
-        prefs = UserJobPreferences(user_id=user.id, target_role="Engineer")
+        prefs = UserJobPreferences(
+            user_id=user.id,
+            target_role="Engineer",
+            target_industries=[],
+            target_locations=[],
+        )
         db.add(prefs)
         await db.commit()
     resp = await client.post("/api/v1/auth/onboarding-complete", headers=headers)
@@ -205,14 +212,20 @@ async def test_onboarding_complete_rejects_when_no_work_history(client: AsyncCli
             db, email="nowork@test.com", full_name="No Work"
         )
         user.intent = "find_referrals"
-        prefs = UserJobPreferences(user_id=user.id, target_role="Engineer")
+        prefs = UserJobPreferences(
+            user_id=user.id,
+            target_role="Engineer",
+            target_industries=[],
+            target_locations=[],
+        )
         db.add(prefs)
         contact = Contact(
             user_id=user.id,
+            full_name="Jane Doe",
             first_name="Jane",
             last_name="Doe",
-            company="Acme",
-            position="Engineer",
+            current_company="Acme",
+            current_title="Engineer",
         )
         db.add(contact)
         await db.commit()
@@ -233,14 +246,20 @@ async def test_onboarding_complete_succeeds_with_all_steps(client: AsyncClient):
             db, email="allsteps@test.com", full_name="All Steps"
         )
         user.intent = "find_referrals"
-        prefs = UserJobPreferences(user_id=user.id, target_role="Engineer")
+        prefs = UserJobPreferences(
+            user_id=user.id,
+            target_role="Engineer",
+            target_industries=[],
+            target_locations=[],
+        )
         db.add(prefs)
         contact = Contact(
             user_id=user.id,
+            full_name="Jane Doe",
             first_name="Jane",
             last_name="Doe",
-            company="Acme",
-            position="Engineer",
+            current_company="Acme",
+            current_title="Engineer",
         )
         db.add(contact)
         profile = ConnectorProfile(
@@ -266,14 +285,20 @@ async def test_onboarding_complete_is_idempotent(client: AsyncClient):
             db, email="idempotent@test.com", full_name="Idempotent"
         )
         user.intent = "explore"
-        prefs = UserJobPreferences(user_id=user.id, target_role="PM")
+        prefs = UserJobPreferences(
+            user_id=user.id,
+            target_role="PM",
+            target_industries=[],
+            target_locations=[],
+        )
         db.add(prefs)
         contact = Contact(
             user_id=user.id,
+            full_name="Bob Smith",
             first_name="Bob",
             last_name="Smith",
-            company="BigCo",
-            position="PM",
+            current_company="BigCo",
+            current_title="PM",
         )
         db.add(contact)
         profile = ConnectorProfile(
