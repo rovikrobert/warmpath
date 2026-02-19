@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { UserProfile } from '@clerk/clerk-react';
+import { useUser as useClerkUser } from '@clerk/clerk-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../context/AuthContext';
 import { auth as authApi, privacy as privacyApi, marketplace as mpApi, contacts as contactsApi } from '../api/client';
 import Spinner from '../components/ui/Spinner';
@@ -672,11 +673,326 @@ function SharingTab() {
 }
 
 // ---------------------------------------------------------------------------
+// Section: Password (within Account tab)
+// ---------------------------------------------------------------------------
+
+function PasswordSection({ clerkUser }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  if (!clerkUser?.passwordEnabled) return null;
+
+  const mismatch = confirmPassword && newPassword !== confirmPassword;
+  const tooShort = newPassword && newPassword.length < 8;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (mismatch || tooShort || !currentPassword || !newPassword) return;
+    setSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      await clerkUser.updatePassword({ currentPassword, newPassword });
+      setSuccess('Password updated.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      setError(err.errors?.[0]?.longMessage || err.message || 'Failed to update password.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputClass = 'w-full rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
+
+  return (
+    <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Password">
+      <h2 className="mb-3 text-base font-semibold text-slate-50">Password</h2>
+      <form onSubmit={handleSubmit} className="space-y-3 max-w-sm">
+        <div>
+          <label htmlFor="current-pw" className="mb-1 block text-xs font-medium text-slate-400">Current password</label>
+          <input id="current-pw" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)}
+            className={inputClass} autoComplete="current-password" />
+        </div>
+        <div>
+          <label htmlFor="new-pw" className="mb-1 block text-xs font-medium text-slate-400">New password</label>
+          <input id="new-pw" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+            className={inputClass} autoComplete="new-password" />
+          {tooShort && <p className="mt-1 text-xs text-amber-400">Must be at least 8 characters</p>}
+        </div>
+        <div>
+          <label htmlFor="confirm-pw" className="mb-1 block text-xs font-medium text-slate-400">Confirm new password</label>
+          <input id="confirm-pw" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+            className={inputClass} autoComplete="new-password" />
+          {mismatch && <p className="mt-1 text-xs text-red-400">Passwords do not match</p>}
+        </div>
+        {error && <p className="rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert">{error}</p>}
+        {success && <p className="rounded-md bg-emerald-500/10 p-2 text-sm text-emerald-400" role="status">{success}</p>}
+        <button type="submit" disabled={saving || mismatch || tooShort || !currentPassword || !newPassword || !confirmPassword}
+          className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
+          {saving ? 'Updating...' : 'Update Password'}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section: Two-Factor Authentication (within Account tab)
+// ---------------------------------------------------------------------------
+
+function TwoFactorSection({ clerkUser }) {
+  const [step, setStep] = useState('idle');
+  const [totp, setTotp] = useState(null);
+  const [code, setCode] = useState('');
+  const [backupCodes, setBackupCodes] = useState(null);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const startSetup = async () => {
+    setError('');
+    try {
+      const resource = await clerkUser.createTOTP();
+      setTotp(resource);
+      setStep('qr');
+    } catch (err) {
+      setError(err.errors?.[0]?.longMessage || err.message || 'Failed to start 2FA setup.');
+    }
+  };
+
+  const verifyCode = async () => {
+    setError('');
+    try {
+      await clerkUser.verifyTOTP({ code });
+      const backup = await clerkUser.createBackupCode();
+      setBackupCodes(backup);
+      setStep('backup');
+    } catch (err) {
+      setError(err.errors?.[0]?.longMessage || err.message || 'Invalid code. Try again.');
+    }
+  };
+
+  const disable2FA = async () => {
+    setError('');
+    setStep('disabling');
+    try {
+      await clerkUser.disableTOTP();
+      setStep('idle');
+      setTotp(null);
+      setCode('');
+      setBackupCodes(null);
+    } catch (err) {
+      setError(err.errors?.[0]?.longMessage || err.message || 'Failed to disable 2FA.');
+      setStep('idle');
+    }
+  };
+
+  const copyBackupCodes = () => {
+    if (backupCodes?.codes) {
+      navigator.clipboard.writeText(backupCodes.codes.join('\n'));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const isEnabled = clerkUser?.totpEnabled;
+
+  return (
+    <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Two-factor authentication">
+      <div className="mb-3 flex items-center gap-3">
+        <h2 className="text-base font-semibold text-slate-50">Two-Factor Authentication</h2>
+        {isEnabled ? (
+          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">Enabled</span>
+        ) : (
+          <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">Not set up</span>
+        )}
+      </div>
+
+      {error && <p className="mb-3 rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert">{error}</p>}
+
+      {step === 'idle' && !isEnabled && (
+        <div>
+          <p className="mb-3 text-sm text-slate-400">Add an extra layer of security with an authenticator app.</p>
+          <button onClick={startSetup}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">
+            Enable 2FA
+          </button>
+        </div>
+      )}
+
+      {step === 'idle' && isEnabled && (
+        <div>
+          <p className="mb-3 text-sm text-slate-400">Your account is protected with an authenticator app.</p>
+          <button onClick={disable2FA}
+            className="rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20">
+            Disable 2FA
+          </button>
+        </div>
+      )}
+
+      {step === 'disabling' && (
+        <p className="text-sm text-slate-400">Disabling...</p>
+      )}
+
+      {step === 'qr' && totp && (
+        <div className="space-y-4">
+          <p className="text-sm text-slate-400">Scan this QR code with your authenticator app (Google Authenticator, Authy, 1Password, etc.):</p>
+          <div className="inline-block rounded-lg bg-white p-3">
+            <QRCodeSVG value={totp.uri || ''} size={180} />
+          </div>
+          <details className="text-xs text-slate-500">
+            <summary className="cursor-pointer hover:text-slate-400">Can&apos;t scan? Use manual entry</summary>
+            <code className="mt-1 block break-all rounded bg-slate-800 p-2 text-slate-300">{totp.uri}</code>
+          </details>
+          <button onClick={() => setStep('verify')}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">
+            Next: Verify Code
+          </button>
+        </div>
+      )}
+
+      {step === 'verify' && (
+        <div className="space-y-3 max-w-xs">
+          <p className="text-sm text-slate-400">Enter the 6-digit code from your authenticator app:</p>
+          <input type="text" inputMode="numeric" maxLength={6} value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+            className="w-full rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-center text-lg tracking-widest text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            placeholder="000000" autoFocus />
+          <button onClick={verifyCode} disabled={code.length !== 6}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
+            Verify
+          </button>
+        </div>
+      )}
+
+      {step === 'backup' && backupCodes && (
+        <div className="space-y-3">
+          <p className="text-sm text-emerald-400 font-medium">2FA enabled successfully!</p>
+          <p className="text-sm text-slate-400">Save these backup codes somewhere safe. Each code can only be used once.</p>
+          <div className="rounded-lg bg-slate-800 p-3">
+            <ul className="grid grid-cols-2 gap-1 text-sm font-mono text-slate-300">
+              {backupCodes.codes.map((c, i) => <li key={i}>{c}</li>)}
+            </ul>
+          </div>
+          <div>
+            <button onClick={copyBackupCodes}
+              className="rounded-lg border border-slate-700/50 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800">
+              {copied ? 'Copied!' : 'Copy All'}
+            </button>
+            <button onClick={() => { setStep('idle'); setTotp(null); setCode(''); setBackupCodes(null); }}
+              className="ml-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section: Connected Accounts (within Account tab)
+// ---------------------------------------------------------------------------
+
+const OAUTH_PROVIDERS = [
+  { strategy: 'oauth_google', label: 'Google', icon: 'G' },
+  { strategy: 'oauth_linkedin_oidc', label: 'LinkedIn', icon: 'in' },
+];
+
+function ConnectedAccountsSection({ clerkUser }) {
+  const [error, setError] = useState('');
+  const [connecting, setConnecting] = useState(null);
+
+  const connected = clerkUser?.externalAccounts || [];
+
+  const normalizeProvider = (strategy) => strategy.replace('oauth_', '').replace('_oidc', '');
+
+  const isConnected = (strategy) =>
+    connected.some((a) => a.provider === normalizeProvider(strategy));
+
+  const handleConnect = async (strategy) => {
+    setError('');
+    setConnecting(strategy);
+    try {
+      const res = await clerkUser.createExternalAccount({
+        strategy,
+        redirectUrl: window.location.origin + '/settings?tab=account',
+      });
+      if (res?.verification?.externalVerificationRedirectURL) {
+        window.location.href = res.verification.externalVerificationRedirectURL.href;
+      }
+    } catch (err) {
+      setError(err.errors?.[0]?.longMessage || err.message || 'Failed to connect account.');
+      setConnecting(null);
+    }
+  };
+
+  const handleDisconnect = async (account) => {
+    setError('');
+    try {
+      await account.destroy();
+    } catch (err) {
+      setError(err.errors?.[0]?.longMessage || err.message || 'Failed to disconnect account.');
+    }
+  };
+
+  return (
+    <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Connected accounts">
+      <h2 className="mb-3 text-base font-semibold text-slate-50">Connected Accounts</h2>
+
+      {error && <p className="mb-3 rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert">{error}</p>}
+
+      <div className="space-y-3">
+        {connected.map((account) => (
+          <div key={account.id} className="flex items-center justify-between rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-bold text-slate-300">
+                {account.provider === 'google' ? 'G' : account.provider === 'linkedin' || account.provider === 'linkedin_oidc' ? 'in' : account.provider.charAt(0).toUpperCase()}
+              </span>
+              <div>
+                <p className="text-sm font-medium text-slate-200 capitalize">{account.provider.replace('_oidc', '')}</p>
+                <p className="text-xs text-slate-500">{account.emailAddress || ''}</p>
+              </div>
+            </div>
+            <button onClick={() => handleDisconnect(account)}
+              className="rounded-lg border border-slate-700/50 px-3 py-1.5 text-xs text-slate-400 hover:border-red-500/30 hover:text-red-400">
+              Disconnect
+            </button>
+          </div>
+        ))}
+
+        {OAUTH_PROVIDERS.filter((p) => !isConnected(p.strategy)).map((provider) => (
+          <div key={provider.strategy} className="flex items-center justify-between rounded-lg border border-dashed border-slate-700/50 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-slate-500">
+                {provider.icon}
+              </span>
+              <p className="text-sm text-slate-500">{provider.label}</p>
+            </div>
+            <button onClick={() => handleConnect(provider.strategy)}
+              disabled={connecting === provider.strategy}
+              className="rounded-lg border border-amber-500/30 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/10 disabled:opacity-50">
+              {connecting === provider.strategy ? 'Connecting...' : 'Connect'}
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Tab: Account
 // ---------------------------------------------------------------------------
 
 function AccountTab() {
   const { user, logout } = useAuth();
+  const { user: clerkUser } = useClerkUser();
   const navigate = useNavigate();
 
   // Delete account state
@@ -699,50 +1015,47 @@ function AccountTab() {
     }
   };
 
+  const primaryEmail = clerkUser?.primaryEmailAddress;
+
   return (
     <div className="space-y-6">
-      {/* Account info */}
+      {/* Account info — sourced from Clerk */}
       <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Account info">
         <h2 className="mb-3 text-base font-semibold text-slate-50">Account Info</h2>
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-slate-300">Name:</span>
-            <span className="text-slate-400">{user?.full_name || '—'}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-slate-300">Email:</span>
-            <span className="text-slate-400">{user?.email || '—'}</span>
-            {user?.email_verified ? (
-              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-400">Verified</span>
-            ) : (
-              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-400">Unverified</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-slate-300">Intent:</span>
-            <span className="text-slate-400 capitalize">{user?.intent?.replace('_', ' ') || 'Not set'}</span>
+        <div className="flex items-start gap-4">
+          {clerkUser?.imageUrl && (
+            <img src={clerkUser.imageUrl} alt="" className="h-12 w-12 rounded-full border border-slate-700/50" />
+          )}
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-slate-300">Name:</span>
+              <span className="text-slate-400">{clerkUser?.fullName || '—'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-slate-300">Email:</span>
+              <span className="text-slate-400">{primaryEmail?.emailAddress || '—'}</span>
+              {primaryEmail?.verification?.status === 'verified' ? (
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-400">Verified</span>
+              ) : (
+                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-400">Unverified</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-slate-300">Intent:</span>
+              <span className="text-slate-400 capitalize">{user?.intent?.replace('_', ' ') || 'Not set'}</span>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Security — managed by Clerk */}
-      <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Security">
-        <h2 className="mb-3 text-base font-semibold text-slate-50">Security</h2>
-        <div className="overflow-hidden rounded-lg [&_.cl-rootBox]:w-full [&_.cl-card]:bg-transparent [&_.cl-card]:shadow-none [&_.cl-card]:p-0 [&_.cl-card]:border-none [&_.cl-navbar]:hidden [&_.cl-headerTitle]:hidden [&_.cl-headerSubtitle]:hidden [&_.cl-profilePage]:p-0 [&_.cl-pageScrollBox]:p-0 [&_.cl-profileSection__activeDevices]:hidden [&_.cl-profileSection__danger]:hidden">
-          <UserProfile
-            appearance={{
-              elements: {
-                rootBox: 'w-full max-w-full',
-                card: 'bg-transparent shadow-none border-none p-0 max-w-full',
-                navbar: 'hidden',
-                pageScrollBox: 'p-0 max-w-full',
-                page: 'max-w-full',
-                profileSection__danger: 'hidden',
-              },
-            }}
-          />
-        </div>
-      </section>
+      {/* Password — only if user has password auth enabled */}
+      <PasswordSection clerkUser={clerkUser} />
+
+      {/* Two-factor authentication */}
+      <TwoFactorSection clerkUser={clerkUser} />
+
+      {/* Connected accounts (Google, LinkedIn) */}
+      <ConnectedAccountsSection clerkUser={clerkUser} />
 
       {/* Delete Account — Danger Zone */}
       <section className="rounded-xl border-2 border-red-500/30 bg-red-500/10 p-5" aria-label="Delete account">
