@@ -111,7 +111,11 @@ export async function api(path, options = {}) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    const message = err.detail || err.error?.message || 'Request failed';
+    let message = err.detail || err.error?.message || 'Request failed';
+    // Pydantic validation errors come as an array of {msg, loc, ...} objects
+    if (Array.isArray(message)) {
+      message = message.map((e) => e.msg || JSON.stringify(e)).join('; ');
+    }
     const error = new Error(typeof message === 'string' ? message : JSON.stringify(message));
     error.status = res.status;
     throw error;
