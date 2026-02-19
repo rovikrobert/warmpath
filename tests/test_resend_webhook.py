@@ -22,8 +22,7 @@ async def campaign_log_with_external_id() -> str:
     """Create a campaign log entry with an external_id, return the external_id."""
     eid = f"resend_{uuid_mod.uuid4().hex[:12]}"
     async with TestSessionLocal() as db:
-        user = User(
-            email="webhook@test.com", full_name="Webhook Tester"        )
+        user = User(email="webhook@test.com", full_name="Webhook Tester")
         db.add(user)
         await db.flush()
 
