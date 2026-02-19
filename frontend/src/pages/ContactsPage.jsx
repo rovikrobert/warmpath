@@ -205,6 +205,7 @@ function BulkImportModal({ onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef(null);
 
   const handleFile = (e) => {
@@ -214,6 +215,20 @@ function BulkImportModal({ onClose, onSuccess }) {
     reader.onload = (ev) => setCsvText(ev.target.result);
     reader.readAsText(file);
   };
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const f = e.dataTransfer.files[0];
+    if (f && f.name.endsWith('.csv')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setCsvText(ev.target.result);
+      reader.readAsText(f);
+      setError('');
+    } else {
+      setError('Please drop a .csv file');
+    }
+  }, []);
 
   // Parse a CSV line respecting quoted fields (handles commas inside quotes)
   const parseCsvLine = (line) => {
@@ -308,23 +323,47 @@ function BulkImportModal({ onClose, onSuccess }) {
         ) : !preview ? (
           <div className="space-y-3">
             <p className="text-sm text-slate-400">
-              Paste or upload a CSV with columns: <code className="rounded bg-slate-800 px-1 text-xs">name, company, title, relationship, how_you_know</code>
+              Drop a CSV file or paste data below. Expected columns:{' '}
+              <code className="rounded bg-slate-800 px-1 text-xs">name, company, title, relationship, how_you_know</code>
             </p>
+
+            {/* Drop zone */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileRef.current?.click()}
+              className={`cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition ${
+                dragOver
+                  ? 'border-amber-500 bg-amber-500/10'
+                  : 'border-slate-600 hover:border-amber-500 hover:bg-slate-800/50'
+              }`}
+            >
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleFile}
+                aria-label="Upload CSV file"
+              />
+              <p className="text-sm text-slate-400">
+                Drag and drop a .csv file here, or click to browse
+              </p>
+              <p className="mt-1 text-xs text-slate-500">.csv files only</p>
+            </div>
+
+            {/* Paste fallback */}
             <label htmlFor="bulk-csv-text" className="sr-only">CSV data</label>
             <textarea
               id="bulk-csv-text"
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
-              rows={6}
+              rows={4}
               className="w-full rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-              placeholder={'name,company,title,relationship,how_you_know\nJohn Smith,TechCo,Engineer,friend,College buddy\nJane Doe,BigCorp,VP Product,former_colleague,Worked together'}
+              placeholder={'name,company,title,relationship,how_you_know\nJohn Smith,TechCo,Engineer,friend,College buddy'}
             />
-            <div className="flex items-center gap-3">
-              <button onClick={() => fileRef.current?.click()} className="text-sm text-amber-400 hover:text-amber-300">
-                Or upload a .csv file
-              </button>
-              <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} aria-label="Upload CSV file" />
-            </div>
+
             {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
             <button
               onClick={parsePreview}
