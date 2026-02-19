@@ -37,6 +37,8 @@ max-complexity = 15
 # FastAPI uses Depends() in function defaults — B008 is a false positive
 "app/api/*.py" = ["B008"]
 "app/utils/security.py" = ["B008"]
+# conftest.py must set env vars + monkey-patch before importing app modules
+"tests/conftest.py" = ["E402"]
 # Inherently complex: scoring algorithms, state machines, prompt templates
 "app/services/ai_matcher.py" = ["C901"]
 "app/services/intro_drafter.py" = ["C901"]
