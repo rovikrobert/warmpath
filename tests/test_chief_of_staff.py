@@ -1945,6 +1945,61 @@ class TestCosWiringIntegration:
 # ---------------------------------------------------------------------------
 
 
+class TestBuildTeamDetailMarkdown:
+    """Tests for _build_team_detail_markdown rich dashboard content."""
+
+    def test_empty_reports_returns_empty(self):
+        from agents.chief_of_staff.cos_agent import _build_team_detail_markdown
+
+        assert _build_team_detail_markdown("engineering", []) == ""
+
+    def test_includes_severity_distribution(self, sample_reports):
+        from agents.chief_of_staff.cos_agent import _build_team_detail_markdown
+
+        md = _build_team_detail_markdown("engineering", sample_reports)
+        assert "## Severity Distribution" in md
+        assert "Critical: 1" in md
+        assert "High: 1" in md
+        assert "Medium: 1" in md
+
+    def test_includes_agent_breakdown(self, sample_reports):
+        from agents.chief_of_staff.cos_agent import _build_team_detail_markdown
+
+        md = _build_team_detail_markdown("engineering", sample_reports)
+        assert "## Agent Breakdown" in md
+        assert "security:" in md
+        assert "architect:" in md
+
+    def test_includes_top_findings_sorted_by_severity(self, sample_reports):
+        from agents.chief_of_staff.cos_agent import _build_team_detail_markdown
+
+        md = _build_team_detail_markdown("engineering", sample_reports)
+        assert "## Top Findings" in md
+        assert "[CRITICAL]" in md
+        # Critical should appear before medium
+        crit_pos = md.index("[CRITICAL]")
+        medium_pos = md.index("[MEDIUM]")
+        assert crit_pos < medium_pos
+
+    def test_includes_metrics(self):
+        from agents.chief_of_staff.cos_agent import _build_team_detail_markdown
+
+        reports = [
+            _make_report("analyst", metrics={"funnel_coverage": 0.58, "endpoints": 106}),
+        ]
+        md = _build_team_detail_markdown("data", reports)
+        assert "## Key Metrics" in md
+        assert "funnel_coverage: 0.58" in md
+
+    def test_clean_scan_no_findings_section(self):
+        from agents.chief_of_staff.cos_agent import _build_team_detail_markdown
+
+        reports = [_make_report("architect"), _make_report("test_engineer")]
+        md = _build_team_detail_markdown("engineering", reports)
+        assert "No findings this cycle" in md
+        assert "## Top Findings" not in md
+
+
 class TestNotionSync:
     """Tests for NotionSync extensions (Team Reports, Weekly, Comms Guide)."""
 
@@ -2026,6 +2081,56 @@ class TestNotionSync:
             )
         assert result["synced"] is True
         assert result["page_id"] == "new-page-id"
+
+    def test_push_team_report_with_detail_markdown(self, monkeypatch, tmp_path):
+        """Team report with detail_markdown generates page body blocks."""
+        monkeypatch.setenv("NOTION_API_KEY", "fake-key")
+        import json as _json
+
+        state_path = tmp_path / "notion_state.json"
+        state_path.write_text(
+            _json.dumps(
+                {
+                    "team_reports_db": "fake-db-id",
+                    "daily_briefs_db": "",
+                    "decision_log_db": "",
+                    "founder_briefs_db": "",
+                    "weekly_synthesis_db": "",
+                    "command_center_page": "",
+                }
+            )
+        )
+        import agents.chief_of_staff.notion_sync as ns_mod
+
+        monkeypatch.setattr(ns_mod, "_STATE_FILE", state_path)
+        from agents.chief_of_staff.notion_sync import NotionSync
+
+        ns = NotionSync()
+        captured = {}
+
+        def mock_create_page(database_id, properties, children=None):
+            captured["children"] = children
+            return {"id": "detail-page-id"}
+
+        with patch.object(ns._client, "create_page", side_effect=mock_create_page):
+            result = ns.push_team_report(
+                date="2025-01-01",
+                team="data",
+                health="yellow",
+                summary="3 medium findings.",
+                agent_count=4,
+                finding_count=3,
+                detail_markdown="## Severity Distribution\n- Medium: 3\n### Agent Breakdown\n- analyst: 3 findings",
+            )
+        assert result["synced"] is True
+        # Verify children blocks were generated from markdown
+        children = captured["children"]
+        assert children is not None
+        assert len(children) >= 3
+        # Check h2 and h3 headings parsed correctly
+        heading_types = [b.get("type") for b in children if "heading" in b.get("type", "")]
+        assert "heading_2" in heading_types
+        assert "heading_3" in heading_types
 
 
 # ---------------------------------------------------------------------------
