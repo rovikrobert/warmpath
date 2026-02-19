@@ -1,5 +1,8 @@
 """Tests for AI-powered CSV data cleanup service."""
 
+import pytest
+from unittest.mock import AsyncMock, patch
+
 from app.services.ai_csv_cleaner import clean_contacts_mock
 
 
@@ -187,3 +190,114 @@ class TestCleanContactsMock:
         assert result[0]["raw_csv_row"] == {"original": "data"}
         assert result[0]["relationship_type"] == "friend"
         assert result[0]["source"] == "linkedin_csv"
+
+
+class TestCleanContactsRealMode:
+    """Tests for Claude API cleanup mode (mocked API calls)."""
+
+    @pytest.mark.asyncio
+    async def test_real_mode_calls_claude_and_returns_cleaned_data(self):
+        """Real mode sends contacts to Claude API and returns cleaned results."""
+        contacts = [
+            {
+                "first_name": "alice",
+                "last_name": "smith",
+                "full_name": "alice smith",
+                "email": "alice@example.com",
+                "current_company": "acme",
+                "current_title": "engineer",
+                "connected_on": None,
+                "linkedin_url": None,
+                "fingerprint": "old",
+            }
+        ]
+
+        mock_response_text = """[
+            {
+                "first_name": "Alice",
+                "last_name": "Smith",
+                "current_company": "Acme Corp",
+                "current_title": "Software Engineer"
+            }
+        ]"""
+
+        mock_message = AsyncMock()
+        mock_message.content = [AsyncMock(text=mock_response_text)]
+        mock_message.usage = AsyncMock(input_tokens=100, output_tokens=50)
+
+        with patch("app.services.ai_csv_cleaner.anthropic") as mock_anthropic:
+            mock_client = AsyncMock()
+            mock_client.messages.create = AsyncMock(return_value=mock_message)
+            mock_anthropic.AsyncAnthropic.return_value = mock_client
+
+            from app.services.ai_csv_cleaner import clean_contacts_real
+
+            result = await clean_contacts_real(contacts)
+
+        assert result[0]["first_name"] == "Alice"
+        assert result[0]["last_name"] == "Smith"
+        assert result[0]["current_company"] == "Acme Corp"
+        assert result[0]["current_title"] == "Software Engineer"
+
+    @pytest.mark.asyncio
+    async def test_real_mode_falls_back_to_mock_on_api_error(self):
+        """If Claude API fails, falls back to mock cleanup."""
+        contacts = [
+            {
+                "first_name": "alice",
+                "last_name": "smith",
+                "full_name": "alice smith",
+                "email": None,
+                "current_company": "acme",
+                "current_title": "dev",
+                "connected_on": None,
+                "linkedin_url": None,
+                "fingerprint": "old",
+            }
+        ]
+
+        with patch("app.services.ai_csv_cleaner.anthropic") as mock_anthropic:
+            mock_client = AsyncMock()
+            mock_client.messages.create = AsyncMock(
+                side_effect=Exception("API unavailable")
+            )
+            mock_anthropic.AsyncAnthropic.return_value = mock_client
+
+            from app.services.ai_csv_cleaner import clean_contacts_real
+
+            result = await clean_contacts_real(contacts)
+
+        # Should still get cleaned data via mock fallback
+        assert result[0]["first_name"] == "Alice"
+        assert result[0]["last_name"] == "Smith"
+
+
+class TestCleanContactsPublicAPI:
+    """Tests for the public clean_contacts() dispatcher."""
+
+    @pytest.mark.asyncio
+    async def test_dispatches_to_mock_when_mock_mode_true(self):
+        """clean_contacts() uses mock cleaner when AI_MOCK_MODE=true."""
+        contacts = [
+            {
+                "first_name": "test",
+                "last_name": "user",
+                "full_name": "test user",
+                "email": None,
+                "current_company": "GOOGLE LLC",
+                "current_title": "SWE",
+                "connected_on": None,
+                "linkedin_url": None,
+                "fingerprint": "old",
+            }
+        ]
+
+        with patch("app.services.ai_csv_cleaner.settings") as mock_settings:
+            mock_settings.AI_MOCK_MODE = True
+
+            from app.services.ai_csv_cleaner import clean_contacts
+
+            result = await clean_contacts(contacts)
+
+        assert result[0]["first_name"] == "Test"
+        assert result[0]["current_company"] == "Google"

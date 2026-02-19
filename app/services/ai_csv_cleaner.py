@@ -2,19 +2,48 @@
 
 Runs AFTER csv_parser to clean messy data from LinkedIn CSV exports.
 
-Mock mode (this module): deterministic heuristics, no API calls.
-Real mode (future): Claude API for fuzzy name/company resolution.
+Mock mode: deterministic heuristics, no API calls.
+Real mode: Claude API for fuzzy name/company resolution.
 
 Follows the same mock/real pattern as ai_matcher.py.
 """
 
+import json
 import logging
 import re
 
+import anthropic
+
+from app.config import settings
 from app.services.csv_parser import generate_fingerprint
 from app.utils.performance import timed
 
 logger = logging.getLogger(__name__)
+
+CLAUDE_MODEL = settings.CLAUDE_MODEL
+CLEANUP_BATCH_SIZE = 50
+
+# ---------------------------------------------------------------------------
+# System prompt for Claude cleanup
+# ---------------------------------------------------------------------------
+
+_CLEANUP_SYSTEM_PROMPT = """You are a data-cleaning assistant for LinkedIn contact records.
+
+For each contact in the input JSON array, clean and normalize these fields:
+- first_name: Fix capitalization (title case). If it contains a full name and last_name is empty, split it.
+- last_name: Fix capitalization (title case).
+- current_company: Normalize to the well-known canonical form (e.g. "GOOGLE LLC" -> "Google", "Meta Platforms, Inc." -> "Meta", "microsoft corp" -> "Microsoft"). For lesser-known companies, just fix capitalization and remove redundant suffixes like "Inc", "LLC", "Ltd", "Corp".
+- current_title: Clean up abbreviations and fix capitalization. E.g. "sr. swe" -> "Senior Software Engineer", "PM" -> "Product Manager", "eng" -> "Engineer". Keep it professional and standardized.
+
+Return a JSON array with one object per input contact. Each object must have exactly these keys:
+- "first_name"
+- "last_name"
+- "current_company"
+- "current_title"
+
+Preserve the input array order (index 0 in input corresponds to index 0 in output).
+
+Return ONLY the JSON array. No markdown fences, no explanation."""
 
 # ---------------------------------------------------------------------------
 # Well-known company normalization
@@ -257,7 +286,7 @@ def _clean_contact(contact: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Public API
+# Mock cleaner
 # ---------------------------------------------------------------------------
 
 
@@ -283,3 +312,140 @@ def clean_contacts_mock(contacts: list[dict]) -> list[dict]:
     result = [_clean_contact(c) for c in contacts]
     logger.info("Cleaned %d contacts (mock mode)", len(result))
     return result
+
+
+# ---------------------------------------------------------------------------
+# Real Claude API cleaner
+# ---------------------------------------------------------------------------
+
+
+def _build_cleanup_payload(contacts: list[dict]) -> list[dict]:
+    """Extract minimal fields to send to Claude for cleanup."""
+    return [
+        {
+            "first_name": c.get("first_name") or "",
+            "last_name": c.get("last_name") or "",
+            "current_company": c.get("current_company") or "",
+            "current_title": c.get("current_title") or "",
+        }
+        for c in contacts
+    ]
+
+
+def _merge_cleaned_fields(original: dict, cleaned_fields: dict) -> dict:
+    """Merge Claude's cleaned fields back into the original contact dict.
+
+    Preserves all fields not returned by Claude (email, connected_on,
+    linkedin_url, etc.). Rebuilds full_name and regenerates fingerprint.
+    """
+    merged = dict(original)
+
+    # Apply Claude's cleaned fields
+    first_name = (cleaned_fields.get("first_name") or "").strip() or None
+    last_name = (cleaned_fields.get("last_name") or "").strip() or None
+    merged["first_name"] = first_name
+    merged["last_name"] = last_name
+
+    # Rebuild full_name from cleaned parts
+    name_parts = [p for p in (first_name, last_name) if p]
+    merged["full_name"] = " ".join(name_parts) if name_parts else None
+
+    # Apply cleaned company and title
+    company = (cleaned_fields.get("current_company") or "").strip() or None
+    merged["current_company"] = company
+    merged["current_title"] = (
+        cleaned_fields.get("current_title") or ""
+    ).strip() or None
+
+    # Clean email (strip whitespace)
+    email = merged.get("email")
+    if email and isinstance(email, str):
+        merged["email"] = email.strip() or None
+    else:
+        merged["email"] = None
+
+    # Infer company from email if still empty
+    if not merged["current_company"]:
+        merged["current_company"] = _infer_company_from_email(merged.get("email"))
+
+    # Regenerate fingerprint
+    merged["fingerprint"] = generate_fingerprint(
+        merged.get("full_name"),
+        merged.get("current_company"),
+        merged.get("linkedin_url"),
+    )
+
+    return merged
+
+
+@timed("csv_clean_real")
+async def clean_contacts_real(contacts: list[dict]) -> list[dict]:
+    """Clean contacts using the Claude API for fuzzy name/company resolution.
+
+    Batches contacts (CLEANUP_BATCH_SIZE per API call), sends minimal payload,
+    merges cleaned fields back into original dicts. Falls back to mock cleaner
+    on any error (graceful degradation).
+    """
+    if not contacts:
+        return []
+
+    try:
+        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        all_cleaned: list[dict] = []
+
+        # Process in batches
+        for batch_start in range(0, len(contacts), CLEANUP_BATCH_SIZE):
+            batch = contacts[batch_start : batch_start + CLEANUP_BATCH_SIZE]
+            payload = _build_cleanup_payload(batch)
+
+            message = await client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=4096,
+                system=_CLEANUP_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": json.dumps(payload)}],
+            )
+
+            raw = message.content[0].text.strip()
+
+            # Handle markdown fences in response
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[1]
+                raw = raw.rsplit("```", 1)[0].strip()
+
+            parsed = json.loads(raw)
+
+            # Merge Claude's cleaned fields back into originals
+            for i, cleaned_fields in enumerate(parsed):
+                if i < len(batch):
+                    merged = _merge_cleaned_fields(batch[i], cleaned_fields)
+                    all_cleaned.append(merged)
+
+            logger.info(
+                "Cleaned batch of %d contacts via Claude API (tokens: %d in / %d out)",
+                len(batch),
+                message.usage.input_tokens,
+                message.usage.output_tokens,
+            )
+
+        logger.info("Cleaned %d contacts total (real mode)", len(all_cleaned))
+        return all_cleaned
+
+    except Exception:
+        logger.exception("Claude API cleanup failed, falling back to mock cleaner")
+        return clean_contacts_mock(contacts)
+
+
+# ---------------------------------------------------------------------------
+# Public dispatcher
+# ---------------------------------------------------------------------------
+
+
+async def clean_contacts(contacts: list[dict]) -> list[dict]:
+    """Clean parsed contact dicts — dispatches to mock or real based on config.
+
+    When AI_MOCK_MODE is true, uses deterministic heuristics (no API calls).
+    When false, uses the Claude API for fuzzy name/company resolution.
+    """
+    if settings.AI_MOCK_MODE:
+        return clean_contacts_mock(contacts)
+    return await clean_contacts_real(contacts)
