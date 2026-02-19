@@ -334,7 +334,9 @@ async def list_contacts(
     from app.utils.tracking import track_action
 
     await track_action(
-        db, current_user.id, "contacts_list",
+        db,
+        current_user.id,
+        "contacts_list",
         metadata_={"page": page, "total": total},
     )
 

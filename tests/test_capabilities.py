@@ -1,4 +1,5 @@
 """Tests for user capabilities computation and intent endpoints."""
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select

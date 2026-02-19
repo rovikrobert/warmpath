@@ -53,8 +53,11 @@ def _enrich_response(app: Application, now: datetime) -> dict:
         app.status == "message_sent"
         and responded_at is None
         and (
-            follow_up_at and follow_up_at <= now
-            or sent_at and days_since_sent is not None and days_since_sent >= 7
+            follow_up_at
+            and follow_up_at <= now
+            or sent_at
+            and days_since_sent is not None
+            and days_since_sent >= 7
         )
     ):
         needs_follow_up = True
@@ -179,7 +182,9 @@ async def create_application(
     from app.utils.tracking import track_action
 
     await track_action(
-        db, current_user.id, "application_create",
+        db,
+        current_user.id,
+        "application_create",
         resource_id=app_record.id,
         metadata_={"company": body.company_name, "role": body.role_title},
     )
@@ -208,7 +213,8 @@ def _needs_follow_up_sql_condition(positive: bool):
         & (
             (Application.follow_up_at.isnot(None) & (Application.follow_up_at <= now))
             | (
-                (Application.sent_at.isnot(None)) & (Application.sent_at <= seven_days_ago)
+                (Application.sent_at.isnot(None))
+                & (Application.sent_at <= seven_days_ago)
             )
         )
     )
@@ -256,11 +262,15 @@ async def list_applications(
     count_query = select(func.count()).select_from(base.subquery())
     total = (await db.execute(count_query)).scalar() or 0
 
-    query = base.options(
-        selectinload(Application.contact),
-        selectinload(Application.company),
-        selectinload(Application.job_opening),
-    ).offset((page - 1) * per_page).limit(per_page)
+    query = (
+        base.options(
+            selectinload(Application.contact),
+            selectinload(Application.company),
+            selectinload(Application.job_opening),
+        )
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+    )
 
     result = await db.execute(query)
     apps = result.scalars().all()
@@ -316,12 +326,8 @@ async def get_application_stats(
 
     # sent_count, responded_count, interview_count via conditional sums (one row)
     sent_expr = case((Application.status != "draft", 1), else_=0)
-    responded_expr = case(
-        (Application.status.in_(RESPONDED_STATUSES), 1), else_=0
-    )
-    interview_expr = case(
-        (Application.status.in_(INTERVIEW_STATUSES), 1), else_=0
-    )
+    responded_expr = case((Application.status.in_(RESPONDED_STATUSES), 1), else_=0)
+    interview_expr = case((Application.status.in_(INTERVIEW_STATUSES), 1), else_=0)
     agg_query = select(
         func.sum(sent_expr).label("sent_count"),
         func.sum(responded_expr).label("responded_count"),
@@ -334,9 +340,7 @@ async def get_application_stats(
 
     # Avg days to response — computed in Python (SQLite/Postgres portable; no
     # func.extract('epoch', ...) in SQL)
-    resp_query = select(
-        Application.sent_at, Application.responded_at
-    ).where(
+    resp_query = select(Application.sent_at, Application.responded_at).where(
         *base,
         Application.sent_at.isnot(None),
         Application.responded_at.isnot(None),
@@ -346,7 +350,11 @@ async def get_application_stats(
         response_days = []
         for sent_at, responded_at in resp_rows:
             s = sent_at if sent_at.tzinfo else sent_at.replace(tzinfo=timezone.utc)
-            r = responded_at if responded_at.tzinfo else responded_at.replace(tzinfo=timezone.utc)
+            r = (
+                responded_at
+                if responded_at.tzinfo
+                else responded_at.replace(tzinfo=timezone.utc)
+            )
             response_days.append((r - s).total_seconds() / 86400)
         avg_days = round(sum(response_days) / len(response_days), 1)
     else:
@@ -354,15 +362,17 @@ async def get_application_stats(
 
     # Channel stats: sent and responded per channel
     ch_sent = case((Application.status != "draft", 1), else_=0)
-    ch_resp = case(
-        (Application.status.in_(RESPONDED_STATUSES), 1), else_=0
-    )
+    ch_resp = case((Application.status.in_(RESPONDED_STATUSES), 1), else_=0)
     channel_col = func.coalesce(Application.channel, "unknown")
-    channel_query = select(
-        channel_col.label("channel"),
-        func.sum(ch_sent).label("sent"),
-        func.sum(ch_resp).label("responded"),
-    ).where(*base).group_by(channel_col)
+    channel_query = (
+        select(
+            channel_col.label("channel"),
+            func.sum(ch_sent).label("sent"),
+            func.sum(ch_resp).label("responded"),
+        )
+        .where(*base)
+        .group_by(channel_col)
+    )
     channel_rows = (await db.execute(channel_query)).all()
 
     response_rate = responded_count / sent_count if sent_count > 0 else 0.0
@@ -465,7 +475,9 @@ async def update_application(
     from app.utils.tracking import track_action
 
     await track_action(
-        db, current_user.id, "application_update",
+        db,
+        current_user.id,
+        "application_update",
         metadata_={
             "application_id": str(application_id),
             "new_status": body.status,

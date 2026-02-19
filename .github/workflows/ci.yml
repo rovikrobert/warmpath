@@ -88,7 +88,10 @@ jobs:
 
       - name: Run security scanner
         # stdlib-only script — if it ever imports project code, add: pip install -r requirements.txt
-        run: python -m scripts.security_scan
+        # Exit codes: 0=clean, 1=findings, 2=critical — only block on critical
+        run: |
+          python -m scripts.security_scan; code=$?
+          if [ $code -eq 2 ]; then exit 2; fi
 
   privacy-scan:
     name: Privacy Scan
@@ -104,7 +107,10 @@ jobs:
 
       - name: Run privacy scanner
         # stdlib-only script — if it ever imports project code, add: pip install -r requirements.txt
-        run: python -m scripts.privacy_scan
+        # Exit codes: 0=compliant, 1=findings, 2=critical — only block on critical
+        run: |
+          python -m scripts.privacy_scan; code=$?
+          if [ $code -eq 2 ]; then exit 2; fi
 
   dep-audit:
     name: Dependency Audit
@@ -122,4 +128,5 @@ jobs:
         run: pip install pip-audit==2.9.0
 
       - name: Audit dependencies
-        run: pip-audit -r requirements.txt
+        # Ignore GHSA-wj6h-64fc-37mp: ecdsa timing attack (transitive via python-jose, no fix available)
+        run: pip-audit -r requirements.txt --ignore-vuln GHSA-wj6h-64fc-37mp

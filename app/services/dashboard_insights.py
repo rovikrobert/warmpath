@@ -112,9 +112,7 @@ async def _get_recently_searched_companies(
     return unique
 
 
-def _aggregate_trend_data(
-    recs: list[dict], recent_companies: list[str]
-) -> dict:
+def _aggregate_trend_data(recs: list[dict], recent_companies: list[str]) -> dict:
     """Aggregate recommendation data into trend metrics."""
     rec_display_names = {r["display_name"].lower(): r for r in recs}
     rec_keys = {r["company"].lower(): r for r in recs}
@@ -288,17 +286,12 @@ def _detect_network_gaps(
     )
 
     target_companies = companies_for_locations(prefs.target_locations)[:15]
-    user_company_names = {
-        c["company"].lower() for c in top_companies if c["company"]
-    }
+    user_company_names = {c["company"].lower() for c in top_companies if c["company"]}
 
     missing = []
     for key in target_companies:
         display = get_display_name(key)
-        if (
-            display.lower() not in user_company_names
-            and key not in user_company_names
-        ):
+        if display.lower() not in user_company_names and key not in user_company_names:
             missing.append(display)
 
     return missing[:5] if missing else None
@@ -313,8 +306,8 @@ async def _get_network_analysis(
     if cached is not None:
         return cached
 
-    total_contacts, top_companies, relationship_breakdown = (
-        await _load_network_stats(user_id, db)
+    total_contacts, top_companies, relationship_breakdown = await _load_network_stats(
+        user_id, db
     )
     if total_contacts == 0:
         return None

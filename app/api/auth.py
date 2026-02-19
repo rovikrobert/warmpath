@@ -802,8 +802,11 @@ async def linkedin_callback(
 
     # 3. Resolve or create user from LinkedIn identity
     user, is_new_user = await _resolve_or_create_linkedin_user(
-        li_sub, account_email or li_email, account_name,
-        account_password_hash, db,
+        li_sub,
+        account_email or li_email,
+        account_name,
+        account_password_hash,
+        db,
     )
 
     # Reset lockout on successful OAuth login
@@ -878,7 +881,9 @@ async def import_resume(
     # Log usage
     from app.utils.tracking import track_action
 
-    await track_action(db, current_user.id, "resume_parse", metadata_={"filename": file.filename})
+    await track_action(
+        db, current_user.id, "resume_parse", metadata_={"filename": file.filename}
+    )
     await db.commit()
 
     return {"data": parsed, "meta": {}}

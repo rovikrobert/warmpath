@@ -8,10 +8,8 @@ Credit economy:
 
 import uuid
 from datetime import datetime, timedelta, timezone
-
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.models.credits import CreditTransaction
 
 MAX_EARN_PER_DAY = 500
@@ -29,7 +27,7 @@ async def get_balance(user_id: uuid.UUID, db: AsyncSession) -> int:
         select(func.coalesce(func.sum(CreditTransaction.amount), 0)).where(
             CreditTransaction.user_id == user_id,
             CreditTransaction.type != "expired",
-            (CreditTransaction.expires_at.is_(None))
+            CreditTransaction.expires_at.is_(None)
             | (CreditTransaction.expires_at > now),
         )
     )
@@ -40,30 +38,31 @@ async def get_credit_summary(user_id: uuid.UUID, db: AsyncSession) -> dict:
     """Get detailed credit summary: balance, lifetime totals, expiring soon (single query)."""
     now = datetime.now(timezone.utc)
     thirty_days = now + timedelta(days=30)
-
-    balance_cond = (
-        (CreditTransaction.type != "expired")
-        & (
-            (CreditTransaction.expires_at.is_(None))
-            | (CreditTransaction.expires_at > now)
-        )
+    balance_cond = (CreditTransaction.type != "expired") & (
+        CreditTransaction.expires_at.is_(None) | (CreditTransaction.expires_at > now)
     )
     earned_cond = CreditTransaction.amount > 0
     spent_cond = CreditTransaction.amount < 0
     expiring_cond = (
-        (CreditTransaction.amount > 0)
-        & (CreditTransaction.expires_at.isnot(None))
+        (CreditTransaction.amount <= 0)
+        & CreditTransaction.expires_at.isnot(None)
         & (CreditTransaction.expires_at > now)
         & (CreditTransaction.expires_at <= thirty_days)
     )
-
     q = select(
-        func.coalesce(func.sum(case((balance_cond, CreditTransaction.amount), else_=0)), 0).label("balance"),
-        func.coalesce(func.sum(case((earned_cond, CreditTransaction.amount), else_=0)), 0).label("earned"),
-        func.coalesce(func.sum(case((spent_cond, CreditTransaction.amount), else_=0)), 0).label("spent"),
-        func.coalesce(func.sum(case((expiring_cond, CreditTransaction.amount), else_=0)), 0).label("expiring"),
+        func.coalesce(
+            func.sum(case((balance_cond, CreditTransaction.amount), else_=0)), 0
+        ).label("balance"),
+        func.coalesce(
+            func.sum(case((earned_cond, CreditTransaction.amount), else_=0)), 0
+        ).label("earned"),
+        func.coalesce(
+            func.sum(case((spent_cond, CreditTransaction.amount), else_=0)), 0
+        ).label("spent"),
+        func.coalesce(
+            func.sum(case((expiring_cond, CreditTransaction.amount), else_=0)), 0
+        ).label("expiring"),
     ).where(CreditTransaction.user_id == user_id)
-
     row = (await db.execute(q)).one()
     return {
         "balance": int(row.balance),
@@ -74,10 +73,7 @@ async def get_credit_summary(user_id: uuid.UUID, db: AsyncSession) -> dict:
 
 
 async def check_and_spend(
-    user_id: uuid.UUID,
-    amount: int,
-    reason: str,
-    db: AsyncSession,
+    user_id: uuid.UUID, amount: int, reason: str, db: AsyncSession
 ) -> bool:
     """Check balance and spend atomically. Returns False if insufficient."""
     bal = await get_balance(user_id, db)
@@ -96,9 +92,10 @@ async def earn_credits(
     skip_daily_cap: bool = False,
 ) -> CreditTransaction:
     """Award credits to a user. Credits expire after 12 months."""
-    # Guard: cap daily earn to prevent abuse (skipped for paid purchases)
     if not skip_daily_cap:
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         earned_today_result = await db.execute(
             select(func.coalesce(func.sum(CreditTransaction.amount), 0)).where(
                 CreditTransaction.user_id == user_id,
@@ -109,10 +106,8 @@ async def earn_credits(
         earned_today = int(earned_today_result.scalar())
         if earned_today + amount > MAX_EARN_PER_DAY:
             raise ValueError(
-                f"Daily earn cap exceeded: already earned {earned_today}, "
-                f"cap is {MAX_EARN_PER_DAY}"
+                f"Daily earn cap exceeded: already earned {earned_today}, cap is {MAX_EARN_PER_DAY}"
             )
-
     txn = CreditTransaction(
         user_id=user_id,
         amount=amount,
@@ -181,8 +176,6 @@ async def expi[RESEND_KEY_REDACTED](db: AsyncSession) -> int:
     Returns count of users whose credits were expired.
     """
     now = datetime.now(timezone.utc)
-
-    # Find users with expired positive transactions
     expired_query = (
         select(
             CreditTransaction.user_id,
@@ -197,10 +190,7 @@ async def expi[RESEND_KEY_REDACTED](db: AsyncSession) -> int:
         .group_by(CreditTransaction.user_id)
     )
     expired_rows = (await db.execute(expired_query)).all()
-
-    # Batch-load already-expired sums and effective balances (avoids N+1)
     user_ids = [uid for uid, _ in expired_rows]
-
     already_expired_map: dict = {}
     effective_balance_map: dict = {}
     if user_ids:
@@ -216,7 +206,6 @@ async def expi[RESEND_KEY_REDACTED](db: AsyncSession) -> int:
             .group_by(CreditTransaction.user_id)
         )
         already_expired_map = {row[0]: abs(int(row[1])) for row in ae_result.all()}
-
         eb_result = await db.execute(
             select(
                 CreditTransaction.user_id,
@@ -224,37 +213,29 @@ async def expi[RESEND_KEY_REDACTED](db: AsyncSession) -> int:
             )
             .where(
                 CreditTransaction.user_id.in_(user_ids),
-                (CreditTransaction.expires_at.is_(None))
+                CreditTransaction.expires_at.is_(None)
                 | (CreditTransaction.expires_at > now),
             )
             .group_by(CreditTransaction.user_id)
         )
         effective_balance_map = {row[0]: int(row[1]) for row in eb_result.all()}
-
     count = 0
     for user_id, expired_amount in expired_rows:
         expired_amount = int(expired_amount)
         if expired_amount <= 0:
             continue
-
         already_expired = already_expired_map.get(user_id, 0)
         to_expire = expired_amount - already_expired
         if to_expire <= 0:
             continue
-
         effective_balance = effective_balance_map.get(user_id, 0)
         to_expire = min(to_expire, effective_balance)
         if to_expire <= 0:
             continue
-
         txn = CreditTransaction(
-            user_id=user_id,
-            amount=-to_expire,
-            type="expired",
-            reason="credits_expired",
+            user_id=user_id, amount=-to_expire, type="expired", reason="credits_expired"
         )
         db.add(txn)
         count += 1
-
     await db.flush()
     return count

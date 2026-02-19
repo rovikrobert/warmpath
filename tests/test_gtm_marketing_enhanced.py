@@ -13,7 +13,6 @@ from __futu[RESEND_KEY_REDACTED] import annotations
 from unittest.mock import patch
 
 
-
 class TestCheckAnalyticsIntegration:
     """PostHog analytics integration detection."""
 

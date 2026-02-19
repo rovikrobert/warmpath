@@ -75,9 +75,15 @@ async def create_search(
     from app.utils.tracking import track_action
 
     await track_action(
-        db, current_user.id, "search_create",
+        db,
+        current_user.id,
+        "search_create",
         resource_id=search.id,
-        metadata_={"target_companies": body.target_companies[:5] if body.target_companies else None},
+        metadata_={
+            "target_companies": body.target_companies[:5]
+            if body.target_companies
+            else None
+        },
     )
 
     await db.commit()
@@ -306,7 +312,9 @@ async def _compute_search_stats(
                 sco[RESEND_KEY_REDACTED]["50-69"] += 1
             else:
                 sco[RESEND_KEY_REDACTED]["20-49"] += 1
-        avg_rel = round(sum(all_relevance) / len(all_relevance), 1) if all_relevance else 0
+        avg_rel = (
+            round(sum(all_relevance) / len(all_relevance), 1) if all_relevance else 0
+        )
         avg_warm = round(sum(all_warm) / len(all_warm), 1) if all_warm else 0
         return avg_rel, avg_warm, sco[RESEND_KEY_REDACTED]
 
@@ -343,8 +351,7 @@ async def _compute_search_stats(
         func.sum(
             case(
                 (
-                    (subq.c.relevance_score >= 70)
-                    & (subq.c.relevance_score < 90),
+                    (subq.c.relevance_score >= 70) & (subq.c.relevance_score < 90),
                     1,
                 ),
                 else_=0,
@@ -353,8 +360,7 @@ async def _compute_search_stats(
         func.sum(
             case(
                 (
-                    (subq.c.relevance_score >= 50)
-                    & (subq.c.relevance_score < 70),
+                    (subq.c.relevance_score >= 50) & (subq.c.relevance_score < 70),
                     1,
                 ),
                 else_=0,
@@ -363,8 +369,7 @@ async def _compute_search_stats(
         func.sum(
             case(
                 (
-                    (subq.c.relevance_score >= 20)
-                    & (subq.c.relevance_score < 50),
+                    (subq.c.relevance_score >= 20) & (subq.c.relevance_score < 50),
                     1,
                 ),
                 else_=0,
@@ -469,10 +474,7 @@ async def get_search_results(
         )
         all_rows = result.all()
         company_lower = company.lower()
-        all_rows = [
-            r for r in all_rows
-            if company_lower in (r[3] or "").lower()
-        ]
+        all_rows = [r for r in all_rows if company_lower in (r[3] or "").lower()]
         total = len(all_rows)
         offset = (page - 1) * per_page
         rows = all_rows[offset : offset + per_page]
@@ -487,9 +489,15 @@ async def get_search_results(
         rows = result.all()
 
     avg_rel, avg_warm, sco[RESEND_KEY_REDACTED] = await _compute_search_stats(
-        all_rows_for_stats, base_query, company is not None,
-        search_id, current_user.id, effective_min_relevance,
-        match_type, min_warm, db,
+        all_rows_for_stats,
+        base_query,
+        company is not None,
+        search_id,
+        current_user.id,
+        effective_min_relevance,
+        match_type,
+        min_warm,
+        db,
     )
 
     data = [_build_match_row(row) for row in rows]
@@ -588,7 +596,9 @@ async def smart_search(
         from app.utils.tracking import track_action
 
         await track_action(
-            db, current_user.id, "search",
+            db,
+            current_user.id,
+            "search",
             resource_id=search_id,
             metadata_={"scope": scope, "companies": body.company_names[:5]},
         )
@@ -603,7 +613,9 @@ async def smart_search(
         )
         if (prior.scalar() or 0) == 0:
             await track_action(
-                db, current_user.id, "first_search",
+                db,
+                current_user.id,
+                "first_search",
                 resource_id=search_id,
                 metadata_={"scope": scope, "companies": body.company_names[:5]},
             )
@@ -850,17 +862,26 @@ async def _process_company(
     open_to_remote: bool = True,
 ) -> dict:
     """Process a single company: fetch openings + find referral paths."""
-    active_openings, total_jobs_fetched, total_matched_openings, job_scan_status = (
-        await _fetch_and_filter_openings(
-            company_name, target_role, target_seniority,
-            target_locations, open_to_remote, fetcher, db,
-        )
+    (
+        active_openings,
+        total_jobs_fetched,
+        total_matched_openings,
+        job_scan_status,
+    ) = await _fetch_and_filter_openings(
+        company_name,
+        target_role,
+        target_seniority,
+        target_locations,
+        open_to_remote,
+        fetcher,
+        db,
     )
 
     # Find user's contacts who work at this company
     company_lower = company_name.lower()
     company_contacts = [
-        c for c in all_contacts
+        c
+        for c in all_contacts
         if c.current_company and company_lower in c.current_company.lower()
     ]
 

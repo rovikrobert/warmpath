@@ -4,6 +4,7 @@ Revision ID: d5c351c415ce
 Revises: 5ba2f473915f
 Create Date: 2026-02-19 01:04:38.020468
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -11,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'd5c351c415ce'
-down_revision: Union[str, None] = '5ba2f473915f'
+revision: str = "d5c351c415ce"
+down_revision: Union[str, None] = "5ba2f473915f"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -87,9 +87,7 @@ async def _export_contacts(user_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     ]
 
 
-async def _export_job_preferences(
-    user_id: uuid.UUID, db: AsyncSession
-) -> dict | None:
+async def _export_job_preferences(user_id: uuid.UUID, db: AsyncSession) -> dict | None:
     result = await db.execute(
         select(UserJobPreferences).where(UserJobPreferences.user_id == user_id)
     )
@@ -225,9 +223,7 @@ async def _export_sharing_preferences(
     return {
         "opt_in_marketplace": sharing.opt_in_marketplace,
         "category_filters": sharing.category_filters,
-        "excluded_contact_ids": [
-            str(c) for c in (sharing.excluded_contact_ids or [])
-        ],
+        "excluded_contact_ids": [str(c) for c in (sharing.excluded_contact_ids or [])],
     }
 
 

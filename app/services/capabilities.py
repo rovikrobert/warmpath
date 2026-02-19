@@ -1,4 +1,5 @@
 """Compute action-based user capabilities from DB state."""
+
 from __futu[RESEND_KEY_REDACTED] import annotations
 
 import uuid
@@ -19,27 +20,25 @@ async def compute_user_capabilities(
     """Derive capabilities from user's actual actions in DB."""
     has_contacts = (
         await db.scalar(
-            select(func.count()).select_from(Contact).where(
-                Contact.user_id == user_id
-            )
+            select(func.count()).select_from(Contact).where(Contact.user_id == user_id)
         )
         or 0
     ) > 0
 
     has_searches = (
         await db.scalar(
-            select(func.count()).select_from(SearchRequest).where(
-                SearchRequest.user_id == user_id
-            )
+            select(func.count())
+            .select_from(SearchRequest)
+            .where(SearchRequest.user_id == user_id)
         )
         or 0
     ) > 0
 
     has_listings = (
         await db.scalar(
-            select(func.count()).select_from(MarketplaceListing).where(
-                MarketplaceListing.network_holder_id == user_id
-            )
+            select(func.count())
+            .select_from(MarketplaceListing)
+            .where(MarketplaceListing.network_holder_id == user_id)
         )
         or 0
     ) > 0
@@ -50,7 +49,9 @@ async def compute_user_capabilities(
 
     facilitation_count = (
         await db.scalar(
-            select(func.count()).select_from(IntroFacilitation).where(
+            select(func.count())
+            .select_from(IntroFacilitation)
+            .where(
                 IntroFacilitation.network_holder_id == user_id,
                 IntroFacilitation.status == "approved",
             )

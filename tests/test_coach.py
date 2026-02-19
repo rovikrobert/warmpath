@@ -476,7 +476,11 @@ class TestCoachingStages:
         ctx = self._base_context(
             network={"total_contacts": 50, "top_companies": []},
             preferences={"target_role": "SWE"},
-            pipeline={"status_counts": {"applied": 2}, "follow_ups_needed": 0, "total": 2},
+            pipeline={
+                "status_counts": {"applied": 2},
+                "follow_ups_needed": 0,
+                "total": 2,
+            },
         )
         assert _determine_coaching_stage(ctx) == STAGE_ACTIVE_SEARCH
 
@@ -497,7 +501,12 @@ class TestCoachingStages:
 class TestSessionBranching:
     def _base_context(self) -> dict:
         return {
-            "user": {"name": "Alice Smith", "title": None, "company": None, "location": None},
+            "user": {
+                "name": "Alice Smith",
+                "title": None,
+                "company": None,
+                "location": None,
+            },
             "preferences": None,
             "network": None,
             "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
@@ -531,7 +540,12 @@ class TestSessionBranching:
 class TestDynamicBriefingSections:
     def test_onboarding_session1_shows_explanation(self):
         ctx = {
-            "user": {"name": "New User", "title": None, "company": None, "location": None},
+            "user": {
+                "name": "New User",
+                "title": None,
+                "company": None,
+                "location": None,
+            },
             "preferences": None,
             "network": None,
             "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
@@ -544,7 +558,12 @@ class TestDynamicBriefingSections:
 
     def test_onboarding_late_session_nudge(self):
         ctx = {
-            "user": {"name": "Lazy User", "title": None, "company": None, "location": None},
+            "user": {
+                "name": "Lazy User",
+                "title": None,
+                "company": None,
+                "location": None,
+            },
             "preferences": None,
             "network": None,
             "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
@@ -557,9 +576,17 @@ class TestDynamicBriefingSections:
 
     def test_pipeline_shown_when_apps_exist(self):
         ctx = {
-            "user": {"name": "Active User", "title": None, "company": None, "location": None},
+            "user": {
+                "name": "Active User",
+                "title": None,
+                "company": None,
+                "location": None,
+            },
             "preferences": {"target_role": "SWE"},
-            "network": {"total_contacts": 50, "top_companies": [{"company": "Google", "count": 10}]},
+            "network": {
+                "total_contacts": 50,
+                "top_companies": [{"company": "Google", "count": 10}],
+            },
             "pipeline": {
                 "status_counts": {"applied": 2, "message_sent": 1},
                 "follow_ups_needed": 0,
@@ -574,7 +601,12 @@ class TestDynamicBriefingSections:
 
     def test_stalled_user_gets_nudge(self):
         ctx = {
-            "user": {"name": "Stalled User", "title": None, "company": None, "location": None},
+            "user": {
+                "name": "Stalled User",
+                "title": None,
+                "company": None,
+                "location": None,
+            },
             "preferences": {"target_role": "PM"},
             "network": {"total_contacts": 100, "top_companies": []},
             "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
@@ -587,7 +619,12 @@ class TestDynamicBriefingSections:
 
     def test_follow_ups_shown_when_due(self):
         ctx = {
-            "user": {"name": "Busy User", "title": None, "company": None, "location": None},
+            "user": {
+                "name": "Busy User",
+                "title": None,
+                "company": None,
+                "location": None,
+            },
             "preferences": {"target_role": "SWE"},
             "network": None,
             "pipeline": {
@@ -684,10 +721,14 @@ class TestAntiRepetition:
 
     def test_targeting_anti_repetition(self):
         fresh, _ = _mock_chat_response(
-            "Which companies should I target?", self._base_context(), recent_topics=set()
+            "Which companies should I target?",
+            self._base_context(),
+            recent_topics=set(),
         )
         varied, _ = _mock_chat_response(
-            "Which companies should I target?", self._base_context(), recent_topics={"targeting"}
+            "Which companies should I target?",
+            self._base_context(),
+            recent_topics={"targeting"},
         )
         assert fresh != varied
 
@@ -696,7 +737,9 @@ class TestAntiRepetition:
             "What follow-ups do I have?", self._base_context(), recent_topics=set()
         )
         varied, _ = _mock_chat_response(
-            "What follow-ups do I have?", self._base_context(), recent_topics={"follow_ups"}
+            "What follow-ups do I have?",
+            self._base_context(),
+            recent_topics={"follow_ups"},
         )
         assert fresh != varied
 
@@ -705,7 +748,9 @@ class TestAntiRepetition:
             "How do I get started?", self._base_context(), recent_topics=set()
         )
         varied, _ = _mock_chat_response(
-            "How do I get started?", self._base_context(), recent_topics={"getting_started"}
+            "How do I get started?",
+            self._base_context(),
+            recent_topics={"getting_started"},
         )
         assert fresh != varied
 
@@ -719,9 +764,7 @@ class TestAntiRepetition:
         assert fresh != varied
 
     def test_fallback_returns_none_topic(self):
-        text, topic = _mock_chat_response(
-            "What's the weather?", self._base_context()
-        )
+        text, topic = _mock_chat_response("What's the weather?", self._base_context())
         assert topic is None
         assert len(text) > 20
 

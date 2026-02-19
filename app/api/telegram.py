@@ -119,7 +119,9 @@ def _handle_consultation(chat_id: int, raw_text: str) -> None:
     _add_to_buffer(chat_id, query, response.answer)
 
 
-def _handle_command(command: str, parsed: dict, chat_id: int, is_founder: bool = False) -> None:
+def _handle_command(
+    command: str, parsed: dict, chat_id: int, is_founder: bool = False
+) -> None:
     """Execute a command and reply via Telegram."""
     try:
         if command == "status":
@@ -142,13 +144,17 @@ def _handle_command(command: str, parsed: dict, chat_id: int, is_founder: bool =
         elif command == "ship":
             feature = parsed.get("feature", "")
             _send_telegram_reply(
-                chat_id, f"Ship request queued: {feature}\nWill execute on next daily cycle."
+                chat_id,
+                f"Ship request queued: {feature}\nWill execute on next daily cycle.",
             )
 
         elif command == "brief":
-            topic = parsed.get("topic", text if (text := parsed.get("raw", "")) else "general")
+            topic = parsed.get(
+                "topic", text if (text := parsed.get("raw", "")) else "general"
+            )
             _send_telegram_reply(
-                chat_id, f"Brief request queued: {topic}\nWill be included in next daily brief."
+                chat_id,
+                f"Brief request queued: {topic}\nWill be included in next daily brief.",
             )
 
         else:

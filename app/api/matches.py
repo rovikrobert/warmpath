@@ -87,8 +87,8 @@ async def create_intro(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Create an intro request and generate referral message drafts."""
-    contact, match_result, job_opening, connector_profile = (
-        await _load_intro_context(body, current_user.id, db)
+    contact, match_result, job_opening, connector_profile = await _load_intro_context(
+        body, current_user.id, db
     )
 
     # Create intro request
@@ -137,7 +137,9 @@ async def create_intro(
     from app.utils.tracking import track_action
 
     await track_action(
-        db, current_user.id, "intro_draft",
+        db,
+        current_user.id,
+        "intro_draft",
         resource_id=intro_req.id,
         metadata_={"contact_id": str(body.contact_id), "channel": body.channel},
     )
