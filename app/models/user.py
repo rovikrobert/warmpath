@@ -45,9 +45,7 @@ class User(Base):
     plan_tier: Mapped[str] = mapped_column(
         String(50), nullable=False, server_default="free"
     )
-    intent: Mapped[str | None] = mapped_column(
-        String(20), nullable=True, default=None
-    )
+    intent: Mapped[str | None] = mapped_column(String(20), nullable=True, default=None)
     # Security / session management
     token_version: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="0"
@@ -98,6 +96,11 @@ class User(Base):
     # Stripe integration
     stripe_customer_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, index=True
+    )
+
+    # Clerk integration
+    clerk_user_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, unique=True, index=True
     )
 
     # Relationships (passive_deletes=True defers to DB-level ON DELETE CASCADE)
