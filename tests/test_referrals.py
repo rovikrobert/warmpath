@@ -75,15 +75,11 @@ async def test_create_code_idempotent(client: AsyncClient):
     headers = await _headers(client, "referrer_idem@test.com", "Idem Referrer")
     await _verify_email(client, "referrer_idem@test.com")
 
-    resp1 = await client.post(
-        "/api/v1/referrals/create", json={}, headers=headers
-    )
+    resp1 = await client.post("/api/v1/referrals/create", json={}, headers=headers)
     assert resp1.status_code == 201
     code1 = resp1.json()["data"]["code"]
 
-    resp2 = await client.post(
-        "/api/v1/referrals/create", json={}, headers=headers
-    )
+    resp2 = await client.post("/api/v1/referrals/create", json={}, headers=headers)
     # Returns existing code (idempotent) — may be 200 or 201
     assert resp2.status_code in (200, 201)
     code2 = resp2.json()["data"]["code"]

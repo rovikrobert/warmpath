@@ -512,9 +512,13 @@ def _build_user_prompt(
                 == c.current_company.strip().lower()
             ):
                 shared.append("Same current company")
-            if profile.location and c.location and (
-                profile.location.strip().lower() in c.location.lower()
-                or c.location.strip().lower() in profile.location.lower()
+            if (
+                profile.location
+                and c.location
+                and (
+                    profile.location.strip().lower() in c.location.lower()
+                    or c.location.strip().lower() in profile.location.lower()
+                )
             ):
                 shared.append("Same location area")
         if shared:

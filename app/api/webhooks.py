@@ -171,7 +171,9 @@ async def _handle_checkout_completed(event: dict, db: AsyncSession) -> None:
     credits_to_grant = (amount_cents * 5) // 100  # 5 credits per dollar
 
     if credits_to_grant > 0:
-        await earn_credits(user.id, credits_to_grant, "purchase", db, skip_daily_cap=True)
+        await earn_credits(
+            user.id, credits_to_grant, "purchase", db, skip_daily_cap=True
+        )
         await log_event(
             db,
             "credit_purchase",

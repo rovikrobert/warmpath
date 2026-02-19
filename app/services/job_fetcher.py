@@ -399,7 +399,11 @@ Only include jobs scoring >= 50. Return ONLY the JSON array."""
                 if not job_location:
                     # Unknown location — don't filter out
                     location_match = True
-                elif any(term in job_location for term in loc_terms) or is_remote and open_to_remote:
+                elif (
+                    any(term in job_location for term in loc_terms)
+                    or is_remote
+                    and open_to_remote
+                ):
                     location_match = True
 
                 if not location_match:

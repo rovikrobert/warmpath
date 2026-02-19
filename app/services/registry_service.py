@@ -272,9 +272,7 @@ async def seed_from_static(db: AsyncSession) -> int:
     created = 0
 
     # Batch-load all existing keys (avoids N+1 per company)
-    existing_result = await db.execute(
-        select(CompanyBoard.company_key)
-    )
+    existing_result = await db.execute(select(CompanyBoard.company_key))
     existing_keys = {r[0] for r in existing_result.all()}
 
     for company_key, boards_dict in BOARD_REGISTRY.items():

@@ -217,7 +217,9 @@ def _run_full_scan_weekly() -> None:
     team_modes = [m for m in _WEEKLY_SCAN_ORDER if not m.startswith("cos-")]
     cos_modes = [m for m in _WEEKLY_SCAN_ORDER if m.startswith("cos-")]
 
-    _log(f"[{tag}] Starting ({len(_WEEKLY_SCAN_ORDER)} steps: {' → '.join(_WEEKLY_SCAN_ORDER)})")
+    _log(
+        f"[{tag}] Starting ({len(_WEEKLY_SCAN_ORDER)} steps: {' → '.join(_WEEKLY_SCAN_ORDER)})"
+    )
     start = time.monotonic()
     results = []
     failed = []
@@ -256,7 +258,9 @@ def _run_full_scan_monthly() -> None:
     team_modes = [m for m in _MONTHLY_SCAN_ORDER if not m.startswith("cos-")]
     cos_modes = [m for m in _MONTHLY_SCAN_ORDER if m.startswith("cos-")]
 
-    _log(f"[{tag}] Starting ({len(_MONTHLY_SCAN_ORDER)} steps: {' → '.join(_MONTHLY_SCAN_ORDER)})")
+    _log(
+        f"[{tag}] Starting ({len(_MONTHLY_SCAN_ORDER)} steps: {' → '.join(_MONTHLY_SCAN_ORDER)})"
+    )
     start = time.monotonic()
     results = []
     failed = []

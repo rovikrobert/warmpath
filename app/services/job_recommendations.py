@@ -66,7 +66,9 @@ async def get_cached_jobs_batch(
     prefix_len = len("job_scan:")
     for row in result.all():
         cache_key, data = row[0], row[1]
-        company_key = cache_key[prefix_len:] if cache_key.startswith("job_scan:") else cache_key
+        company_key = (
+            cache_key[prefix_len:] if cache_key.startswith("job_scan:") else cache_key
+        )
         jobs = (data or {}).get("jobs", [])
         key_to_jobs[company_key] = jobs
     return key_to_jobs
@@ -316,9 +318,7 @@ async def warm_job_cache_for_user(user_id: str) -> None:
     try:
         async with _get_session_factory()() as db:
             result = await db.execute(
-                select(UserJobPreferences).where(
-                    UserJobPreferences.user_id == user_id
-                )
+                select(UserJobPreferences).where(UserJobPreferences.user_id == user_id)
             )
             prefs = result.scalar_one_or_none()
             if not prefs or not prefs.target_role:
@@ -355,7 +355,9 @@ async def warm_job_cache_for_user(user_id: str) -> None:
             await db.commit()
             logger.info(
                 "Warmed job cache for user %s: %d/%d companies cached",
-                user_id, cached_count, len(to_warm),
+                user_id,
+                cached_count,
+                len(to_warm),
             )
     except Exception:
         logger.debug("Background job cache warm failed for user %s", user_id)

@@ -350,7 +350,9 @@ async def request_intro(
     from app.utils.tracking import track_action
 
     await track_action(
-        db, current_user.id, "intro_request",
+        db,
+        current_user.id,
+        "intro_request",
         resource_id=facilitation.id,
         metadata_={"listing_id": str(listing.id)},
     )
@@ -390,7 +392,11 @@ async def my_requests(
             select(MarketplaceListing).where(MarketplaceListing.id.in_(listing_ids))
         )
         listings_map = {listing.id: listing for listing in lr.scalars()}
-        company_ids = {listing.company_id for listing in listings_map.values() if listing.company_id}
+        company_ids = {
+            listing.company_id
+            for listing in listings_map.values()
+            if listing.company_id
+        }
         if company_ids:
             cr = await db.execute(select(Company).where(Company.id.in_(company_ids)))
             companies_map = {c.id: c for c in cr.scalars()}
@@ -442,7 +448,11 @@ async def incoming_requests(
             .options(selectinload(MarketplaceListing.contact))
         )
         listings_map = {listing.id: listing for listing in lr.scalars()}
-        company_ids = {listing.company_id for listing in listings_map.values() if listing.company_id}
+        company_ids = {
+            listing.company_id
+            for listing in listings_map.values()
+            if listing.company_id
+        }
         if company_ids:
             cr = await db.execute(select(Company).where(Company.id.in_(company_ids)))
             companies_map = {c.id: c for c in cr.scalars()}
@@ -562,7 +572,9 @@ async def update_facilitation(
 
     action_name = "intro_approve" if body.action == "approve" else "intro_decline"
     await track_action(
-        db, current_user.id, action_name,
+        db,
+        current_user.id,
+        action_name,
         metadata_={"facilitation_id": str(facilitation.id)},
     )
 

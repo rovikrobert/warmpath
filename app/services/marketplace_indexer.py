@@ -292,8 +292,12 @@ async def generate_marketplace_listings(
 
     for contact in contacts:
         if not _should_list_contact(
-            contact, excluded_ids, exclude_companies,
-            include_departments, suppressed_email_hashes, suppressed_name_co_hashes,
+            contact,
+            excluded_ids,
+            exclude_companies,
+            include_departments,
+            suppressed_email_hashes,
+            suppressed_name_co_hashes,
         ):
             continue
 

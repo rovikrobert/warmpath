@@ -2,6 +2,8 @@
 asyncio_mode = "auto"
 filterwarnings = [
     "error::DeprecationWarning",
+    # passlib imports deprecated crypt module (removed in 3.13) — suppress until passlib updates
+    "ignore:'crypt' is deprecated:DeprecationWarning:passlib",
 ]
 
 [tool.mypy]

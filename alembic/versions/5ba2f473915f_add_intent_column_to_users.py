@@ -4,6 +4,7 @@ Revision ID: 5ba2f473915f
 Revises: 8be588bf721c
 Create Date: 2026-02-18 23:00:00.000000
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -11,14 +12,14 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '5ba2f473915f'
-down_revision: Union[str, None] = '8be588bf721c'
+revision: str = "5ba2f473915f"
+down_revision: Union[str, None] = "8be588bf721c"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('users', sa.Column('intent', sa.String(length=20), nullable=True))
+    op.add_column("users", sa.Column("intent", sa.String(length=20), nullable=True))
     op.execute("""
         UPDATE users SET intent = CASE
             WHEN user_type = 'job_seeker' THEN 'find_referrals'
@@ -30,4 +31,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column('users', 'intent')
+    op.drop_column("users", "intent")

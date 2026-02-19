@@ -1985,7 +1985,9 @@ class TestBuildTeamDetailMarkdown:
         from agents.chief_of_staff.cos_agent import _build_team_detail_markdown
 
         reports = [
-            _make_report("analyst", metrics={"funnel_coverage": 0.58, "endpoints": 106}),
+            _make_report(
+                "analyst", metrics={"funnel_coverage": 0.58, "endpoints": 106}
+            ),
         ]
         md = _build_team_detail_markdown("data", reports)
         assert "## Key Metrics" in md
@@ -2128,7 +2130,9 @@ class TestNotionSync:
         assert children is not None
         assert len(children) >= 3
         # Check h2 and h3 headings parsed correctly
-        heading_types = [b.get("type") for b in children if "heading" in b.get("type", "")]
+        heading_types = [
+            b.get("type") for b in children if "heading" in b.get("type", "")
+        ]
         assert "heading_2" in heading_types
         assert "heading_3" in heading_types
 
@@ -2279,7 +2283,10 @@ class TestConsultantHistory:
 
         history = [
             {"role": "user", "content": "What's our test coverage?"},
-            {"role": "assistant", "content": "Currently at 1806 tests across 57 files."},
+            {
+                "role": "assistant",
+                "content": "Currently at 1806 tests across 57 files.",
+            },
         ]
         result = consult(
             "Can you break that down by module?",
@@ -2408,7 +2415,9 @@ class TestTelegramWebhookConsultation:
         mock_route.reasoning = "Best match"
 
         with (
-            patch("agents.shared.consultant.consult", return_value=mock_response) as mock_consult,
+            patch(
+                "agents.shared.consultant.consult", return_value=mock_response
+            ) as mock_consult,
             patch("agents.chief_of_staff.router.route_query", return_value=mock_route),
             patch("app.api.telegram._send_telegram_reply") as mock_reply,
         ):
@@ -2437,7 +2446,9 @@ class TestTelegramWebhookConsultation:
         mock_response.confidence = "high"
 
         with (
-            patch("agents.shared.consultant.consult", return_value=mock_response) as mock_consult,
+            patch(
+                "agents.shared.consultant.consult", return_value=mock_response
+            ) as mock_consult,
             patch("app.api.telegram._send_telegram_reply"),
         ):
             _handle_command(
@@ -2449,7 +2460,9 @@ class TestTelegramWebhookConsultation:
             # Should have called consult with team="finance"
             call_kwargs = mock_consult.call_args
             # Check positional or keyword args for team
-            assert call_kwargs[1].get("team") == "finance" or (len(call_kwargs[0]) >= 2 and call_kwargs[0][1] == "finance")
+            assert call_kwargs[1].get("team") == "finance" or (
+                len(call_kwargs[0]) >= 2 and call_kwargs[0][1] == "finance"
+            )
 
     def test_handle_consult_updates_buffer(self):
         """Consultation should add exchange to conversation buffer."""
@@ -2473,7 +2486,9 @@ class TestTelegramWebhookConsultation:
             patch("agents.chief_of_staff.router.route_query", return_value=mock_route),
             patch("app.api.telegram._send_telegram_reply"),
         ):
-            _handle_command("unknown", {"command": "unknown", "raw": "hello"}, 456, is_founder=True)
+            _handle_command(
+                "unknown", {"command": "unknown", "raw": "hello"}, 456, is_founder=True
+            )
 
         history = _get_history(456)
         assert len(history) == 2
@@ -2485,7 +2500,9 @@ class TestTelegramWebhookConsultation:
         from app.api.telegram import _handle_command
 
         with patch("app.api.telegram._send_telegram_reply") as mock_reply:
-            with patch("agents.chief_of_staff.cos_agent.run_status", return_value="All green"):
+            with patch(
+                "agents.chief_of_staff.cos_agent.run_status", return_value="All green"
+            ):
                 _handle_command("status", {"command": "status"}, 123)
 
             mock_reply.assert_called_once_with(123, "All green")
@@ -2512,6 +2529,8 @@ class TestTelegramWebhookConsultation:
         from app.api.telegram import _handle_command
 
         with patch("app.api.telegram._send_telegram_reply") as mock_reply:
-            _handle_command("unknown", {"command": "unknown", "raw": ""}, 123, is_founder=True)
+            _handle_command(
+                "unknown", {"command": "unknown", "raw": ""}, 123, is_founder=True
+            )
             reply_text = mock_reply.call_args[0][1]
             assert "commands:" in reply_text.lower() or "Commands:" in reply_text

@@ -13,7 +13,6 @@ from __future__ import annotations
 from unittest.mock import patch
 
 
-
 class TestBenchmarkPricing:
     """External pricing benchmark collection from web search."""
 
