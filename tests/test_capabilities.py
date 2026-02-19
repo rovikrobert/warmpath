@@ -2,8 +2,6 @@
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models.user import User
 from app.services.capabilities import compute_user_capabilities

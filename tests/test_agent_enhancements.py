@@ -591,11 +591,13 @@ class TestArchitectMutationTesting:
         mock_pytest_result.returncode = 1  # tests caught the mutation
 
         findings: list[Finding] = []
-        with patch("agents.architect.architect.PROJECT_ROOT", tmp_path):
-            with patch(
+        with (
+            patch("agents.architect.architect.PROJECT_ROOT", tmp_path),
+            patch(
                 "agents.architect.architect._run_tool", return_value=mock_pytest_result
-            ):
-                metrics = _scan_mutation_testing(findings)
+            ),
+        ):
+            metrics = _scan_mutation_testing(findings)
 
         # Original file should be restored
         assert target.read_text() == original_code
