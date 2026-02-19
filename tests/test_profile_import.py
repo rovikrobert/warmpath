@@ -1,4 +1,4 @@
-"""Tests for resume PDF upload and LinkedIn OAuth features."""
+"""Tests for resume PDF upload."""
 
 import io
 
@@ -136,86 +136,4 @@ class TestResumeUpload:
             log = result.scalar_one_or_none()
             assert log is not None
             assert log.action == "resume_parse"
-
-
-# ---------------------------------------------------------------------------
-# LinkedIn OAuth Tests
-# ---------------------------------------------------------------------------
-
-
-class TestLinkedInOAuthUnconfigured:
-    """LinkedIn endpoints return 503 when credentials are not configured."""
-
-    @pytest.mark.asyncio
-    async def test_authorize_returns_503_when_unconfigured(self, client: AsyncClient):
-        resp = await client.get("/api/v1/auth/linkedin/authorize")
-        assert resp.status_code == 503
-        assert "not configured" in resp.json()["detail"].lower()
-
-    @pytest.mark.asyncio
-    async def test_callback_returns_503_when_unconfigured(self, client: AsyncClient):
-        resp = await client.post(
-            "/api/v1/auth/linkedin/callback",
-            json={"code": "any_code", "state": "any_state"},
-        )
-        assert resp.status_code == 503
-        assert "not configured" in resp.json()["detail"].lower()
-
-
-class TestLinkedInOAuth:
-    @pytest.fixture(autouse=True)
-    def _enable_linkedin_mock(self, monkeypatch):
-        """Set a test client ID so the endpoint guard passes, but service stays in mock mode."""
-        from app.config import settings
-
-        monkeypatch.setattr(settings, "LINKEDIN_CLIENT_ID", "test_client_id")
-        monkeypatch.setattr(settings, "LINKEDIN_CLIENT_SECRET", "test_client_secret")
-        monkeypatch.setattr(
-            settings,
-            "LINKEDIN_REDIRECT_URI",
-            "http://localhost:3000/auth/linkedin/callback",
-        )
-
-    @pytest.mark.asyncio
-    async def test_linkedin_authorize_returns_url(self, client: AsyncClient):
-        resp = await client.get("/api/v1/auth/linkedin/authorize")
-        assert resp.status_code == 200
-        data = resp.json()["data"]
-        assert "url" in data
-        assert "state" in data
-        # In mock mode, URL points to localhost callback
-        assert "callback" in data["url"]
-
-    @pytest.mark.asyncio
-    async def test_linkedin_callback_invalid_state(self, client: AsyncClient):
-        resp = await client.post(
-            "/api/v1/auth/linkedin/callback",
-            json={"code": "mock_code", "state": "totally_invalid_state_token"},
-        )
-        assert resp.status_code == 400
-        assert "state" in resp.json()["detail"].lower()
-
-    @pytest.mark.asyncio
-    async def test_linkedin_callback_expired_state(self, client: AsyncClient):
-        """Expired state token should be rejected."""
-        from datetime import datetime, timedelta, timezone
-
-        from jose import jwt
-
-        from app.config import settings
-
-        expired_payload = {
-            "nonce": "test",
-            "exp": datetime.now(timezone.utc) - timedelta(minutes=1),
-            "type": "linkedin_state",
-        }
-        expired_state = jwt.encode(
-            expired_payload, settings.SECRET_KEY, algorithm="HS256"
-        )
-
-        resp = await client.post(
-            "/api/v1/auth/linkedin/callback",
-            json={"code": "mock_code", "state": expired_state},
-        )
-        assert resp.status_code == 400
 
