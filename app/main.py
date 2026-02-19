@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
@@ -94,6 +95,18 @@ app.add_middleware(UsageTrackingMiddleware)
 # ---------------------------------------------------------------------------
 # Global exception handlers
 # ---------------------------------------------------------------------------
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Strip Pydantic v2 'input' and 'ctx' from 422 errors to prevent data leakage."""
+    errors = []
+    for err in exc.errors():
+        clean = {k: v for k, v in err.items() if k not in ("input", "ctx", "url")}
+        errors.append(clean)
+    return JSONResponse(status_code=422, content={"detail": errors})
 
 
 @app.exception_handler(AppError)

@@ -215,15 +215,36 @@ function BulkImportModal({ onClose, onSuccess }) {
     reader.readAsText(file);
   };
 
+  // Parse a CSV line respecting quoted fields (handles commas inside quotes)
+  const parseCsvLine = (line) => {
+    const vals = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+        else { inQuotes = !inQuotes; }
+      } else if (ch === ',' && !inQuotes) {
+        vals.push(cur.trim());
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    vals.push(cur.trim());
+    return vals;
+  };
+
   const parsePreview = () => {
     if (!csvText.trim()) return;
-    const lines = csvText.trim().split('\n');
+    const lines = csvText.trim().split('\n').map((l) => l.replace(/\r$/, ''));
     if (lines.length < 2) { setError('CSV must have a header row and at least one data row.'); return; }
-    const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+    const headers = parseCsvLine(lines[0]).map((h) => h.trim().toLowerCase());
     const rows = lines.slice(1).map((line) => {
-      const vals = line.split(',');
+      const vals = parseCsvLine(line);
       const row = {};
-      headers.forEach((h, i) => { row[h] = vals[i]?.trim() || ''; });
+      headers.forEach((h, i) => { row[h] = vals[i] || ''; });
       return row;
     }).filter((r) => r.name || r['first name'] || r.first_name);
     setPreview(rows);
@@ -247,8 +268,17 @@ function BulkImportModal({ onClose, onSuccess }) {
           how_you_know: r.how_you_know || r['how you know'] || undefined,
         };
       });
-      const res = await contactsApi.bulkImport(mapped);
-      setResult(res.data);
+      // Batch in chunks of 50 (server limit per request)
+      const BATCH_SIZE = 50;
+      let totalCreated = 0;
+      const allErrors = [];
+      for (let i = 0; i < mapped.length; i += BATCH_SIZE) {
+        const batch = mapped.slice(i, i + BATCH_SIZE);
+        const res = await contactsApi.bulkImport(batch);
+        totalCreated += res.data.created || 0;
+        if (res.data.errors?.length) allErrors.push(...res.data.errors);
+      }
+      setResult({ created: totalCreated, errors: allErrors });
     } catch (err) {
       setError(err.message);
     } finally {

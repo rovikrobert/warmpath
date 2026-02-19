@@ -406,6 +406,32 @@ async def test_bulk_import_over_50_rejected(client: AsyncClient):
     assert resp.status_code == 422
 
 
+async def test_bulk_import_422_does_not_leak_input_data(client: AsyncClient):
+    """Validation error responses must not include the 'input' field (PII leakage)."""
+    auth = await _signup(client, "leak_check@test.com")
+
+    contacts = [
+        {"first_name": f"Secret{i}", "last_name": "Person", "company": f"Acme{i}"}
+        for i in range(51)
+    ]
+
+    resp = await client.post(
+        "/api/v1/contacts/manual/bulk",
+        headers=auth["headers"],
+        json={"contacts": contacts},
+    )
+    assert resp.status_code == 422
+    body = resp.json()
+    # detail should be a list of error objects
+    assert "detail" in body
+    # No error object should contain the 'input' key (which leaks request data)
+    for err in body["detail"]:
+        assert "input" not in err, "Validation error leaked 'input' data"
+    # The input contact data should not appear anywhere in the response
+    raw = resp.text
+    assert "Secret0" not in raw, "Contact PII leaked in validation error response"
+
+
 # ---------------------------------------------------------------------------
 # Profile work_history
 # ---------------------------------------------------------------------------
