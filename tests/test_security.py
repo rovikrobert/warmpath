@@ -338,25 +338,28 @@ class TestChangePassword:
         resp = await _signup(client)
         token = resp.json()["data"]["access_token"]
 
-        await client.post(
+        change_resp = await client.post(
             "/api/v1/auth/change-password",
             headers={"Authorization": f"Bearer {token}"},
             json={"old_password": "Secret123", "new_password": "Newsecret456"},
         )
+        assert change_resp.status_code == 200
 
         # Login with new password
         resp2 = await _login(client, password="Newsecret456")
         assert resp2.status_code == 200
+        assert "access_token" in resp2.json()["data"]
 
     async def test_change_password_old_password_fails(self, client: AsyncClient):
         resp = await _signup(client)
         token = resp.json()["data"]["access_token"]
 
-        await client.post(
+        change_resp = await client.post(
             "/api/v1/auth/change-password",
             headers={"Authorization": f"Bearer {token}"},
             json={"old_password": "Secret123", "new_password": "Newsecret456"},
         )
+        assert change_resp.status_code == 200
 
         # Login with old password should fail
         resp2 = await _login(client, password="Secret123")
@@ -697,6 +700,7 @@ class TestAccountLockout:
         # Should be able to log in now
         resp = await _login(client, email="lock3@example.com", password="Secret123")
         assert resp.status_code == 200
+        assert "access_token" in resp.json()["data"]
 
     async def test_successful_login_resets_counter(self, client: AsyncClient):
         """Successful login after failures resets the counter."""
@@ -830,6 +834,7 @@ class TestEmailVerification:
             files={"file": ("test.csv", csv_bytes, "text/csv")},
         )
         assert resp2.status_code == 201
+        assert "status" in resp2.json()["data"]
 
     async def test_unverified_can_view_own_contacts(self, client: AsyncClient):
         """Unverified user CAN view their own contacts."""
@@ -1140,7 +1145,8 @@ class TestPasswordStrength:
     def test_valid_password(self):
         from app.utils.security import validate_password_strength
 
-        validate_password_strength("Secret123")  # Should not raise
+        result = validate_password_strength("Secret123")  # Should not raise
+        assert result is None
 
     async def test_signup_weak_password_rejected(self, client: AsyncClient):
         resp = await client.post(

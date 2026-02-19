@@ -338,13 +338,17 @@ class TestExperimentStart:
         eid = create.json()["data"]["id"]
 
         # Start once
-        await client.post(f"/api/v1/experiments/{eid}/start", headers=admin_headers)
+        first_start = await client.post(
+            f"/api/v1/experiments/{eid}/start", headers=admin_headers
+        )
+        assert first_start.status_code == 200
 
         # Try to start again — should fail
         resp = await client.post(
             f"/api/v1/experiments/{eid}/start", headers=admin_headers
         )
         assert resp.status_code == 422
+        assert "error" in resp.json()
 
     @pytest.mark.asyncio
     async def test_start_not_found(self, client: AsyncClient, admin_headers: dict):

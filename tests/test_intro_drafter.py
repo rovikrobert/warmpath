@@ -674,6 +674,7 @@ async def test_intro_user_scoped(client: AsyncClient):
         headers=headers_a,
         json={"contact_id": contact_id},
     )
+    assert create_resp.status_code == 201
     intro_id = create_resp.json()["data"]["id"]
 
     token_b = await _signup_and_get_token(client, email="ib@example.com")
@@ -701,6 +702,7 @@ async def test_patch_nonexistent_message(client: AsyncClient):
         headers=headers,
         json={"contact_id": contact_id},
     )
+    assert create_resp.status_code == 201
     intro_id = create_resp.json()["data"]["id"]
 
     resp = await client.patch(

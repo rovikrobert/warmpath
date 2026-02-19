@@ -228,6 +228,7 @@ async def test_requester_cannot_respond(
         headers=user_a_headers,
     )
     assert resp.status_code == 404
+    assert "error" in resp.json()
 
 
 @pytest.mark.asyncio
@@ -469,6 +470,7 @@ async def test_blocked_user_cant_send_request(
         headers=user_b_headers,
     )
     assert resp.status_code == 403
+    assert "error" in resp.json()
 
 
 @pytest.mark.asyncio
@@ -686,3 +688,4 @@ async def test_marketplace_friend_filter_invalid(
         headers=user_a_headers,
     )
     assert resp.status_code == 422
+    assert "detail" in resp.json()
