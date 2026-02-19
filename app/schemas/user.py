@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class IntentUpdate(BaseModel):
     intent: str = Field(..., max_length=20)
+    full_name: str | None = Field(None, max_length=200)
 
 
 class DeleteAccountRequest(BaseModel):

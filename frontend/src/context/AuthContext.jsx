@@ -53,7 +53,7 @@ export function AuthProvider({ children }) {
   const token = isSignedIn ? 'clerk-managed' : null;
 
   return (
-    <AuthContext.Provider value={{ token, user, loading, logout, refreshUser }}>
+    <AuthContext.Provider value={{ token, user, clerkUser, loading, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
