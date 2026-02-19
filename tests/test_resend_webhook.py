@@ -23,8 +23,7 @@ async def campaign_log_with_external_id() -> str:
     eid = f"resend_{uuid_mod.uuid4().hex[:12]}"
     async with TestSessionLocal() as db:
         user = User(
-            email="webhook@test.com", full_name="Webhook Tester", password_hash="x"
-        )
+            email="webhook@test.com", full_name="Webhook Tester"        )
         db.add(user)
         await db.flush()
 
@@ -180,7 +179,7 @@ async def test_resend_webhook_idempotent_open(
         result = await db.execute(
             select(EmailCampaignLog).where(EmailCampaignLog.external_id == eid)
         )
-        first_opened = result.scalar_one().opened_at
+        assert result.scalar_one().opened_at is not None
 
     # Second open event
     await client.post(
@@ -208,7 +207,7 @@ async def test_resend_webhook_idempotent_open(
 async def test_record_send_stores_external_id() -> None:
     """_record_send should store external_id when provided."""
     async with TestSessionLocal() as db:
-        user = User(email="eid@test.com", full_name="EID Tester", password_hash="x")
+        user = User(email="eid@test.com", full_name="EID Tester")
         db.add(user)
         await db.flush()
 
@@ -234,7 +233,7 @@ async def test_record_send_stores_external_id() -> None:
 async def test_record_send_handles_none_external_id() -> None:
     """_record_send with None external_id should work (console mode)."""
     async with TestSessionLocal() as db:
-        user = User(email="noeid@test.com", full_name="No EID", password_hash="x")
+        user = User(email="noeid@test.com", full_name="No EID")
         db.add(user)
         await db.flush()
 

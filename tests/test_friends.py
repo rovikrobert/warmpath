@@ -528,8 +528,8 @@ async def test_get_friend_ids_service() -> None:
 
     async with TestSessionLocal() as db:
         # Create two users
-        u1 = User(email="svc1@test.com", full_name="Svc One", password_hash="x")
-        u2 = User(email="svc2@test.com", full_name="Svc Two", password_hash="x")
+        u1 = User(email="svc1@test.com", full_name="Svc One")
+        u2 = User(email="svc2@test.com", full_name="Svc Two")
         db.add_all([u1, u2])
         await db.flush()
 
@@ -560,9 +560,9 @@ async def test_get_friend_and_fof_ids() -> None:
     )
 
     async with TestSessionLocal() as db:
-        u1 = User(email="fof1@test.com", full_name="FoF One", password_hash="x")
-        u2 = User(email="fof2@test.com", full_name="FoF Two", password_hash="x")
-        u3 = User(email="fof3@test.com", full_name="FoF Three", password_hash="x")
+        u1 = User(email="fof1@test.com", full_name="FoF One")
+        u2 = User(email="fof2@test.com", full_name="FoF Two")
+        u3 = User(email="fof3@test.com", full_name="FoF Three")
         db.add_all([u1, u2, u3])
         await db.flush()
 
@@ -598,9 +598,9 @@ async def test_delete_user_friendships() -> None:
     )
 
     async with TestSessionLocal() as db:
-        u1 = User(email="del1@test.com", full_name="Del One", password_hash="x")
-        u2 = User(email="del2@test.com", full_name="Del Two", password_hash="x")
-        u3 = User(email="del3@test.com", full_name="Del Three", password_hash="x")
+        u1 = User(email="del1@test.com", full_name="Del One")
+        u2 = User(email="del2@test.com", full_name="Del Two")
+        u3 = User(email="del3@test.com", full_name="Del Three")
         db.add_all([u1, u2, u3])
         await db.flush()
 

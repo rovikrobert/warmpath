@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.conftest import TestSessionLocal
@@ -49,7 +50,6 @@ def _make_user(
     return User(
         id=uuid.uuid4(),
         email=email or f"{uuid.uuid4().hex[:8]}@test.com",
-        password_hash="hashed",
         full_name="Test User",
         intent=intent,
         created_at=created_at or datetime.now(timezone.utc),
@@ -117,7 +117,7 @@ async def test_email_campaign_log_dedup_constraint(db: AsyncSession) -> None:
         user_id=user.id, email_type="csv_reminder_d1", sent_date="2026-02-18"
     )
     db.add(log2)
-    with pytest.raises(Exception):  # IntegrityError
+    with pytest.raises(IntegrityError):
         await db.flush()
     await db.rollback()
 
