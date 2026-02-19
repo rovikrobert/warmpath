@@ -104,7 +104,7 @@ export default function SharingSettings() {
       <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
         <h3 className="mb-1 text-sm font-semibold text-blue-400">How marketplace sharing works</h3>
         <p className="text-sm text-blue-400">
-          Job seekers see <strong>role level and department only</strong> &mdash; never names or contact details.
+          Candidates see <strong>role level and department only</strong> &mdash; never names or contact details.
           When someone requests an intro, you see their profile and choose whether to introduce them to your contact.
           Names and details are never revealed without your explicit approval.
         </p>
@@ -117,7 +117,7 @@ export default function SharingSettings() {
             <h2 className="text-base font-semibold text-slate-50">Share my network on the marketplace</h2>
             <p className="text-sm text-slate-400">
               {prefs?.opt_in_marketplace
-                ? 'Your contacts are visible (anonymized) to job seekers. When a hire happens, the referral bonus ($2-10K) goes to you.'
+                ? 'Your contacts are visible (anonymized) to candidates. When a hire happens, the referral bonus ($2-10K) goes to you.'
                 : 'Enable sharing to capture referral bonuses ($2-10K per hire) and earn credits.'}
             </p>
           </div>

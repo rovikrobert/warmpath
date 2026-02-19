@@ -52,7 +52,7 @@ export default function RequestIntroModal({ listing, creditBalance, onClose, onS
 
         {/* Message */}
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-300">Message to network holder (optional)</label>
+          <label className="mb-1 block text-sm font-medium text-slate-300">Message to connection owner (optional)</label>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}

@@ -186,7 +186,7 @@ export default function CreditsPage() {
         <div className="space-y-3">
           {[
             { action: 'Upload your LinkedIn CSV', amount: '+100', desc: 'Import your connections to get started' },
-            { action: 'Facilitate an intro', amount: '+50', desc: 'Approve an intro request from a job seeker' },
+            { action: 'Facilitate an intro', amount: '+50', desc: 'Approve an intro request from a candidate' },
             { action: 'Keep data fresh', amount: '+10', desc: 'Re-upload your CSV each quarter' },
             { action: 'Welcome bonus', amount: '+50', desc: 'Awarded when you create your account' },
           ].map((item, i) => (
@@ -207,7 +207,7 @@ export default function CreditsPage() {
         <div className="space-y-3">
           {[
             { action: 'Marketplace search', amount: '-5', desc: 'Search other people\'s networks' },
-            { action: 'Request intro', amount: '-20', desc: 'Ask a network holder to introduce you (15 refunded if declined)' },
+            { action: 'Request intro', amount: '-20', desc: 'Ask a connection owner to introduce you (15 refunded if declined)' },
           ].map((item, i) => (
             <div key={i} className="flex items-center justify-between rounded-lg bg-slate-800/50 p-3">
               <div>

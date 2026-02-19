@@ -27,8 +27,8 @@ function CopyButton({ text }) {
 }
 
 const TYPE_LABELS = {
-  nh_invite: 'Network Holder',
-  js_invite: 'Job Seeker',
+  nh_invite: 'Share Connections',
+  js_invite: 'Find Referrals',
 };
 
 export default function ReferralCodesPage() {
@@ -100,7 +100,7 @@ export default function ReferralCodesPage() {
       <section className="mb-6 rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Create referral code">
         <h2 className="mb-1 text-base font-semibold text-slate-50">Create a Referral Code</h2>
         <p className="mb-4 text-sm text-slate-400">
-          Invite friends and earn credits when they sign up. Network holder invites earn 25 credits, job seeker invites earn 50 credits per conversion.
+          Invite friends and earn credits when they sign up. Invite someone to share connections (25 credits) or to find referrals (50 credits) when they convert.
         </p>
 
         <form onSubmit={handleCreate} className="space-y-3">
@@ -108,8 +108,8 @@ export default function ReferralCodesPage() {
             <label className="mb-1 block text-sm font-medium text-slate-300">Invite type</label>
             <div className="flex gap-3" role="radiogroup" aria-label="Referral code type">
               {[
-                { value: 'nh_invite', label: 'Network Holder', desc: '25 credits/conversion' },
-                { value: 'js_invite', label: 'Job Seeker', desc: '50 credits/conversion' },
+                { value: 'nh_invite', label: 'Share Connections', desc: '25 credits/conversion' },
+                { value: 'js_invite', label: 'Find Referrals', desc: '50 credits/conversion' },
               ].map((opt) => (
                 <label
                   key={opt.value}

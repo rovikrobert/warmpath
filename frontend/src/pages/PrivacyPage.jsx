@@ -106,8 +106,8 @@ export default function PrivacyPage() {
         </SectionHeading>
         <Paragraph>
           Privacy is not a feature of WarmPath &mdash; it is our foundational architecture.
-          Job seekers need absolute confidence that their current employer cannot discover
-          they are exploring new opportunities. Network holders need assurance that their
+          People exploring new opportunities need absolute confidence that their current employer
+          cannot discover their search. Those sharing connections need assurance that their
           contacts are protected. Third-party contacts referenced in uploaded data need
           safeguards even though they have not created accounts.
         </Paragraph>
@@ -116,7 +116,7 @@ export default function PrivacyPage() {
             Your full contact data is visible only to you. We never share it without your explicit consent.
           </InfoCard>
           <InfoCard icon={<svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>} title="Consent Gates">
-            Contact identity is revealed only through the network holder's explicit, active approval.
+            Contact identity is revealed only through the connection owner's explicit, active approval.
           </InfoCard>
           <InfoCard icon={<svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" /></svg>} title="Never Sell Data">
             We never sell, rent, or trade your personal data or contact data to third parties.
@@ -139,19 +139,19 @@ export default function PrivacyPage() {
           simultaneously occupy multiple roles.
         </Paragraph>
         <div className="space-y-3">
-          <InfoCard icon={<svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>} title="Job Seekers">
+          <InfoCard icon={<svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>} title="People Seeking Referrals">
             Your account, search activity, target companies, and application pipeline are private.
             You remain anonymous in the marketplace until you choose to request an introduction.
             No employer &mdash; including yours &mdash; can discover you're looking.
           </InfoCard>
-          <InfoCard icon={<svg className="h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" /></svg>} title="Network Holders">
+          <InfoCard icon={<svg className="h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" /></svg>} title="Connection Owners">
             Marketplace participation is entirely opt-in. Your identity as a facilitator is not
             disclosed to third parties. You retain granular controls over which contacts are
             shared and can pause or withdraw at any time.
           </InfoCard>
           <InfoCard icon={<svg className="h-5 w-5 text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>} title="Contacts Referenced">
             Protected through anonymisation in the marketplace (no names or emails in listings),
-            consent gates (identity revealed only when network holder approves), and the
+            consent gates (identity revealed only when the connection owner approves), and the
             suppression list (any person may request permanent removal).
           </InfoCard>
           <InfoCard icon={<svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" /></svg>} title="Companies">
@@ -160,9 +160,9 @@ export default function PrivacyPage() {
           </InfoCard>
         </div>
         <Paragraph>
-          Where roles overlap, the strongest privacy protection prevails. Job-seeking activity
-          stays invisible even if you are also a network holder. We never merge data across
-          vaults.
+          Where roles overlap, the strongest privacy protection prevails. Referral-seeking
+          activity stays invisible even if you also share connections. We never merge data
+          across vaults.
         </Paragraph>
       </section>
 
@@ -255,11 +255,11 @@ export default function PrivacyPage() {
           <h4 className="mb-2 font-semibold text-slate-200">Consent-Gated Disclosure Flow</h4>
           <ol className="space-y-2 pl-5">
             {[
-              'Job seeker sees anonymous listing ("1 senior engineer at Stripe, strong connection").',
-              'Job seeker requests an introduction (spends credits).',
-              'Network holder reviews the request and the specific contact involved.',
-              'Network holder actively approves or declines.',
-              'Only upon approval is the contact\'s identity revealed \u2014 through the network holder\'s active choice.',
+              'The person seeking a referral sees an anonymous listing ("1 senior engineer at Stripe, strong connection").',
+              'They request an introduction (spends credits).',
+              'The connection owner reviews the request and the specific contact involved.',
+              'The connection owner actively approves or declines.',
+              'Only upon approval is the contact\'s identity revealed \u2014 through the connection owner\'s active choice.',
             ].map((step, i) => (
               <li key={i} className="list-decimal text-sm leading-relaxed text-slate-300">
                 {step}
@@ -283,15 +283,15 @@ export default function PrivacyPage() {
         </Paragraph>
         <BulletList items={[
           'Service providers who process data on our behalf under contractual agreements: cloud hosting, Stripe (payments), Anthropic (AI), email delivery.',
-          'Marketplace participants \u2014 only when a network holder explicitly approves an introduction request.',
+          'Marketplace participants \u2014 only when a connection owner explicitly approves an introduction request.',
           'Legal authorities when required by law to comply with legal obligations or protect rights and safety.',
         ]} />
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
           <h4 className="mb-1 font-semibold text-red-400">What We Will Never Do</h4>
           <BulletList items={[
             'Sell your contact data to recruiters, advertisers, or data brokers.',
-            'Share your job-seeking activity with your current employer.',
-            'Expose contact identities without explicit, active consent from the network holder.',
+            'Share your referral-seeking activity with your current employer.',
+            'Expose contact identities without explicit, active consent from the connection owner.',
             'Use your data to build profiles for advertising or promotional targeting by third parties.',
           ]} />
         </div>
@@ -311,9 +311,9 @@ export default function PrivacyPage() {
           <h4 className="font-semibold text-slate-200">How It Works</h4>
           <BulletList items={[
             'We match requests using SHA-256 hashing of normalised email addresses and/or name-plus-company combinations.',
-            'Matching records are purged across all network holders\' private vaults.',
+            'Matching records are purged across all users\' private vaults.',
             'The individual is added to a permanent suppression list, blocking all future CSV imports.',
-            'Network holders are notified a contact was removed (but not who requested it).',
+            'Connection owners are notified a contact was removed (but not who requested it).',
             'Removal is permanent unless the individual contacts us to be taken off.',
           ]} />
         </div>
