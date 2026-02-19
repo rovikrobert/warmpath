@@ -15,13 +15,13 @@ _ALWAYS_HEADERS: list[tuple[bytes, bytes]] = [
     (
         b"content-security-policy",
         b"default-src 'self';"
-        b" script-src 'self' https://clerk.majiq.agency https://*.clerk.accounts.dev;"
+        b" script-src 'self' https://clerk.majiq.agency https://*.clerk.accounts.dev https://challenges.cloudflare.com;"
         b" style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;"
         b" connect-src 'self' https://clerk.majiq.agency https://*.clerk.accounts.dev https://clerk-telemetry.com;"
         b" img-src 'self' data: https://img.clerk.com;"
         b" font-src 'self' https://fonts.gstatic.com;"
         b" worker-src 'self' blob:;"
-        b" frame-src 'self' https://clerk.majiq.agency https://*.clerk.accounts.dev;",
+        b" frame-src 'self' https://clerk.majiq.agency https://*.clerk.accounts.dev https://challenges.cloudflare.com;",
     ),
     (b"referrer-policy", b"strict-origin-when-cross-origin"),
     (b"permissions-policy", b"camera=(), microphone=(), geolocation=()"),

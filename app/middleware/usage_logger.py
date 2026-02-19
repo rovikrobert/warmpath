@@ -46,6 +46,14 @@ _MARKETPLACE_WARNING = (
     "Marketplace access requires a paid plan. Upgrade for full access."
 )
 
+_ACTION_LABELS: dict[str, str] = {
+    "smart_search": "smart searches",
+    "intro_draft": "intro drafts",
+    "csv_upload": "CSV uploads",
+    "marketplace_search": "marketplace searches",
+    "intro_request": "intro requests",
+}
+
 
 def match_metered_action(method: str, path: str) -> str | None:
     """Return metered action name if this request is metered, else None."""
@@ -97,12 +105,13 @@ async def compute_metering_warning(
     )
     count = count_result.scalar() or 0
 
+    label = _ACTION_LABELS.get(action, action.replace("_", " "))
     if count >= limit:
         return (
-            f"Free tier limit reached for {action} "
+            f"Free tier limit reached for {label} "
             f"({count}/{limit} this month). "
             f"Upgrade for unlimited access."
         )
     elif count >= limit - 1:
-        return f"Approaching free tier limit for {action} ({count}/{limit} this month)."
+        return f"Approaching free tier limit for {label} ({count}/{limit} this month)."
     return None
