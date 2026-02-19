@@ -275,15 +275,26 @@ export default function Layout() {
         {/* Spacer for mobile top bar */}
         <div className="h-14 lg:hidden" />
 
+        {/* Beta sandbox banner */}
+        {import.meta.env.VITE_BETA_MODE === 'true' && (
+          <div className="border-b border-blue-500/30 bg-blue-500/10 px-4 py-2.5">
+            <p className="text-sm text-blue-400 text-center">
+              You're in the WarmPath beta — explore freely, limits are relaxed!
+            </p>
+          </div>
+        )}
+
         {/* Usage warning banner */}
         {usageWarning && (
           <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5">
             <div className="flex items-center justify-between">
               <p className="text-sm text-amber-400">
                 {usageWarning}{' '}
-                <Link to="/credits" className="font-medium text-amber-300 underline hover:text-amber-200">
-                  Upgrade &rarr;
-                </Link>
+                {import.meta.env.VITE_BETA_MODE !== 'true' && (
+                  <Link to="/credits" className="font-medium text-amber-300 underline hover:text-amber-200">
+                    Upgrade &rarr;
+                  </Link>
+                )}
               </p>
               <button onClick={() => setUsageWarning(null)} className="ml-4 text-amber-400 hover:text-amber-300">
                 &times;

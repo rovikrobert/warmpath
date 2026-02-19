@@ -31,7 +31,7 @@ export default function WelcomeToast({ onDismiss }) {
           <div className="flex-1">
             <p className="text-sm font-semibold text-slate-50">Welcome to WarmPath!</p>
             <p className="mt-1 text-xs text-slate-400">
-              You've got <span className="font-semibold text-amber-400">50 credits</span> to get started.
+              You've got <span className="font-semibold text-amber-400">{import.meta.env.VITE_BETA_MODE === 'true' ? '500' : '50'} credits</span> to get started.
               Upload your LinkedIn CSV to earn <span className="font-semibold text-amber-400">100 more</span>.
             </p>
             <Link

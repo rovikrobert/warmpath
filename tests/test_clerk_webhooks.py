@@ -3,12 +3,21 @@
 import json
 import uuid
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.models.credits import CreditTransaction
 from app.models.user import User
 from tests.conftest import TestSessionLocal
+
+
+@pytest.fixture(autouse=True)
+def _disable_beta_sandbox(monkeypatch):
+    """Ensure standard (non-beta) limits for all tests in this module."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "BETA_SANDBOX_MODE", False)
 
 
 async def test_webhook_user_created_creates_db_user_with_welcome_credits(

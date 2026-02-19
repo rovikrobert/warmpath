@@ -131,7 +131,7 @@ export default function CreditsPage() {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-semibold text-slate-50">Usage This Month</h2>
             <span className="rounded-full bg-slate-700/50 px-2.5 py-0.5 text-xs font-medium text-slate-400">
-              {usageData.plan_tier === 'free' ? 'Free plan' : usageData.plan_tier}
+              {usageData.beta_sandbox ? 'Beta' : usageData.plan_tier === 'free' ? 'Free plan' : usageData.plan_tier}
             </span>
           </div>
           <div className="space-y-3">
@@ -188,7 +188,7 @@ export default function CreditsPage() {
             { action: 'Upload your LinkedIn CSV', amount: '+100', desc: 'Import your connections to get started' },
             { action: 'Facilitate an intro', amount: '+50', desc: 'Approve an intro request from a candidate' },
             { action: 'Keep data fresh', amount: '+10', desc: 'Re-upload your CSV each quarter' },
-            { action: 'Welcome bonus', amount: '+50', desc: 'Awarded when you create your account' },
+            { action: 'Welcome bonus', amount: usageData?.beta_sandbox ? '+500' : '+50', desc: usageData?.beta_sandbox ? 'Beta bonus' : 'Awarded when you create your account' },
           ].map((item, i) => (
             <div key={i} className="flex items-center justify-between rounded-lg bg-slate-800/50 p-3">
               <div>
@@ -220,22 +220,24 @@ export default function CreditsPage() {
         </div>
       </div>
 
-      {/* Buy credits stub */}
-      <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-slate-50">Buy Credits</h2>
-            <p className="text-sm text-slate-400">$1 = 5 credits. Credits expire after 12 months.</p>
+      {/* Buy credits stub — hidden during beta */}
+      {!(usageData?.beta_sandbox) && (
+        <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-50">Buy Credits</h2>
+              <p className="text-sm text-slate-400">$1 = 5 credits. Credits expire after 12 months.</p>
+            </div>
+            <button
+              disabled
+              aria-disabled="true"
+              className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white opacity-50"
+            >
+              Coming Soon
+            </button>
           </div>
-          <button
-            disabled
-            aria-disabled="true"
-            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white opacity-50"
-          >
-            Coming Soon
-          </button>
         </div>
-      </div>
+      )}
 
       {/* Transaction history */}
       <div className="rounded-xl bg-slate-900 border border-slate-700/50">
