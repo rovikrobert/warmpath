@@ -5,8 +5,10 @@ COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci
 COPY frontend/ ./
 ARG VITE_BETA_MODE=false
+ARG VITE_CLERK_PUBLISHABLE_KEY
 ENV VITE_API_URL=""
 ENV VITE_BETA_MODE=${VITE_BETA_MODE}
+ENV VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
 RUN npm run build
 
 # Stage 2: Python runtime
