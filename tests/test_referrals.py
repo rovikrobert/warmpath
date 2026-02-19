@@ -3,6 +3,8 @@
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import TestSessionLocal, create_test_user_in_db
+
 pytestmark = pytest.mark.anyio
 
 
@@ -11,17 +13,16 @@ pytestmark = pytest.mark.anyio
 # ---------------------------------------------------------------------------
 
 
-async def _signup(client: AsyncClient, email: str, name: str = "Test User") -> dict:
-    """Sign up a user and return login response data."""
-    await client.post(
-        "/api/v1/auth/signup",
-        json={"email": email, "password": "Pass123!", "full_name": name},
-    )
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": email, "password": "Pass123!"},
-    )
-    return login.json()["data"]
+async def _signup(
+    client: AsyncClient, email: str, name: str = "Test User"
+) -> dict:
+    """Create a test user and return auth data dict."""
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email=email, full_name=name
+        )
+    token = headers["Authorization"].split(" ")[1]
+    return {"access_token": token, "user": {"id": str(user.id), "email": email}}
 
 
 async def _headers(client: AsyncClient, email: str, name: str = "Test User") -> dict:

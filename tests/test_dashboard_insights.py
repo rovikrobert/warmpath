@@ -19,20 +19,13 @@ from tests.conftest import TestSessionLocal
 @pytest_asyncio.fixture
 async def auth_headers(client: AsyncClient) -> dict:
     """Create a test user and return auth headers."""
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "dashtest@test.com",
-            "password": "Testpass123",
-            "full_name": "Dash Tester",
-        },
-    )
-    login_res = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "dashtest@test.com", "password": "Testpass123"},
-    )
-    token = login_res.json()["data"]["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    from tests.conftest import create_test_user_in_db
+
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="dashtest@test.com", full_name="Dash Tester"
+        )
+    return headers
 
 
 @pytest_asyncio.fixture

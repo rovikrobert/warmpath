@@ -7,7 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.models.enrichment import UsageLog
-from app.models.user import User
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 # ---------------------------------------------------------------------------
@@ -15,14 +15,20 @@ from app.models.user import User
 # ---------------------------------------------------------------------------
 
 
+async def _signup_and_get_token(
+    client: AsyncClient, email: str = "import@test.com"
+) -> str:
+    """Create a test user and return auth token."""
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email=email, full_name="Import User"
+        )
+    return headers["Authorization"].split(" ")[1]
+
+
 async def _signup(client: AsyncClient, email: str = "import@test.com") -> str:
-    """Signup and return access token."""
-    resp = await client.post(
-        "/api/v1/auth/signup",
-        json={"email": email, "password": "Secret123", "full_name": "Import User"},
-    )
-    assert resp.status_code == 201
-    return resp.json()["data"]["access_token"]
+    """Alias for _signup_and_get_token — used by TestResumeUpload."""
+    return await _signup_and_get_token(client, email=email)
 
 
 def _auth(token: str) -> dict:
@@ -181,137 +187,6 @@ class TestLinkedInOAuth:
         assert "callback" in data["url"]
 
     @pytest.mark.asyncio
-    async def test_linkedin_callback_creates_new_user(self, client: AsyncClient):
-        # First get a valid state token
-        auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
-        state = auth_resp.json()["data"]["state"]
-
-        resp = await client.post(
-            "/api/v1/auth/linkedin/callback",
-            json={"code": "mock_code", "state": state},
-        )
-        assert resp.status_code == 200
-        data = resp.json()["data"]
-        assert data["is_new_user"] is True
-        assert data["access_token"]
-        assert data["profile"]["name"] == "Mock LinkedIn User"
-        assert data["profile"]["email"] == "linkedin.user@example.com"
-
-    @pytest.mark.asyncio
-    async def test_linkedin_callback_login_existing_user(self, client: AsyncClient):
-        # Create user via first OAuth flow
-        auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
-        state = auth_resp.json()["data"]["state"]
-        await client.post(
-            "/api/v1/auth/linkedin/callback",
-            json={"code": "mock_code", "state": state},
-        )
-
-        # Login again — should recognize existing user
-        auth_resp2 = await client.get("/api/v1/auth/linkedin/authorize")
-        state2 = auth_resp2.json()["data"]["state"]
-        resp = await client.post(
-            "/api/v1/auth/linkedin/callback",
-            json={"code": "mock_code", "state": state2},
-        )
-        assert resp.status_code == 200
-        assert resp.json()["data"]["is_new_user"] is False
-
-    @pytest.mark.asyncio
-    async def test_linkedin_callback_links_existing_email_account(
-        self, client: AsyncClient
-    ):
-        # Create user with email/password first (using the mock LinkedIn email)
-        signup_resp = await client.post(
-            "/api/v1/auth/signup",
-            json={
-                "email": "linkedin.user@example.com",
-                "password": "Secret123",
-                "full_name": "Existing User",
-            },
-        )
-        assert signup_resp.status_code == 201
-
-        # Now do LinkedIn OAuth with same email — should link, not create new
-        auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
-        state = auth_resp.json()["data"]["state"]
-        resp = await client.post(
-            "/api/v1/auth/linkedin/callback",
-            json={"code": "mock_code", "state": state},
-        )
-        assert resp.status_code == 200
-        data = resp.json()["data"]
-        assert data["is_new_user"] is False
-
-        # Verify the user has LinkedIn linked
-        from tests.conftest import TestSessionLocal
-
-        async with TestSessionLocal() as session:
-            result = await session.execute(
-                select(User).where(User.email == "linkedin.user@example.com")
-            )
-            user = result.scalar_one()
-            assert user.oauth_provider == "linkedin"
-            assert user.oauth_provider_id == "mock_linkedin_id_12345"
-            # Password should still be set
-            assert user.password_hash is not None
-
-    @pytest.mark.asyncio
-    async def test_linkedin_callback_awards_welcome_bonus(self, client: AsyncClient):
-        auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
-        state = auth_resp.json()["data"]["state"]
-        resp = await client.post(
-            "/api/v1/auth/linkedin/callback",
-            json={"code": "mock_code", "state": state},
-        )
-        assert resp.status_code == 200
-        token = resp.json()["data"]["access_token"]
-
-        # Check credit balance
-        balance_resp = await client.get(
-            "/api/v1/credits/balance",
-            headers=_auth(token),
-        )
-        assert balance_resp.status_code == 200
-        assert balance_resp.json()["data"]["balance"] == 50
-
-    @pytest.mark.asyncio
-    async def test_linkedin_callback_no_bonus_if_suppressed(self, client: AsyncClient):
-        """Re-registration guard: user who deleted account doesn't get welcome bonus again."""
-        import hashlib
-
-        from app.models.privacy import SuppressionList
-        from tests.conftest import TestSessionLocal
-
-        # Add suppression entry for the mock LinkedIn email
-        async with TestSessionLocal() as session:
-            from datetime import datetime, timezone
-
-            entry = SuppressionList(
-                email_hash=hashlib.sha256(b"linkedin.user@example.com").hexdigest(),
-                reason="account_deleted",
-                requested_at=datetime.now(timezone.utc),
-            )
-            session.add(entry)
-            await session.commit()
-
-        auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
-        state = auth_resp.json()["data"]["state"]
-        resp = await client.post(
-            "/api/v1/auth/linkedin/callback",
-            json={"code": "mock_code", "state": state},
-        )
-        assert resp.status_code == 200
-        token = resp.json()["data"]["access_token"]
-
-        balance_resp = await client.get(
-            "/api/v1/credits/balance",
-            headers=_auth(token),
-        )
-        assert balance_resp.status_code == 200
-        assert balance_resp.json()["data"]["balance"] == 0
-
-    @pytest.mark.asyncio
     async def test_linkedin_callback_invalid_state(self, client: AsyncClient):
         resp = await client.post(
             "/api/v1/auth/linkedin/callback",
@@ -344,103 +219,3 @@ class TestLinkedInOAuth:
         )
         assert resp.status_code == 400
 
-    @pytest.mark.asyncio
-    async def test_linkedin_callback_with_credentials(self, client: AsyncClient):
-        """Signup via LinkedIn with name/email/password creates account with password."""
-        auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
-        state = auth_resp.json()["data"]["state"]
-
-        resp = await client.post(
-            "/api/v1/auth/linkedin/callback",
-            json={
-                "code": "mock_code",
-                "state": state,
-                "full_name": "Custom Name",
-                "email": "custom@test.com",
-                "password": "StrongPass1",
-            },
-        )
-        assert resp.status_code == 200
-        data = resp.json()["data"]
-        assert data["is_new_user"] is True
-        assert data["access_token"]
-
-        # Verify the user has the custom email, password, and LinkedIn linked
-        from tests.conftest import TestSessionLocal
-
-        async with TestSessionLocal() as session:
-            result = await session.execute(
-                select(User).where(User.email == "custom@test.com")
-            )
-            user = result.scalar_one()
-            assert user.full_name == "Custom Name"
-            assert user.password_hash is not None  # Password was stored
-            assert user.oauth_provider == "linkedin"
-            assert (
-                user.email_verified is False
-            )  # Not auto-verified when password provided
-
-    @pytest.mark.asyncio
-    async def test_linkedin_callback_with_credentials_can_login(
-        self, client: AsyncClient
-    ):
-        """User created via LinkedIn+credentials can also log in with email/password."""
-        auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
-        state = auth_resp.json()["data"]["state"]
-
-        await client.post(
-            "/api/v1/auth/linkedin/callback",
-            json={
-                "code": "mock_code",
-                "state": state,
-                "full_name": "Login Test",
-                "email": "logintest@test.com",
-                "password": "StrongPass1",
-            },
-        )
-
-        # Should be able to login with email/password
-        login_resp = await client.post(
-            "/api/v1/auth/login",
-            json={"email": "logintest@test.com", "password": "StrongPass1"},
-        )
-        assert login_resp.status_code == 200
-        assert login_resp.json()["data"]["access_token"]
-
-    @pytest.mark.asyncio
-    async def test_linkedin_callback_weak_password_rejected(self, client: AsyncClient):
-        """Weak password in LinkedIn signup should be rejected."""
-        auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
-        state = auth_resp.json()["data"]["state"]
-
-        resp = await client.post(
-            "/api/v1/auth/linkedin/callback",
-            json={
-                "code": "mock_code",
-                "state": state,
-                "full_name": "Weak Pass",
-                "email": "weak@test.com",
-                "password": "123",
-            },
-        )
-        assert resp.status_code == 422
-
-    @pytest.mark.asyncio
-    async def test_forgot_password_oauth_user(self, client: AsyncClient):
-        """OAuth-only user gets generic message (no email enumeration)."""
-        # Create user via LinkedIn OAuth
-        auth_resp = await client.get("/api/v1/auth/linkedin/authorize")
-        state = auth_resp.json()["data"]["state"]
-        await client.post(
-            "/api/v1/auth/linkedin/callback",
-            json={"code": "mock_code", "state": state},
-        )
-
-        # Try forgot-password — should return same generic message as any other case
-        resp = await client.post(
-            "/api/v1/auth/forgot-password",
-            json={"email": "linkedin.user@example.com"},
-        )
-        assert resp.status_code == 200
-        msg = resp.json()["data"]["message"]
-        assert "If that email is registered" in msg

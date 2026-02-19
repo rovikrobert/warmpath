@@ -8,6 +8,7 @@ from httpx import AsyncClient
 
 from app.services.csv_parser import classify_relationship
 from app.services.warm_scorer import compute_warm_score
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -22,14 +23,11 @@ SAMPLE_CSV = (
 
 
 async def _signup(client: AsyncClient, email: str = "reltest@test.com") -> dict:
-    resp = await client.post(
-        "/api/v1/auth/signup",
-        json={"email": email, "password": "Secret123", "full_name": "Rel User"},
-    )
-    token = resp.json()["data"]["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-    me = await client.get("/api/v1/auth/me", headers=headers)
-    return {"headers": headers, "user_id": me.json()["data"]["id"]}
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email=email, full_name="Rel User"
+        )
+    return {"headers": headers, "user_id": str(user.id)}
 
 
 async def _signup_with_profile(

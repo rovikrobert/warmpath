@@ -18,7 +18,7 @@ from ops_team.keevs.coach_service import (
     _mock_briefing,
     _mock_chat_response,
 )
-from tests.conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 # ---------------------------------------------------------------------------
@@ -29,20 +29,11 @@ from tests.conftest import TestSessionLocal
 @pytest_asyncio.fixture
 async def auth_headers(client: AsyncClient) -> dict:
     """Create a test user and return auth headers."""
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "keevs@test.com",
-            "password": "Testpass123",
-            "full_name": "Keevs Tester",
-        },
-    )
-    login_res = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "keevs@test.com", "password": "Testpass123"},
-    )
-    token = login_res.json()["data"]["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="keevs@test.com", full_name="Keevs Tester"
+        )
+    return headers
 
 
 @pytest_asyncio.fixture

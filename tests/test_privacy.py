@@ -22,7 +22,7 @@ from app.services.suppression import (
 )
 from app.utils.encryption import compute_blind_index
 from app.utils.hashing import hash_for_suppression
-from tests.conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 # ---------------------------------------------------------------------------
@@ -32,20 +32,11 @@ from tests.conftest import TestSessionLocal
 
 @pytest_asyncio.fixture
 async def auth_headers(client: AsyncClient) -> dict:
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "privacy@test.com",
-            "password": "Testpass123",
-            "full_name": "Privacy Tester",
-        },
-    )
-    login_res = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "privacy@test.com", "password": "Testpass123"},
-    )
-    token = login_res.json()["data"]["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="privacy@test.com", full_name="Privacy Tester"
+        )
+    return headers
 
 
 @pytest_asyncio.fixture
@@ -57,24 +48,11 @@ async def user_id(auth_headers: dict, client: AsyncClient) -> str:
 @pytest_asyncio.fixture
 async def second_user_id(client: AsyncClient) -> str:
     """Create a second user to test cross-vault purge."""
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "holder2@test.com",
-            "password": "Testpass123",
-            "full_name": "Second Holder",
-        },
-    )
-    login_res = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "holder2@test.com", "password": "Testpass123"},
-    )
-    token = login_res.json()["data"]["access_token"]
-    resp = await client.get(
-        "/api/v1/auth/me",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    return resp.json()["data"]["id"]
+    async with TestSessionLocal() as db:
+        user, _ = await create_test_user_in_db(
+            db, email="holder2@test.com", full_name="Second Holder"
+        )
+    return str(user.id)
 
 
 @pytest_asyncio.fixture

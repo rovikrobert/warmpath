@@ -5,6 +5,7 @@ from httpx import AsyncClient
 from sqlalchemy import update
 
 from app.models.user import User
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 # ---------------------------------------------------------------------------
@@ -22,11 +23,12 @@ SAMPLE_CSV = (
 async def _signup_and_get_token(
     client: AsyncClient, email: str = "usage@example.com"
 ) -> str:
-    resp = await client.post(
-        "/api/v1/auth/signup",
-        json={"email": email, "password": "Secret123", "full_name": "Usage User"},
-    )
-    return resp.json()["data"]["access_token"]
+    """Create a test user and return auth token."""
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email=email, full_name="Usage User"
+        )
+    return headers["Authorization"].split(" ")[1]
 
 
 def _csv_file(content: str = SAMPLE_CSV):

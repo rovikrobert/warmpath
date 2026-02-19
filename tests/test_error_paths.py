@@ -7,6 +7,8 @@ Covers 401 Unauthorized, 404 Not Found, and 422 Invalid Input for each module.
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import TestSessionLocal, create_test_user_in_db
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -16,25 +18,19 @@ FAKE_UUID = "00000000-0000-0000-0000-000000000000"
 _user_counter = 0
 
 
+_user_counter = 0
+
+
 async def _auth_headers(client: AsyncClient) -> dict:
-    """Sign up a unique user and return Authorization headers."""
+    """Create a test user and return Authorization headers."""
     global _user_counter
     _user_counter += 1
     email = f"error-test-{_user_counter}@example.com"
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": email,
-            "password": "TestPass123!",
-            "full_name": "Error Tester",
-        },
-    )
-    resp = await client.post(
-        "/api/v1/auth/login",
-        json={"email": email, "password": "TestPass123!"},
-    )
-    token = resp.json()["data"]["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email=email, full_name="Error Tester"
+        )
+    return headers
 
 
 # ===========================================================================

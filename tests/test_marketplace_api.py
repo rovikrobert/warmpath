@@ -15,7 +15,7 @@ from app.models.marketplace import (
 )
 from app.models.match_result import WarmScore
 from app.services.credits import earn_credits, get_balance, spend_credits
-from tests.conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 # ---------------------------------------------------------------------------
@@ -26,63 +26,21 @@ from tests.conftest import TestSessionLocal
 @pytest_asyncio.fixture
 async def seeker_auth(client: AsyncClient) -> dict:
     """Create a job seeker user and return auth headers + user_id."""
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "seeker@test.com",
-            "password": "Testpass123",
-            "full_name": "Job Seeker",
-        },
-    )
-    # Verify email so marketplace features are accessible
-    from app.models.user import User
-    from sqlalchemy import select
-
     async with TestSessionLocal() as db:
-        result = await db.execute(select(User).where(User.email == "seeker@test.com"))
-        user = result.scalar_one()
-        user.email_verified = True
-        await db.commit()
-
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "seeker@test.com", "password": "Testpass123"},
-    )
-    token = login.json()["data"]["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-    me = await client.get("/api/v1/auth/me", headers=headers)
-    return {"headers": headers, "user_id": me.json()["data"]["id"]}
+        user, headers = await create_test_user_in_db(
+            db, email="seeker@test.com", full_name="Job Seeker", email_verified=True
+        )
+    return {"headers": headers, "user_id": str(user.id)}
 
 
 @pytest_asyncio.fixture
 async def holder_auth(client: AsyncClient) -> dict:
     """Create a network holder user and return auth headers + user_id."""
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "holder@test.com",
-            "password": "Testpass123",
-            "full_name": "Network Holder",
-        },
-    )
-    # Verify email so marketplace features are accessible
-    from app.models.user import User
-    from sqlalchemy import select
-
     async with TestSessionLocal() as db:
-        result = await db.execute(select(User).where(User.email == "holder@test.com"))
-        user = result.scalar_one()
-        user.email_verified = True
-        await db.commit()
-
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "holder@test.com", "password": "Testpass123"},
-    )
-    token = login.json()["data"]["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-    me = await client.get("/api/v1/auth/me", headers=headers)
-    return {"headers": headers, "user_id": me.json()["data"]["id"]}
+        user, headers = await create_test_user_in_db(
+            db, email="holder@test.com", full_name="Network Holder", email_verified=True
+        )
+    return {"headers": headers, "user_id": str(user.id)}
 
 
 @pytest_asyncio.fixture

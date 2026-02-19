@@ -8,7 +8,7 @@ from httpx import AsyncClient
 
 from app.models.enrichment import UsageLog
 from app.models.user import User
-from tests.conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -23,15 +23,12 @@ SAMPLE_CSV = (
 
 
 async def _signup(client: AsyncClient, email: str = "meter@test.com") -> dict:
-    """Sign up a user, return {headers, user_id}."""
-    resp = await client.post(
-        "/api/v1/auth/signup",
-        json={"email": email, "password": "Secret123", "full_name": "Meter User"},
-    )
-    token = resp.json()["data"]["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-    me = await client.get("/api/v1/auth/me", headers=headers)
-    return {"headers": headers, "user_id": me.json()["data"]["id"]}
+    """Create a test user, return {headers, user_id}."""
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email=email, full_name="Meter User"
+        )
+    return {"headers": headers, "user_id": str(user.id)}
 
 
 def _csv_file(content: str = SAMPLE_CSV):

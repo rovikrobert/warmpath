@@ -4,23 +4,16 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
+from tests.conftest import TestSessionLocal, create_test_user_in_db
+
 
 @pytest_asyncio.fixture
 async def auth_headers(client: AsyncClient) -> dict:
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "feedback@test.com",
-            "password": "Testpass123",
-            "full_name": "Feedback Tester",
-        },
-    )
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "feedback@test.com", "password": "Testpass123"},
-    )
-    token = login.json()["data"]["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="feedback@test.com", full_name="Feedback Tester"
+        )
+    return headers
 
 
 @pytest.mark.asyncio
