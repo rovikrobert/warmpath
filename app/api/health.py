@@ -1,4 +1,6 @@
+import hashlib
 import logging
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Query
@@ -8,6 +10,15 @@ from app.utils.performance import THRESHOLDS, get_recent_metrics, get_stats
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _frontend_version() -> str:
+    """Derive frontend version from index.html asset hash."""
+    index = Path("frontend/dist/index.html")
+    if not index.exists():
+        return "unknown"
+    content = index.read_bytes()
+    return hashlib.md5(content).hexdigest()[:8]
 
 
 @router.get("/health")
@@ -24,7 +35,11 @@ def health_check() -> dict:
         logger.debug("Celery ping failed", exc_info=True)
 
     return {
-        "data": {"status": "healthy", "celery": celery_status},
+        "data": {
+            "status": "healthy",
+            "celery": celery_status,
+            "frontend_version": _frontend_version(),
+        },
         "meta": {},
     }
 
