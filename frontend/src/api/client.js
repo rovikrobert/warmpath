@@ -85,6 +85,8 @@ export const auth = {
     form.append('file', file);
     return api('/api/v1/auth/profile/import-resume', { method: 'POST', body: form });
   },
+  completeOnboarding: () =>
+    api('/api/v1/auth/onboarding-complete', { method: 'POST' }),
 };
 
 export const contacts = {
