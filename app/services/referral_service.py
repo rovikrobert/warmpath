@@ -238,16 +238,22 @@ async def get_leaderboard(
     )
     rows = result.all()
 
-    # Also get total referral codes per user
-    code_counts = {}
-    for row in rows:
-        code_result = await db.execute(
-            select(func.count(ReferralCode.id)).where(
-                ReferralCode.owner_id == row.owner_id,
+    # Batch-load total referral codes per user (avoids N+1)
+    owner_ids = [row.owner_id for row in rows]
+    code_counts: dict = {}
+    if owner_ids:
+        cc_result = await db.execute(
+            select(
+                ReferralCode.owner_id,
+                func.count(ReferralCode.id).label("cnt"),
+            )
+            .where(
+                ReferralCode.owner_id.in_(owner_ids),
                 ReferralCode.deleted_at.is_(None),
             )
+            .group_by(ReferralCode.owner_id)
         )
-        code_counts[row.owner_id] = code_result.scalar() or 0
+        code_counts = dict(cc_result.all())
 
     return [
         {

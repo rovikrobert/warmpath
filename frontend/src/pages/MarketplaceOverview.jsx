@@ -263,7 +263,7 @@ export default function MarketplaceOverview() {
       </div>
 
       {/* My Listings */}
-      {listings.length > 0 && (
+      {listings.length > 0 ? (
         <div className="overflow-hidden rounded-xl bg-slate-900 border border-slate-700/50">
           <div className="border-b border-slate-700/50 px-5 py-4">
             <h2 className="text-base font-semibold text-slate-50">My Listings ({listings.length})</h2>
@@ -291,6 +291,21 @@ export default function MarketplaceOverview() {
               ))}
             </tbody>
           </table>
+        </div>
+      ) : (
+        <div className="rounded-xl bg-slate-900 p-12 text-center border border-slate-700/50">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800" aria-hidden="true">
+            <svg className="h-7 w-7 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
+            </svg>
+          </div>
+          <h2 className="mb-2 text-base font-semibold text-slate-50">No marketplace listings yet</h2>
+          <p className="mx-auto mb-4 max-w-sm text-sm text-slate-400">
+            Upload your contacts and enable sharing to list them anonymously on the marketplace. You'll earn credits and capture referral bonuses when candidates get hired.
+          </p>
+          <Link to="/settings?tab=sharing" className="inline-block rounded-lg bg-amber-500 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-400">
+            Enable Sharing
+          </Link>
         </div>
       )}
     </div>

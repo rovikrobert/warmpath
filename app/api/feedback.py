@@ -62,7 +62,6 @@ def _sync_feedback_to_notion(
                 "Contacts": "Contacts",
                 "Search": "Search",
                 "Marketplace": "Marketplace",
-                "Coach": "Coach",
                 "Applications": "Applications",
                 "Settings": "Settings",
                 "Onboarding": "Onboarding",
@@ -76,7 +75,7 @@ def _sync_feedback_to_notion(
         if comment:
             lines = comment.split("\n")
             # First line(s) before metadata markers are the user comment
-            user_lines = [l for l in lines if not l.startswith("[")]
+            user_lines = [ln for ln in lines if not ln.startswith("[")]
             user_comment = "\n".join(user_lines).strip()
 
         summary = user_comment[:80] if user_comment else f"{category} on {page_feature}"

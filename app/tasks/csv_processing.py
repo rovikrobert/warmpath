@@ -16,13 +16,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.celery_app import celery_app
 from app.config import settings
 from app.models.contact import Contact, CsvUpload
+from app.models.privacy import SuppressionList
 from app.models.user import ConnectorProfile
 from app.services.company_normalizer import link_contact_to_company
 from app.services.credits import earn_credits
 from app.services.csv_parser import classify_relationship, parse_linkedin_csv
-from app.services.suppression import check_suppression
 from app.services.warm_scorer import batch_compute_scores
 from app.utils.encryption import compute_blind_index
+from app.utils.hashing import hash_for_suppression
 from app.utils.performance import timed
 
 
@@ -88,16 +89,26 @@ async def process_csv_upload_core(
             )
             existing_by_fp = {c.fingerprint: c for c in fp_result.scalars()}
 
+        # Pre-load ALL suppression hashes in one query (avoids N+1)
+        supp_result = await db.execute(
+            select(SuppressionList.email_hash, SuppressionList.name_company_hash)
+        )
+        supp_rows = supp_result.all()
+        suppressed_email_hashes = {r[0] for r in supp_rows if r[0]}
+        suppressed_name_co_hashes = {r[1] for r in supp_rows if r[1]}
+
         for row in parsed:
-            # Check suppression list before inserting
-            is_suppressed = await check_suppression(
-                email=row.get("email"),
-                first_name=row.get("first_name", ""),
-                last_name=row.get("last_name", ""),
-                company=row.get("current_company", ""),
-                db=db,
-            )
-            if is_suppressed:
+            # Check suppression list via set membership (O(1) per row)
+            email = row.get("email")
+            if email and hash_for_suppression(email) in suppressed_email_hashes:
+                suppressed_count += 1
+                continue
+
+            fn = row.get("first_name", "")
+            ln = row.get("last_name", "")
+            co = row.get("current_company", "")
+            name_co_key = f"{fn}{ln}{co}"
+            if hash_for_suppression(name_co_key) in suppressed_name_co_hashes:
                 suppressed_count += 1
                 continue
 
@@ -113,13 +124,9 @@ async def process_csv_upload_core(
             )
             source = row.get("source", "linkedin_csv")
 
-            # Pre-compute blind indexes for this row
-            row_email = row.get("email")
-            email_bi = compute_blind_index(row_email) if row_email else None
+            # Pre-compute blind indexes (reuse fn/ln/co/email from suppression check)
+            email_bi = compute_blind_index(email) if email else None
             name_co_bi = None
-            fn = row.get("first_name", "")
-            ln = row.get("last_name", "")
-            co = row.get("current_company", "")
             if fn and ln and co:
                 name_co_bi = compute_blind_index(f"{fn}{ln}{co}")
 

@@ -34,7 +34,10 @@ class EnrichmentCache(Base):
 
 class UsageLog(Base):
     __tablename__ = "usage_logs"
-    __table_args__ = (Index("idx_usage_logs_created", "user_id", "created_at"),)
+    __table_args__ = (
+        Index("idx_usage_logs_created", "user_id", "created_at"),
+        Index("idx_usage_logs_rate_limit", "user_id", "action", "created_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

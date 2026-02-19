@@ -218,22 +218,50 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
       {/* Step 3: Done */}
       {step === 3 && result && (
         <div className="text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
-            <span className="text-xl text-emerald-400">&#10003;</span>
-          </div>
-          <h3 className="mb-1 text-base font-medium text-slate-50">
-            You're all set!
-          </h3>
-          <p className="mb-4 text-sm text-slate-400">
-            {result.processed_count ?? result.row_count ?? 0} contacts imported
-            {result.company_count ? ` across ${result.company_count} companies` : ''}
-          </p>
-          <Button
-            onClick={() => { onComplete?.(); onClose(); }}
-            className="w-full"
-          >
-            Start searching
-          </Button>
+          {!hasContacts ? (
+            <>
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10">
+                <svg className="h-8 w-8 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456Z" />
+                </svg>
+              </div>
+              <h3 className="mb-1 text-lg font-semibold text-slate-50">
+                Your network is live!
+              </h3>
+              <p className="mb-2 text-sm text-slate-400">
+                {result.processed_count ?? result.row_count ?? 0} contacts imported
+                {result.company_count ? ` across ${result.company_count} companies` : ''}
+              </p>
+              <p className="mx-auto mb-4 max-w-xs text-xs text-slate-500">
+                You earned 100 credits for your first upload. Your contacts are now scored and ready to search.
+              </p>
+              <Button
+                onClick={() => { onComplete?.(); onClose(); }}
+                className="w-full"
+              >
+                Start searching
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
+                <span className="text-xl text-emerald-400">&#10003;</span>
+              </div>
+              <h3 className="mb-1 text-base font-medium text-slate-50">
+                You're all set!
+              </h3>
+              <p className="mb-4 text-sm text-slate-400">
+                {result.processed_count ?? result.row_count ?? 0} contacts imported
+                {result.company_count ? ` across ${result.company_count} companies` : ''}
+              </p>
+              <Button
+                onClick={() => { onComplete?.(); onClose(); }}
+                className="w-full"
+              >
+                Start searching
+              </Button>
+            </>
+          )}
         </div>
       )}
     </Modal>

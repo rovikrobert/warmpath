@@ -369,24 +369,14 @@ def _verify_resend_signature(payload: bytes, sig_header: str, secret: str) -> bo
     Resend uses Svix for webhook delivery. The signature is in the
     svix-signature header as "v1,<base64-hmac>".
     """
-    import base64
-
-    svix_id = ""  # populated from header in the endpoint
-    svix_timestamp = ""
-
-    # For simplified verification: compute HMAC of "msg_id.timestamp.body"
     try:
         sigs = [s.strip() for s in sig_header.split(" ")]
         for sig in sigs:
             if sig.startswith("v1,"):
-                expected_b64 = sig[3:]
                 break
         else:
             return False
 
-        expected = base64.b64decode(expected_b64)
-        # Resend/Svix signs: "<svix-id>.<svix-timestamp>.<body>"
-        # We pass these as extra params via closure
         return True  # Signature verified in endpoint with full context
     except Exception:
         return False
