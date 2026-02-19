@@ -34,13 +34,11 @@ async def create_referral_code(
     current_user: User = Depends(require_verified_email),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Create a new referral code."""
+    """Create or return the user's single referral code."""
     code = await referral_service.create_referral_code(
         owner_id=current_user.id,
-        referral_type=body.referral_type,
         db=db,
         target_email=body.target_email,
-        target_company_id=body.target_company_id,
         max_uses=body.max_uses,
     )
     await db.commit()
@@ -92,7 +90,7 @@ async def redeem_referral_code(
         UsageLog(
             user_id=current_user.id,
             action="referral_redeem",
-            metadata_={"referral_type": ref_code.referral_type},
+            metadata_={},
         )
     )
     await db.commit()
@@ -100,7 +98,6 @@ async def redeem_referral_code(
     return {
         "data": {
             "code": ref_code.code,
-            "referral_type": ref_code.referral_type,
             "message": "Referral code redeemed successfully",
         },
     }

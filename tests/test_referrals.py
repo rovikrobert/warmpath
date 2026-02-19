@@ -1,4 +1,4 @@
-"""Tests for the referral system — codes, redemption, conversions, leaderboard."""
+"""Tests for the referral system — single code per user, flat 25 credits."""
 
 import pytest
 from httpx import AsyncClient
@@ -50,50 +50,54 @@ async def _verify_email(client: AsyncClient, email: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_create_nh_invite_code(client: AsyncClient):
-    """Create a nh_invite referral code."""
+async def test_create_referral_code(client: AsyncClient):
+    """Create a referral code — flat 25 credits."""
     headers = await _headers(client, "referrer1@test.com", "Referrer One")
     await _verify_email(client, "referrer1@test.com")
 
     resp = await client.post(
         "/api/v1/referrals/create",
-        json={"referral_type": "nh_invite"},
+        json={},
         headers=headers,
     )
     assert resp.status_code == 201
     data = resp.json()["data"]
-    assert data["referral_type"] == "nh_invite"
     assert data["is_active"] is True
     assert data["uses_count"] == 0
     assert len(data["code"]) > 0
     assert data["credits_per_conversion"] == 25
+    # No referral_type in response
+    assert "referral_type" not in data
 
 
-async def test_create_js_invite_code(client: AsyncClient):
-    """Create a js_invite referral code."""
-    headers = await _headers(client, "referrer2@test.com", "Referrer Two")
-    await _verify_email(client, "referrer2@test.com")
+async def test_create_code_idempotent(client: AsyncClient):
+    """Creating a second code returns the existing one."""
+    headers = await _headers(client, "referrer_idem@test.com", "Idem Referrer")
+    await _verify_email(client, "referrer_idem@test.com")
 
-    resp = await client.post(
-        "/api/v1/referrals/create",
-        json={"referral_type": "js_invite"},
-        headers=headers,
+    resp1 = await client.post(
+        "/api/v1/referrals/create", json={}, headers=headers
     )
-    assert resp.status_code == 201
-    data = resp.json()["data"]
-    assert data["referral_type"] == "js_invite"
-    assert data["credits_per_conversion"] == 50
+    assert resp1.status_code == 201
+    code1 = resp1.json()["data"]["code"]
+
+    resp2 = await client.post(
+        "/api/v1/referrals/create", json={}, headers=headers
+    )
+    # Returns existing code (idempotent) — may be 200 or 201
+    assert resp2.status_code in (200, 201)
+    code2 = resp2.json()["data"]["code"]
+    assert code1 == code2
 
 
 async def test_create_targeted_invite(client: AsyncClient):
-    """Create a targeted NH invite for a specific email."""
+    """Create a targeted invite for a specific email."""
     headers = await _headers(client, "referrer3@test.com", "Referrer Three")
     await _verify_email(client, "referrer3@test.com")
 
     resp = await client.post(
         "/api/v1/referrals/create",
         json={
-            "referral_type": "nh_invite",
             "target_email": "friend@company.com",
             "max_uses": 1,
         },
@@ -109,7 +113,7 @@ async def test_create_code_requires_auth(client: AsyncClient):
     """Unauthenticated request should fail."""
     resp = await client.post(
         "/api/v1/referrals/create",
-        json={"referral_type": "nh_invite"},
+        json={},
     )
     assert resp.status_code in (401, 403)
 
@@ -119,23 +123,10 @@ async def test_create_code_requires_verified_email(client: AsyncClient):
     headers = await _headers(client, "unverified@test.com")
     resp = await client.post(
         "/api/v1/referrals/create",
-        json={"referral_type": "nh_invite"},
+        json={},
         headers=headers,
     )
     assert resp.status_code == 403
-
-
-async def test_create_code_invalid_type(client: AsyncClient):
-    """Invalid referral_type should fail validation."""
-    headers = await _headers(client, "referrer4@test.com")
-    await _verify_email(client, "referrer4@test.com")
-
-    resp = await client.post(
-        "/api/v1/referrals/create",
-        json={"referral_type": "bad_type"},
-        headers=headers,
-    )
-    assert resp.status_code == 422
 
 
 # ---------------------------------------------------------------------------
@@ -144,28 +135,22 @@ async def test_create_code_invalid_type(client: AsyncClient):
 
 
 async def test_list_my_codes(client: AsyncClient):
-    """User can list their own referral codes."""
+    """User can list their referral code (single code)."""
     headers = await _headers(client, "lister@test.com", "Lister")
     await _verify_email(client, "lister@test.com")
 
-    # Create two codes
+    # Create code
     await client.post(
         "/api/v1/referrals/create",
-        json={"referral_type": "nh_invite"},
-        headers=headers,
-    )
-    await client.post(
-        "/api/v1/referrals/create",
-        json={"referral_type": "js_invite"},
+        json={},
         headers=headers,
     )
 
     resp = await client.get("/api/v1/referrals/mine", headers=headers)
     assert resp.status_code == 200
     data = resp.json()["data"]
-    assert len(data) == 2
-    types = {c["referral_type"] for c in data}
-    assert types == {"nh_invite", "js_invite"}
+    assert len(data) == 1
+    assert data[0]["credits_per_conversion"] == 25
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +167,7 @@ async def test_redeem_code(client: AsyncClient):
     # Create code
     create_resp = await client.post(
         "/api/v1/referrals/create",
-        json={"referral_type": "js_invite"},
+        json={},
         headers=referrer_headers,
     )
     code = create_resp.json()["data"]["code"]
@@ -196,6 +181,8 @@ async def test_redeem_code(client: AsyncClient):
     )
     assert redeem_resp.status_code == 200
     assert redeem_resp.json()["data"]["code"] == code
+    # No referral_type in response
+    assert "referral_type" not in redeem_resp.json()["data"]
 
     # Verify uses_count incremented
     list_resp = await client.get("/api/v1/referrals/mine", headers=referrer_headers)
@@ -211,7 +198,7 @@ async def test_redeem_self_referral_fails(client: AsyncClient):
 
     create_resp = await client.post(
         "/api/v1/referrals/create",
-        json={"referral_type": "js_invite"},
+        json={},
         headers=headers,
     )
     code = create_resp.json()["data"]["code"]
@@ -250,7 +237,7 @@ async def test_redeem_expired_code_fails(client: AsyncClient):
 
     create_resp = await client.post(
         "/api/v1/referrals/create",
-        json={"referral_type": "nh_invite"},
+        json={},
         headers=referrer_headers,
     )
     code = create_resp.json()["data"]["code"]
@@ -283,7 +270,7 @@ async def test_redeem_exhausted_code_fails(client: AsyncClient):
     # Single-use code
     create_resp = await client.post(
         "/api/v1/referrals/create",
-        json={"referral_type": "nh_invite", "max_uses": 1},
+        json={"max_uses": 1},
         headers=referrer_headers,
     )
     code = create_resp.json()["data"]["code"]
@@ -311,7 +298,7 @@ async def test_redeem_duplicate_fails(client: AsyncClient):
 
     create_resp = await client.post(
         "/api/v1/referrals/create",
-        json={"referral_type": "js_invite"},
+        json={},
         headers=referrer_headers,
     )
     code = create_resp.json()["data"]["code"]
@@ -351,7 +338,7 @@ async def test_leaderboard_with_referrals(client: AsyncClient):
 
     create_resp = await client.post(
         "/api/v1/referrals/create",
-        json={"referral_type": "js_invite"},
+        json={},
         headers=referrer_headers,
     )
     code = create_resp.json()["data"]["code"]
@@ -377,7 +364,7 @@ async def test_leaderboard_with_referrals(client: AsyncClient):
 
 
 async def test_record_conversion_awards_credits(client: AsyncClient):
-    """Recording a conversion event awards credits to the referrer."""
+    """Recording a conversion event awards 25 credits to the referrer."""
     from tests.conftest import TestSessionLocal
     from app.services.referral_service import record_conversion
     from app.services.credits import get_balance
@@ -390,7 +377,7 @@ async def test_record_conversion_awards_credits(client: AsyncClient):
 
     create_resp = await client.post(
         "/api/v1/referrals/create",
-        json={"referral_type": "js_invite"},
+        json={},
         headers=referrer_headers,
     )
     code = create_resp.json()["data"]["code"]
@@ -414,13 +401,13 @@ async def test_record_conversion_awards_credits(client: AsyncClient):
         conversion = await record_conversion(referred.id, "csv_upload", db)
         assert conversion is not None
         assert conversion.conversion_event == "csv_upload"
-        assert conversion.credits_awarded == 50  # js_invite rate
+        assert conversion.credits_awarded == 25  # flat rate
 
         await db.commit()
 
         # Check referrer got credits
         balance = await get_balance(referrer.id, db)
-        assert balance >= 50
+        assert balance >= 25
 
         # Duplicate conversion should return None
         dup = await record_conversion(referred.id, "csv_upload", db)

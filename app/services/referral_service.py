@@ -16,9 +16,8 @@ from app.models.referral import ReferralCode, ReferralConversion
 from app.models.user import User
 from app.services.credits import earn_credits
 
-# Credit amounts for referral conversions
-CREDITS_NH_INVITE = 25  # JS earns when their invited NH uploads CSV
-CREDITS_JS_INVITE = 50  # JS earns when their invited JS subscribes
+# Credit amount for referral conversions — flat rate, single code per user
+CREDITS_PER_REFERRAL = 25
 REFERRAL_CODE_EXPIRY_DAYS = 90
 
 
@@ -29,19 +28,26 @@ def _generate_code() -> str:
 
 async def create_referral_code(
     owner_id: uuid.UUID,
-    referral_type: str,
     db: AsyncSession,
     target_email: str | None = None,
-    target_company_id: uuid.UUID | None = None,
     max_uses: int | None = None,
 ) -> ReferralCode:
-    """Create a new referral code for a user."""
-    if referral_type not in ("nh_invite", "js_invite"):
-        raise ValueError(f"Invalid referral_type: {referral_type}")
+    """Create or return the user's single referral code.
 
-    credits_per = (
-        CREDITS_NH_INVITE if referral_type == "nh_invite" else CREDITS_JS_INVITE
+    Each user gets one active referral code. If they already have one,
+    return it (idempotent). Flat 25 credits per conversion.
+    """
+    # Check for existing active code
+    existing = await db.execute(
+        select(ReferralCode).where(
+            ReferralCode.owner_id == owner_id,
+            ReferralCode.is_active.is_(True),
+            ReferralCode.deleted_at.is_(None),
+        )
     )
+    active_code = existing.scalar_one_or_none()
+    if active_code is not None:
+        return active_code
 
     # For targeted invites, default to single-use
     if target_email and max_uses is None:
@@ -50,11 +56,9 @@ async def create_referral_code(
     code = ReferralCode(
         owner_id=owner_id,
         code=_generate_code(),
-        referral_type=referral_type,
         target_email=target_email,
-        target_company_id=target_company_id,
         max_uses=max_uses,
-        credits_per_conversion=credits_per,
+        credits_per_conversion=CREDITS_PER_REFERRAL,
         expires_at=datetime.now(timezone.utc)
         + timedelta(days=REFERRAL_CODE_EXPIRY_DAYS),
     )

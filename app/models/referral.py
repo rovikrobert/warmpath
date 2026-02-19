@@ -1,8 +1,6 @@
 """Referral system models — referral codes and conversion tracking.
 
-Two referral types:
-- nh_invite: Job seeker invites someone to become a Network Holder
-- js_invite: Job seeker invites another job seeker to join
+Single referral code per user. Flat 25 credits per conversion event.
 """
 
 import uuid
@@ -40,15 +38,10 @@ class ReferralCode(Base):
         nullable=False,
     )
     code: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
-    referral_type: Mapped[str] = mapped_column(
-        String(20), nullable=False
-    )  # nh_invite | js_invite
+    referral_type: Mapped[str | None] = mapped_column(
+        String(20), nullable=True
+    )  # Legacy — no longer used
     target_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    target_company_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("companies.id", ondelete="SET NULL"),
-        nullable=True,
-    )
     max_uses: Mapped[int | None] = mapped_column(
         Integer, nullable=True
     )  # null = unlimited
@@ -76,7 +69,6 @@ class ReferralCode(Base):
 
     # Relationships
     owner = relationship("User", foreign_keys=[owner_id])
-    target_company = relationship("Company", foreign_keys=[target_company_id])
     conversions = relationship(
         "ReferralConversion", back_populates="referral_code", passive_deletes=True
     )

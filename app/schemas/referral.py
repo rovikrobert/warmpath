@@ -9,14 +9,8 @@ from pydantic import BaseModel, Field
 
 
 class ReferralCodeCreate(BaseModel):
-    referral_type: str = Field(
-        ..., pattern="^(nh_invite|js_invite)$", description="nh_invite or js_invite"
-    )
     target_email: str | None = Field(
         None, max_length=255, description="Specific person to invite"
-    )
-    target_company_id: uuid.UUID | None = Field(
-        None, description="Target company for NH invite"
     )
     max_uses: int | None = Field(
         None, ge=1, le=1000, description="Max redemptions (null=unlimited)"
@@ -26,9 +20,7 @@ class ReferralCodeCreate(BaseModel):
 class ReferralCodeResponse(BaseModel):
     id: uuid.UUID
     code: str
-    referral_type: str
     target_email: str | None = None
-    target_company_id: uuid.UUID | None = None
     max_uses: int | None = None
     uses_count: int
     credits_per_conversion: int
