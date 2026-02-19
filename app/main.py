@@ -12,6 +12,7 @@ from app.api import (
     applications,
     auth,
     benchmarks,
+    clerk_webhooks,
     coach,
     companies,
     competitors,
@@ -175,6 +176,7 @@ app.include_router(referrals.router, prefix="/api/v1/referrals", tags=["referral
 app.include_router(friends.router, prefix="/api/v1/friends", tags=["friends"])
 app.include_router(registry.router, prefix="/api/v1/registry", tags=["registry"])
 app.include_router(webhooks.router, prefix="/api/v1", tags=["webhooks"])
+app.include_router(clerk_webhooks.router, prefix="/api/v1", tags=["clerk-webhooks"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 app.include_router(
     competitors.router, prefix="/api/v1/competitors", tags=["competitors"]
