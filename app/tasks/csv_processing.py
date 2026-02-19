@@ -20,6 +20,7 @@ from app.models.privacy import SuppressionList
 from app.models.user import ConnectorProfile
 from app.services.company_normalizer import link_contact_to_company
 from app.services.credits import earn_credits
+from app.services.ai_csv_cleaner import clean_contacts
 from app.services.csv_parser import classify_relationship, parse_linkedin_csv
 from app.services.warm_scorer import batch_compute_scores
 from app.utils.encryption import compute_blind_index
@@ -57,6 +58,9 @@ async def process_csv_upload_core(
     try:
         parsed = parse_linkedin_csv(raw_bytes)
         csv_upload.row_count = len(parsed)
+
+        # AI-powered data cleanup (mock or real based on AI_MOCK_MODE)
+        parsed = await clean_contacts(parsed)
 
         # Load user's connector profile for relationship classification
         profile_result = await db.execute(
