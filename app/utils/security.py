@@ -41,13 +41,6 @@ def verify_clerk_token(token: str) -> dict:
     import jwt as pyjwt
 
     try:
-        parts = token.split(".") if token else []
-        logger.warning(
-            "JWT debug: len=%d parts=%d first20=%r",
-            len(token) if token else 0,
-            len(parts),
-            token[:20] if token else "",
-        )
         client = _get_jwks_client()
         signing_key = client.get_signing_key_from_jwt(token)
         payload = pyjwt.decode(
