@@ -3,10 +3,6 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "[DATABASE_URL_REDACTED]"
-    SECRET_KEY: str = "change-me-to-a-random-secret"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    SECURE_COOKIES: bool = False  # True in production (requires HTTPS)
     SECURE_HEADERS: bool = False  # True in production — enables HSTS
     ANTHROPIC_API_KEY: str = ""
     AI_MOCK_MODE: bool = True
@@ -16,9 +12,6 @@ class Settings(BaseSettings):
     CSV_ASYNC_PROCESSING: bool = True
     CORS_ORIGINS: str = "http://localhost:5173"
     STRIPE_WEBHOOK_SECRET: str = ""
-    LINKEDIN_CLIENT_ID: str = ""
-    LINKEDIN_CLIENT_SECRET: str = ""
-    LINKEDIN_REDIRECT_URI: str = ""
     CLERK_SECRET_KEY: str = ""
     CLERK_PUBLISHABLE_KEY: str = ""
     CLERK_WEBHOOK_SECRET: str = ""
