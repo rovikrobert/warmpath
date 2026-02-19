@@ -590,7 +590,7 @@ export default function OnboardingPage() {
                   />
                   <div>
                     <p className="text-sm font-medium text-slate-300">Share my network on the marketplace</p>
-                    <p className="text-xs text-slate-400">Job seekers see anonymized listings only (company + role level). You approve every intro request before any identity is revealed.</p>
+                    <p className="text-xs text-slate-400">Candidates see anonymized listings only (company + role level). You approve every intro request before any identity is revealed.</p>
                   </div>
                 </label>
               )}

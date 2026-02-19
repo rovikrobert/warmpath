@@ -142,7 +142,7 @@ export default function MarketplaceOverview() {
 
         {pendingRequests.length === 0 && pastRequests.length === 0 ? (
           <div className="p-8 text-center text-sm text-slate-400">
-            No intro requests yet. When job seekers find your contacts on the marketplace, their requests will appear here.
+            No intro requests yet. When candidates find your contacts on the marketplace, their requests will appear here.
           </div>
         ) : (
           <div className="divide-y divide-slate-700/50">
@@ -160,7 +160,7 @@ export default function MarketplaceOverview() {
 
                     {/* Job seeker profile snapshot */}
                     <div className="mt-2 rounded-lg bg-blue-500/10 p-3">
-                      <p className="text-xs font-medium uppercase tracking-wider text-blue-400">Job Seeker</p>
+                      <p className="text-xs font-medium uppercase tracking-wider text-blue-400">Candidate</p>
                       <p className="mt-1 text-sm font-medium text-slate-50">
                         {req.job_seeker_profile_snapshot?.full_name || 'Anonymous'}
                       </p>
@@ -194,7 +194,7 @@ export default function MarketplaceOverview() {
                     <button
                       onClick={() => handleAction(req.id, 'approve')}
                       disabled={actionLoading === req.id}
-                      aria-label={`Approve intro request from ${req.job_seeker_profile_snapshot?.full_name || 'job seeker'}`}
+                      aria-label={`Approve intro request from ${req.job_seeker_profile_snapshot?.full_name || 'candidate'}`}
                       className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-400 disabled:opacity-50"
                     >
                       Approve
@@ -202,7 +202,7 @@ export default function MarketplaceOverview() {
                     <button
                       onClick={() => handleAction(req.id, 'decline')}
                       disabled={actionLoading === req.id}
-                      aria-label={`Decline intro request from ${req.job_seeker_profile_snapshot?.full_name || 'job seeker'}`}
+                      aria-label={`Decline intro request from ${req.job_seeker_profile_snapshot?.full_name || 'candidate'}`}
                       className="rounded-md border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
                     >
                       Decline
@@ -233,7 +233,7 @@ export default function MarketplaceOverview() {
                 {req.status === 'approved' && (req.id === approvedCoaching || !approvedCoaching) && (
                   <div className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4" aria-live="polite">
                     <p className="mb-2 text-sm font-semibold text-emerald-400">
-                      Now introduce {req.job_seeker_profile_snapshot?.full_name || 'the job seeker'} to {req.contact_name || 'your contact'}
+                      Now introduce {req.job_seeker_profile_snapshot?.full_name || 'this candidate'} to {req.contact_name || 'your contact'}
                     </p>
                     <p className="text-sm text-emerald-400/80">
                       Reach out to {req.contact_name || 'your contact'} via LinkedIn or email with a quick intro. Here's a suggested message:

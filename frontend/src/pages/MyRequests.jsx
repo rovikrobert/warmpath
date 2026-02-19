@@ -140,13 +140,13 @@ export default function MyRequests() {
                     <h4 className="mb-1 text-sm font-semibold text-emerald-400">Intro Approved!</h4>
                     {req.network_holder_notes && (
                       <p className="mb-3 text-sm text-emerald-400/80">
-                        Message from network holder: "{req.network_holder_notes}"
+                        Their message: "{req.network_holder_notes}"
                       </p>
                     )}
                     <div className="space-y-2 text-sm text-emerald-400/80">
                       <p className="font-medium">Next steps:</p>
                       <ol className="ml-4 list-decimal space-y-1">
-                        <li>The network holder will introduce you to their contact via LinkedIn or email.</li>
+                        <li>They'll introduce you to their contact via LinkedIn or email.</li>
                         <li>Look out for a connection request or intro message in the next few days.</li>
                         <li>When you hear from the contact, send a warm follow-up thanking them for their time.</li>
                         <li>Mention the specific role you're interested in and keep the conversation natural.</li>
@@ -169,7 +169,7 @@ export default function MyRequests() {
                 {/* Pending: reminder */}
                 {req.status === 'requested' && (
                   <p className="mt-3 text-xs text-slate-400">
-                    Waiting for the network holder to review your request. You'll be notified when they respond.
+                    Waiting for the connection owner to review your request. You'll be notified when they respond.
                   </p>
                 )}
               </div>
