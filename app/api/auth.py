@@ -155,6 +155,8 @@ async def update_intent(
             detail=f"intent must be one of: {', '.join(sorted(valid_intents))}",
         )
     current_user.intent = body.intent
+    if body.full_name is not None:
+        current_user.full_name = body.full_name
     await db.commit()
     await db.refresh(current_user)
     return {

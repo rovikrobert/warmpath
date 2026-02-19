@@ -76,8 +76,8 @@ export async function api(path, options = {}) {
 export const auth = {
   me: () => api('/api/v1/auth/me'),
   upsertProfile: (body) => api('/api/v1/auth/profile', { method: 'POST', body }),
-  updateIntent: (intent) =>
-    api('/api/v1/auth/intent', { method: 'PATCH', body: { intent } }),
+  updateIntent: (intent, fullName) =>
+    api('/api/v1/auth/intent', { method: 'PATCH', body: { intent, full_name: fullName || undefined } }),
   deleteAccount: (body) =>
     api('/api/v1/auth/delete-account', { method: 'POST', body }),
   uploadResume: (file) => {

@@ -107,7 +107,7 @@ const PRIVACY_STEPS = [
 ];
 
 export default function OnboardingPage() {
-  const { refreshUser, setJustSignedUp } = useAuth();
+  const { refreshUser, setJustSignedUp, clerkUser } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -249,7 +249,7 @@ export default function OnboardingPage() {
     setSaving(true);
     setError('');
     try {
-      await authApi.updateIntent(intent);
+      await authApi.updateIntent(intent, clerkUser?.fullName);
       await refreshUser();
       // share_network and explore see referral bonus pitch; find_referrals skips to privacy
       setStep(intent === 'find_referrals' ? 4 : 3);
