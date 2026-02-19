@@ -16,6 +16,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 
+from agents.chief_of_staff.telegram_bridge import split_telegram_message
 from agents.shared.whatsapp_formatter import WhatsAppFormatter
 
 logger = logging.getLogger(__name__)
@@ -68,17 +69,23 @@ def _get_history(chat_id: int) -> list[dict[str, str]]:
 
 
 def _send_telegram_reply(chat_id: int, text: str) -> None:
-    """Send a text reply to a Telegram chat (best-effort, sync)."""
+    """Send a text reply to a Telegram chat (best-effort, sync).
+
+    Splits long messages into multiple parts to stay within Telegram's
+    4096-character limit.
+    """
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     if not token:
         logger.debug("TELEGRAM_BOT_TOKEN not set — skipping reply")
         return
     try:
+        chunks = split_telegram_message(text)
         with httpx.Client(timeout=10.0) as client:
-            client.post(
-                f"https://api.telegram.org/bot{token}/sendMessage",
-                json={"chat_id": chat_id, "text": text},
-            )
+            for chunk in chunks:
+                client.post(
+                    f"https://api.telegram.org/bot{token}/sendMessage",
+                    json={"chat_id": chat_id, "text": chunk},
+                )
     except Exception:
         logger.debug("Failed to send Telegram reply to %s", chat_id)
 
@@ -106,13 +113,8 @@ def _handle_consultation(chat_id: int, raw_text: str) -> None:
     # Run consultation
     response = consult(query, team=team, conversation_history=history)
 
-    # Format reply
+    # Format reply — _send_telegram_reply handles splitting if too long
     reply = f"{routing_note}\n\n{response.answer}"
-
-    # Telegram has a 4096 char limit per message
-    if len(reply) > 4000:
-        reply = reply[:3997] + "..."
-
     _send_telegram_reply(chat_id, reply)
 
     # Update conversation buffer
