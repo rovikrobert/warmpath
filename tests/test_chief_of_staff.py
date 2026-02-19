@@ -2304,3 +2304,79 @@ class TestConsultantHistory:
         ]
         result = consult("follow up", team="data", conversation_history=history)
         assert result.answer  # non-empty
+
+
+# ---------------------------------------------------------------------------
+# Telegram consultation infrastructure tests
+# ---------------------------------------------------------------------------
+
+
+class TestTelegramConsultation:
+    """Tests for Telegram free-form consultation."""
+
+    def test_parse_team_prefix_engineering(self):
+        from app.api.telegram import _parse_team_prefix
+
+        team, query = _parse_team_prefix("ask engineering: what's our test coverage?")
+        assert team == "engineering"
+        assert query == "what's our test coverage?"
+
+    def test_parse_team_prefix_finance(self):
+        from app.api.telegram import _parse_team_prefix
+
+        team, query = _parse_team_prefix("ask finance: what's our burn rate?")
+        assert team == "finance"
+        assert query == "what's our burn rate?"
+
+    def test_parse_team_prefix_none(self):
+        from app.api.telegram import _parse_team_prefix
+
+        team, query = _parse_team_prefix("how should we improve onboarding?")
+        assert team is None
+        assert query == "how should we improve onboarding?"
+
+    def test_parse_team_prefix_case_insensitive(self):
+        from app.api.telegram import _parse_team_prefix
+
+        team, query = _parse_team_prefix("Ask Data: warm score accuracy?")
+        assert team == "data"
+        assert query == "warm score accuracy?"
+
+    def test_parse_team_prefix_invalid_team(self):
+        from app.api.telegram import _parse_team_prefix
+
+        team, query = _parse_team_prefix("ask marketing: how's SEO?")
+        assert team is None
+        assert query == "ask marketing: how's SEO?"
+
+    def test_conversation_buffer_stores_exchanges(self):
+        from app.api.telegram import _add_to_buffer, _conversation_buffer, _get_history
+
+        _conversation_buffer.clear()
+        _add_to_buffer(123, "what's our test count?", "1806 tests")
+        _add_to_buffer(123, "break it down", "57 files across 6 modules")
+        history = _get_history(123)
+        assert len(history) == 4
+        assert history[0] == {"role": "user", "content": "what's our test count?"}
+        assert history[1] == {"role": "assistant", "content": "1806 tests"}
+
+    def test_conversation_buffer_max_5_exchanges(self):
+        from app.api.telegram import _add_to_buffer, _conversation_buffer, _get_history
+
+        _conversation_buffer.clear()
+        for i in range(7):
+            _add_to_buffer(123, f"question {i}", f"answer {i}")
+        history = _get_history(123)
+        assert len(history) == 10  # 5 exchanges * 2 messages
+        assert history[0] == {"role": "user", "content": "question 2"}
+
+    def test_conversation_buffer_per_chat(self):
+        from app.api.telegram import _add_to_buffer, _conversation_buffer, _get_history
+
+        _conversation_buffer.clear()
+        _add_to_buffer(111, "q1", "a1")
+        _add_to_buffer(222, "q2", "a2")
+        assert len(_get_history(111)) == 2
+        assert len(_get_history(222)) == 2
+        assert _get_history(111)[0]["content"] == "q1"
+        assert _get_history(222)[0]["content"] == "q2"
