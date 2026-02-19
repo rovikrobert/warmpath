@@ -5,7 +5,6 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
-    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -18,22 +17,12 @@ from app.models import Base
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (
-        UniqueConstraint(
-            "oauth_provider", "oauth_provider_id", name="uq_user_oauth_identity"
-        ),
-    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     email: Mapped[str] = mapped_column(
         String(255), unique=True, nullable=False, index=True
-    )
-    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    oauth_provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    oauth_provider_id: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, index=True
     )
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(
@@ -46,27 +35,11 @@ class User(Base):
         String(50), nullable=False, server_default="free"
     )
     intent: Mapped[str | None] = mapped_column(String(20), nullable=True, default=None)
-    # Security / session management
-    token_version: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default="0"
-    )
-    failed_login_attempts: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default="0"
-    )
-    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_admin: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
     email_verified: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
-    )
-    email_verification_token: Mapped[str | None] = mapped_column(String(255))
-    email_verification_sent_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
-    password_reset_token: Mapped[str | None] = mapped_column(String(255))
-    password_reset_sent_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
     )
     # Privacy / GDPR
     processing_restricted: Mapped[bool] = mapped_column(

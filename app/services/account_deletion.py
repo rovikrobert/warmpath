@@ -182,9 +182,7 @@ async def delete_user_data(
     if user:
         user.email = f"deleted-{user_id}@warmpath.local"
         user.full_name = "[Deleted User]"
-        user.password_hash = None
         user.deleted_at = datetime.now(timezone.utc)
-        user.token_version = (user.token_version or 0) + 1  # Invalidate all sessions
 
     # 5. Audit log (append-only, preserved)
     await log_event(

@@ -45,7 +45,6 @@ class TestComputeCapabilities:
             user = User(
                 email="caps-contacts@example.com",
                 full_name="Caps Test",
-                password_hash="fakehash",
             )
             session.add(user)
             await session.flush()
@@ -71,7 +70,6 @@ class TestComputeCapabilities:
             user = User(
                 email="caps-sub@example.com",
                 full_name="Sub Test",
-                password_hash="fakehash",
                 plan_tier="pro",
             )
             session.add(user)

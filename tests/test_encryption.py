@@ -32,7 +32,6 @@ async def _create_user(db: AsyncSession, email: str = "enc@test.com") -> User:
     user = User(
         email=email,
         full_name="Encryption Test",
-        password_hash="fakehash",
         email_verified=True,
     )
     db.add(user)
