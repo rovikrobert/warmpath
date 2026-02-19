@@ -136,6 +136,7 @@ async def get_me(
 
     caps = await compute_user_capabilities(current_user.id, db)
     response = UserResponse.model_validate(current_user).model_dump(mode="json")
+    response["onboarding_complete"] = current_user.onboarding_completed_at is not None
     response["capabilities"] = caps.model_dump()
     return {"data": response, "meta": {}}
 

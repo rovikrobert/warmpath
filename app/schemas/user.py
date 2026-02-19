@@ -27,6 +27,7 @@ class UserResponse(BaseModel):
     plan_tier: str
     intent: str | None = None
     email_verified: bool
+    onboarding_complete: bool = False
     created_at: datetime
     capabilities: UserCapabilities | None = None
 

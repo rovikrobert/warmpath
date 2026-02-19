@@ -66,6 +66,11 @@ class User(Base):
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Onboarding
+    onboarding_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+
     # Stripe integration
     stripe_customer_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, index=True
