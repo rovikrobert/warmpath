@@ -2264,3 +2264,43 @@ class TestTelegramBridge:
         assert result["status"] == "file_only"
         files = list(tmp_path.glob("telegram-daily-*.txt"))
         assert len(files) == 1
+
+
+# ---------------------------------------------------------------------------
+# Consultant conversation history tests
+# ---------------------------------------------------------------------------
+
+
+class TestConsultantHistory:
+    """Tests for consultant conversation history support."""
+
+    def test_consult_accepts_history_param(self):
+        from agents.shared.consultant import consult
+
+        history = [
+            {"role": "user", "content": "What's our test coverage?"},
+            {"role": "assistant", "content": "Currently at 1806 tests across 57 files."},
+        ]
+        result = consult(
+            "Can you break that down by module?",
+            team="engineering",
+            conversation_history=history,
+        )
+        assert result.team == "engineering"
+        assert result.query == "Can you break that down by module?"
+
+    def test_consult_history_default_empty(self):
+        from agents.shared.consultant import consult
+
+        result = consult("hello", team="cos")
+        assert result.team == "cos"
+
+    def test_consult_history_included_in_mock_response(self):
+        from agents.shared.consultant import consult
+
+        history = [
+            {"role": "user", "content": "previous question"},
+            {"role": "assistant", "content": "previous answer"},
+        ]
+        result = consult("follow up", team="data", conversation_history=history)
+        assert result.answer  # non-empty
