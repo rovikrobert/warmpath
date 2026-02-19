@@ -83,7 +83,43 @@ def _send_telegram_reply(chat_id: int, text: str) -> None:
         logger.debug("Failed to send Telegram reply to %s", chat_id)
 
 
-def _handle_command(command: str, parsed: dict, chat_id: int) -> None:
+def _handle_consultation(chat_id: int, raw_text: str) -> None:
+    """Route a free-form message through the consultant engine."""
+    from agents.shared.consultant import consult
+    from agents.chief_of_staff.router import route_query
+
+    # Parse optional "ask <team>:" prefix
+    explicit_team, query = _parse_team_prefix(raw_text)
+
+    # Determine target team
+    if explicit_team:
+        team = explicit_team
+        routing_note = f"[{team}]"
+    else:
+        route = route_query(query)
+        team = route.primary_team
+        routing_note = f"[{team}] (auto-routed)"
+
+    # Get conversation history
+    history = _get_history(chat_id)
+
+    # Run consultation
+    response = consult(query, team=team, conversation_history=history)
+
+    # Format reply
+    reply = f"{routing_note}\n\n{response.answer}"
+
+    # Telegram has a 4096 char limit per message
+    if len(reply) > 4000:
+        reply = reply[:3997] + "..."
+
+    _send_telegram_reply(chat_id, reply)
+
+    # Update conversation buffer
+    _add_to_buffer(chat_id, query, response.answer)
+
+
+def _handle_command(command: str, parsed: dict, chat_id: int, is_founder: bool = False) -> None:
     """Execute a command and reply via Telegram."""
     try:
         if command == "status":
@@ -116,10 +152,21 @@ def _handle_command(command: str, parsed: dict, chat_id: int) -> None:
             )
 
         else:
-            _send_telegram_reply(
-                chat_id,
-                "Commands: status, cost, approve <id>, ship <feature>, brief me on <topic>",
-            )
+            # Free-form natural language → route to consultant engine
+            raw_text = parsed.get("raw", "")
+            if not raw_text:
+                _send_telegram_reply(
+                    chat_id,
+                    "Commands: status, cost, approve <id>, ship <feature>, brief me on <topic>\n"
+                    "Or just type a question to consult any agent team.",
+                )
+                return
+
+            if not is_founder:
+                _send_telegram_reply(chat_id, "Free-form consultation is founder-only.")
+                return
+
+            _handle_consultation(chat_id, raw_text)
     except Exception as exc:
         logger.exception("Error handling Telegram command: %s", command)
         _send_telegram_reply(chat_id, f"Error processing '{command}': {str(exc)[:200]}")
@@ -149,11 +196,14 @@ async def telegram_webhook(
     if not text or not chat_id:
         return {"ok": True, "action": "ignored"}
 
+    expected_chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+    is_founder = str(chat_id) == expected_chat_id
+
     parsed = WhatsAppFormatter.parse_reply(text)
     command = parsed.get("command", "unknown")
 
     logger.info("Telegram command received: %s (from chat %s)", command, chat_id)
 
-    background_tasks.add_task(_handle_command, command, parsed, chat_id)
+    background_tasks.add_task(_handle_command, command, parsed, chat_id, is_founder)
 
     return {"ok": True, "command": command}

@@ -2380,3 +2380,138 @@ class TestTelegramConsultation:
         assert len(_get_history(222)) == 2
         assert _get_history(111)[0]["content"] == "q1"
         assert _get_history(222)[0]["content"] == "q2"
+
+
+# ---------------------------------------------------------------------------
+# Telegram webhook → consultation wiring tests
+# ---------------------------------------------------------------------------
+
+
+class TestTelegramWebhookConsultation:
+    """Tests for the full webhook -> consultation flow."""
+
+    def test_handle_consult_calls_consultant(self):
+        """Unknown commands should route to consultation, not show help."""
+        from unittest.mock import patch, MagicMock
+        from app.api.telegram import _handle_command, _conversation_buffer
+
+        _conversation_buffer.clear()
+
+        mock_response = MagicMock()
+        mock_response.team = "engineering"
+        mock_response.query = "what's our test coverage?"
+        mock_response.answer = "1806 tests across 57 files."
+        mock_response.confidence = "high"
+
+        mock_route = MagicMock()
+        mock_route.primary_team = "engineering"
+        mock_route.reasoning = "Best match"
+
+        with (
+            patch("agents.shared.consultant.consult", return_value=mock_response) as mock_consult,
+            patch("agents.chief_of_staff.router.route_query", return_value=mock_route),
+            patch("app.api.telegram._send_telegram_reply") as mock_reply,
+        ):
+            _handle_command(
+                "unknown",
+                {"command": "unknown", "raw": "what's our test coverage?"},
+                123,
+                is_founder=True,
+            )
+            mock_consult.assert_called_once()
+            mock_reply.assert_called_once()
+            reply_text = mock_reply.call_args[0][1]
+            assert "engineering" in reply_text.lower()
+
+    def test_handle_consult_with_team_prefix(self):
+        """'ask finance: ...' should bypass auto-routing."""
+        from unittest.mock import patch, MagicMock
+        from app.api.telegram import _handle_command, _conversation_buffer
+
+        _conversation_buffer.clear()
+
+        mock_response = MagicMock()
+        mock_response.team = "finance"
+        mock_response.query = "what's our burn rate?"
+        mock_response.answer = "About $200/month on infrastructure."
+        mock_response.confidence = "high"
+
+        with (
+            patch("agents.shared.consultant.consult", return_value=mock_response) as mock_consult,
+            patch("app.api.telegram._send_telegram_reply"),
+        ):
+            _handle_command(
+                "unknown",
+                {"command": "unknown", "raw": "ask finance: what's our burn rate?"},
+                123,
+                is_founder=True,
+            )
+            # Should have called consult with team="finance"
+            call_kwargs = mock_consult.call_args
+            # Check positional or keyword args for team
+            assert call_kwargs[1].get("team") == "finance" or (len(call_kwargs[0]) >= 2 and call_kwargs[0][1] == "finance")
+
+    def test_handle_consult_updates_buffer(self):
+        """Consultation should add exchange to conversation buffer."""
+        from unittest.mock import patch, MagicMock
+        from app.api.telegram import _handle_command, _conversation_buffer, _get_history
+
+        _conversation_buffer.clear()
+
+        mock_response = MagicMock()
+        mock_response.team = "cos"
+        mock_response.query = "hello"
+        mock_response.answer = "Hello! How can I help?"
+        mock_response.confidence = "high"
+
+        mock_route = MagicMock()
+        mock_route.primary_team = "cos"
+        mock_route.reasoning = "Default"
+
+        with (
+            patch("agents.shared.consultant.consult", return_value=mock_response),
+            patch("agents.chief_of_staff.router.route_query", return_value=mock_route),
+            patch("app.api.telegram._send_telegram_reply"),
+        ):
+            _handle_command("unknown", {"command": "unknown", "raw": "hello"}, 456, is_founder=True)
+
+        history = _get_history(456)
+        assert len(history) == 2
+        assert history[0]["content"] == "hello"
+
+    def test_structured_commands_still_work(self):
+        """Existing structured commands should not be affected."""
+        from unittest.mock import patch
+        from app.api.telegram import _handle_command
+
+        with patch("app.api.telegram._send_telegram_reply") as mock_reply:
+            with patch("agents.chief_of_staff.cos_agent.run_status", return_value="All green"):
+                _handle_command("status", {"command": "status"}, 123)
+
+            mock_reply.assert_called_once_with(123, "All green")
+
+    def test_non_founder_blocked_from_consultation(self):
+        """Non-founder users should get a rejection message."""
+        from unittest.mock import patch
+        from app.api.telegram import _handle_command
+
+        with patch("app.api.telegram._send_telegram_reply") as mock_reply:
+            _handle_command(
+                "unknown",
+                {"command": "unknown", "raw": "what's our architecture?"},
+                999,
+                is_founder=False,
+            )
+            mock_reply.assert_called_once()
+            reply_text = mock_reply.call_args[0][1]
+            assert "founder-only" in reply_text.lower()
+
+    def test_empty_raw_shows_help(self):
+        """Unknown command with no raw text should show help."""
+        from unittest.mock import patch
+        from app.api.telegram import _handle_command
+
+        with patch("app.api.telegram._send_telegram_reply") as mock_reply:
+            _handle_command("unknown", {"command": "unknown", "raw": ""}, 123, is_founder=True)
+            reply_text = mock_reply.call_args[0][1]
+            assert "commands:" in reply_text.lower() or "Commands:" in reply_text
