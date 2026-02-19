@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { UserButton } from '@clerk/clerk-react';
 import { useAuth } from '../context/AuthContext';
-import { auth as authApi, credits as creditsApi, onUsageWarning } from '../api/client';
-import Spinner from './ui/Spinner';
-import WelcomeToast from './WelcomeToast';
+import { credits as creditsApi, onUsageWarning } from '../api/client';
 import BetaFeedbackButton from './BetaFeedbackButton';
 
 const NAV_ITEMS = [
@@ -77,42 +76,22 @@ const BOTTOM_NAV_ITEMS = [
 ];
 
 export default function Layout() {
-  const { user, logout, refreshUser, justSignedUp, setJustSignedUp } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [balance, setBalance] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [usageWarning, setUsageWarning] = useState(null);
-  const [resending, setResending] = useState(false);
-  const [resendMsg, setResendMsg] = useState('');
-  const [verifyDismissed, setVerifyDismissed] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(justSignedUp);
 
   useEffect(() => {
     creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
     onUsageWarning((msg) => setUsageWarning(msg));
   }, []);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/');
   };
-
-  const handleResendVerification = async () => {
-    setResending(true);
-    setResendMsg('');
-    try {
-      await authApi.resendVerification();
-      setResendMsg('Verification email sent!');
-      await refreshUser();
-    } catch (err) {
-      setResendMsg(err.message || 'Failed to resend');
-    } finally {
-      setResending(false);
-    }
-  };
-
-  const isUnverified = user && !user.email_verified;
   const visibleNav = NAV_ITEMS.filter((item) => item.show(user));
 
   return (
@@ -189,32 +168,16 @@ export default function Layout() {
                 {balance ?? '—'} credits
               </Link>
               <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-full bg-amber-500 flex items-center justify-center text-xs font-bold text-white">
-                  {user?.full_name?.[0]?.toUpperCase() || '?'}
-                </div>
+                <UserButton afterSignOutUrl="/" />
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm font-medium text-slate-200">{user?.full_name}</p>
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="text-slate-500 hover:text-slate-300 transition-colors"
-                  aria-label="Log out"
-                  title="Log out"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                  </svg>
-                </button>
               </div>
             </>
           )}
           {collapsed && (
             <div className="flex flex-col items-center gap-2">
-              <button onClick={handleLogout} className="text-slate-500 hover:text-slate-300 transition-colors" aria-label="Log out" title="Log out">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                </svg>
-              </button>
+              <UserButton afterSignOutUrl="/" />
             </div>
           )}
         </div>
@@ -298,15 +261,10 @@ export default function Layout() {
                 Settings
               </NavLink>
               <div className="mx-4 my-2 border-t border-slate-700/50" />
-              <button
-                onClick={() => { setMobileNav(false); handleLogout(); }}
-                className="flex w-full items-center gap-3 border-l-2 border-transparent px-4 py-2.5 text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                </svg>
-                Log out
-              </button>
+              <div className="flex items-center gap-3 px-4 py-2.5">
+                <UserButton afterSignOutUrl="/" />
+                <span className="text-sm text-slate-400">Account</span>
+              </div>
             </nav>
           </div>
         </div>
@@ -316,31 +274,6 @@ export default function Layout() {
       <div className="flex flex-1 flex-col overflow-hidden lg:overflow-visible">
         {/* Spacer for mobile top bar */}
         <div className="h-14 lg:hidden" />
-
-        {/* Email verification banner */}
-        {isUnverified && !verifyDismissed && (
-          <div className="border-b border-blue-500/30 bg-blue-500/10 px-4 py-2.5">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-blue-400">
-                Please verify your email to access marketplace features.{' '}
-                {resendMsg ? (
-                  <span className="font-medium">{resendMsg}</span>
-                ) : (
-                  <button
-                    onClick={handleResendVerification}
-                    disabled={resending}
-                    className="font-medium text-blue-300 underline hover:text-blue-200 disabled:opacity-50"
-                  >
-                    {resending ? 'Sending...' : 'Resend verification email'}
-                  </button>
-                )}
-              </p>
-              <button onClick={() => setVerifyDismissed(true)} className="ml-4 text-blue-400 hover:text-blue-300">
-                &times;
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Usage warning banner */}
         {usageWarning && (
@@ -395,11 +328,6 @@ export default function Layout() {
         {/* Spacer for mobile bottom tabs */}
         <div className="h-16 lg:hidden" />
       </div>
-
-      {/* Welcome toast for new signups */}
-      {showWelcome && (
-        <WelcomeToast onDismiss={() => { setShowWelcome(false); setJustSignedUp(false); }} />
-      )}
 
       {/* Beta feedback button */}
       {import.meta.env.VITE_BETA_MODE === 'true' && <BetaFeedbackButton />}

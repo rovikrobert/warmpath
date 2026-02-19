@@ -1,11 +1,14 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
+import { ClerkProvider } from '@clerk/clerk-react';
 import posthog from 'posthog-js';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './components/ui/Toast';
 import App from './App.jsx';
 import './index.css';
+
+const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 // Initialize PostHog (no-op when VITE_POSTHOG_KEY is not set)
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY;
@@ -23,11 +26,13 @@ if (POSTHOG_KEY) {
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
-      <ToastProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </ToastProvider>
+      <ClerkProvider publishableKey={CLERK_KEY}>
+        <ToastProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </ToastProvider>
+      </ClerkProvider>
     </BrowserRouter>
   </StrictMode>,
 );

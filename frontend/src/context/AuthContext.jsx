@@ -1,74 +1,42 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { auth as authApi, setAuthFailureHandler, setTokenGetter, setTokenSetter } from '../api/client';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useAuth as useClerkAuth, useUser as useClerkUser } from '@clerk/clerk-react';
+import { auth as authApi, setTokenGetter } from '../api/client';
 import { identifyUser, resetAnalytics } from '../utils/analytics';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(null);
+  const { getToken, isSignedIn, isLoaded: authLoaded, signOut } = useClerkAuth();
+  const { user: clerkUser, isLoaded: userLoaded } = useClerkUser();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [justSignedUp, setJustSignedUp] = useState(false);
-  const bootAttempted = useRef(false);
 
-  // Keep the API client's token getter in sync
-  const getToken = useCallback(() => token, [token]);
-
+  // Wire up the API client to use Clerk tokens
   useEffect(() => {
-    setTokenGetter(getToken);
+    setTokenGetter(() => getToken());
   }, [getToken]);
 
-  // Wire up the token setter so the 401 interceptor can update state
+  // Fetch backend user profile when Clerk auth state changes
   useEffect(() => {
-    setTokenSetter((newToken) => {
-      setToken(newToken);
-      setTokenGetter(() => newToken);
-    });
-    setAuthFailureHandler(() => {
-      setToken(null);
-      setUser(null);
-      setJustSignedUp(false);
-    });
-  }, []);
+    if (!authLoaded || !userLoaded) return;
 
-  // On boot: try to restore session via refresh token cookie
-  useEffect(() => {
-    if (bootAttempted.current) return;
-    bootAttempted.current = true;
-
-    const base = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
-    fetch(`${base}/api/v1/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        const newToken = data?.data?.access_token;
-        if (newToken) {
-          setToken(newToken);
-          setTokenGetter(() => newToken);
-        } else {
+    if (isSignedIn && clerkUser) {
+      authApi.me()
+        .then((res) => {
+          setUser(res.data);
+          identifyUser(res.data.id, { email: res.data.email });
           setLoading(false);
-        }
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
-  // Fetch user when token changes
-  useEffect(() => {
-    if (token && !user) {
-      authApi.me().then(res => {
-        setUser(res.data);
-        identifyUser(res.data.id, { email: res.data.email });
-        setLoading(false);
-      }).catch(() => {
-        setToken(null);
-        setLoading(false);
-      });
-    } else if (!token) {
+        })
+        .catch(() => {
+          setUser(null);
+          setLoading(false);
+        });
+    } else {
+      setUser(null);
+      resetAnalytics();
       setLoading(false);
     }
-  }, [token, user]);
+  }, [isSignedIn, clerkUser, authLoaded, userLoaded]);
 
   const refreshUser = useCallback(async () => {
     const res = await authApi.me();
@@ -76,50 +44,16 @@ export function AuthProvider({ children }) {
     return res.data;
   }, []);
 
-  const login = useCallback(async (credentials) => {
-    const res = await authApi.login(credentials);
-    const newToken = res.data.access_token;
-    setToken(newToken);
-    setTokenGetter(() => newToken);
-    const me = await authApi.me();
-    setUser(me.data);
-    identifyUser(me.data.id, { email: me.data.email });
-    setJustSignedUp(false);
-    return me.data;
-  }, []);
-
-  const signup = useCallback(async (body) => {
-    const res = await authApi.signup(body);
-    const newToken = res.data.access_token;
-    setToken(newToken);
-    setTokenGetter(() => newToken);
-    const me = await authApi.me();
-    setUser(me.data);
-    identifyUser(me.data.id, { email: me.data.email });
-    setJustSignedUp(true);
-    return me.data;
-  }, []);
-
-  const loginWithLinkedIn = useCallback(async (tokenData) => {
-    const newToken = tokenData.access_token;
-    setToken(newToken);
-    setTokenGetter(() => newToken);
-    const me = await authApi.me();
-    setUser(me.data);
-    identifyUser(me.data.id, { email: me.data.email });
-    setJustSignedUp(tokenData.is_new_user);
-    return me.data;
-  }, []);
-
-  const logout = useCallback(() => {
-    setToken(null);
+  const logout = useCallback(async () => {
+    await signOut();
     setUser(null);
-    setJustSignedUp(false);
     resetAnalytics();
-  }, []);
+  }, [signOut]);
+
+  const token = isSignedIn ? 'clerk-managed' : null;
 
   return (
-    <AuthContext.Provider value={{ token, user, loading, login, signup, loginWithLinkedIn, logout, refreshUser, justSignedUp, setJustSignedUp }}>
+    <AuthContext.Provider value={{ token, user, loading, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { auth as authApi, privacy as privacyApi, marketplace as mpApi, contacts as contactsApi } from '../api/client';
-import PasswordStrength from '../components/PasswordStrength';
 import Spinner from '../components/ui/Spinner';
 
 // ---------------------------------------------------------------------------
@@ -679,43 +678,17 @@ function AccountTab() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  // Change password state
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [pwLoading, setPwLoading] = useState(false);
-  const [pwSuccess, setPwSuccess] = useState('');
-  const [pwError, setPwError] = useState('');
-
   // Delete account state
   const [showDelete, setShowDelete] = useState(false);
-  const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
-    if (newPassword !== confirmPassword) {
-      setPwError('New passwords do not match'); return;
-    }
-    setPwLoading(true); setPwError(''); setPwSuccess('');
-    try {
-      await authApi.changePassword({ old_password: oldPassword, new_password: newPassword });
-      setPwSuccess('Password changed successfully.');
-      setOldPassword(''); setNewPassword(''); setConfirmPassword('');
-    } catch (err) {
-      setPwError(err.message);
-    } finally {
-      setPwLoading(false);
-    }
-  };
-
   const handleDeleteAccount = async () => {
-    if (!deleteConfirmed || !deletePassword) return;
+    if (!deleteConfirmed) return;
     setDeleteLoading(true); setDeleteError('');
     try {
-      await authApi.deleteAccount({ password: deletePassword, confirm_deletion: true });
+      await authApi.deleteAccount({ confirm_deletion: true });
       logout();
       navigate('/');
     } catch (err) {
@@ -751,29 +724,10 @@ function AccountTab() {
         </div>
       </section>
 
-      {/* Change Password */}
-      <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Change password">
-        <h2 className="mb-3 text-base font-semibold text-slate-50">Change Password</h2>
-        <form onSubmit={handleChangePassword} className="space-y-3">
-          <div>
-            <label htmlFor="old-password" className="mb-1 block text-sm font-medium text-slate-300">Current password</label>
-            <input id="old-password" type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} className={inputClass} placeholder="Enter current password" required aria-required="true" />
-          </div>
-          <div>
-            <label htmlFor="new-password" className="mb-1 block text-sm font-medium text-slate-300">New password</label>
-            <input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputClass} placeholder="Enter new password" required aria-required="true" />
-            <PasswordStrength password={newPassword} />
-          </div>
-          <div>
-            <label htmlFor="confirm-password" className="mb-1 block text-sm font-medium text-slate-300">Confirm new password</label>
-            <input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputClass} placeholder="Confirm new password" required aria-required="true" />
-          </div>
-          {pwError && <p role="alert" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{pwError}</p>}
-          {pwSuccess && <p role="status" className="rounded-md bg-emerald-500/10 p-2 text-sm text-emerald-400">{pwSuccess}</p>}
-          <button type="submit" disabled={pwLoading || !oldPassword || !newPassword || !confirmPassword} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50">
-            {pwLoading ? 'Changing...' : 'Change Password'}
-          </button>
-        </form>
+      {/* Password managed by Clerk */}
+      <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Security">
+        <h2 className="mb-3 text-base font-semibold text-slate-50">Security</h2>
+        <p className="text-sm text-slate-400">Password, email, and two-factor authentication are managed through your account provider. Click your profile picture in the sidebar to access these settings.</p>
       </section>
 
       {/* Delete Account — Danger Zone */}
@@ -787,7 +741,7 @@ function AccountTab() {
         </ul>
 
         {!showDelete ? (
-          <button onClick={() => { setShowDelete(true); setDeletePassword(''); setDeleteConfirmed(false); setDeleteError(''); }}
+          <button onClick={() => { setShowDelete(true); setDeleteConfirmed(false); setDeleteError(''); }}
             className="rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20">
             Delete My Account
           </button>
@@ -798,18 +752,13 @@ function AccountTab() {
                 className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 text-red-500 focus:ring-red-500" />
               I understand this action is permanent and my data cannot be recovered
             </label>
-            <div>
-              <label htmlFor="delete-password" className="mb-1 block text-sm font-medium text-slate-300">Enter your password to confirm</label>
-              <input id="delete-password" type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)}
-                className={inputClass} placeholder="Your current password" aria-required="true" />
-            </div>
             {deleteError && <p className="rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert">{deleteError}</p>}
             <div className="flex gap-2">
-              <button onClick={handleDeleteAccount} disabled={!deleteConfirmed || !deletePassword || deleteLoading}
+              <button onClick={handleDeleteAccount} disabled={!deleteConfirmed || deleteLoading}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
                 {deleteLoading ? 'Deleting...' : 'Permanently Delete'}
               </button>
-              <button onClick={() => { setShowDelete(false); setDeleteConfirm(''); }}
+              <button onClick={() => setShowDelete(false)}
                 className="rounded-lg border border-slate-700/50 px-4 py-2 text-sm text-slate-400 hover:bg-slate-800">Cancel</button>
             </div>
           </div>
