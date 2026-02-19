@@ -117,7 +117,7 @@ async def signup(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(e),
-        )
+        ) from e
 
     result = await db.execute(select(User).where(User.email == body.email))
     if result.scalar_one_or_none() is not None:
@@ -493,7 +493,7 @@ async def change_password(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(e),
-        )
+        ) from e
 
     current_user.password_hash = hash_password(body.new_password)
     current_user.token_version += 1
@@ -607,7 +607,7 @@ async def verify_email(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
+        ) from e
     await log_event(db, "email_verified", user_id=user.id)
 
     # Track funnel step
@@ -764,7 +764,7 @@ async def linkedin_callback(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired state token",
-        )
+        ) from None
     if state_data.get("type") != "linkedin_state":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -780,7 +780,7 @@ async def linkedin_callback(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to communicate with LinkedIn",
-        )
+        ) from None
 
     li_sub = li_profile["sub"]
     li_email = li_profile.get("email", "").lower().strip()
@@ -797,7 +797,7 @@ async def linkedin_callback(
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=str(e),
-            )
+            ) from e
         account_password_hash = hash_password(body.password)
 
     # 3. Resolve or create user from LinkedIn identity
@@ -873,7 +873,7 @@ async def import_resume(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
-        )
+        ) from e
 
     # Log usage
     from app.utils.tracking import track_action
@@ -900,24 +900,23 @@ async def forgot_password(
     )
     user = result.scalar_one_or_none()
 
-    if user is not None:
+    if user is not None and not (user.password_hash is None and user.oauth_provider):
         # Skip sending for OAuth-only users (no password to reset),
         # but return the same generic message to prevent enumeration.
-        if not (user.password_hash is None and user.oauth_provider):
-            # Rate limit: 1 per 5 minutes — silently skip to avoid
-            # leaking account existence via a 429 response.
-            rate_limited = False
-            if user.password_reset_sent_at is not None:
-                sent_at = user.password_reset_sent_at
-                if sent_at.tzinfo is None:
-                    sent_at = sent_at.replace(tzinfo=timezone.utc)
-                elapsed = (datetime.now(timezone.utc) - sent_at).total_seconds()
-                if elapsed < 300:
-                    rate_limited = True
+        # Rate limit: 1 per 5 minutes — silently skip to avoid
+        # leaking account existence via a 429 response.
+        rate_limited = False
+        if user.password_reset_sent_at is not None:
+            sent_at = user.password_reset_sent_at
+            if sent_at.tzinfo is None:
+                sent_at = sent_at.replace(tzinfo=timezone.utc)
+            elapsed = (datetime.now(timezone.utc) - sent_at).total_seconds()
+            if elapsed < 300:
+                rate_limited = True
 
-            if not rate_limited:
-                await send_password_reset_email(user, db)
-                await db.commit()
+        if not rate_limited:
+            await send_password_reset_email(user, db)
+            await db.commit()
 
     # Always return the same message regardless of whether the email exists,
     # the user is rate-limited, or the account is OAuth-only.
@@ -970,7 +969,7 @@ async def reset_password(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(e),
-        )
+        ) from e
 
     # Update password and invalidate all sessions
     user.password_hash = hash_password(body.new_password)

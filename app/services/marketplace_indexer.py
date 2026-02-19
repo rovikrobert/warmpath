@@ -198,18 +198,14 @@ def _should_list_contact(
         return False
 
     # Suppression list check (in-memory)
-    if contact.email:
-        if hash_for_suppression(contact.email) in suppressed_email_hashes:
-            return False
+    if contact.email and hash_for_suppression(contact.email) in suppressed_email_hashes:
+        return False
     name_company = (
         f"{contact.first_name or ''}"
         f"{contact.last_name or ''}"
         f"{contact.current_company or ''}"
     )
-    if hash_for_suppression(name_company) in suppressed_name_co_hashes:
-        return False
-
-    return True
+    return hash_for_suppression(name_company) not in suppressed_name_co_hashes
 
 
 # ---------------------------------------------------------------------------

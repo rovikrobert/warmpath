@@ -5,6 +5,7 @@ different response formats into a standard dict structure that maps
 directly to the job_openings table.
 """
 
+import contextlib
 import json
 import logging
 import re
@@ -60,10 +61,8 @@ class JobFetcher:
             posted_at = None
             updated = job.get("updated_at")
             if updated:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     posted_at = datetime.fromisoformat(updated.replace("Z", "+00:00"))
-                except (ValueError, TypeError):
-                    pass
 
             results.append(
                 {
@@ -112,11 +111,9 @@ class JobFetcher:
             posted_at = None
             created = posting.get("createdAt")
             if created:
-                try:
+                with contextlib.suppress(ValueError, TypeError, OSError):
                     # Lever returns epoch milliseconds
                     posted_at = datetime.fromtimestamp(created / 1000, tz=timezone.utc)
-                except (ValueError, TypeError, OSError):
-                    pass
 
             results.append(
                 {
@@ -166,10 +163,8 @@ class JobFetcher:
             posted_at = None
             published = job.get("publishedAt")
             if published:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     posted_at = datetime.fromisoformat(published.replace("Z", "+00:00"))
-                except (ValueError, TypeError):
-                    pass
 
             results.append(
                 {
@@ -278,10 +273,9 @@ class JobFetcher:
                 len(seniority_words & title_words) if seniority_words else 0
             )
 
-            if role_overlap == 0:
+            if role_overlap == 0 and any(w in title for w in role_words):
                 # Check for substring match (e.g. "engineer" in "software engineer")
-                if any(w in title for w in role_words):
-                    role_overlap = 0.5
+                role_overlap = 0.5
 
             if role_overlap == 0:
                 continue
@@ -405,9 +399,7 @@ Only include jobs scoring >= 50. Return ONLY the JSON array."""
                 if not job_location:
                     # Unknown location — don't filter out
                     location_match = True
-                elif any(term in job_location for term in loc_terms):
-                    location_match = True
-                elif is_remote and open_to_remote:
+                elif any(term in job_location for term in loc_terms) or is_remote and open_to_remote:
                     location_match = True
 
                 if not location_match:

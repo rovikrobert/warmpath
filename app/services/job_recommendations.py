@@ -6,6 +6,7 @@ matching_count * avg_relevance.
 """
 
 import asyncio
+import contextlib
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -83,10 +84,8 @@ async def set_cached_jobs(company_key: str, jobs: list[dict], db: AsyncSession) 
         entry = {k: v for k, v in j.items() if k != "raw_data"}
         # Convert datetime objects to ISO strings
         if "posted_at" in entry and entry["posted_at"] is not None:
-            try:
+            with contextlib.suppress(AttributeError):
                 entry["posted_at"] = entry["posted_at"].isoformat()
-            except AttributeError:
-                pass
         serializable.append(entry)
 
     result = await db.execute(
@@ -262,14 +261,14 @@ async def get_recommendations(
             results = await asyncio.gather(*tasks)
 
             # Sequential: write to cache (needs DB session)
-            for key, jobs in zip(to_fetch, results):
+            for key, jobs in zip(to_fetch, results, strict=False):
                 if jobs:
                     await set_cached_jobs(key, jobs, db)
 
             # Parallel: match all fetched results (no DB needed)
             match_tasks = [
                 _match_and_build(fetcher, key, jobs, target_role, target_seniority)
-                for key, jobs in zip(to_fetch, results)
+                for key, jobs in zip(to_fetch, results, strict=False)
                 if jobs
             ]
             batch_recs = [r for r in await asyncio.gather(*match_tasks) if r]
@@ -348,7 +347,7 @@ async def warm_job_cache_for_user(user_id: str) -> None:
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
             cached_count = 0
-            for key, jobs in zip(to_warm, results):
+            for key, jobs in zip(to_warm, results, strict=False):
                 if isinstance(jobs, list) and jobs:
                     await set_cached_jobs(key, jobs, db)
                     cached_count += 1

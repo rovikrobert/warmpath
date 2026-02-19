@@ -536,13 +536,14 @@ async def smart_search(
     scope = body.scope or "own_network"
 
     # Marketplace scope costs credits
-    if scope == "marketplace":
-        if not await check_and_spend(current_user.id, 5, "smart_search_marketplace", db):
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail="Insufficient credits for marketplace search. "
-                "You need 5 credits. Earn credits by uploading your network.",
-            )
+    if scope == "marketplace" and not await check_and_spend(
+        current_user.id, 5, "smart_search_marketplace", db
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Insufficient credits for marketplace search. "
+            "You need 5 credits. Earn credits by uploading your network.",
+        )
 
     # Create SearchRequest for history tracking
     search_req = SearchRequest(

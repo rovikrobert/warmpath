@@ -419,13 +419,12 @@ async def lookup_or_discover_boards(
     )
     cached = result.scalar_one_or_none()
 
-    if cached is not None:
-        if cached.expires_at > datetime.now(timezone.utc):
-            data = cached.data
-            if data.get("boards"):
-                return data["boards"], True
-            return None, False
-        # Expired — will re-probe below
+    if cached is not None and cached.expires_at > datetime.now(timezone.utc):
+        data = cached.data
+        if data.get("boards"):
+            return data["boards"], True
+        return None, False
+    # Expired — will re-probe below
 
     # 3. Live probe
     discovered = await discover_boards(company_name)

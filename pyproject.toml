@@ -13,7 +13,37 @@ warn_unused_configs = true
 [tool.ruff]
 target-version = "py311"
 
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "C90",    # mccabe complexity
+    "B",      # flake8-bugbear
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line-too-long — not enforced yet (164 pre-existing)
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
 [tool.ruff.lint.per-file-ignores]
 # SQLAlchemy models use string-based forward references in relationship() type hints.
-# These are resolved at runtime by SQLAlchemy, not by Python's type system.
 "app/models/*.py" = ["F821"]
+# FastAPI uses Depends() in function defaults — B008 is a false positive
+"app/api/*.py" = ["B008"]
+"app/utils/security.py" = ["B008"]
+# Inherently complex: scoring algorithms, state machines, prompt templates
+"app/services/ai_matcher.py" = ["C901"]
+"app/services/intro_drafter.py" = ["C901"]
+"app/services/warm_scorer.py" = ["C901"]
+"app/tasks/csv_processing.py" = ["C901"]
+# Agent/team orchestrators have inherent complexity
+"agents/**/*.py" = ["C901"]
+"data_team/**/*.py" = ["C901"]
+"product_team/**/*.py" = ["C901"]
+"ops_team/**/*.py" = ["C901"]
+"gtm_team/**/*.py" = ["C901"]
+"finance_team/**/*.py" = ["C901"]
