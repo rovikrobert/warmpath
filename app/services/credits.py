@@ -41,12 +41,8 @@ async def get_credit_summary(user_id: uuid.UUID, db: AsyncSession) -> dict:
     now = datetime.now(timezone.utc)
     thirty_days = now + timedelta(days=30)
 
-    balance_cond = (
-        (CreditTransaction.type != "expired")
-        & (
-            (CreditTransaction.expires_at.is_(None))
-            | (CreditTransaction.expires_at > now)
-        )
+    balance_cond = (CreditTransaction.type != "expired") & (
+        (CreditTransaction.expires_at.is_(None)) | (CreditTransaction.expires_at > now)
     )
     earned_cond = CreditTransaction.amount > 0
     spent_cond = CreditTransaction.amount < 0
@@ -58,10 +54,18 @@ async def get_credit_summary(user_id: uuid.UUID, db: AsyncSession) -> dict:
     )
 
     q = select(
-        func.coalesce(func.sum(case((balance_cond, CreditTransaction.amount), else_=0)), 0).label("balance"),
-        func.coalesce(func.sum(case((earned_cond, CreditTransaction.amount), else_=0)), 0).label("earned"),
-        func.coalesce(func.sum(case((spent_cond, CreditTransaction.amount), else_=0)), 0).label("spent"),
-        func.coalesce(func.sum(case((expiring_cond, CreditTransaction.amount), else_=0)), 0).label("expiring"),
+        func.coalesce(
+            func.sum(case((balance_cond, CreditTransaction.amount), else_=0)), 0
+        ).label("balance"),
+        func.coalesce(
+            func.sum(case((earned_cond, CreditTransaction.amount), else_=0)), 0
+        ).label("earned"),
+        func.coalesce(
+            func.sum(case((spent_cond, CreditTransaction.amount), else_=0)), 0
+        ).label("spent"),
+        func.coalesce(
+            func.sum(case((expiring_cond, CreditTransaction.amount), else_=0)), 0
+        ).label("expiring"),
     ).where(CreditTransaction.user_id == user_id)
 
     row = (await db.execute(q)).one()
@@ -98,7 +102,9 @@ async def earn_credits(
     """Award credits to a user. Credits expire after 12 months."""
     # Guard: cap daily earn to prevent abuse (skipped for paid purchases)
     if not skip_daily_cap:
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         earned_today_result = await db.execute(
             select(func.coalesce(func.sum(CreditTransaction.amount), 0)).where(
                 CreditTransaction.user_id == user_id,

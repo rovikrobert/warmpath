@@ -283,12 +283,14 @@ class TestCheckBetaFeedback:
         mock_client.query_database.return_value = mock_response
         mock_client.update_page.return_value = {}
 
-        with patch.dict("os.environ", {"NOTION_API_KEY": "test-key"}):
-            with patch(
+        with (
+            patch.dict("os.environ", {"NOTION_API_KEY": "test-key"}),
+            patch(
                 "agents.shared.notion_client.NotionClient",
                 return_value=mock_client,
-            ):
-                findings, insights, xtr = _check_beta_feedback()
+            ),
+        ):
+            findings, insights, xtr = _check_beta_feedback()
 
         assert len(findings) == 2
         assert findings[0].severity == "high"  # Annoying → high
@@ -331,12 +333,14 @@ class TestCheckBetaFeedback:
         mock_client.query_database.return_value = mock_response
         mock_client.update_page.return_value = {}
 
-        with patch.dict("os.environ", {"NOTION_API_KEY": "test-key"}):
-            with patch(
+        with (
+            patch.dict("os.environ", {"NOTION_API_KEY": "test-key"}),
+            patch(
                 "agents.shared.notion_client.NotionClient",
                 return_value=mock_client,
-            ):
-                findings, insights, xtr = _check_beta_feedback()
+            ),
+        ):
+            findings, insights, xtr = _check_beta_feedback()
 
         assert len(xtr) == 1
         assert xtr[0]["team"] == "gtm"
@@ -377,12 +381,14 @@ class TestCheckBetaFeedback:
         mock_client.query_database.return_value = mock_response
         mock_client.update_page.return_value = {}
 
-        with patch.dict("os.environ", {"NOTION_API_KEY": "test-key"}):
-            with patch(
+        with (
+            patch.dict("os.environ", {"NOTION_API_KEY": "test-key"}),
+            patch(
                 "agents.shared.notion_client.NotionClient",
                 return_value=mock_client,
-            ):
-                findings, _, _ = _check_beta_feedback()
+            ),
+        ):
+            findings, _, _ = _check_beta_feedback()
 
         assert len(findings) == 1
         assert "john@example.com" not in findings[0].title
@@ -397,12 +403,14 @@ class TestCheckBetaFeedback:
         mock_client.enabled = True
         mock_client.query_database.return_value = {"results": []}
 
-        with patch.dict("os.environ", {"NOTION_API_KEY": "test-key"}):
-            with patch(
+        with (
+            patch.dict("os.environ", {"NOTION_API_KEY": "test-key"}),
+            patch(
                 "agents.shared.notion_client.NotionClient",
                 return_value=mock_client,
-            ):
-                findings, insights, xtr = _check_beta_feedback()
+            ),
+        ):
+            findings, insights, xtr = _check_beta_feedback()
 
         assert findings == []
         assert insights == []
