@@ -6,6 +6,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -71,6 +72,8 @@ class Application(Base):
             "'offer_accepted', 'rejected', 'withdrawn', 'no_response')",
             name="ck_applications_status",
         ),
+        Index("idx_applications_user_created", "user_id", "created_at"),
+        Index("idx_applications_user_status", "user_id", "status"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

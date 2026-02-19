@@ -272,11 +272,21 @@ async def get_friend_and_fof_ids(
     if not friend_ids:
         return set(), set()
 
-    # For each friend, get their friends
+    # Batch-load all friends-of-friends in a single query (avoids N+1)
+    fof_result = await db.execute(
+        select(UserFriendship).where(
+            or_(
+                UserFriendship.requester_id.in_(friend_ids),
+                UserFriendship.addressee_id.in_(friend_ids),
+            ),
+            UserFriendship.status == "accepted",
+            UserFriendship.deleted_at.is_(None),
+        )
+    )
     fof_ids: set[uuid.UUID] = set()
-    for fid in friend_ids:
-        fof = await get_friend_ids(fid, db)
-        fof_ids.update(fof)
+    for f in fof_result.scalars():
+        fof_ids.add(f.requester_id)
+        fof_ids.add(f.addressee_id)
 
     # Remove self and direct friends from FoF set
     fof_ids.discard(user_id)

@@ -397,14 +397,37 @@ async def send_intro_pending_reminder(db: AsyncSession) -> int:
         .group_by(IntroFacilitation.network_holder_id)
     )
     rows = result.all()
+    if not rows:
+        logger.info("intro_pending_24h: sent 0 emails")
+        return 0
+
+    nh_ids = [nh_id for nh_id, _ in rows]
+
+    # Batch-load users
+    user_result = await db.execute(
+        select(User).where(
+            User.id.in_(nh_ids),
+            User.deleted_at.is_(None),
+        )
+    )
+    users_by_id: dict[uuid.UUID, User] = {u.id: u for u in user_result.scalars().all()}
+
+    # Batch-load already-sent set for today
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    sent_result = await db.execute(
+        select(EmailCampaignLog.user_id).where(
+            EmailCampaignLog.user_id.in_(nh_ids),
+            EmailCampaignLog.email_type == "intro_pending_24h",
+            EmailCampaignLog.sent_date == today,
+        )
+    )
+    already_sent_ids: set[uuid.UUID] = {row[0] for row in sent_result.all()}
+
     count = 0
     for nh_id, pending_count in rows:
-        if await _already_sent(db, nh_id, "intro_pending_24h"):
+        if nh_id in already_sent_ids:
             continue
-        user_result = await db.execute(
-            select(User).where(User.id == nh_id, User.deleted_at.is_(None))
-        )
-        u = user_result.scalar_one_or_none()
+        u = users_by_id.get(nh_id)
         if not u or u.marketing_opt_out:
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
@@ -450,39 +473,74 @@ async def send_weekly_digest(db: AsyncSession) -> int:
         )
     )
     users = result.scalars().all()
+    if not users:
+        logger.info("weekly_digest: sent 0 emails")
+        return 0
+
+    user_ids = [u.id for u in users]
+
+    # Batch-load already-sent set for today
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    sent_result = await db.execute(
+        select(EmailCampaignLog.user_id).where(
+            EmailCampaignLog.user_id.in_(user_ids),
+            EmailCampaignLog.email_type == "weekly_digest",
+            EmailCampaignLog.sent_date == today,
+        )
+    )
+    already_sent_ids: set[uuid.UUID] = {row[0] for row in sent_result.all()}
+
+    # Batch-compute search counts per user (GROUP BY)
+    search_result = await db.execute(
+        select(
+            SearchRequest.user_id,
+            func.count(SearchRequest.id),
+        )
+        .where(
+            SearchRequest.user_id.in_(user_ids),
+            SearchRequest.created_at > week_ago,
+        )
+        .group_by(SearchRequest.user_id)
+    )
+    search_counts: dict[uuid.UUID, int] = dict(search_result.all())
+
+    # Batch-compute intro_sent counts per user (as job seeker)
+    intro_sent_result = await db.execute(
+        select(
+            IntroFacilitation.job_seeker_id,
+            func.count(IntroFacilitation.id),
+        )
+        .where(
+            IntroFacilitation.job_seeker_id.in_(user_ids),
+            IntroFacilitation.requested_at > week_ago,
+        )
+        .group_by(IntroFacilitation.job_seeker_id)
+    )
+    intro_sent_counts: dict[uuid.UUID, int] = dict(intro_sent_result.all())
+
+    # Batch-compute intro_received counts per user (as network holder)
+    intro_recv_result = await db.execute(
+        select(
+            IntroFacilitation.network_holder_id,
+            func.count(IntroFacilitation.id),
+        )
+        .where(
+            IntroFacilitation.network_holder_id.in_(user_ids),
+            IntroFacilitation.requested_at > week_ago,
+        )
+        .group_by(IntroFacilitation.network_holder_id)
+    )
+    intro_recv_counts: dict[uuid.UUID, int] = dict(intro_recv_result.all())
+
     count = 0
     for u in users:
-        if await _already_sent(db, u.id, "weekly_digest"):
+        if u.id in already_sent_ids:
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
 
-        # Gather stats
-        search_count = (
-            await db.execute(
-                select(func.count(SearchRequest.id)).where(
-                    SearchRequest.user_id == u.id,
-                    SearchRequest.created_at > week_ago,
-                )
-            )
-        ).scalar() or 0
-
-        intro_sent = (
-            await db.execute(
-                select(func.count(IntroFacilitation.id)).where(
-                    IntroFacilitation.job_seeker_id == u.id,
-                    IntroFacilitation.requested_at > week_ago,
-                )
-            )
-        ).scalar() or 0
-
-        intro_received = (
-            await db.execute(
-                select(func.count(IntroFacilitation.id)).where(
-                    IntroFacilitation.network_holder_id == u.id,
-                    IntroFacilitation.requested_at > week_ago,
-                )
-            )
-        ).scalar() or 0
+        search_count = search_counts.get(u.id, 0)
+        intro_sent = intro_sent_counts.get(u.id, 0)
+        intro_received = intro_recv_counts.get(u.id, 0)
 
         stats_html = ""
         if search_count or intro_sent:

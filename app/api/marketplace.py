@@ -374,8 +374,8 @@ async def my_requests(
         lr = await db.execute(
             select(MarketplaceListing).where(MarketplaceListing.id.in_(listing_ids))
         )
-        listings_map = {l.id: l for l in lr.scalars()}
-        company_ids = {l.company_id for l in listings_map.values() if l.company_id}
+        listings_map = {listing.id: listing for listing in lr.scalars()}
+        company_ids = {listing.company_id for listing in listings_map.values() if listing.company_id}
         if company_ids:
             cr = await db.execute(select(Company).where(Company.id.in_(company_ids)))
             companies_map = {c.id: c for c in cr.scalars()}
@@ -426,8 +426,8 @@ async def incoming_requests(
             .where(MarketplaceListing.id.in_(listing_ids))
             .options(selectinload(MarketplaceListing.contact))
         )
-        listings_map = {l.id: l for l in lr.scalars()}
-        company_ids = {l.company_id for l in listings_map.values() if l.company_id}
+        listings_map = {listing.id: listing for listing in lr.scalars()}
+        company_ids = {listing.company_id for listing in listings_map.values() if listing.company_id}
         if company_ids:
             cr = await db.execute(select(Company).where(Company.id.in_(company_ids)))
             companies_map = {c.id: c for c in cr.scalars()}

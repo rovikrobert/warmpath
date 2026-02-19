@@ -151,7 +151,7 @@ async def purge_suppressed_person(
     listings = list(listing_result.scalars())
 
     # Batch-cancel pending intro facilitations for all affected listings
-    listing_ids = [l.id for l in listings]
+    listing_ids = [listing.id for listing in listings]
     if listing_ids:
         await db.execute(
             update(IntroFacilitation)

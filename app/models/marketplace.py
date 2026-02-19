@@ -120,6 +120,8 @@ class IntroFacilitation(Base):
     __table_args__ = (
         Index("idx_intro_status", "status"),
         Index("idx_intro_expires", "expires_at"),
+        Index("idx_intro_holder_status", "network_holder_id", "status"),
+        Index("idx_intro_seeker_created", "job_seeker_id", "created_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

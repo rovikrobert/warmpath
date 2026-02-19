@@ -419,7 +419,6 @@ async def get_search_results(
             ).label("b20"),
         ).select_from(subq)
         agg_row = (await db.execute(agg_query)).one()
-        cnt = int(agg_row.cnt or 0)
         avg_rel = float(agg_row.avg_rel or 0)
         avg_warm = float(agg_row.avg_warm or 0)
         score_dist = {

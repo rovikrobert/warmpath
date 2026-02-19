@@ -188,8 +188,22 @@ export default function SearchResults() {
           <Spinner size="md" />
         </div>
       ) : results.length === 0 ? (
-        <div className="rounded-lg bg-slate-900 p-8 text-center border border-slate-700/50" aria-live="polite">
-          <p className="text-sm text-slate-400">No matches found with current filters</p>
+        <div className="rounded-xl bg-slate-900 p-12 text-center border border-slate-700/50" aria-live="polite">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800" aria-hidden="true">
+            <svg className="h-7 w-7 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+          </div>
+          <h2 className="mb-2 text-base font-semibold text-slate-50">No matches found</h2>
+          <p className="mx-auto mb-4 max-w-sm text-sm text-slate-400">
+            No contacts matched your current filters. Try lowering the minimum match strength or clearing the company filter.
+          </p>
+          <button
+            onClick={() => setFilters({ min_relevance: 0, min_warm: '', match_type: '', company: '', page: 1, per_page: 20 })}
+            className="inline-block rounded-lg bg-amber-500 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-400"
+          >
+            Reset Filters
+          </button>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl bg-slate-900 border border-slate-700/50">
