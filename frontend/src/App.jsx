@@ -20,8 +20,8 @@ import ReferralCodesPage from './pages/ReferralCodesPage';
 import SettingsPage from './pages/SettingsPage';
 import ScoreGlossary from './pages/ScoreGlossary';
 
-function ProtectedRoute({ children }) {
-  const { loading } = useAuth();
+function ProtectedRoute({ children, allowIncomplete = false }) {
+  const { user, loading } = useAuth();
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-950">
@@ -31,16 +31,32 @@ function ProtectedRoute({ children }) {
   }
   return (
     <>
-      <SignedIn>{children}</SignedIn>
+      <SignedIn>
+        {!allowIncomplete && user && !user.onboarding_complete ? (
+          <Navigate to="/onboarding" replace />
+        ) : (
+          children
+        )}
+      </SignedIn>
       <SignedOut><RedirectToSignIn /></SignedOut>
     </>
   );
 }
 
 function RootRedirect() {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-950">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
   return (
     <>
-      <SignedIn><Navigate to="/coach" replace /></SignedIn>
+      <SignedIn>
+        <Navigate to={user?.onboarding_complete ? '/coach' : '/onboarding'} replace />
+      </SignedIn>
       <SignedOut><AuthPage /></SignedOut>
     </>
   );
@@ -61,7 +77,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<RootRedirect />} />
       <Route path="/privacy" element={<PrivacyPage />} />
-      <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
+      <Route path="/onboarding" element={<ProtectedRoute allowIncomplete><OnboardingPage /></ProtectedRoute>} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/coach" element={<CoachPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
