@@ -174,9 +174,9 @@ async def signup(
     await send_welcome_email_js(user, db)
 
     # Track funnel step
-    from app.models.enrichment import UsageLog
+    from app.utils.tracking import track_action
 
-    db.add(UsageLog(user_id=user.id, action="signup"))
+    await track_action(db, user.id, "signup")
 
     await db.commit()
     await db.refresh(user)
@@ -611,9 +611,9 @@ async def verify_email(
     await log_event(db, "email_verified", user_id=user.id)
 
     # Track funnel step
-    from app.models.enrichment import UsageLog
+    from app.utils.tracking import track_action
 
-    db.add(UsageLog(user_id=user.id, action="email_verify"))
+    await track_action(db, user.id, "email_verify")
 
     await db.commit()
     return {"data": {"message": "Email verified successfully"}, "meta": {}}
@@ -670,6 +670,74 @@ async def linkedin_authorize() -> dict:
     state = jose_jwt.encode(state_payload, settings.SECRET_KEY, algorithm="HS256")
     url = get_authorize_url(state)
     return {"data": {"url": url, "state": state}, "meta": {}}
+
+
+async def _resolve_or_create_linkedin_user(
+    li_sub: str,
+    email: str,
+    name: str,
+    password_hash: str | None,
+    db: AsyncSession,
+) -> tuple[User, bool]:
+    """Resolve existing user or create new one from LinkedIn OAuth.
+
+    Returns (user, is_new_user). Handles three cases:
+    1. Existing OAuth user (same li_sub) → return it
+    2. Existing email user → link LinkedIn identity
+    3. New user → create, send verification if password set, award bonus
+    """
+    # Case 1: existing LinkedIn identity
+    result = await db.execute(
+        select(User).where(
+            User.oauth_provider == "linkedin",
+            User.oauth_provider_id == li_sub,
+            User.deleted_at.is_(None),
+        )
+    )
+    existing_oauth_user = result.scalar_one_or_none()
+    if existing_oauth_user is not None:
+        return existing_oauth_user, False
+
+    # Case 2: email matches existing account
+    if email:
+        result = await db.execute(
+            select(User).where(User.email == email, User.deleted_at.is_(None))
+        )
+        existing_email_user = result.scalar_one_or_none()
+    else:
+        existing_email_user = None
+
+    if existing_email_user is not None:
+        existing_email_user.oauth_provider = "linkedin"
+        existing_email_user.oauth_provider_id = li_sub
+        return existing_email_user, False
+
+    # Case 3: new user
+    user = User(
+        email=email,
+        password_hash=password_hash,
+        full_name=name,
+        email_verified=not password_hash,
+        oauth_provider="linkedin",
+        oauth_provider_id=li_sub,
+    )
+    db.add(user)
+    await db.flush()
+
+    if password_hash:
+        await send_verification_email(user, db)
+
+    email_hash = hashlib.sha256(email.encode()).hexdigest()
+    suppression_result = await db.execute(
+        select(SuppressionList).where(
+            SuppressionList.email_hash == email_hash,
+            SuppressionList.reason == "account_deleted",
+        )
+    )
+    if suppression_result.scalars().first() is None:
+        await earn_credits(user.id, 50, "welcome_bonus", db)
+
+    return user, True
 
 
 @router.post("/linkedin/callback")
@@ -732,68 +800,11 @@ async def linkedin_callback(
             )
         account_password_hash = hash_password(body.password)
 
-    # 3. Check if user with this LinkedIn identity already exists
-    result = await db.execute(
-        select(User).where(
-            User.oauth_provider == "linkedin",
-            User.oauth_provider_id == li_sub,
-            User.deleted_at.is_(None),
-        )
+    # 3. Resolve or create user from LinkedIn identity
+    user, is_new_user = await _resolve_or_create_linkedin_user(
+        li_sub, account_email or li_email, account_name,
+        account_password_hash, db,
     )
-    existing_oauth_user = result.scalar_one_or_none()
-
-    is_new_user = False
-
-    if existing_oauth_user is not None:
-        # Existing LinkedIn user — login
-        user = existing_oauth_user
-    else:
-        # Check if email matches an existing account
-        lookup_email = account_email or li_email
-        if lookup_email:
-            result = await db.execute(
-                select(User).where(
-                    User.email == lookup_email, User.deleted_at.is_(None)
-                )
-            )
-            existing_email_user = result.scalar_one_or_none()
-        else:
-            existing_email_user = None
-
-        if existing_email_user is not None:
-            # Link LinkedIn identity to existing email/password account
-            existing_email_user.oauth_provider = "linkedin"
-            existing_email_user.oauth_provider_id = li_sub
-            user = existing_email_user
-        else:
-            # Create new user — with password if frontend provided one
-            user = User(
-                email=account_email,
-                password_hash=account_password_hash,
-                full_name=account_name,
-                email_verified=not account_password_hash,  # Only auto-verify if no password (pure OAuth)
-                oauth_provider="linkedin",
-                oauth_provider_id=li_sub,
-            )
-            db.add(user)
-            await db.flush()
-
-            # If user provided password, send verification email (they entered their own email)
-            if account_password_hash:
-                await send_verification_email(user, db)
-
-            # Check suppression list before welcome bonus
-            email_hash = hashlib.sha256(account_email.encode()).hexdigest()
-            suppression_result = await db.execute(
-                select(SuppressionList).where(
-                    SuppressionList.email_hash == email_hash,
-                    SuppressionList.reason == "account_deleted",
-                )
-            )
-            if suppression_result.scalars().first() is None:
-                await earn_credits(user.id, 50, "welcome_bonus", db)
-
-            is_new_user = True
 
     # Reset lockout on successful OAuth login
     user.failed_login_attempts = 0
@@ -865,14 +876,9 @@ async def import_resume(
         )
 
     # Log usage
-    from app.models.enrichment import UsageLog
+    from app.utils.tracking import track_action
 
-    usage_entry = UsageLog(
-        user_id=current_user.id,
-        action="resume_parse",
-        metadata_={"filename": file.filename},
-    )
-    db.add(usage_entry)
+    await track_action(db, current_user.id, "resume_parse", metadata_={"filename": file.filename})
     await db.commit()
 
     return {"data": parsed, "meta": {}}

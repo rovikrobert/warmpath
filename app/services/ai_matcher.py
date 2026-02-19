@@ -891,6 +891,63 @@ async def score_contacts(
     return all_results
 
 
+async def _upsert_match_results(
+    search_id: uuid.UUID,
+    user_id: uuid.UUID,
+    matches: list[ContactMatch],
+    model_version: str,
+    db: AsyncSession,
+) -> list[MatchResult]:
+    """Persist or update MatchResult rows for scored contacts (score >= 20)."""
+    MIN_PERSIST_SCORE = 20.0
+    filtered_matches = [m for m in matches if m.relevance_score >= MIN_PERSIST_SCORE]
+
+    # Batch-load existing match results for upsert (avoids N+1)
+    existing_map: dict = {}
+    if filtered_matches:
+        contact_ids = [m.contact_id for m in filtered_matches]
+        er = await db.execute(
+            select(MatchResult).where(
+                MatchResult.search_request_id == search_id,
+                MatchResult.contact_id.in_(contact_ids),
+            )
+        )
+        existing_map = {mr.contact_id: mr for mr in er.scalars()}
+
+    match_results: list[MatchResult] = []
+    for m in filtered_matches:
+        ctx_blob = {
+            **m.cultural_context,
+            "referral_likelihood": m.referral_likelihood,
+            "recommended_channel": m.recommended_channel,
+            "message_sequence": m.message_sequence,
+        }
+
+        existing = existing_map.get(m.contact_id)
+        if existing:
+            existing.relevance_score = Decimal(str(m.relevance_score))
+            existing.match_reasoning = m.reasoning
+            existing.match_type = m.match_type
+            existing.ai_model_version = model_version
+            existing.cultural_context = ctx_blob
+            match_results.append(existing)
+        else:
+            mr = MatchResult(
+                search_request_id=search_id,
+                contact_id=m.contact_id,
+                user_id=user_id,
+                relevance_score=Decimal(str(m.relevance_score)),
+                match_reasoning=m.reasoning,
+                match_type=m.match_type,
+                ai_model_version=model_version,
+                cultural_context=ctx_blob,
+            )
+            db.add(mr)
+            match_results.append(mr)
+
+    return match_results
+
+
 @timed("ai_match")
 async def run_search(
     search_id: uuid.UUID,
@@ -950,54 +1007,10 @@ async def run_search(
     )
 
     # Upsert match results (skip scores below 20)
-    MIN_PERSIST_SCORE = 20.0
     model_version = "mock-v2-referral" if settings.AI_MOCK_MODE else CLAUDE_MODEL
-    match_results: list[MatchResult] = []
-    filtered_matches = [m for m in matches if m.relevance_score >= MIN_PERSIST_SCORE]
-
-    # Batch-load existing match results for upsert (avoids N+1)
-    existing_map: dict = {}
-    if filtered_matches:
-        contact_ids = [m.contact_id for m in filtered_matches]
-        er = await db.execute(
-            select(MatchResult).where(
-                MatchResult.search_request_id == search_id,
-                MatchResult.contact_id.in_(contact_ids),
-            )
-        )
-        existing_map = {mr.contact_id: mr for mr in er.scalars()}
-
-    for m in filtered_matches:
-        # Build cultural_context blob for storage
-        ctx_blob = {
-            **m.cultural_context,
-            "referral_likelihood": m.referral_likelihood,
-            "recommended_channel": m.recommended_channel,
-            "message_sequence": m.message_sequence,
-        }
-
-        existing = existing_map.get(m.contact_id)
-
-        if existing:
-            existing.relevance_score = Decimal(str(m.relevance_score))
-            existing.match_reasoning = m.reasoning
-            existing.match_type = m.match_type
-            existing.ai_model_version = model_version
-            existing.cultural_context = ctx_blob
-            match_results.append(existing)
-        else:
-            mr = MatchResult(
-                search_request_id=search_id,
-                contact_id=m.contact_id,
-                user_id=user_id,
-                relevance_score=Decimal(str(m.relevance_score)),
-                match_reasoning=m.reasoning,
-                match_type=m.match_type,
-                ai_model_version=model_version,
-                cultural_context=ctx_blob,
-            )
-            db.add(mr)
-            match_results.append(mr)
+    match_results = await _upsert_match_results(
+        search_id, user_id, matches, model_version, db
+    )
 
     search.last_run_at = datetime.now(timezone.utc)
     search.status = "completed"

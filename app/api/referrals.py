@@ -84,15 +84,9 @@ async def redeem_referral_code(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     # Funnel instrumentation: referral_redeem
-    from app.models.enrichment import UsageLog
+    from app.utils.tracking import track_action
 
-    db.add(
-        UsageLog(
-            user_id=current_user.id,
-            action="referral_redeem",
-            metadata_={},
-        )
-    )
+    await track_action(db, current_user.id, "referral_redeem")
     await db.commit()
 
     return {

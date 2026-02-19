@@ -174,6 +174,45 @@ def classify_connection_recency(connected_on: date | None) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Contact eligibility check
+# ---------------------------------------------------------------------------
+
+
+def _should_list_contact(
+    contact: Contact,
+    excluded_ids: list[str],
+    exclude_companies: list[str],
+    include_departments: list[str],
+    suppressed_email_hashes: set[str],
+    suppressed_name_co_hashes: set[str],
+) -> bool:
+    """Return True if a contact passes all marketplace listing filters."""
+    if str(contact.id) in excluded_ids:
+        return False
+
+    if contact.company_id and str(contact.company_id) in exclude_companies:
+        return False
+
+    dept = classify_department(contact.current_title)
+    if include_departments and dept not in include_departments:
+        return False
+
+    # Suppression list check (in-memory)
+    if contact.email:
+        if hash_for_suppression(contact.email) in suppressed_email_hashes:
+            return False
+    name_company = (
+        f"{contact.first_name or ''}"
+        f"{contact.last_name or ''}"
+        f"{contact.current_company or ''}"
+    )
+    if hash_for_suppression(name_company) in suppressed_name_co_hashes:
+        return False
+
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Main indexer
 # ---------------------------------------------------------------------------
 
@@ -256,36 +295,13 @@ async def generate_marketplace_listings(
     created = 0
 
     for contact in contacts:
-        # Skip excluded contacts
-        if str(contact.id) in excluded_ids:
+        if not _should_list_contact(
+            contact, excluded_ids, exclude_companies,
+            include_departments, suppressed_email_hashes, suppressed_name_co_hashes,
+        ):
             continue
 
-        # Skip contacts at excluded companies
-        if contact.company_id and str(contact.company_id) in exclude_companies:
-            continue
-
-        # Classify department
         dept = classify_department(contact.current_title)
-
-        # Check department filter (if set, only include listed departments)
-        if include_departments and dept not in include_departments:
-            continue
-
-        # Check suppression list (in-memory, no DB query per contact)
-        is_suppressed = False
-        if contact.email:
-            if hash_for_suppression(contact.email) in suppressed_email_hashes:
-                is_suppressed = True
-        if not is_suppressed:
-            name_company = (
-                f"{contact.first_name or ''}"
-                f"{contact.last_name or ''}"
-                f"{contact.current_company or ''}"
-            )
-            if hash_for_suppression(name_company) in suppressed_name_co_hashes:
-                is_suppressed = True
-        if is_suppressed:
-            continue
 
         # Create anonymized listing
         listing = MarketplaceListing(

@@ -44,6 +44,46 @@ MAX_CSV_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 ALLOWED_CSV_CONTENT_TYPES = {"text/csv", "application/octet-stream"}
 
 
+async def _validate_csv_file(file: UploadFile) -> bytes:
+    """Validate CSV filename, content-type, size, and parseability. Returns raw bytes."""
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only CSV files are accepted",
+        )
+
+    ct = (file.content_type or "").split(";")[0].strip().lower()
+    if ct and ct not in ALLOWED_CSV_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Content type '{file.content_type}' is not supported. "
+            "Upload a CSV file (text/csv).",
+        )
+
+    raw_bytes = await file.read()
+    if len(raw_bytes) > MAX_CSV_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"CSV file exceeds the maximum allowed size of "
+            f"{MAX_CSV_FILE_SIZE // (1024 * 1024)} MB.",
+        )
+
+    try:
+        parse_linkedin_csv(raw_bytes)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Failed to parse CSV: {exc}",
+        ) from exc
+
+    return raw_bytes
+
+
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 @timed("csv_upload_endpoint")
 async def upload_csv(
@@ -65,43 +105,7 @@ async def upload_csv(
             f"CSV upload limit reached ({settings.RATE_LIMIT_CSV_UPLOADS_PER_DAY}/day)"
         )
 
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only CSV files are accepted",
-        )
-
-    # Content-type validation
-    ct = (file.content_type or "").split(";")[0].strip().lower()
-    if ct and ct not in ALLOWED_CSV_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"Content type '{file.content_type}' is not supported. "
-            "Upload a CSV file (text/csv).",
-        )
-
-    # File size limit — read with cap
-    raw_bytes = await file.read()
-    if len(raw_bytes) > MAX_CSV_FILE_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail=f"CSV file exceeds the maximum allowed size of "
-            f"{MAX_CSV_FILE_SIZE // (1024 * 1024)} MB.",
-        )
-
-    # Validate CSV is parseable before queuing (also enforces row limit + encoding)
-    try:
-        parse_linkedin_csv(raw_bytes)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=f"Failed to parse CSV: {exc}",
-        ) from exc
+    raw_bytes = await _validate_csv_file(file)
 
     # Base64-encode for safe serialization
     content_b64 = base64.b64encode(raw_bytes).decode("ascii")
@@ -196,6 +200,61 @@ async def compute_scores(
 _ENCRYPTED_SORT_COLUMNS = {"full_name", "current_company", "connected_on"}
 
 
+async def _query_contacts_in_memory(
+    base_query,
+    search: str | None,
+    sort_by: str,
+    sort_order: str,
+    page: int,
+    per_page: int,
+    db: AsyncSession,
+) -> tuple[list, int]:
+    """Load, filter, sort, and paginate contacts in-memory (encrypted columns)."""
+    result = await db.execute(base_query)
+    all_rows = result.all()
+
+    if search:
+        s = search.lower()
+        all_rows = [
+            (c, sc)
+            for c, sc in all_rows
+            if s in (c.full_name or "").lower()
+            or s in (c.current_company or "").lower()
+            or s in (c.current_title or "").lower()
+            or s in (c.email or "").lower()
+        ]
+
+    total = len(all_rows)
+
+    reverse = sort_order == "desc"
+    if sort_by == "warm_score":
+        all_rows.sort(key=lambda r: (r[1] is not None, r[1] or 0), reverse=reverse)
+    elif sort_by == "connected_on":
+        from datetime import date as _date
+
+        _min = _date.min
+        all_rows.sort(
+            key=lambda r: getattr(r[0], "connected_on", None) or _min,
+            reverse=reverse,
+        )
+    elif sort_by == "created_at":
+        from datetime import datetime as _dt
+
+        _epoch = _dt.min
+        all_rows.sort(
+            key=lambda r: getattr(r[0], "created_at", None) or _epoch,
+            reverse=reverse,
+        )
+    else:
+        all_rows.sort(
+            key=lambda r: (getattr(r[0], sort_by, None) or "").lower(),
+            reverse=reverse,
+        )
+
+    offset = (page - 1) * per_page
+    return all_rows[offset : offset + per_page], total
+
+
 @router.get("")
 @timed("contacts_list")
 async def list_contacts(
@@ -238,54 +297,9 @@ async def list_contacts(
     need_in_memory = bool(search) or sort_by in _ENCRYPTED_SORT_COLUMNS
 
     if need_in_memory:
-        # Load all matching rows (user-scoped, so bounded)
-        result = await db.execute(base_query)
-        all_rows = result.all()
-
-        # In-memory search filter on decrypted values
-        if search:
-            s = search.lower()
-            all_rows = [
-                (c, sc)
-                for c, sc in all_rows
-                if s in (c.full_name or "").lower()
-                or s in (c.current_company or "").lower()
-                or s in (c.current_title or "").lower()
-                or s in (c.email or "").lower()
-            ]
-
-        total = len(all_rows)
-
-        # In-memory sort
-        reverse = sort_order == "desc"
-        if sort_by == "warm_score":
-            all_rows.sort(key=lambda r: (r[1] is not None, r[1] or 0), reverse=reverse)
-        elif sort_by == "connected_on":
-            from datetime import date as _date
-
-            _min = _date.min
-            all_rows.sort(
-                key=lambda r: getattr(r[0], "connected_on", None) or _min,
-                reverse=reverse,
-            )
-        elif sort_by == "created_at":
-            from datetime import datetime as _dt
-
-            _epoch = _dt.min
-            all_rows.sort(
-                key=lambda r: getattr(r[0], "created_at", None) or _epoch,
-                reverse=reverse,
-            )
-        else:
-            # String PII columns (full_name, current_company)
-            all_rows.sort(
-                key=lambda r: (getattr(r[0], sort_by, None) or "").lower(),
-                reverse=reverse,
-            )
-
-        # In-memory pagination
-        offset = (page - 1) * per_page
-        rows = all_rows[offset : offset + per_page]
+        rows, total = await _query_contacts_in_memory(
+            base_query, search, sort_by, sort_order, page, per_page, db
+        )
     else:
         # Pure SQL path — no encrypted columns involved in search/sort
         count_query = select(func.count()).select_from(base_query.subquery())
