@@ -1,5 +1,6 @@
 [build]
 dockerfilePath = "Dockerfile"
+watchPatterns = ["app/**", "frontend/**", "alembic/**", "requirements.txt", "Dockerfile", "railway.toml"]
 
 [deploy]
 preDeployCommand = "alembic upgrade head"
