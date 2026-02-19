@@ -878,11 +878,14 @@ async def _process_company(
     )
 
     # Find user's contacts who work at this company
+    # Match via normalized company name (companies table) since
+    # current_company may be encrypted at rest.
     company_lower = company_name.lower()
     company_contacts = [
         c
         for c in all_contacts
-        if c.current_company and company_lower in c.current_company.lower()
+        if (c.company and c.company.name and company_lower in c.company.name.lower())
+        or (c.current_company and company_lower in c.current_company.lower())
     ]
 
     referral_paths: list[dict] = []
