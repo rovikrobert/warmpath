@@ -8,6 +8,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect as sa_inspect
 
 # revision identifiers, used by Alembic.
 revision: str = '621e94b7b6bd'
@@ -21,8 +22,17 @@ def upgrade() -> None:
     op.alter_column('referral_codes', 'referral_type',
                existing_type=sa.VARCHAR(length=20),
                nullable=True)
-    # Drop target_company_id FK and column
-    op.drop_constraint('referral_codes_target_company_id_fkey', 'referral_codes', type_='foreignkey')
+
+    # Drop target_company_id FK — find the actual constraint name dynamically
+    conn = op.get_bind()
+    inspector = sa_inspect(conn)
+    fks = inspector.get_foreign_keys('referral_codes')
+    for fk in fks:
+        if 'target_company_id' in fk['constrained_columns']:
+            op.drop_constraint(fk['name'], 'referral_codes', type_='foreignkey')
+            break
+
+    # Drop the column
     op.drop_column('referral_codes', 'target_company_id')
 
 
