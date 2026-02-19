@@ -112,35 +112,10 @@ async def _get_recently_searched_companies(
     return unique
 
 
-async def _get_job_market_trends(
-    prefs: UserJobPreferences, user_id: uuid.UUID, db: AsyncSession
-) -> dict | None:
-    """Scan top companies for the user's target role and summarize."""
-    cache_key = f"dashboard_trends:{user_id}"
-    cached = await _read_cache(cache_key, db)
-    if cached is not None:
-        return cached
-
-    from app.services.job_recommendations import get_recommendations
-
-    result = await get_recommendations(
-        target_role=prefs.target_role,
-        target_seniority=prefs.target_seniority,
-        target_locations=prefs.target_locations if prefs.target_locations else None,
-        exclude_companies=None,
-        limit=20,
-        db=db,
-    )
-
-    recs = result.get("recommendations", [])
-
-    if not recs:
-        return None
-
-    companies_hiring = len(recs)
-
-    # Check which of the user's recently-searched companies are hiring
-    recent_companies = await _get_recently_searched_companies(user_id, db)
+def _aggregate_trend_data(
+    recs: list[dict], recent_companies: list[str]
+) -> dict:
+    """Aggregate recommendation data into trend metrics."""
     rec_display_names = {r["display_name"].lower(): r for r in recs}
     rec_keys = {r["company"].lower(): r for r in recs}
 
@@ -163,7 +138,6 @@ async def _get_job_market_trends(
 
     # Top companies by score (prioritize user's searched companies)
     searched_set = {n.lower() for n in searched_and_hiring}
-    # Split recs: user-searched first, then the rest
     searched_recs = [r for r in recs if r["display_name"].lower() in searched_set]
     other_recs = [r for r in recs if r["display_name"].lower() not in searched_set]
     prioritized_recs = searched_recs + other_recs
@@ -175,11 +149,49 @@ async def _get_job_market_trends(
         region = rec.get("region") or "Other"
         region_counts[region] = region_counts.get(region, 0) + 1
 
+    return {
+        "searched_and_hiring": searched_and_hiring,
+        "trending_titles": trending_titles,
+        "top_companies": top_companies,
+        "region_counts": region_counts,
+    }
+
+
+async def _get_job_market_trends(
+    prefs: UserJobPreferences, user_id: uuid.UUID, db: AsyncSession
+) -> dict | None:
+    """Scan top companies for the user's target role and summarize."""
+    cache_key = f"dashboard_trends:{user_id}"
+    cached = await _read_cache(cache_key, db)
+    if cached is not None:
+        return cached
+
+    from app.services.job_recommendations import get_recommendations
+
+    result = await get_recommendations(
+        target_role=prefs.target_role,
+        target_seniority=prefs.target_seniority,
+        target_locations=prefs.target_locations if prefs.target_locations else None,
+        exclude_companies=None,
+        limit=20,
+        db=db,
+    )
+
+    recs = result.get("recommendations", [])
+    if not recs:
+        return None
+
+    companies_hiring = len(recs)
+    recent_companies = await _get_recently_searched_companies(user_id, db)
+    agg = _aggregate_trend_data(recs, recent_companies)
+
+    searched_and_hiring = agg["searched_and_hiring"]
+    top_companies = agg["top_companies"]
+
     # Build personalized summary
     role = prefs.target_role or "your target role"
     top_names = ", ".join(top_companies)
     if searched_and_hiring:
-        # Personalized: mention their searched companies specifically
         names_str = ", ".join(searched_and_hiring[:3])
         others = companies_hiring - len(searched_and_hiring)
         if others > 0:
@@ -190,7 +202,6 @@ async def _get_job_market_trends(
         else:
             summary = f"{names_str} {'is' if len(searched_and_hiring) == 1 else 'are'} actively hiring for {role} roles."
     else:
-        # Generic but not "scanned" language
         summary = (
             f"{companies_hiring} companies are actively hiring for {role} roles "
             f"in your target market. Top: {top_names}."
@@ -199,10 +210,10 @@ async def _get_job_market_trends(
     trends = {
         "summary": summary,
         "companies_hiring": companies_hiring,
-        "trending_titles": trending_titles,
+        "trending_titles": agg["trending_titles"],
         "top_companies": top_companies,
         "searched_and_hiring": searched_and_hiring,
-        "region_breakdown": region_counts,
+        "region_breakdown": agg["region_counts"],
     }
 
     await _write_cache(cache_key, trends, settings.DASHBOARD_TRENDS_CACHE_TTL_HOURS, db)
@@ -214,16 +225,10 @@ async def _get_job_market_trends(
 # ---------------------------------------------------------------------------
 
 
-async def _get_network_analysis(
-    user_id: uuid.UUID, db: AsyncSession, prefs: UserJobPreferences | None = None
-) -> dict | None:
-    """Analyze the user's contacts to show network strengths."""
-    cache_key = f"dashboard_network:{user_id}"
-    cached = await _read_cache(cache_key, db)
-    if cached is not None:
-        return cached
-
-    # Total contact count
+async def _load_network_stats(
+    user_id: uuid.UUID, db: AsyncSession
+) -> tuple[int, list[dict], dict]:
+    """Load total contacts, top companies, and relationship breakdown."""
     total_result = await db.execute(
         select(func.count(Contact.id)).where(
             Contact.user_id == user_id,
@@ -232,28 +237,25 @@ async def _get_network_analysis(
     )
     total_contacts = total_result.scalar() or 0
 
-    if total_contacts == 0:
-        return None
-
-    # Top 10 companies by contact count — in-memory because current_company
-    # is encrypted and cannot be grouped/compared at SQL level
-    contacts_result = await db.execute(
-        select(Contact).where(
-            Contact.user_id == user_id,
-            Contact.deleted_at.is_(None),
+    top_companies: list[dict] = []
+    if total_contacts > 0:
+        # In-memory because current_company is encrypted
+        contacts_result = await db.execute(
+            select(Contact).where(
+                Contact.user_id == user_id,
+                Contact.deleted_at.is_(None),
+            )
         )
-    )
-    all_contacts = list(contacts_result.scalars())
-    company_counts = Counter(
-        c.current_company
-        for c in all_contacts
-        if c.current_company and c.current_company.strip()
-    )
-    top_companies = [
-        {"company": co, "count": n} for co, n in company_counts.most_common(10)
-    ]
+        all_contacts = list(contacts_result.scalars())
+        company_counts = Counter(
+            c.current_company
+            for c in all_contacts
+            if c.current_company and c.current_company.strip()
+        )
+        top_companies = [
+            {"company": co, "count": n} for co, n in company_counts.most_common(10)
+        ]
 
-    # Relationship type breakdown
     rel_result = await db.execute(
         select(
             Contact.relationship_type,
@@ -270,9 +272,55 @@ async def _get_network_analysis(
         (row[0] or "unclassified"): row[1] for row in rel_result.all()
     }
 
+    return total_contacts, top_companies, relationship_breakdown
+
+
+def _detect_network_gaps(
+    prefs: UserJobPreferences | None, top_companies: list[dict]
+) -> list[str] | None:
+    """Identify target-location companies missing from the user's network."""
+    if not prefs or not prefs.target_locations:
+        return None
+
+    from app.services.board_registry import (
+        companies_for_locations,
+        get_display_name,
+    )
+
+    target_companies = companies_for_locations(prefs.target_locations)[:15]
+    user_company_names = {
+        c["company"].lower() for c in top_companies if c["company"]
+    }
+
+    missing = []
+    for key in target_companies:
+        display = get_display_name(key)
+        if (
+            display.lower() not in user_company_names
+            and key not in user_company_names
+        ):
+            missing.append(display)
+
+    return missing[:5] if missing else None
+
+
+async def _get_network_analysis(
+    user_id: uuid.UUID, db: AsyncSession, prefs: UserJobPreferences | None = None
+) -> dict | None:
+    """Analyze the user's contacts to show network strengths."""
+    cache_key = f"dashboard_network:{user_id}"
+    cached = await _read_cache(cache_key, db)
+    if cached is not None:
+        return cached
+
+    total_contacts, top_companies, relationship_breakdown = (
+        await _load_network_stats(user_id, db)
+    )
+    if total_contacts == 0:
+        return None
+
     # Build summary
     top_names = ", ".join(f"{c['company']} ({c['count']})" for c in top_companies[:3])
-    # Find the most common relationship type
     top_rel = (
         max(relationship_breakdown, key=relationship_breakdown.get)
         if relationship_breakdown
@@ -286,39 +334,12 @@ async def _get_network_analysis(
     if top_rel and top_rel != "unclassified":
         parts.append(f"{top_rel_count} {top_rel} connections.")
 
-    summary = " ".join(parts)
-
-    # Network gaps: if user has target locations, check coverage
-    network_gaps = None
-    if prefs and prefs.target_locations:
-        from app.services.board_registry import (
-            companies_for_locations,
-            get_display_name,
-        )
-
-        target_companies = companies_for_locations(prefs.target_locations)[:15]
-        user_company_names = {
-            c["company"].lower() for c in top_companies if c["company"]
-        }
-
-        missing = []
-        for key in target_companies:
-            display = get_display_name(key)
-            if (
-                display.lower() not in user_company_names
-                and key not in user_company_names
-            ):
-                missing.append(display)
-
-        if missing:
-            network_gaps = missing[:5]
-
     analysis = {
-        "summary": summary,
+        "summary": " ".join(parts),
         "total_contacts": total_contacts,
         "top_companies": top_companies,
         "relationship_breakdown": relationship_breakdown,
-        "network_gaps": network_gaps,
+        "network_gaps": _detect_network_gaps(prefs, top_companies),
     }
 
     await _write_cache(

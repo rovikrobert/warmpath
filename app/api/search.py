@@ -35,7 +35,7 @@ from app.services.ai_matcher import sco[RESEND_KEY_REDACTED]
 from app.services.ai_matcher import run_search
 from app.utils.privacy_checks import requi[RESEND_KEY_REDACTED]
 from app.services.board_registry import lookup_careers_url, lookup_or_discover_boards
-from app.services.credits import get_balance, spend_credits
+from app.services.credits import check_and_spend
 from app.api.jobs import _upsert_openings
 from app.services.job_fetcher import JobFetcher
 from app.services.job_recommendations import get_recommendations
@@ -230,6 +230,148 @@ async def execute_search(
     }
 
 
+def _build_match_row(row_tuple: tuple) -> dict:
+    """Build a single match result response dict from a query row."""
+    match, contact_name, contact_title, contact_company, warm_sco[RESEND_KEY_REDACTED] = row_tuple
+    warm = float(warm_sco[RESEND_KEY_REDACTED]) if warm_sco[RESEND_KEY_REDACTED] is not None else None
+    relevance = float(match.relevance_score)
+    combined = relevance * 0.5 + (warm or 0) * 0.5
+    ctx = match.cultural_context or {}
+
+    return MatchResultResponse(
+        id=match.id,
+        search_request_id=match.search_request_id,
+        contact_id=match.contact_id,
+        relevance_score=relevance,
+        match_reasoning=match.match_reasoning,
+        match_type=match.match_type,
+        warm_score=warm,
+        combined_score=round(combined, 2),
+        referral_likelihood=ctx.get("referral_likelihood"),
+        cultural_context=ctx,
+        recommended_channel=ctx.get("recommended_channel"),
+        message_sequence=ctx.get("message_sequence"),
+        contact_name=contact_name,
+        contact_title=contact_title,
+        contact_company=contact_company,
+        created_at=match.created_at,
+    ).model_dump(mode="json")
+
+
+async def _compute_search_stats(
+    all_rows: list | None,
+    base_query,
+    has_company_filter: bool,
+    search_id: uuid.UUID,
+    user_id: uuid.UUID,
+    effective_min_relevance: float,
+    match_type: str | None,
+    min_warm: float | None,
+    db: AsyncSession,
+) -> tuple[float | None, float | None, dict]:
+    """Compute avg_relevance, avg_warm, and sco[RESEND_KEY_REDACTED].
+
+    When has_company_filter is True, stats are computed from the in-memory
+    all_rows list. Otherwise, a single SQL aggregate query is used.
+    """
+    sco[RESEND_KEY_REDACTED] = {"90-100": 0, "70-89": 0, "50-69": 0, "20-49": 0}
+
+    if has_company_filter and all_rows is not None:
+        stats_pairs = [
+            (float(r[0].relevance_score), float(r[4] or 0)) for r in all_rows
+        ]
+        all_relevance: list[float] = []
+        all_warm: list[float] = []
+        for rel, warm_val in stats_pairs:
+            r = float(rel)
+            w = float(warm_val)
+            all_relevance.append(r)
+            all_warm.append(w)
+            if r >= 90:
+                sco[RESEND_KEY_REDACTED]["90-100"] += 1
+            elif r >= 70:
+                sco[RESEND_KEY_REDACTED]["70-89"] += 1
+            elif r >= 50:
+                sco[RESEND_KEY_REDACTED]["50-69"] += 1
+            else:
+                sco[RESEND_KEY_REDACTED]["20-49"] += 1
+        avg_rel = round(sum(all_relevance) / len(all_relevance), 1) if all_relevance else 0
+        avg_warm = round(sum(all_warm) / len(all_warm), 1) if all_warm else 0
+        return avg_rel, avg_warm, sco[RESEND_KEY_REDACTED]
+
+    # SQL aggregate path
+    stats_base = (
+        select(
+            MatchResult.relevance_score,
+            func.coalesce(WarmScore.total_score, 0).label("warm"),
+        )
+        .join(Contact, MatchResult.contact_id == Contact.id)
+        .outerjoin(
+            WarmScore,
+            (WarmScore.contact_id == MatchResult.contact_id)
+            & (WarmScore.user_id == MatchResult.user_id),
+        )
+        .where(
+            MatchResult.search_request_id == search_id,
+            MatchResult.user_id == user_id,
+            MatchResult.relevance_score >= effective_min_relevance,
+        )
+    )
+    if match_type is not None:
+        stats_base = stats_base.where(MatchResult.match_type == match_type)
+    if min_warm is not None:
+        stats_base = stats_base.where(
+            func.coalesce(WarmScore.total_score, 0) >= min_warm
+        )
+    subq = stats_base.subquery()
+    agg_query = select(
+        func.count().label("cnt"),
+        func.avg(subq.c.relevance_score).label("avg_rel"),
+        func.avg(subq.c.warm).label("avg_warm"),
+        func.sum(case((subq.c.relevance_score >= 90, 1), else_=0)).label("b90"),
+        func.sum(
+            case(
+                (
+                    (subq.c.relevance_score >= 70)
+                    & (subq.c.relevance_score < 90),
+                    1,
+                ),
+                else_=0,
+            )
+        ).label("b70"),
+        func.sum(
+            case(
+                (
+                    (subq.c.relevance_score >= 50)
+                    & (subq.c.relevance_score < 70),
+                    1,
+                ),
+                else_=0,
+            )
+        ).label("b50"),
+        func.sum(
+            case(
+                (
+                    (subq.c.relevance_score >= 20)
+                    & (subq.c.relevance_score < 50),
+                    1,
+                ),
+                else_=0,
+            )
+        ).label("b20"),
+    ).select_from(subq)
+    agg_row = (await db.execute(agg_query)).one()
+    avg_rel = round(float(agg_row.avg_rel or 0), 1)
+    avg_warm = round(float(agg_row.avg_warm or 0), 1)
+    sco[RESEND_KEY_REDACTED] = {
+        "90-100": int(agg_row.b90 or 0),
+        "70-89": int(agg_row.b70 or 0),
+        "50-69": int(agg_row.b50 or 0),
+        "20-49": int(agg_row.b20 or 0),
+    }
+    return avg_rel, avg_warm, sco[RESEND_KEY_REDACTED]
+
+
 @router.get("/{search_id}/results")
 @timed("search_results")
 async def get_search_results(
@@ -258,7 +400,6 @@ async def get_search_results(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Get paginated match results for a search, with score and type filters."""
-    # min_relevance takes precedence over min_score for backwards compat
     effective_min_relevance = min_relevance if min_relevance is not None else min_score
 
     # Verify search exists and belongs to user
@@ -297,180 +438,50 @@ async def get_search_results(
         )
     )
 
-    # Apply optional filters (non-encrypted columns only at SQL level)
     if match_type is not None:
         base_query = base_query.where(MatchResult.match_type == match_type)
-    # company filter applied in-memory below (current_company is encrypted)
     if min_warm is not None:
         base_query = base_query.where(
             func.coalesce(WarmScore.total_score, 0) >= min_warm
         )
 
-    # Sort by combined score: relevance * 0.5 + warm_score * 0.5
-    # Use COALESCE for null warm scores
     combined_expr = MatchResult.relevance_score * Decimal("0.5") + func.coalesce(
         WarmScore.total_score, 0
     ) * Decimal("0.5")
 
-    # Cap in-memory company filter at 2000 rows for performance
     SEARCH_COMPANY_CAP = 2000
+    all_rows_for_stats = None
 
     if company is not None:
-        # Load up to cap rows, filter in-memory on decrypted company, then paginate
         result = await db.execute(
             base_query.order_by(combined_expr.desc()).limit(SEARCH_COMPANY_CAP)
         )
         all_rows = result.all()
         company_lower = company.lower()
         all_rows = [
-            r
-            for r in all_rows
-            if company_lower in (r[3] or "").lower()  # r[3] = contact_company
+            r for r in all_rows
+            if company_lower in (r[3] or "").lower()
         ]
         total = len(all_rows)
         offset = (page - 1) * per_page
         rows = all_rows[offset : offset + per_page]
+        all_rows_for_stats = all_rows
     else:
         count_query = select(func.count()).select_from(base_query.subquery())
         total = (await db.execute(count_query)).scalar() or 0
-
         offset = (page - 1) * per_page
         result = await db.execute(
             base_query.order_by(combined_expr.desc()).offset(offset).limit(per_page)
         )
         rows = result.all()
 
-    # Build response data + collect stats
-    data = []
-    all_relevance: list[float] = []
-    all_warm: list[float] = []
-    sco[RESEND_KEY_REDACTED] = {"90-100": 0, "70-89": 0, "50-69": 0, "20-49": 0}
-    # Pre-computed averages from SQL (no-company path only). We never fabricate
-    # per-row arrays — only avg_relevance/avg_warm and sco[RESEND_KEY_REDACTED] are
-    # exposed; no percentiles/stddev from raw values.
-    avg_rel: float | None = None
-    avg_warm: float | None = None
+    avg_rel, avg_warm, sco[RESEND_KEY_REDACTED] = await _compute_search_stats(
+        all_rows_for_stats, base_query, company is not None,
+        search_id, current_user.id, effective_min_relevance,
+        match_type, min_warm, db,
+    )
 
-    if company is not None:
-        # Stats from already-filtered in-memory rows (includes company filter)
-        stats_pairs = [
-            (float(r[0].relevance_score), float(r[4] or 0)) for r in all_rows
-        ]
-    else:
-        # Single aggregated stats query (one row) instead of fetching all score pairs
-        stats_base = (
-            select(
-                MatchResult.relevance_score,
-                func.coalesce(WarmScore.total_score, 0).label("warm"),
-            )
-            .join(Contact, MatchResult.contact_id == Contact.id)
-            .outerjoin(
-                WarmScore,
-                (WarmScore.contact_id == MatchResult.contact_id)
-                & (WarmScore.user_id == MatchResult.user_id),
-            )
-            .where(
-                MatchResult.search_request_id == search_id,
-                MatchResult.user_id == current_user.id,
-                MatchResult.relevance_score >= effective_min_relevance,
-            )
-        )
-        if match_type is not None:
-            stats_base = stats_base.where(MatchResult.match_type == match_type)
-        if min_warm is not None:
-            stats_base = stats_base.where(
-                func.coalesce(WarmScore.total_score, 0) >= min_warm
-            )
-        subq = stats_base.subquery()
-        agg_query = select(
-            func.count().label("cnt"),
-            func.avg(subq.c.relevance_score).label("avg_rel"),
-            func.avg(subq.c.warm).label("avg_warm"),
-            func.sum(case((subq.c.relevance_score >= 90, 1), else_=0)).label("b90"),
-            func.sum(
-                case(
-                    (
-                        (subq.c.relevance_score >= 70)
-                        & (subq.c.relevance_score < 90),
-                        1,
-                    ),
-                    else_=0,
-                )
-            ).label("b70"),
-            func.sum(
-                case(
-                    (
-                        (subq.c.relevance_score >= 50)
-                        & (subq.c.relevance_score < 70),
-                        1,
-                    ),
-                    else_=0,
-                )
-            ).label("b50"),
-            func.sum(
-                case(
-                    (
-                        (subq.c.relevance_score >= 20)
-                        & (subq.c.relevance_score < 50),
-                        1,
-                    ),
-                    else_=0,
-                )
-            ).label("b20"),
-        ).select_from(subq)
-        agg_row = (await db.execute(agg_query)).one()
-        avg_rel = float(agg_row.avg_rel or 0)
-        avg_warm = float(agg_row.avg_warm or 0)
-        sco[RESEND_KEY_REDACTED] = {
-            "90-100": int(agg_row.b90 or 0),
-            "70-89": int(agg_row.b70 or 0),
-            "50-69": int(agg_row.b50 or 0),
-            "20-49": int(agg_row.b20 or 0),
-        }
-        stats_pairs = []
-
-    for rel, warm_val in stats_pairs:
-        r = float(rel)
-        w = float(warm_val)
-        all_relevance.append(r)
-        all_warm.append(w)
-        if r >= 90:
-            sco[RESEND_KEY_REDACTED]["90-100"] += 1
-        elif r >= 70:
-            sco[RESEND_KEY_REDACTED]["70-89"] += 1
-        elif r >= 50:
-            sco[RESEND_KEY_REDACTED]["50-69"] += 1
-        else:
-            sco[RESEND_KEY_REDACTED]["20-49"] += 1
-
-    for match, contact_name, contact_title, contact_company, warm_sco[RESEND_KEY_REDACTED] in rows:
-        warm = float(warm_sco[RESEND_KEY_REDACTED]) if warm_sco[RESEND_KEY_REDACTED] is not None else None
-        relevance = float(match.relevance_score)
-        combined = relevance * 0.5 + (warm or 0) * 0.5
-
-        # Extract cultural context fields
-        ctx = match.cultural_context or {}
-
-        data.append(
-            MatchResultResponse(
-                id=match.id,
-                search_request_id=match.search_request_id,
-                contact_id=match.contact_id,
-                relevance_score=relevance,
-                match_reasoning=match.match_reasoning,
-                match_type=match.match_type,
-                warm_score=warm,
-                combined_score=round(combined, 2),
-                referral_likelihood=ctx.get("referral_likelihood"),
-                cultural_context=ctx,
-                recommended_channel=ctx.get("recommended_channel"),
-                message_sequence=ctx.get("message_sequence"),
-                contact_name=contact_name,
-                contact_title=contact_title,
-                contact_company=contact_company,
-                created_at=match.created_at,
-            ).model_dump(mode="json")
-        )
+    data = [_build_match_row(row) for row in rows]
 
     return {
         "data": data,
@@ -483,12 +494,8 @@ async def get_search_results(
             ).model_dump(),
             "total_matches": total,
             "shown": len(data),
-            "avg_relevance": round(sum(all_relevance) / len(all_relevance), 1)
-            if all_relevance
-            else (round(avg_rel, 1) if avg_rel is not None else 0),
-            "avg_warm": round(sum(all_warm) / len(all_warm), 1)
-            if all_warm
-            else (round(avg_warm, 1) if avg_warm is not None else 0),
+            "avg_relevance": avg_rel if avg_rel is not None else 0,
+            "avg_warm": avg_warm if avg_warm is not None else 0,
             "sco[RESEND_KEY_REDACTED]": sco[RESEND_KEY_REDACTED],
         },
     }
@@ -530,14 +537,12 @@ async def smart_search(
 
     # Marketplace scope costs credits
     if scope == "marketplace":
-        balance = await get_balance(current_user.id, db)
-        if balance < 5:
+        if not await check_and_spend(current_user.id, 5, "smart_search_marketplace", db):
             raise HTTPException(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
                 detail="Insufficient credits for marketplace search. "
                 "You need 5 credits. Earn credits by uploading your network.",
             )
-        await spend_credits(current_user.id, 5, "smart_search_marketplace", db)
 
     # Create SearchRequest for history tracking
     search_req = SearchRequest(
@@ -568,15 +573,12 @@ async def smart_search(
         search_req.last_run_at = datetime.now(timezone.utc)
 
         # Funnel instrumentation: search + first_search
-        from app.models.enrichment import UsageLog
+        from app.utils.tracking import track_action
 
-        db.add(
-            UsageLog(
-                user_id=current_user.id,
-                action="search",
-                resource_id=search_id,
-                metadata_={"scope": scope, "companies": body.company_names[:5]},
-            )
+        await track_action(
+            db, current_user.id, "search",
+            resource_id=search_id,
+            metadata_={"scope": scope, "companies": body.company_names[:5]},
         )
 
         # Track first_search milestone (only fires once per user)
@@ -588,13 +590,10 @@ async def smart_search(
             )
         )
         if (prior.scalar() or 0) == 0:
-            db.add(
-                UsageLog(
-                    user_id=current_user.id,
-                    action="first_search",
-                    resource_id=search_id,
-                    metadata_={"scope": scope, "companies": body.company_names[:5]},
-                )
+            await track_action(
+                db, current_user.id, "first_search",
+                resource_id=search_id,
+                metadata_={"scope": scope, "companies": body.company_names[:5]},
             )
 
         await db.commit()
@@ -720,6 +719,111 @@ async def _run_smart_search(
     return {"companies": companies_results, "summary": summary}
 
 
+async def _fetch_and_filter_openings(
+    company_name: str,
+    target_role: str,
+    target_seniority: str | None,
+    target_locations: list[str] | None,
+    open_to_remote: bool,
+    fetcher: JobFetcher,
+    db: AsyncSession,
+) -> tuple[list[dict], int, int, str]:
+    """Fetch job board openings, filter, and return (openings, fetched, matched, status)."""
+    boards, was_discovered = await lookup_or_discover_boards(company_name, db)
+    if not boards:
+        return [], 0, 0, "no_board"
+
+    raw_jobs = await fetcher.fetch_jobs_for_company(company_name, boards)
+    total_jobs_fetched = len(raw_jobs)
+
+    if raw_jobs:
+        company_result = await db.execute(
+            select(Company).where(Company.name.ilike(f"%{company_name}%"))
+        )
+        company_record = company_result.scalar_one_or_none()
+        await _upsert_openings(
+            db, raw_jobs, company_id=company_record.id if company_record else None
+        )
+
+    matched_jobs = await fetcher.match_jobs_to_role(
+        raw_jobs, target_role, target_seniority
+    )
+    filtered_jobs = fetcher.filter_and_rank_jobs(
+        matched_jobs,
+        target_role,
+        target_seniority=target_seniority,
+        target_locations=target_locations,
+        open_to_remote=open_to_remote,
+    )
+    total_matched = len(filtered_jobs)
+
+    if was_discovered:
+        scan_status = "discovered" if filtered_jobs else "no_match"
+    else:
+        scan_status = "matched" if filtered_jobs else "no_match"
+
+    active_openings = [
+        {
+            "title": job.get("title", ""),
+            "url": job.get("url", ""),
+            "department": job.get("department"),
+            "location": job.get("location"),
+            "is_remote": job.get("is_remote", False),
+            "relevance": job.get("role_relevance", 0),
+            "fit_score": job.get("fit_score", 0),
+            "source": job.get("source", ""),
+        }
+        for job in filtered_jobs[:10]
+    ]
+
+    return active_openings, total_jobs_fetched, total_matched, scan_status
+
+
+async def _build_referral_paths(
+    contacts: list[Contact],
+    search_req: SearchRequest,
+    profile: ConnectorProfile | None,
+    user_name: str,
+    target_role: str,
+) -> list[dict]:
+    """Score contacts and build referral path dicts."""
+    matches = sco[RESEND_KEY_REDACTED](search_req, contacts, profile, user_name)
+    if hasattr(matches, "__await__"):
+        matches = await matches
+
+    contact_map = {c.id: c for c in contacts}
+    referral_paths: list[dict] = []
+
+    for match in matches:
+        if match.relevance_score < 20:
+            continue
+        contact = contact_map.get(match.contact_id)
+        if contact is None:
+            continue
+
+        warm_result = compute_warm_score(contact, profile, target_role)
+        referral_paths.append(
+            {
+                "contact": {
+                    "id": str(contact.id),
+                    "name": contact.full_name,
+                    "title": contact.current_title,
+                    "company": contact.current_company,
+                    "warm_score": warm_result.total_score,
+                    "referral_likelihood": match.referral_likelihood,
+                },
+                "match_type": match.match_type,
+                "relevance_score": match.relevance_score,
+                "cultural_context": match.cultural_context,
+                "recommended_channel": match.recommended_channel,
+                "source": "own_network",
+            }
+        )
+
+    referral_paths.sort(key=lambda p: p["relevance_score"], reverse=True)
+    return referral_paths
+
+
 async def _process_company(
     company_name: str,
     target_role: str,
@@ -734,113 +838,25 @@ async def _process_company(
     open_to_remote: bool = True,
 ) -> dict:
     """Process a single company: fetch openings + find referral paths."""
-    active_openings: list[dict] = []
-    referral_paths: list[dict] = []
-
-    # Step 1: Look up board registry (with auto-discovery fallback)
-    boards, was_discovered = await lookup_or_discover_boards(company_name, db)
-    total_jobs_fetched = 0
-    job_scan_status = "no_board"
-    total_matched_openings = 0
-    if boards:
-        raw_jobs = await fetcher.fetch_jobs_for_company(company_name, boards)
-        total_jobs_fetched = len(raw_jobs)
-
-        # Persist fetched jobs to job_openings table (refresh on every search)
-        if raw_jobs:
-            company_result = await db.execute(
-                select(Company).where(Company.name.ilike(f"%{company_name}%"))
-            )
-            company_record = company_result.scalar_one_or_none()
-            await _upsert_openings(
-                db, raw_jobs, company_id=company_record.id if company_record else None
-            )
-
-        matched_jobs = await fetcher.match_jobs_to_role(
-            raw_jobs, target_role, target_seniority
+    active_openings, total_jobs_fetched, total_matched_openings, job_scan_status = (
+        await _fetch_and_filter_openings(
+            company_name, target_role, target_seniority,
+            target_locations, open_to_remote, fetcher, db,
         )
+    )
 
-        # Apply location/seniority filtering and ranking
-        filtered_jobs = fetcher.filter_and_rank_jobs(
-            matched_jobs,
-            target_role,
-            target_seniority=target_seniority,
-            target_locations=target_locations,
-            open_to_remote=open_to_remote,
-        )
-
-        total_matched_openings = len(filtered_jobs)
-
-        if was_discovered:
-            job_scan_status = "discovered" if filtered_jobs else "no_match"
-        else:
-            job_scan_status = "matched" if filtered_jobs else "no_match"
-
-        # Cap at 10 openings
-        for job in filtered_jobs[:10]:
-            active_openings.append(
-                {
-                    "title": job.get("title", ""),
-                    "url": job.get("url", ""),
-                    "department": job.get("department"),
-                    "location": job.get("location"),
-                    "is_remote": job.get("is_remote", False),
-                    "relevance": job.get("role_relevance", 0),
-                    "fit_score": job.get("fit_score", 0),
-                    "source": job.get("source", ""),
-                }
-            )
-
-    # Step 2: Find user's contacts who work at this company
+    # Find user's contacts who work at this company
     company_lower = company_name.lower()
     company_contacts = [
-        c
-        for c in all_contacts
+        c for c in all_contacts
         if c.current_company and company_lower in c.current_company.lower()
     ]
 
-    # Step 3: Run AI matcher on those contacts
+    referral_paths: list[dict] = []
     if company_contacts:
-        matches = sco[RESEND_KEY_REDACTED](search_req, company_contacts, profile, user.full_name)
-        # sco[RESEND_KEY_REDACTED] might be a coroutine
-        if hasattr(matches, "__await__"):
-            matches = await matches
-
-        # Pre-build contact map for O(1) lookups (avoids O(n²) next() scan)
-        contact_map = {c.id: c for c in company_contacts}
-
-        for match in matches:
-            if match.relevance_score < 20:
-                continue
-
-            # Find the contact object for enrichment
-            contact = contact_map.get(match.contact_id)
-            if contact is None:
-                continue
-
-            # Compute warm score
-            warm_result = compute_warm_score(contact, profile, target_role)
-
-            referral_paths.append(
-                {
-                    "contact": {
-                        "id": str(contact.id),
-                        "name": contact.full_name,
-                        "title": contact.current_title,
-                        "company": contact.current_company,
-                        "warm_score": warm_result.total_score,
-                        "referral_likelihood": match.referral_likelihood,
-                    },
-                    "match_type": match.match_type,
-                    "relevance_score": match.relevance_score,
-                    "cultural_context": match.cultural_context,
-                    "recommended_channel": match.recommended_channel,
-                    "source": "own_network",
-                }
-            )
-
-        # Sort referral paths by relevance score descending
-        referral_paths.sort(key=lambda p: p["relevance_score"], reverse=True)
+        referral_paths = await _build_referral_paths(
+            company_contacts, search_req, profile, user.full_name, target_role
+        )
 
     return {
         "name": company_name,

@@ -43,10 +43,9 @@ from app.schemas.marketplace import (
     NetworkSharingPrefsUpdate,
 )
 from app.services.credits import (
+    check_and_spend,
     earn_credits,
-    get_balance,
     refund_credits,
-    spend_credits,
 )
 from app.services.audit_logger import log_event
 from app.services.friendship_service import get_friend_and_fof_ids, get_friend_ids
@@ -87,6 +86,74 @@ def _build_listing_summary(
     )
 
 
+async def _update_connector_reputation(
+    user_id: uuid.UUID, action: str, db: AsyncSession
+) -> None:
+    """Load or create reputation record and increment on approve."""
+    rep_result = await db.execute(
+        select(ConnectorReputation).where(ConnectorReputation.user_id == user_id)
+    )
+    reputation = rep_result.scalar_one_or_none()
+    if reputation is None:
+        reputation = ConnectorReputation(user_id=user_id)
+        db.add(reputation)
+        await db.flush()
+
+    if action == "approve":
+        reputation.intros_facilitated += 1
+
+
+async def _check_contact_in_vault(
+    listing: MarketplaceListing, seeker_user_id: uuid.UUID, db: AsyncSession
+) -> bool:
+    """Check if the listing's contact already exists in the seeker's vault.
+
+    Uses hash comparison only — never exposes the network holder's contact PII.
+    """
+    contact_result = await db.execute(
+        select(Contact).where(Contact.id == listing.contact_id)
+    )
+    listed_contact = contact_result.scalar_one_or_none()
+    if listed_contact is None:
+        return False
+
+    hashes_to_check: list[str] = []
+    if listed_contact.email:
+        hashes_to_check.append(hash_for_suppression(listed_contact.email))
+    if (
+        listed_contact.first_name
+        and listed_contact.last_name
+        and listed_contact.current_company
+    ):
+        name_company = (
+            f"{listed_contact.first_name}"
+            f"{listed_contact.last_name}"
+            f"{listed_contact.current_company}"
+        )
+        hashes_to_check.append(hash_for_suppression(name_company))
+
+    if not hashes_to_check:
+        return False
+
+    seeker_contacts_result = await db.execute(
+        select(Contact).where(
+            Contact.user_id == seeker_user_id,
+            Contact.deleted_at.is_(None),
+        )
+    )
+    for sc in seeker_contacts_result.scalars():
+        if sc.email and hash_for_suppression(sc.email) in hashes_to_check:
+            return True
+        if sc.first_name and sc.last_name and sc.current_company:
+            sc_hash = hash_for_suppression(
+                f"{sc.first_name}{sc.last_name}{sc.current_company}"
+            )
+            if sc_hash in hashes_to_check:
+                return True
+
+    return False
+
+
 def _build_seeker_profile_snapshot(user: User, visibility: str) -> dict:
     """Build a profile snapshot based on visibility level."""
     if visibility == "full":
@@ -117,17 +184,13 @@ async def marketplace_search(
     """Search the anonymized marketplace index. Costs 5 credits."""
     requi[RESEND_KEY_REDACTED](current_user)
 
-    # Check credits
-    balance = await get_balance(current_user.id, db)
-    if balance < 5:
+    # Check and deduct credits
+    if not await check_and_spend(current_user.id, 5, "marketplace_search", db):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Insufficient credits. You need 5 credits for a marketplace search. "
             "Upgrade your plan or earn credits by uploading your network.",
         )
-
-    # Deduct credits
-    await spend_credits(current_user.id, 5, "marketplace_search", db)
 
     # Look up company IDs by name (single query instead of per-name loop)
     company_map: dict[uuid.UUID, str] = {}
@@ -251,65 +314,20 @@ async def request_intro(
         )
 
     # Duplicate detection: check if the underlying contact is already in
-    # the job seeker's vault. Uses hash comparison only — never exposes
-    # the network holder's contact PII to the job seeker.
-    contact_result = await db.execute(
-        select(Contact).where(Contact.id == listing.contact_id)
-    )
-    listed_contact = contact_result.scalar_one_or_none()
-    if listed_contact is not None:
-        # Build hashes for the listed contact
-        hashes_to_check: list[str] = []
-        if listed_contact.email:
-            hashes_to_check.append(hash_for_suppression(listed_contact.email))
-        if (
-            listed_contact.first_name
-            and listed_contact.last_name
-            and listed_contact.current_company
-        ):
-            name_company = (
-                f"{listed_contact.first_name}"
-                f"{listed_contact.last_name}"
-                f"{listed_contact.current_company}"
-            )
-            hashes_to_check.append(hash_for_suppression(name_company))
+    # the job seeker's vault.
+    if await _check_contact_in_vault(listing, current_user.id, db):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This person is already in your network "
+            "— you can reach out directly from your contacts page.",
+        )
 
-        if hashes_to_check:
-            # Load seeker's contacts and compare by hash
-            seeker_contacts_result = await db.execute(
-                select(Contact).where(
-                    Contact.user_id == current_user.id,
-                    Contact.deleted_at.is_(None),
-                )
-            )
-            for sc in seeker_contacts_result.scalars():
-                if sc.email and hash_for_suppression(sc.email) in hashes_to_check:
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail="This person is already in your network "
-                        "— you can reach out directly from your contacts page.",
-                    )
-                if sc.first_name and sc.last_name and sc.current_company:
-                    sc_hash = hash_for_suppression(
-                        f"{sc.first_name}{sc.last_name}{sc.current_company}"
-                    )
-                    if sc_hash in hashes_to_check:
-                        raise HTTPException(
-                            status_code=status.HTTP_409_CONFLICT,
-                            detail="This person is already in your network "
-                            "— you can reach out directly from your contacts page.",
-                        )
-
-    # Check credits (20 per intro request)
-    balance = await get_balance(current_user.id, db)
-    if balance < 20:
+    # Check and deduct credits (20 per intro request)
+    if not await check_and_spend(current_user.id, 20, "intro_request", db):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Insufficient credits. You need 20 credits to request an intro.",
         )
-
-    # Deduct credits
-    await spend_credits(current_user.id, 20, "intro_request", db)
 
     # Build profile snapshot
     snapshot = _build_seeker_profile_snapshot(current_user, body.profile_visibility)
@@ -329,15 +347,12 @@ async def request_intro(
     await db.flush()
 
     # Track funnel step
-    from app.models.enrichment import UsageLog
+    from app.utils.tracking import track_action
 
-    db.add(
-        UsageLog(
-            user_id=current_user.id,
-            action="intro_request",
-            resource_id=facilitation.id,
-            metadata_={"listing_id": str(listing.id)},
-        )
+    await track_action(
+        db, current_user.id, "intro_request",
+        resource_id=facilitation.id,
+        metadata_={"listing_id": str(listing.id)},
     )
 
     return {
@@ -540,30 +555,15 @@ async def update_facilitation(
         )
 
     # Update connector reputation
-    rep_result = await db.execute(
-        select(ConnectorReputation).where(
-            ConnectorReputation.user_id == current_user.id
-        )
-    )
-    reputation = rep_result.scalar_one_or_none()
-    if reputation is None:
-        reputation = ConnectorReputation(user_id=current_user.id)
-        db.add(reputation)
-        await db.flush()
-
-    if body.action == "approve":
-        reputation.intros_facilitated += 1
+    await _update_connector_reputation(current_user.id, body.action, db)
 
     # Track funnel step
-    from app.models.enrichment import UsageLog
+    from app.utils.tracking import track_action
 
     action_name = "intro_approve" if body.action == "approve" else "intro_decline"
-    db.add(
-        UsageLog(
-            user_id=current_user.id,
-            action=action_name,
-            metadata_={"facilitation_id": str(facilitation.id)},
-        )
+    await track_action(
+        db, current_user.id, action_name,
+        metadata_={"facilitation_id": str(facilitation.id)},
     )
 
     await db.flush()

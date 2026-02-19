@@ -71,6 +71,20 @@ async def get_credit_summary(user_id: uuid.UUID, db: AsyncSession) -> dict:
     }
 
 
+async def check_and_spend(
+    user_id: uuid.UUID,
+    amount: int,
+    reason: str,
+    db: AsyncSession,
+) -> bool:
+    """Check balance and spend atomically. Returns False if insufficient."""
+    bal = await get_balance(user_id, db)
+    if bal < amount:
+        return False
+    await spend_credits(user_id, amount, reason, db)
+    return True
+
+
 async def earn_credits(
     user_id: uuid.UUID,
     amount: int,

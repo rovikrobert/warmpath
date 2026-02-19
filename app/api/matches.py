@@ -27,18 +27,14 @@ from app.utils.security import get_current_user
 router = APIRouter()
 
 
-@router.post("/intros", status_code=status.HTTP_201_CREATED)
-async def create_intro(
-    body: IntroRequestCreate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> dict:
-    """Create an intro request and generate referral message drafts."""
-    # Verify contact belongs to user
+async def _load_intro_context(
+    body: IntroRequestCreate, user_id: uuid.UUID, db: AsyncSession
+) -> tuple[Contact, MatchResult | None, "JobOpening | None", ConnectorProfile | None]:
+    """Load and validate the contact, match result, job opening, and profile."""
     contact_result = await db.execute(
         select(Contact).where(
             Contact.id == body.contact_id,
-            Contact.user_id == current_user.id,
+            Contact.user_id == user_id,
             Contact.deleted_at.is_(None),
         )
     )
@@ -49,13 +45,12 @@ async def create_intro(
             detail="Contact not found",
         )
 
-    # Optionally verify match_result belongs to user
     match_result = None
     if body.match_result_id:
         mr_result = await db.execute(
             select(MatchResult).where(
                 MatchResult.id == body.match_result_id,
-                MatchResult.user_id == current_user.id,
+                MatchResult.user_id == user_id,
             )
         )
         match_result = mr_result.scalar_one_or_none()
@@ -65,7 +60,6 @@ async def create_intro(
                 detail="Match result not found",
             )
 
-    # Optionally load job opening
     job_opening = None
     if body.job_opening_id:
         jo_result = await db.execute(
@@ -78,11 +72,24 @@ async def create_intro(
                 detail="Job opening not found",
             )
 
-    # Load connector profile for context
     profile_result = await db.execute(
-        select(ConnectorProfile).where(ConnectorProfile.user_id == current_user.id)
+        select(ConnectorProfile).where(ConnectorProfile.user_id == user_id)
     )
     connector_profile = profile_result.scalar_one_or_none()
+
+    return contact, match_result, job_opening, connector_profile
+
+
+@router.post("/intros", status_code=status.HTTP_201_CREATED)
+async def create_intro(
+    body: IntroRequestCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Create an intro request and generate referral message drafts."""
+    contact, match_result, job_opening, connector_profile = (
+        await _load_intro_context(body, current_user.id, db)
+    )
 
     # Create intro request
     intro_req = IntroRequest(
