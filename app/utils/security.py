@@ -41,6 +41,14 @@ def verify_clerk_token(token: str) -> dict:
     import jwt as pyjwt
 
     try:
+        # Debug: log token shape to diagnose auth failures
+        parts = token.split(".") if token else []
+        logger.info(
+            "JWT debug: len=%d parts=%d first20=%r",
+            len(token) if token else 0,
+            len(parts),
+            token[:20] if token else "",
+        )
         client = _get_jwks_client()
         signing_key = client.get_signing_key_from_jwt(token)
         payload = pyjwt.decode(
@@ -51,7 +59,9 @@ def verify_clerk_token(token: str) -> dict:
         )
         return payload
     except pyjwt.PyJWTError as exc:
-        logger.warning("Clerk JWT verification failed: %s (domain=%s)", exc, settings.CLERK_DOMAIN)
+        logger.warning(
+            "Clerk JWT verification failed: %s (domain=%s)", exc, settings.CLERK_DOMAIN
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
         ) from None
