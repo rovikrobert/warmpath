@@ -76,10 +76,10 @@ junit.xml
 .claude/settings.json
 .claude/agent-memory/
 
-# Node (not a Node project — occasional tooling only)
+# Node (root-level only — frontend/ has its own package.json)
 node_modules/
-package-lock.json
-package.json
+/package-lock.json
+/package.json
 
 # Generated reports (binary)
 finance_team/reports/*.xlsx
