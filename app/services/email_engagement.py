@@ -213,9 +213,24 @@ async def send_csv_reminder_d1(db: AsyncSession) -> int:
         )
     )
     users = result.scalars().all()
+
+    # Batch-load already-sent set for today (avoids N+1)
+    user_ids = [u.id for u in users]
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    already_sent_ids: set[uuid.UUID] = set()
+    if user_ids:
+        sent_result = await db.execute(
+            select(EmailCampaignLog.user_id).where(
+                EmailCampaignLog.user_id.in_(user_ids),
+                EmailCampaignLog.email_type == "csv_reminder_d1",
+                EmailCampaignLog.sent_date == today,
+            )
+        )
+        already_sent_ids = {row[0] for row in sent_result.all()}
+
     count = 0
     for u in users:
-        if await _already_sent(db, u.id, "csv_reminder_d1"):
+        if u.id in already_sent_ids:
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
         agent = _agent_signoff(u.intent)
@@ -256,9 +271,24 @@ async def send_csv_reminder_d3(db: AsyncSession) -> int:
         )
     )
     users = result.scalars().all()
+
+    # Batch-load already-sent set for today (avoids N+1)
+    user_ids = [u.id for u in users]
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    already_sent_ids: set[uuid.UUID] = set()
+    if user_ids:
+        sent_result = await db.execute(
+            select(EmailCampaignLog.user_id).where(
+                EmailCampaignLog.user_id.in_(user_ids),
+                EmailCampaignLog.email_type == "csv_reminder_d3",
+                EmailCampaignLog.sent_date == today,
+            )
+        )
+        already_sent_ids = {row[0] for row in sent_result.all()}
+
     count = 0
     for u in users:
-        if await _already_sent(db, u.id, "csv_reminder_d3"):
+        if u.id in already_sent_ids:
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
         agent = _agent_signoff(u.intent)
@@ -302,9 +332,24 @@ async def send_nh_sharing_reminder_d2(db: AsyncSession) -> int:
         )
     )
     users = result.scalars().all()
+
+    # Batch-load already-sent set for today (avoids N+1)
+    user_ids = [u.id for u in users]
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    already_sent_ids: set[uuid.UUID] = set()
+    if user_ids:
+        sent_result = await db.execute(
+            select(EmailCampaignLog.user_id).where(
+                EmailCampaignLog.user_id.in_(user_ids),
+                EmailCampaignLog.email_type == "nh_sharing_d2",
+                EmailCampaignLog.sent_date == today,
+            )
+        )
+        already_sent_ids = {row[0] for row in sent_result.all()}
+
     count = 0
     for u in users:
-        if await _already_sent(db, u.id, "nh_sharing_d2"):
+        if u.id in already_sent_ids:
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
         html = f"""\
@@ -350,9 +395,24 @@ async def send_first_search_nudge_d2(db: AsyncSession) -> int:
         )
     )
     users = result.scalars().all()
+
+    # Batch-load already-sent set for today (avoids N+1)
+    user_ids = [u.id for u in users]
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    already_sent_ids: set[uuid.UUID] = set()
+    if user_ids:
+        sent_result = await db.execute(
+            select(EmailCampaignLog.user_id).where(
+                EmailCampaignLog.user_id.in_(user_ids),
+                EmailCampaignLog.email_type == "first_search_d2",
+                EmailCampaignLog.sent_date == today,
+            )
+        )
+        already_sent_ids = {row[0] for row in sent_result.all()}
+
     count = 0
     for u in users:
-        if await _already_sent(db, u.id, "first_search_d2"):
+        if u.id in already_sent_ids:
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
         html = f"""\
@@ -622,9 +682,24 @@ async def send_reengagement_d30(db: AsyncSession) -> int:
         )
     )
     users = result.scalars().all()
+
+    # Batch-load already-sent set for today (avoids N+1)
+    user_ids = [u.id for u in users]
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    already_sent_ids: set[uuid.UUID] = set()
+    if user_ids:
+        sent_result = await db.execute(
+            select(EmailCampaignLog.user_id).where(
+                EmailCampaignLog.user_id.in_(user_ids),
+                EmailCampaignLog.email_type == "reengagement_d30",
+                EmailCampaignLog.sent_date == today,
+            )
+        )
+        already_sent_ids = {row[0] for row in sent_result.all()}
+
     count = 0
     for u in users:
-        if await _already_sent(db, u.id, "reengagement_d30"):
+        if u.id in already_sent_ids:
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
         agent = _agent_signoff(u.intent)
@@ -676,9 +751,24 @@ async def send_reengagement_d90(db: AsyncSession) -> int:
         )
     )
     users = result.scalars().all()
+
+    # Batch-load already-sent set for today (avoids N+1)
+    user_ids = [u.id for u in users]
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    already_sent_ids: set[uuid.UUID] = set()
+    if user_ids:
+        sent_result = await db.execute(
+            select(EmailCampaignLog.user_id).where(
+                EmailCampaignLog.user_id.in_(user_ids),
+                EmailCampaignLog.email_type == "reengagement_d90",
+                EmailCampaignLog.sent_date == today,
+            )
+        )
+        already_sent_ids = {row[0] for row in sent_result.all()}
+
     count = 0
     for u in users:
-        if await _already_sent(db, u.id, "reengagement_d90"):
+        if u.id in already_sent_ids:
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
         agent = _agent_signoff(u.intent)
