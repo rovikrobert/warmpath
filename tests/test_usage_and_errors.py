@@ -311,10 +311,13 @@ async def test_non_admin_still_rate_limited(client: AsyncClient):
 
 async def test_cors_headers_present(client: AsyncClient):
     """CORS headers should be present for configured origins."""
+    from app.config import settings
+
+    origin = settings.CORS_ORIGINS.split(",")[0].strip()
     resp = await client.options(
         "/api/v1/contacts",
         headers={
-            "Origin": "http://localhost:3000",
+            "Origin": origin,
             "Access-Control-Request-Method": "GET",
         },
     )

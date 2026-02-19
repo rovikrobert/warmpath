@@ -98,9 +98,7 @@ async def delete_account(
             async with httpx.AsyncClient() as http:
                 await http.delete(
                     f"https://api.clerk.com/v1/users/{current_user.clerk_user_id}",
-                    headers={
-                        "Authorization": f"Bearer {settings.CLERK_SECRET_KEY}"
-                    },
+                    headers={"Authorization": f"Bearer {settings.CLERK_SECRET_KEY}"},
                 )
         except Exception:
             logger.exception("Failed to delete user from Clerk")
