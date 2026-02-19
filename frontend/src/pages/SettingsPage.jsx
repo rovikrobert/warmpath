@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { UserProfile } from '@clerk/clerk-react';
 import { useAuth } from '../context/AuthContext';
 import { auth as authApi, privacy as privacyApi, marketplace as mpApi, contacts as contactsApi } from '../api/client';
 import Spinner from '../components/ui/Spinner';
@@ -724,10 +725,21 @@ function AccountTab() {
         </div>
       </section>
 
-      {/* Password managed by Clerk */}
+      {/* Security — managed by Clerk */}
       <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Security">
         <h2 className="mb-3 text-base font-semibold text-slate-50">Security</h2>
-        <p className="text-sm text-slate-400">Password, email, and two-factor authentication are managed through your account provider. Click your profile picture in the sidebar to access these settings.</p>
+        <div className="[&_.cl-rootBox]:w-full [&_.cl-card]:bg-transparent [&_.cl-card]:shadow-none [&_.cl-card]:p-0 [&_.cl-navbar]:hidden [&_.cl-headerTitle]:hidden [&_.cl-headerSubtitle]:hidden [&_.cl-profilePage]:p-0">
+          <UserProfile
+            appearance={{
+              elements: {
+                rootBox: 'w-full',
+                card: 'bg-transparent shadow-none border-none p-0',
+                navbar: 'hidden',
+                pageScrollBox: 'p-0',
+              },
+            }}
+          />
+        </div>
       </section>
 
       {/* Delete Account — Danger Zone */}
