@@ -21,6 +21,7 @@ class CompanyBoard(Base):
     __table_args__ = (
         Index("idx_company_boards_key", "company_key", unique=True),
         Index("idx_company_boards_region", "region"),
+        Index("idx_company_boards_is_active", "is_active"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

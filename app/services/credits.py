@@ -14,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.credits import CreditTransaction
 
+MAX_EARN_PER_DAY = 500
+
 
 async def get_balance(user_id: uuid.UUID, db: AsyncSession) -> int:
     """Get user's current credit balance (sum of non-expired transactions).
@@ -91,8 +93,26 @@ async def earn_credits(
     reason: str,
     db: AsyncSession,
     reference_id: uuid.UUID | None = None,
+    skip_daily_cap: bool = False,
 ) -> CreditTransaction:
     """Award credits to a user. Credits expire after 12 months."""
+    # Guard: cap daily earn to prevent abuse (skipped for paid purchases)
+    if not skip_daily_cap:
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        earned_today_result = await db.execute(
+            select(func.coalesce(func.sum(CreditTransaction.amount), 0)).where(
+                CreditTransaction.user_id == user_id,
+                CreditTransaction.type == "earned",
+                CreditTransaction.created_at >= today_start,
+            )
+        )
+        earned_today = int(earned_today_result.scalar())
+        if earned_today + amount > MAX_EARN_PER_DAY:
+            raise ValueError(
+                f"Daily earn cap exceeded: already earned {earned_today}, "
+                f"cap is {MAX_EARN_PER_DAY}"
+            )
+
     txn = CreditTransaction(
         user_id=user_id,
         amount=amount,

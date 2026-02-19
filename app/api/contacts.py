@@ -330,6 +330,14 @@ async def list_contacts(
         resp["warm_score"] = float(sco[RESEND_KEY_REDACTED]) if sco[RESEND_KEY_REDACTED] is not None else None
         data.append(resp)
 
+    # Track funnel step
+    from app.utils.tracking import track_action
+
+    await track_action(
+        db, current_user.id, "contacts_list",
+        metadata_={"page": page, "total": total},
+    )
+
     return {
         "data": data,
         "meta": PaginationMeta(

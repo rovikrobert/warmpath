@@ -18,6 +18,7 @@ class EmailCampaignLog(Base):
         ),
         Index("idx_campaign_user", "user_id"),
         Index("idx_campaign_type_date", "email_type", "sent_date"),
+        Index("idx_campaign_external_id", "external_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -38,6 +39,14 @@ class EmailCampaignLog(Base):
     opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     clicked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     external_id: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     # Relationships
     user: Mapped["User"] = relationship()

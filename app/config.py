@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
     CSV_ASYNC_PROCESSING: bool = True
-    CORS_ORIGINS: str = "*"
+    CORS_ORIGINS: str = "http://localhost:5173"
     STRIPE_WEBHOOK_SECRET: str = ""
     LINKEDIN_CLIENT_ID: str = ""
     LINKEDIN_CLIENT_SECRET: str = ""

@@ -136,6 +136,7 @@ async def purchase_credits(
         body.amount,
         "purchase",
         db,
+        skip_daily_cap=True,
     )
     await log_event(
         db,

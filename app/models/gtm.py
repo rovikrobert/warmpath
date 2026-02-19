@@ -72,6 +72,7 @@ class PricingBenchmark(Base):
     __tablename__ = "pricing_benchmarks"
     __table_args__ = (
         Index("idx_pricing_benchmarks_product_category", "product_category"),
+        Index("idx_pricing_benchmarks_pricing_model", "pricing_model"),
         Index("idx_pricing_benchmarks_scraped_at", "scraped_at"),
         Index("idx_pricing_benchmarks_domain", "domain"),
     )

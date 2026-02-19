@@ -132,6 +132,16 @@ async def create_intro(
         db.add(msg)
 
     intro_req.status = "completed"
+
+    # Track funnel step
+    from app.utils.tracking import track_action
+
+    await track_action(
+        db, current_user.id, "intro_draft",
+        resource_id=intro_req.id,
+        metadata_={"contact_id": str(body.contact_id), "channel": body.channel},
+    )
+
     await db.commit()
 
     # Reload with messages

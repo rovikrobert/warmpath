@@ -69,6 +69,17 @@ async def create_search(
         status="active",
     )
     db.add(search)
+    await db.flush()
+
+    # Track funnel step
+    from app.utils.tracking import track_action
+
+    await track_action(
+        db, current_user.id, "search_create",
+        resource_id=search.id,
+        metadata_={"target_companies": body.target_companies[:5] if body.target_companies else None},
+    )
+
     await db.commit()
     await db.refresh(search)
 
