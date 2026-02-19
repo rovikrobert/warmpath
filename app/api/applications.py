@@ -49,11 +49,15 @@ def _enrich_response(app: Application, now: datetime) -> dict:
 
     # Compute needs_follow_up
     needs_follow_up = False
-    if app.status == "message_sent" and responded_at is None:
-        if follow_up_at and follow_up_at <= now:
-            needs_follow_up = True
-        elif sent_at and days_since_sent is not None and days_since_sent >= 7:
-            needs_follow_up = True
+    if (
+        app.status == "message_sent"
+        and responded_at is None
+        and (
+            follow_up_at and follow_up_at <= now
+            or sent_at and days_since_sent is not None and days_since_sent >= 7
+        )
+    ):
+        needs_follow_up = True
 
     # Contact name
     contact_name = None
