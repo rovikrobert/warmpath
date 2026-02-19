@@ -95,31 +95,3 @@ async def requi[RESEND_KEY_REDACTED](
             detail="Please verify your email to access marketplace features",
         )
     return current_user
-
-
-def hash_password(password: str) -> str:
-    raise RuntimeError("Legacy auth removed -- use Clerk")
-
-
-def verify_password(plain: str, hashed: str) -> bool:
-    raise RuntimeError("Legacy auth removed -- use Clerk")
-
-
-def validate_password_strength(password: str) -> None:
-    raise RuntimeError("Legacy auth removed -- use Clerk")
-
-
-def create_access_token(user_id, token_version: int = 0) -> str:
-    raise RuntimeError("Legacy auth removed -- use Clerk")
-
-
-def create_refresh_token(user_id, token_version: int = 0) -> str:
-    raise RuntimeError("Legacy auth removed -- use Clerk")
-
-
-def decode_token(token: str, expected_type: str = "access") -> dict:
-    raise RuntimeError("Legacy auth removed -- use Clerk")
-
-
-def decode_access_token(token: str):
-    raise RuntimeError("Legacy auth removed -- use Clerk")

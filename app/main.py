@@ -51,12 +51,14 @@ app = FastAPI(title="WarmPath", version="0.1.0")
 # ---------------------------------------------------------------------------
 if settings.SECURE_HEADERS:
     _boot_errors: list[str] = []
-    if settings.SECRET_KEY == "change-me-to-a-random-secret":
-        _boot_errors.append("SECRET_KEY is the default value — set a random secret.")
     if not settings.ENCRYPTION_KEY:
         _boot_errors.append(
             "ENCRYPTION_KEY is empty — PII will be stored as plaintext."
         )
+    if not settings.CLERK_SECRET_KEY:
+        _boot_errors.append("CLERK_SECRET_KEY is not set.")
+    if not settings.CLERK_DOMAIN:
+        _boot_errors.append("CLERK_DOMAIN is not set.")
     if _boot_errors:
         for _err in _boot_errors:
             logger.critical("BOOT BLOCKED: %s", _err)
@@ -123,18 +125,19 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
 
     # Telegram alert for founder (rate-limited per endpoint)
-    user_email = None
+    user_hint = None
     try:
-        from app.utils.security import decode_access_token
+        from app.utils.security import verify_clerk_token
 
-        auth = request.headers.get("authorization", "")
-        if auth.startswith("Bearer "):
-            user_id = decode_access_token(auth[7:])
-            if user_id:
-                user_email = f"user:{user_id}"
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            payload = verify_clerk_token(auth_header[7:])
+            clerk_id = payload.get("sub")
+            if clerk_id:
+                user_hint = f"clerk:{clerk_id}"
     except Exception:
         pass
-    send_error_alert(request.method, request.url.path, exc, user_email)
+    send_error_alert(request.method, request.url.path, exc, user_hint)
 
     return JSONResponse(
         status_code=500,
