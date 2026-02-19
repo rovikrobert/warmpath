@@ -531,6 +531,7 @@ function SharingTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
@@ -551,7 +552,7 @@ function SharingTab() {
   }, []);
 
   const handleSave = async () => {
-    setSaving(true); setSaved(false);
+    setSaving(true); setSaved(false); setError('');
     try {
       const body = {
         opt_in_marketplace: prefs.opt_in_marketplace,
@@ -563,7 +564,7 @@ function SharingTab() {
       setPrefs(res.data);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch { /* ignore */ }
+    } catch (err) { setError(err.message || 'Failed to save settings'); }
     finally { setSaving(false); }
   };
 
@@ -586,6 +587,8 @@ function SharingTab() {
 
   return (
     <div className="space-y-6">
+      {error && <div role="alert" aria-live="assertive" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-400">{error}</div>}
+
       {/* Privacy explainer */}
       <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
         <h3 className="mb-1 text-sm font-semibold text-blue-400">How marketplace sharing works</h3>

@@ -144,7 +144,7 @@ async def purchase_credits(
         user_id=current_user.id,
         metadata={"amount": body.amount, "transaction_id": str(txn.id)},
     )
-    await db.flush()
+    await db.commit()
 
     return {
         "data": {
@@ -184,7 +184,7 @@ async def trigger_expiry(
         )
 
     count = await expi[RESEND_KEY_REDACTED](db)
-    await db.flush()
+    await db.commit()
 
     return {
         "data": {"users_expired": count},

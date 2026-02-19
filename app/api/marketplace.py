@@ -357,6 +357,8 @@ async def request_intro(
         metadata_={"listing_id": str(listing.id)},
     )
 
+    await db.commit()
+
     return {
         "data": IntroFacilitationResponse.model_validate(facilitation).model_dump(
             mode="json"
@@ -580,6 +582,8 @@ async def update_facilitation(
 
     await db.flush()
 
+    await db.commit()
+
     return {
         "data": IntroFacilitationResponse.model_validate(facilitation).model_dump(
             mode="json"
@@ -659,6 +663,8 @@ async def update_sharing_preferences(
             f.status = "expired"
 
         await db.flush()
+
+    await db.commit()
 
     return {
         "data": NetworkSharingPreferencesResponse.model_validate(prefs).model_dump(
