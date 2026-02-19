@@ -1,48 +1,14 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
-
-
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str = Field(..., max_length=128)
-    full_name: str = Field(..., max_length=200)
-    # Optional connector profile fields (created during signup if any provided)
-    headline: str | None = Field(default=None, max_length=500)
-    current_company: str | None = Field(default=None, max_length=500)
-    current_title: str | None = Field(default=None, max_length=500)
-    industry: str | None = Field(default=None, max_length=200)
-    location: str | None = Field(default=None, max_length=200)
-    linkedin_url: str | None = Field(default=None, max_length=500)
-    bio_summary: str | None = Field(default=None, max_length=2000)
-
-
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str = Field(..., max_length=128)
+from pydantic import BaseModel, Field
 
 
 class IntentUpdate(BaseModel):
     intent: str = Field(..., max_length=20)
 
 
-class ChangePasswordRequest(BaseModel):
-    old_password: str = Field(..., max_length=128)
-    new_password: str = Field(..., max_length=128)
-
-
-class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
-
-
-class ResetPasswordRequest(BaseModel):
-    token: str = Field(..., max_length=500)
-    new_password: str = Field(..., max_length=128)
-
-
 class DeleteAccountRequest(BaseModel):
-    password: str = Field(..., max_length=128)
     confirm_deletion: bool
 
 
@@ -65,11 +31,6 @@ class UserResponse(BaseModel):
     capabilities: UserCapabilities | None = None
 
     model_config = {"from_attributes": True}
-
-
-class TokenResponse(BaseModel):
-    access_token: str = Field(..., max_length=2000)
-    token_type: str = "bearer"
 
 
 class WorkHistoryEntry(BaseModel):
@@ -105,17 +66,6 @@ class ConnectorProfileResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
-
-
-# -- Job Preferences --
-
-
-class LinkedInCallbackRequest(BaseModel):
-    code: str = Field(..., max_length=500)
-    state: str = Field(..., max_length=500)
-    full_name: str | None = Field(default=None, max_length=200)
-    email: EmailStr | None = None
-    password: str | None = Field(default=None, max_length=128)
 
 
 class ResumeParseResponse(BaseModel):
