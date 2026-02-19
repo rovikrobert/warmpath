@@ -301,3 +301,43 @@ class TestCleanContactsPublicAPI:
 
         assert result[0]["first_name"] == "Test"
         assert result[0]["current_company"] == "Google"
+
+
+class TestCsvProcessingIntegration:
+    """Verify AI cleaner is called during CSV upload processing."""
+
+    @pytest.mark.asyncio
+    async def test_uploaded_csv_gets_cleaned_names_and_company(self, client):
+        """Messy CSV data has names title-cased and company inferred from email during upload."""
+        from io import BytesIO
+
+        from sqlalchemy import select
+
+        from app.models.contact import Contact
+        from tests.conftest import TestSessionLocal, create_test_user_in_db
+
+        async with TestSessionLocal() as db_session:
+            user, headers = await create_test_user_in_db(db_session)
+
+        messy_csv = (
+            "First Name,Last Name,Email Address,Company,Position,Connected On\n"
+            "alice,SMITH,alice@google.com,,,15 Jan 2024\n"
+        )
+        csv_bytes = messy_csv.encode("utf-8")
+
+        response = await client.post(
+            "/api/v1/contacts/upload",
+            files={"file": ("connections.csv", BytesIO(csv_bytes), "text/csv")},
+            headers=headers,
+        )
+        assert response.status_code == 201
+
+        # Verify the contact was stored with cleaned data
+        async with TestSessionLocal() as db_session:
+            result = await db_session.execute(
+                select(Contact).where(Contact.user_id == user.id)
+            )
+            contact = result.scalar_one()
+            assert contact.first_name == "Alice"
+            assert contact.last_name == "Smith"
+            assert contact.current_company == "Google"
