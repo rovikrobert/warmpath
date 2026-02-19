@@ -172,15 +172,12 @@ async def create_application(
     await db.flush()
 
     # Track funnel step
-    from app.models.enrichment import UsageLog
+    from app.utils.tracking import track_action
 
-    db.add(
-        UsageLog(
-            user_id=current_user.id,
-            action="application_create",
-            resource_id=app_record.id,
-            metadata_={"company": body.company_name, "role": body.role_title},
-        )
+    await track_action(
+        db, current_user.id, "application_create",
+        resource_id=app_record.id,
+        metadata_={"company": body.company_name, "role": body.role_title},
     )
     await db.commit()
     await db.refresh(app_record)
@@ -356,11 +353,12 @@ async def get_application_stats(
     ch_resp = case(
         (Application.status.in_(RESPONDED_STATUSES), 1), else_=0
     )
+    channel_col = func.coalesce(Application.channel, "unknown")
     channel_query = select(
-        func.coalesce(Application.channel, "unknown").label("channel"),
+        channel_col.label("channel"),
         func.sum(ch_sent).label("sent"),
         func.sum(ch_resp).label("responded"),
-    ).where(*base).group_by(func.coalesce(Application.channel, "unknown"))
+    ).where(*base).group_by(channel_col)
     channel_rows = (await db.execute(channel_query)).all()
 
     response_rate = responded_count / sent_count if sent_count > 0 else 0.0
@@ -460,17 +458,14 @@ async def update_application(
         app_record.responded_at = body.responded_at
 
     # Track funnel step
-    from app.models.enrichment import UsageLog
+    from app.utils.tracking import track_action
 
-    db.add(
-        UsageLog(
-            user_id=current_user.id,
-            action="application_update",
-            metadata_={
-                "application_id": str(application_id),
-                "new_status": body.status,
-            },
-        )
+    await track_action(
+        db, current_user.id, "application_update",
+        metadata_={
+            "application_id": str(application_id),
+            "new_status": body.status,
+        },
     )
 
     await db.commit()
