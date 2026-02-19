@@ -17,7 +17,7 @@ _ALWAYS_HEADERS: list[tuple[bytes, bytes]] = [
         b"default-src 'self';"
         b" script-src 'self' https://*.clerk.accounts.dev;"
         b" style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;"
-        b" connect-src 'self' https://*.clerk.accounts.dev;"
+        b" connect-src 'self' https://*.clerk.accounts.dev https://clerk-telemetry.com;"
         b" img-src 'self' data: https://img.clerk.com;"
         b" font-src 'self' https://fonts.gstatic.com;"
         b" worker-src 'self' blob:;"
