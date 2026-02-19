@@ -9,6 +9,8 @@ from __futu[RESEND_KEY_REDACTED] import annotations
 
 import logging
 import os
+import re
+from collections import deque
 from typing import Any
 
 import httpx
@@ -19,6 +21,50 @@ from agents.shared.whatsapp_formatter import WhatsAppFormatter
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# ---------------------------------------------------------------------------
+# Team prefix parser
+# ---------------------------------------------------------------------------
+
+_VALID_TEAMS = {"engineering", "data", "product", "ops", "gtm", "finance", "cos"}
+
+
+def _parse_team_prefix(text: str) -> tuple[str | None, str]:
+    """Parse optional 'ask <team>:' prefix from message.
+
+    Returns (team_or_None, remaining_query).
+    """
+    match = re.match(r"^ask\s+(\w+)\s*:\s*(.+)$", text, re.IGNORECASE)
+    if match:
+        team = match.group(1).lower()
+        query = match.group(2).strip()
+        if team in _VALID_TEAMS:
+            return team, query
+    return None, text
+
+
+# ---------------------------------------------------------------------------
+# Conversation buffer
+# ---------------------------------------------------------------------------
+
+_conversation_buffer: dict[int, deque[tuple[str, str]]] = {}
+_MAX_HISTORY = 5
+
+
+def _add_to_buffer(chat_id: int, user_msg: str, bot_response: str) -> None:
+    """Store a user/bot exchange in the per-chat conversation buffer."""
+    if chat_id not in _conversation_buffer:
+        _conversation_buffer[chat_id] = deque(maxlen=_MAX_HISTORY)
+    _conversation_buffer[chat_id].append((user_msg, bot_response))
+
+
+def _get_history(chat_id: int) -> list[dict[str, str]]:
+    """Return conversation history as a list of role/content dicts."""
+    messages: list[dict[str, str]] = []
+    for user_msg, bot_response in _conversation_buffer.get(chat_id, []):
+        messages.append({"role": "user", "content": user_msg})
+        messages.append({"role": "assistant", "content": bot_response})
+    return messages
 
 
 def _send_telegram_reply(chat_id: int, text: str) -> None:
