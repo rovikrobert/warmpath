@@ -1,0 +1,87 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+.pytest_cache/
+.ruff_cache/
+*.db
+*.sqlite3
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Tests (not needed in production image)
+tests/
+
+# Agent report artifacts
+agents/reports/*.json
+agents/shared/intel_cache.json
+agents/*/state.json
+agents/chief_of_staff/cos_state.json
+agents/chief_of_staff/notion_state.json
+agents/chief_of_staff/reports/
+data_team/reports/*.json
+data_team/shared/intel_cache.json
+data_team/*/state.json
+product_team/reports/*.json
+product_team/shared/intel_cache.json
+product_team/*/state.json
+ops_team/reports/*.json
+ops_team/shared/intel_cache.json
+ops_team/*/state.json
+finance_team/reports/*.json
+finance_team/shared/intel_cache.json
+finance_team/*/state.json
+finance_team/cross_team_requests/*.json
+finance_team/reports/*.xlsx
+gtm_team/reports/*.json
+gtm_team/shared/intel_cache.json
+gtm_team/*/state.json
+gtm_team/cross_team_requests/*.json
+
+# Frontend build artifacts (Docker builds fresh)
+frontend/node_modules/
+frontend/dist/
+
+# Root-level Node artifacts (not the frontend)
+/node_modules/
+/package.json
+/package-lock.json
+
+# Docs / non-code
+docs/
+*.md
+!CLAUDE.md
+!ARCHITECTURE.md
+!COMPETITIVE_STRATEGY.md
+!frontend/CLAUDE.md
+
+# Coverage / CI
+coverage.json
+.coverage
+junit.xml
+*.mutation_backup
+
+# Claude Code
+.claude/
+
+# User documents
+*.docx
+*.jpeg
+*.jpg
+*.png
