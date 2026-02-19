@@ -107,7 +107,7 @@ const PRIVACY_STEPS = [
 ];
 
 export default function OnboardingPage() {
-  const { refreshUser, setJustSignedUp, clerkUser } = useAuth();
+  const { refreshUser, clerkUser } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -134,6 +134,40 @@ export default function OnboardingPage() {
   const fileInputRef = useRef(null);
   const [uploadProgressWidth, setUploadProgressWidth] = useState(0);
   const [uploadProgressMsg, setUploadProgressMsg] = useState('');
+
+  // Resume from last completed step on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [prefsRes, contactsRes, meRes] = await Promise.allSettled([
+          preferences.getJob(),
+          contactsApi.list({ per_page: 1 }),
+          authApi.me(),
+        ]);
+
+        if (cancelled) return;
+
+        const hasPrefs = prefsRes.status === 'fulfilled' && prefsRes.value?.data?.target_role;
+        const hasIntent = meRes.status === 'fulfilled' && meRes.value?.data?.intent;
+        const hasContacts = contactsRes.status === 'fulfilled' && (contactsRes.value?.data?.length > 0 || contactsRes.value?.meta?.total > 0);
+
+        // Pre-fill intent from existing data
+        if (hasIntent) setIntent(meRes.value.data.intent);
+
+        // Jump to first incomplete step
+        if (!hasPrefs) { setStep(1); return; }
+        if (!hasIntent) { setStep(2); return; }
+        // Steps 3-7 are informational — skip to data steps
+        if (!hasContacts) { setStep(8); return; }
+        // Work history is the last step
+        setStep(9);
+      } catch {
+        // Default to step 1 on error
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const UPLOAD_STEPS = [
     'Reading file...',
@@ -296,9 +330,18 @@ export default function OnboardingPage() {
     }
   };
 
-  const finish = () => {
-    setJustSignedUp(false);
-    navigate('/coach');
+  const finish = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await authApi.completeOnboarding();
+      await refreshUser();
+      navigate('/coach');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const isHolder = intent === 'sha[RESEND_KEY_REDACTED]' || intent === 'explore';
@@ -387,9 +430,6 @@ export default function OnboardingPage() {
               {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
 
               <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => setStep(2)} className="flex-1" size="lg">
-                  Skip for now
-                </Button>
                 <Button onClick={handlePrefs} loading={saving} className="flex-1" size="lg">
                   Continue
                 </Button>
@@ -613,9 +653,6 @@ export default function OnboardingPage() {
                 <Button variant="secondary" onClick={() => { setError(''); setStep(7); }} size="lg" className="px-4">
                   Back
                 </Button>
-                <Button variant="secondary" onClick={finish} className="flex-1" size="lg">
-                  Skip for now
-                </Button>
                 <Button onClick={handleUpload} disabled={!file} loading={uploading} className="flex-1" size="lg">
                   Upload
                 </Button>
@@ -638,9 +675,6 @@ export default function OnboardingPage() {
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={() => { setError(''); setStep(7); }} size="lg" className="px-4">
                   Back
-                </Button>
-                <Button variant="secondary" onClick={finish} className="flex-1" size="lg">
-                  Skip for now
                 </Button>
                 <Button onClick={() => setStep(9)} className="flex-1" size="lg">
                   Add Work History
@@ -777,9 +811,6 @@ export default function OnboardingPage() {
                 <Button variant="secondary" onClick={() => { setError(''); setStep(8); }} size="lg" className="px-4">
                   Back
                 </Button>
-                <Button variant="secondary" onClick={finish} className="flex-1" size="lg">
-                  Skip for now
-                </Button>
                 <Button
                   onClick={async () => {
                     setSaving(true);
@@ -794,14 +825,15 @@ export default function OnboardingPage() {
                           end_date: e.is_current ? undefined : (e.end_date || undefined),
                         }));
                       const profilePayload = { work_history: entries.length > 0 ? entries : undefined };
-                      // Include resume profile fields if imported from resume
                       if (resumeProfileData) {
                         Object.entries(resumeProfileData).forEach(([k, v]) => {
                           if (v) profilePayload[k] = v;
                         });
                       }
                       await authApi.upsertProfile(profilePayload);
-                      finish();
+                      await authApi.completeOnboarding();
+                      await refreshUser();
+                      navigate('/coach');
                     } catch (err) {
                       setError(err.message);
                     } finally {
