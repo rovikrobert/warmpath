@@ -303,20 +303,13 @@ class TestFallbackChain:
 
 @pytest_asyncio.fixture
 async def auth_headers(client: AsyncClient) -> dict:
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "sea_test@test.com",
-            "password": "Testpass123",
-            "full_name": "SEA Tester",
-        },
-    )
-    login_res = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "sea_test@test.com", "password": "Testpass123"},
-    )
-    token = login_res.json()["data"]["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    from tests.conftest import TestSessionLocal, create_test_user_in_db
+
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="sea_test@test.com", full_name="SEA Tester"
+        )
+    return headers
 
 
 class TestScanAPIFallback:

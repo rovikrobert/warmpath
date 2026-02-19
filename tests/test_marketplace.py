@@ -17,7 +17,7 @@ from app.services.marketplace_indexer import (
     classify_warm_score_range,
     generate_marketplace_listings,
 )
-from tests.conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 # ---------------------------------------------------------------------------
@@ -27,20 +27,11 @@ from tests.conftest import TestSessionLocal
 
 @pytest_asyncio.fixture
 async def auth_headers(client: AsyncClient) -> dict:
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "marketplace@test.com",
-            "password": "Testpass123",
-            "full_name": "Marketplace Tester",
-        },
-    )
-    login_res = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "marketplace@test.com", "password": "Testpass123"},
-    )
-    token = login_res.json()["data"]["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="marketplace@test.com", full_name="Marketplace Tester"
+        )
+    return headers
 
 
 @pytest_asyncio.fixture

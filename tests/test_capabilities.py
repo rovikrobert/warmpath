@@ -1,27 +1,22 @@
 """Tests for user capabilities computation and intent endpoints."""
 
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 
 from app.models.user import User
 from app.services.capabilities import compute_user_capabilities
 
-# Re-use test DB session from conftest
-from tests.conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
-async def _signup(client: AsyncClient, email: str) -> str:
-    """Quick signup, return access token (no verification needed for these tests)."""
-    resp = await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": email,
-            "password": "Str0ngP@ss!",
-            "full_name": "Test User",
-        },
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()["data"]["access_token"]
+@pytest_asyncio.fixture
+async def auth_headers(client: AsyncClient) -> dict:
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="caps@test.com", full_name="Test User"
+        )
+    return headers
 
 
 class TestComputeCapabilities:
@@ -90,11 +85,10 @@ class TestMeEndpointCapabilities:
     """GET /auth/me should include capabilities."""
 
     @pytest.mark.asyncio
-    async def test_me_includes_capabilities(self, client: AsyncClient):
-        token = await _signup(client, "me-caps@example.com")
-        headers = {"Authorization": f"Bearer {token}"}
-
-        resp = await client.get("/api/v1/auth/me", headers=headers)
+    async def test_me_includes_capabilities(
+        self, client: AsyncClient, auth_headers: dict
+    ):
+        resp = await client.get("/api/v1/auth/me", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert "capabilities" in data
@@ -109,12 +103,9 @@ class TestMeEndpointCapabilities:
         assert caps["facilitation_count"] == 0
 
     @pytest.mark.asyncio
-    async def test_me_includes_intent(self, client: AsyncClient):
+    async def test_me_includes_intent(self, client: AsyncClient, auth_headers: dict):
         """GET /auth/me returns intent field (initially None)."""
-        token = await _signup(client, "me-intent@example.com")
-        headers = {"Authorization": f"Bearer {token}"}
-
-        resp = await client.get("/api/v1/auth/me", headers=headers)
+        resp = await client.get("/api/v1/auth/me", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert "intent" in data
@@ -124,39 +115,30 @@ class TestPatchIntent:
     """PATCH /auth/intent endpoint tests."""
 
     @pytest.mark.asyncio
-    async def test_set_intent(self, client: AsyncClient):
-        token = await _signup(client, "intent-set@example.com")
-        headers = {"Authorization": f"Bearer {token}"}
-
+    async def test_set_intent(self, client: AsyncClient, auth_headers: dict):
         resp = await client.patch(
             "/api/v1/auth/intent",
-            headers=headers,
+            headers=auth_headers,
             json={"intent": "find_referrals"},
         )
         assert resp.status_code == 200
         assert resp.json()["data"]["intent"] == "find_referrals"
 
     @pytest.mark.asyncio
-    async def test_invalid_intent(self, client: AsyncClient):
-        token = await _signup(client, "intent-invalid@example.com")
-        headers = {"Authorization": f"Bearer {token}"}
-
+    async def test_invalid_intent(self, client: AsyncClient, auth_headers: dict):
         resp = await client.patch(
             "/api/v1/auth/intent",
-            headers=headers,
+            headers=auth_headers,
             json={"intent": "invalid_value"},
         )
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_all_valid_values(self, client: AsyncClient):
-        token = await _signup(client, "intent-all@example.com")
-        headers = {"Authorization": f"Bearer {token}"}
-
+    async def test_all_valid_values(self, client: AsyncClient, auth_headers: dict):
         for intent_val in ("find_referrals", "share_network", "explore"):
             resp = await client.patch(
                 "/api/v1/auth/intent",
-                headers=headers,
+                headers=auth_headers,
                 json={"intent": intent_val},
             )
             assert resp.status_code == 200

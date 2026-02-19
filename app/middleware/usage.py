@@ -12,15 +12,16 @@ session to avoid BaseHTTPMiddleware stacking issues.
 
 import logging
 import time
-import uuid
 
+from sqlalchemy import select
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
 from app.middleware.usage_logger import compute_metering_warning, match_metered_action
 from app.models.enrichment import UsageLog
-from app.utils.security import decode_access_token
+from app.models.user import User
+from app.utils.security import verify_clerk_token
 
 
 # Map (method, path_prefix) to (action, resource_type)
@@ -59,13 +60,14 @@ def _classify_request(method: str, path: str) -> tuple[str, str]:
     return "api_call", "unknown"
 
 
-def _extract_user_id(request: Request) -> uuid.UUID | None:
-    """Try to extract user_id from Bearer token without raising."""
+def _extract_clerk_user_id(request: Request) -> str | None:
+    """Try to extract clerk_user_id from Clerk JWT without raising."""
     auth = request.headers.get("authorization", "")
     if not auth.startswith("Bearer "):
         return None
     try:
-        return decode_access_token(auth[7:])
+        payload = verify_clerk_token(auth[7:])
+        return payload.get("sub")
     except Exception:
         return None
 
@@ -82,8 +84,8 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
         elapsed_ms = round((time.monotonic() - start) * 1000, 2)
 
         # Only log authenticated requests (successful ones)
-        user_id = _extract_user_id(request)
-        if user_id is None:
+        clerk_user_id = _extract_clerk_user_id(request)
+        if clerk_user_id is None:
             return response
 
         action, resource_type = _classify_request(request.method, path)
@@ -106,6 +108,14 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
 
             db_dep = _app.dependency_overrides.get(get_db, get_db)
             async for db in db_dep():
+                # Resolve clerk_user_id → WarmPath UUID
+                result = await db.execute(
+                    select(User.id).where(User.clerk_user_id == clerk_user_id)
+                )
+                user_id = result.scalar_one_or_none()
+                if user_id is None:
+                    break
+
                 # ---- broad tracking log ----
                 log = UsageLog(
                     user_id=user_id,

@@ -3,6 +3,7 @@ import io
 from httpx import AsyncClient
 
 from app.services.csv_parser import generate_fingerprint, parse_linkedin_csv
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 # ---------------------------------------------------------------------------
 # Sample CSV fixtures
@@ -160,16 +161,12 @@ class TestGenerateFingerprint:
 # ---------------------------------------------------------------------------
 
 
-async def _signup_and_get_token(client: AsyncClient) -> str:
-    resp = await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "csv@example.com",
-            "password": "Secret123",
-            "full_name": "CSV User",
-        },
-    )
-    return resp.json()["data"]["access_token"]
+async def _get_auth_headers(client: AsyncClient) -> dict:
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="csv@example.com", full_name="CSV User"
+        )
+    return headers
 
 
 def _csv_file(content: str | bytes, filename: str = "connections.csv"):
@@ -179,10 +176,10 @@ def _csv_file(content: str | bytes, filename: str = "connections.csv"):
 
 
 async def test_upload_csv_success(client: AsyncClient):
-    token = await _signup_and_get_token(client)
+    headers = await _get_auth_headers(client)
     resp = await client.post(
         "/api/v1/contacts/upload",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=headers,
         files=_csv_file(SAMPLE_CSV),
     )
     assert resp.status_code == 201
@@ -198,8 +195,7 @@ async def test_upload_csv_success(client: AsyncClient):
 
 async def test_upload_csv_dedup_tracking(client: AsyncClient):
     """Second upload of same CSV should track duplicates_skipped."""
-    token = await _signup_and_get_token(client)
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = await _get_auth_headers(client)
 
     # First upload
     await client.post(
@@ -219,8 +215,7 @@ async def test_upload_csv_dedup_tracking(client: AsyncClient):
 
 async def test_poll_upload_status(client: AsyncClient):
     """GET /contacts/uploads/{id} returns upload status."""
-    token = await _signup_and_get_token(client)
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = await _get_auth_headers(client)
 
     upload_resp = await client.post(
         "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
@@ -236,17 +231,16 @@ async def test_poll_upload_status(client: AsyncClient):
 
 
 async def test_poll_upload_not_found(client: AsyncClient):
-    token = await _signup_and_get_token(client)
+    headers = await _get_auth_headers(client)
     resp = await client.get(
         "/api/v1/contacts/uploads/00000000-0000-0000-0000-000000000000",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=headers,
     )
     assert resp.status_code == 404
 
 
 async def test_upload_deduplication(client: AsyncClient):
-    token = await _signup_and_get_token(client)
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = await _get_auth_headers(client)
 
     # Upload the same CSV twice
     await client.post(
@@ -263,18 +257,17 @@ async def test_upload_deduplication(client: AsyncClient):
 
 
 async def test_upload_rejects_non_csv(client: AsyncClient):
-    token = await _signup_and_get_token(client)
+    headers = await _get_auth_headers(client)
     resp = await client.post(
         "/api/v1/contacts/upload",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=headers,
         files={"file": ("data.txt", io.BytesIO(b"hello"), "text/plain")},
     )
     assert resp.status_code == 400
 
 
 async def test_list_contacts_pagination(client: AsyncClient):
-    token = await _signup_and_get_token(client)
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = await _get_auth_headers(client)
     await client.post(
         "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
     )
@@ -287,8 +280,7 @@ async def test_list_contacts_pagination(client: AsyncClient):
 
 
 async def test_list_contacts_search(client: AsyncClient):
-    token = await _signup_and_get_token(client)
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = await _get_auth_headers(client)
     await client.post(
         "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
     )
@@ -300,8 +292,7 @@ async def test_list_contacts_search(client: AsyncClient):
 
 
 async def test_get_single_contact(client: AsyncClient):
-    token = await _signup_and_get_token(client)
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = await _get_auth_headers(client)
     await client.post(
         "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
     )
@@ -315,8 +306,7 @@ async def test_get_single_contact(client: AsyncClient):
 
 
 async def test_delete_contact_soft_delete(client: AsyncClient):
-    token = await _signup_and_get_token(client)
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = await _get_auth_headers(client)
     await client.post(
         "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
     )
@@ -336,34 +326,24 @@ async def test_delete_contact_soft_delete(client: AsyncClient):
 async def test_contacts_are_user_scoped(client: AsyncClient):
     """User A's contacts should not be visible to User B (multi-tenant)."""
     # User A uploads contacts
-    resp_a = await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "usera@example.com",
-            "password": "Secret123",
-            "full_name": "User A",
-        },
-    )
-    token_a = resp_a.json()["data"]["access_token"]
+    async with TestSessionLocal() as db:
+        _, headers_a = await create_test_user_in_db(
+            db, email="usera@example.com", full_name="User A"
+        )
     await client.post(
         "/api/v1/contacts/upload",
-        headers={"Authorization": f"Bearer {token_a}"},
+        headers=headers_a,
         files=_csv_file(SAMPLE_CSV),
     )
 
     # User B should see 0 contacts
-    resp_b = await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "userb@example.com",
-            "password": "Secret123",
-            "full_name": "User B",
-        },
-    )
-    token_b = resp_b.json()["data"]["access_token"]
+    async with TestSessionLocal() as db:
+        _, headers_b = await create_test_user_in_db(
+            db, email="userb@example.com", full_name="User B"
+        )
     resp = await client.get(
         "/api/v1/contacts",
-        headers={"Authorization": f"Bearer {token_b}"},
+        headers=headers_b,
     )
     assert resp.json()["meta"]["total"] == 0
 

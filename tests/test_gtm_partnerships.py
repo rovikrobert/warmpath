@@ -6,8 +6,7 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from app.models.user import User
-from tests.conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 # ---------------------------------------------------------------------------
@@ -18,46 +17,21 @@ from tests.conftest import TestSessionLocal
 @pytest_asyncio.fixture
 async def admin_headers(client: AsyncClient) -> dict:
     """Create an admin user and return auth headers."""
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "partadmin@test.com",
-            "password": "Test1234!@#$",
-            "full_name": "Part Admin",
-        },
-    )
-    async with TestSessionLocal() as s:
-        from sqlalchemy import update
-
-        await s.execute(
-            update(User).where(User.email == "partadmin@test.com").values(is_admin=True)
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="partadmin@test.com", full_name="Part Admin", is_admin=True
         )
-        await s.commit()
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "partadmin@test.com", "password": "Test1234!@#$"},
-    )
-    token = login.json()["data"]["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    return headers
 
 
 @pytest_asyncio.fixture
 async def user_headers(client: AsyncClient) -> dict:
     """Create a non-admin user and return auth headers."""
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "partuser@test.com",
-            "password": "Test1234!@#$",
-            "full_name": "Part User",
-        },
-    )
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "partuser@test.com", "password": "Test1234!@#$"},
-    )
-    token = login.json()["data"]["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="partuser@test.com", full_name="Part User"
+        )
+    return headers
 
 
 def _partnership_body(**overrides) -> dict:

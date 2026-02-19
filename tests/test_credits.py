@@ -3,6 +3,7 @@
 import uuid as uuid_mod
 from datetime import datetime, timedelta, timezone
 
+import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
@@ -15,7 +16,7 @@ from app.services.credits import (
     refund_credits,
     spend_credits,
 )
-from tests.conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 # ---------------------------------------------------------------------------
@@ -184,11 +185,8 @@ class TestSpendCredits:
         uid = uuid_mod.uuid4()
         async with TestSessionLocal() as db:
             await earn_credits(uid, 10, "csv_upload", db)
-            try:
+            with pytest.raises(ValueError, match="Insufficient credits"):
                 await spend_credits(uid, 20, "intro_request", db)
-                assert False, "Should have raised ValueError"
-            except ValueError as e:
-                assert "Insufficient credits" in str(e)
 
     async def test_exact_balance_succeeds(self):
         uid = uuid_mod.uuid4()
@@ -201,11 +199,8 @@ class TestSpendCredits:
     async def test_spend_zero_balance_raises(self):
         uid = uuid_mod.uuid4()
         async with TestSessionLocal() as db:
-            try:
+            with pytest.raises(ValueError):
                 await spend_credits(uid, 5, "search", db)
-                assert False, "Should have raised ValueError"
-            except ValueError:
-                pass
 
 
 class TestRefundCredits:
@@ -341,32 +336,17 @@ class TestExpireStaleCredits:
 
 @pytest_asyncio.fixture
 async def auth_headers(client: AsyncClient) -> dict:
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "credits@test.com",
-            "password": "Testpass123",
-            "full_name": "Credit Tester",
-        },
-    )
-    # Verify email so credit purchase (marketplace feature) is accessible
-    from sqlalchemy import select
-
-    from app.models.user import User
-    from tests.conftest import TestSessionLocal
-
     async with TestSessionLocal() as db:
-        result = await db.execute(select(User).where(User.email == "credits@test.com"))
-        user = result.scalar_one()
-        user.email_verified = True
+        user, headers = await create_test_user_in_db(
+            db,
+            email="credits@test.com",
+            full_name="Credit Tester",
+            email_verified=True,
+        )
+        # Award welcome bonus (normally done by Clerk webhook)
+        await earn_credits(user.id, 50, "welcome_bonus", db)
         await db.commit()
-
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "credits@test.com", "password": "Testpass123"},
-    )
-    token = login.json()["data"]["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    return headers
 
 
 @pytest_asyncio.fixture
@@ -534,22 +514,14 @@ class TestExpireEndpoint:
 
 
 class TestCreditTriggers:
-    async def test_signup_awards_welcome_bonus(self, client: AsyncClient):
-        """Signup awards 50 welcome credits."""
-        await client.post(
-            "/api/v1/auth/signup",
-            json={
-                "email": "welcome@test.com",
-                "password": "Testpass123",
-                "full_name": "Welcome User",
-            },
-        )
-        login = await client.post(
-            "/api/v1/auth/login",
-            json={"email": "welcome@test.com", "password": "Testpass123"},
-        )
-        token = login.json()["data"]["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
+    async def test_welcome_bonus_credited(self, client: AsyncClient):
+        """Welcome bonus awards 50 credits."""
+        async with TestSessionLocal() as db:
+            user, headers = await create_test_user_in_db(
+                db, email="welcome@test.com", full_name="Welcome User"
+            )
+            await earn_credits(user.id, 50, "welcome_bonus", db)
+            await db.commit()
 
         resp = await client.get("/api/v1/credits/balance", headers=headers)
         assert resp.json()["data"]["balance"] == 50

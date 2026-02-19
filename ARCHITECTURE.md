@@ -20,15 +20,16 @@ HTTP Request
 
 ### API Routes → Services → Models
 
-#### Auth (`app/api/auth.py`)
+#### Auth (`app/api/auth.py`) — Clerk Migration In Progress
 ```
-POST /signup     → email_service, credits.earn_credits(50)  → User, ConnectorProfile, CreditTransaction
-POST /login      → audit_logger                             → User, AuditLog
-POST /refresh    → audit_logger                             → User, AuditLog
-POST /change-password → audit_logger                        → User, AuditLog  (increments token_version)
-POST /logout-all → audit_logger                             → User, AuditLog  (increments token_version)
-GET  /verify-email → email_service.verify_token             → User, AuditLog
+GET  /me               → get_current_user (Clerk JWT via JWKS)  → User
+POST /webhooks/clerk   → Clerk webhook (user.created, user.updated, user.deleted)
+                         → User, ConnectorProfile, CreditTransaction
+POST /profile/import-resume → resume parsing (mock mode)        → User, UsageLog
+GET  /linkedin/authorize    → LinkedIn OAuth URL generation      → (state JWT)
+POST /linkedin/callback     → LinkedIn OAuth token exchange      → User (⚠️ needs Clerk token migration)
 ```
+_Legacy endpoints (signup, login, refresh, change-password, logout-all, verify-email) still in file but non-functional — pending removal in Task 7._
 
 #### Contacts (`app/api/contacts.py`)
 ```
@@ -120,18 +121,15 @@ POST /search/smart {company_names: [...], scope: "own_network" | "marketplace"}
 
 | Dependency | Applied To | Effect |
 |------------|-----------|--------|
-| `get_current_user` | Most endpoints | Validates JWT, returns User |
+| `get_current_user` | Most endpoints | Validates Clerk JWT via JWKS (RS256), returns User |
 | `require_verified_email` | Marketplace search, request-intro, credit purchase | 403 if `email_verified=False` |
 | `check_rate_limit` | CSV upload, search run | Counts UsageLog rows, 429 if exceeded |
 
-### Token Versioning
-- `token_version` (int) on User model, embedded in every JWT
-- Incremented on: password change, logout-all
-- Mismatch = 401 Unauthorized (all old tokens invalidated)
-
-### Account Lockout
-- 5 failed logins → `locked_until` set to now + 15 minutes → 429
-- Reset on successful login
+### Authentication (Clerk)
+- **JWT verification**: RS256 via Clerk's JWKS endpoint (`{CLERK_ISSUER}/.well-known/jwks.json`), cached with `PyJWKClient`
+- **User sync**: Clerk webhooks (`user.created`, `user.updated`, `user.deleted`) keep local User model in sync
+- **Session management**: Handled entirely by Clerk (no local tokens, no refresh flow)
+- _Legacy token versioning and account lockout removed — Clerk handles these concerns_
 
 ---
 
@@ -171,7 +169,7 @@ async with TestSessionLocal() as session:
 ### Test File Map
 | File | What It Tests |
 |------|--------------|
-| `test_auth.py` | Signup, login, refresh, verify, lockout |
+| `test_auth.py` | Clerk JWT verification, webhook sync, /me endpoint |
 | `test_csv_parser.py` | CSV parsing, fingerprinting, sanitization |
 | `test_warm_scorer.py` | Warm score computation, referral_likelihood |
 | `test_search.py` | Search CRUD, AI matching, results |
@@ -184,7 +182,7 @@ async with TestSessionLocal() as session:
 | `test_usage_metering.py` | Metered logging, usage API, tier warnings |
 | `test_relationship_manual.py` | Relationship types, work history, manual contacts |
 | `test_sea_boards.py` | SEA/India/ANZ registry, career page scraper |
-| `test_security.py` | JWT refresh, CSV limits, headers, lockout, webhooks |
+| `test_security.py` | CSV hardening, security headers, Stripe webhooks, audit log |
 | `test_integration.py` | End-to-end solo + marketplace + privacy compliance |
 | `test_smart_search.py` | Smart search, job preferences |
 | `test_usage_and_errors.py` | Usage tracking, error handlers |

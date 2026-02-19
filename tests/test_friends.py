@@ -7,7 +7,7 @@ import pytest_asyncio
 from httpx import AsyncClient
 
 from app.models.user import User
-from tests.conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 # ---------------------------------------------------------------------------
@@ -17,53 +17,29 @@ from tests.conftest import TestSessionLocal
 
 @pytest_asyncio.fixture
 async def user_a_headers(client: AsyncClient) -> dict:
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "alice@test.com",
-            "password": "Testpass123",
-            "full_name": "Alice Alpha",
-        },
-    )
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "alice@test.com", "password": "Testpass123"},
-    )
-    return {"Authorization": f"Bearer {login.json()['data']['access_token']}"}
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="alice@test.com", full_name="Alice Alpha"
+        )
+    return headers
 
 
 @pytest_asyncio.fixture
 async def user_b_headers(client: AsyncClient) -> dict:
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "bob@test.com",
-            "password": "Testpass123",
-            "full_name": "Bob Beta",
-        },
-    )
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "bob@test.com", "password": "Testpass123"},
-    )
-    return {"Authorization": f"Bearer {login.json()['data']['access_token']}"}
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="bob@test.com", full_name="Bob Beta"
+        )
+    return headers
 
 
 @pytest_asyncio.fixture
 async def user_c_headers(client: AsyncClient) -> dict:
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "carol@test.com",
-            "password": "Testpass123",
-            "full_name": "Carol Charlie",
-        },
-    )
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "carol@test.com", "password": "Testpass123"},
-    )
-    return {"Authorization": f"Bearer {login.json()['data']['access_token']}"}
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="carol@test.com", full_name="Carol Charlie"
+        )
+    return headers
 
 
 async def _get_user_id(client: AsyncClient, headers: dict) -> str:

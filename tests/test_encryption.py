@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.contact import Contact
 from app.models.user import User
 from app.utils.encryption import compute_blind_index
-from tests.conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 # ---------------------------------------------------------------------------
@@ -72,30 +72,15 @@ async def _create_contact(
 
 
 async def _get_auth_headers(client: AsyncClient) -> tuple[dict, User]:
-    """Register a user via API and return (headers, user)."""
-    resp = await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": f"enc-{uuid.uuid4().hex[:8]}@test.com",
-            "password": "TestPass123!",
-            "full_name": "Enc Tester",
-        },
-    )
-    assert resp.status_code == 201, resp.text
-    token = resp.json()["data"]["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-
-    # Verify user email so marketplace features work
-    async with TestSessionLocal() as sess:
-        result = await sess.execute(select(User).where(User.email_verified.is_(False)))
-        user = result.scalar_one_or_none()
-        if user:
-            user.email_verified = True
-            await sess.commit()
-            await sess.refresh(user)
-            return headers, user
-
-    return headers, None
+    """Create a test user and return (headers, user)."""
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db,
+            email=f"enc-{uuid.uuid4().hex[:8]}@test.com",
+            full_name="Enc Tester",
+            email_verified=True,
+        )
+    return headers, user
 
 
 # ---------------------------------------------------------------------------

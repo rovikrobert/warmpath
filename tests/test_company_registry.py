@@ -10,7 +10,6 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from app.models.user import User
 from app.services.board_registry import BOARD_REGISTRY, lookup_or_discover_boards
 from app.services.registry_service import (
     batch_discover,
@@ -22,7 +21,7 @@ from app.services.registry_service import (
     update_board,
     verify_board,
 )
-from tests.conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 # ---------------------------------------------------------------------------
@@ -33,48 +32,21 @@ from tests.conftest import TestSessionLocal
 @pytest_asyncio.fixture
 async def auth_headers(client: AsyncClient) -> dict:
     """Create a test user and return auth headers."""
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "registry@test.com",
-            "password": "Testpass123",
-            "full_name": "Registry Tester",
-        },
-    )
-    login_res = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "registry@test.com", "password": "Testpass123"},
-    )
-    token = login_res.json()["data"]["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="registry@test.com", full_name="Registry Tester"
+        )
+    return headers
 
 
 @pytest_asyncio.fixture
 async def admin_headers(client: AsyncClient) -> dict:
     """Create an admin user and return auth headers."""
-    await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "email": "regadmin@test.com",
-            "password": "Testpass123",
-            "full_name": "Registry Admin",
-        },
-    )
-    # Promote to admin directly in DB
-    async with TestSessionLocal() as session:
-        from sqlalchemy import update
-
-        await session.execute(
-            update(User).where(User.email == "regadmin@test.com").values(is_admin=True)
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="regadmin@test.com", full_name="Registry Admin", is_admin=True
         )
-        await session.commit()
-
-    login_res = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "regadmin@test.com", "password": "Testpass123"},
-    )
-    token = login_res.json()["data"]["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    return headers
 
 
 @pytest_asyncio.fixture
