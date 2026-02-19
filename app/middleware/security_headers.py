@@ -14,7 +14,14 @@ _ALWAYS_HEADERS: list[tuple[bytes, bytes]] = [
     (b"x-frame-options", b"DENY"),
     (
         b"content-security-policy",
-        b"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:",
+        b"default-src 'self';"
+        b" script-src 'self' https://*.clerk.accounts.dev;"
+        b" style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;"
+        b" connect-src 'self' https://*.clerk.accounts.dev;"
+        b" img-src 'self' data: https://img.clerk.com;"
+        b" font-src 'self' https://fonts.gstatic.com;"
+        b" worker-src 'self' blob:;"
+        b" frame-src 'self' https://*.clerk.accounts.dev;",
     ),
     (b"referrer-policy", b"strict-origin-when-cross-origin"),
     (b"permissions-policy", b"camera=(), microphone=(), geolocation=()"),
