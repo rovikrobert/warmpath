@@ -90,8 +90,8 @@ jobs:
         # stdlib-only script — if it ever imports project code, add: pip install -r requirements.txt
         # Exit codes: 0=clean, 1=findings, 2=critical — only block on critical
         run: |
-          python -m scripts.security_scan; code=$?
-          if [ $code -eq 2 ]; then exit 2; fi
+          python -m scripts.security_scan || code=$?
+          if [ "${code:-0}" -eq 2 ]; then exit 2; fi
 
   privacy-scan:
     name: Privacy Scan
@@ -109,8 +109,8 @@ jobs:
         # stdlib-only script — if it ever imports project code, add: pip install -r requirements.txt
         # Exit codes: 0=compliant, 1=findings, 2=critical — only block on critical
         run: |
-          python -m scripts.privacy_scan; code=$?
-          if [ $code -eq 2 ]; then exit 2; fi
+          python -m scripts.privacy_scan || code=$?
+          if [ "${code:-0}" -eq 2 ]; then exit 2; fi
 
   dep-audit:
     name: Dependency Audit
