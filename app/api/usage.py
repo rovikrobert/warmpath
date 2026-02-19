@@ -12,8 +12,9 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
-from app.middleware.usage_logger import FREE_TIER_LIMITS
+from app.middleware.usage_logger import get_free_tier_limits
 from app.models.enrichment import UsageLog
 from app.models.user import User
 from app.utils.security import get_current_user
@@ -30,8 +31,10 @@ async def usage_summary(
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
+    free_tier_limits = get_free_tier_limits()
+
     # Count each metered action this month (single GROUP BY query)
-    metered_actions = list(FREE_TIER_LIMITS.keys()) + [
+    metered_actions = list(free_tier_limits.keys()) + [
         "job_scan",
         "application_create",
     ]
@@ -65,8 +68,8 @@ async def usage_summary(
     plan_tier = current_user.plan_tier or "free"
     limits: dict[str, int | str] = {}
     for action in metered_actions:
-        if plan_tier == "free" and action in FREE_TIER_LIMITS:
-            limits[action] = FREE_TIER_LIMITS[action]
+        if plan_tier == "free" and action in free_tier_limits:
+            limits[action] = free_tier_limits[action]
         else:
             limits[action] = "unlimited"
 
@@ -74,6 +77,7 @@ async def usage_summary(
         "data": {
             "period": month_start.strftime("%Y-%m"),
             "plan_tier": plan_tier,
+            "beta_sandbox": settings.BETA_SANDBOX_MODE,
             "total_metered_calls": total_metered,
             "counts": counts,
             "limits": limits,

@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     SECURE_HEADERS: bool = False  # True in production — enables HSTS
     ANTHROPIC_API_KEY: str = ""
     AI_MOCK_MODE: bool = True
+    BETA_SANDBOX_MODE: bool = True  # Relaxed limits for early beta users
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"

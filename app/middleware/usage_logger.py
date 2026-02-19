@@ -3,13 +3,16 @@
 Exposes helpers that the main UsageTrackingMiddleware calls in the same
 DB session (avoids BaseHTTPMiddleware stacking issues with SQLite).
 
-Free tier limits:
+Free tier limits (standard):
   - marketplace_search: 0 (blocked — needs paid plan)
   - intro_request: 0 (blocked — needs paid plan)
   - smart_search: 3/month
   - intro_draft: 5/month
   - csv_upload: 1/month
   - job_scan, application_create: unlimited
+
+Beta sandbox mode (BETA_SANDBOX_MODE=true) relaxes limits to encourage
+exploration during early beta. See get_free_tier_limits().
 
 Never blocks requests — adds X-WarmPath-Usage-Warning headers only.
 """
@@ -34,13 +37,34 @@ _METERED_ROUTES: list[tuple[str, re.Pattern, str]] = [
     ("POST", re.compile(r"^/api/v1/marketplace/request-intro$"), "intro_request"),
 ]
 
-FREE_TIER_LIMITS: dict[str, int] = {
+_STANDARD_FREE_TIER_LIMITS: dict[str, int] = {
     "smart_search": 3,
     "intro_draft": 5,
     "csv_upload": 1,
     "marketplace_search": 0,
     "intro_request": 0,
 }
+
+_BETA_FREE_TIER_LIMITS: dict[str, int] = {
+    "smart_search": 25,
+    "intro_draft": 25,
+    "csv_upload": 5,
+    "marketplace_search": 15,
+    "intro_request": 10,
+}
+
+# Backward compat alias (points to standard limits)
+FREE_TIER_LIMITS = _STANDARD_FREE_TIER_LIMITS
+
+
+def get_free_tier_limits() -> dict[str, int]:
+    """Return the active free-tier limits, respecting BETA_SANDBOX_MODE."""
+    from app.config import settings
+
+    if settings.BETA_SANDBOX_MODE:
+        return _BETA_FREE_TIER_LIMITS
+    return _STANDARD_FREE_TIER_LIMITS
+
 
 _MARKETPLACE_WARNING = (
     "Marketplace access requires a paid plan. Upgrade for full access."
@@ -82,10 +106,11 @@ async def compute_metering_warning(
     plan_tier, is_admin = row
     plan_tier = plan_tier or "free"
 
-    if is_admin or plan_tier != "free" or action not in FREE_TIER_LIMITS:
+    limits = get_free_tier_limits()
+    if is_admin or plan_tier != "free" or action not in limits:
         return None
 
-    limit = FREE_TIER_LIMITS[action]
+    limit = limits[action]
 
     if limit == 0:
         return _MARKETPLACE_WARNING

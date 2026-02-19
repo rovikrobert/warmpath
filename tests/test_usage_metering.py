@@ -4,11 +4,21 @@ import io
 import uuid as uuid_mod
 from datetime import date, timedelta
 
+import pytest
 from httpx import AsyncClient
 
 from app.models.enrichment import UsageLog
 from app.models.user import User
 from tests.conftest import TestSessionLocal, create_test_user_in_db
+
+
+@pytest.fixture(autouse=True)
+def _disable_beta_sandbox(monkeypatch):
+    """Ensure standard (non-beta) limits for all tests in this module."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "BETA_SANDBOX_MODE", False)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
