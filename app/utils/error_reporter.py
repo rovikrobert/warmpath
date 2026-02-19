@@ -1,12 +1,8 @@
-"""WhatsApp error alerting for beta user onboarding.
+"""Error alerting via Telegram for beta user onboarding.
 
-When unhandled 500 errors occur, generates a WhatsApp-formatted message
-so the founder can be notified immediately. Phase 1 saves to file,
-Phase 2 sends via Twilio.
-
-The alerts include: endpoint, method, error type, error message,
-and user context (if authenticated). Rate-limited to avoid spam
-(max 1 alert per endpoint per 5 minutes).
+When unhandled 500 errors occur, sends a Telegram message to the founder
+and saves a local copy. Rate-limited to avoid spam (max 1 alert per
+endpoint per 5 minutes).
 """
 
 import logging
@@ -18,7 +14,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-WHATSAPP_DIR = Path("agents/chief_of_staff/reports/whatsapp")
+ALERT_DIR = Path("agents/chief_of_staff/reports/error_alerts")
 _recent_alerts: dict[str, float] = {}
 _COOLDOWN_SECONDS = 300  # 5 minutes per endpoint
 
@@ -39,8 +35,9 @@ def send_error_alert(
     error: Exception,
     user_email: str | None = None,
 ) -> str | None:
-    """Generate a WhatsApp error alert for a 500 error.
+    """Generate an error alert for a 500 error.
 
+    Sends via Telegram if configured, always saves a local copy.
     Returns the file path if saved, None if rate-limited or failed.
     """
     endpoint_key = f"{method}:{path}"
@@ -48,7 +45,7 @@ def send_error_alert(
         return None
 
     try:
-        WHATSAPP_DIR.mkdir(parents=True, exist_ok=True)
+        ALERT_DIR.mkdir(parents=True, exist_ok=True)
 
         now = datetime.now(timezone.utc)
         time_str = now.strftime("%H:%M UTC")
@@ -80,14 +77,14 @@ def send_error_alert(
             ]
         )
 
-        filename = f"whatsapp-error-{date_str}-{now.strftime('%H%M%S')}.txt"
-        filepath = WHATSAPP_DIR / filename
+        filename = f"error-alert-{date_str}-{now.strftime('%H%M%S')}.txt"
+        filepath = ALERT_DIR / filename
         filepath.write_text(message, encoding="utf-8")
         logger.info("Error alert saved: %s", filepath)
 
-        # Phase 2: Send via Twilio if configured
-        if os.environ.get("TWILIO_ACCOUNT_SID"):
-            _send_via_twilio(message)
+        # Send via Telegram if configured
+        if os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID"):
+            _send_via_telegram(message)
 
         return str(filepath)
 
@@ -96,25 +93,19 @@ def send_error_alert(
         return None
 
 
-def _send_via_twilio(message: str) -> None:
-    """Send error alert via Twilio WhatsApp (Phase 2)."""
+def _send_via_telegram(message: str) -> None:
+    """Send error alert via Telegram Bot API."""
     try:
         import httpx
 
-        account_sid = os.environ["TWILIO_ACCOUNT_SID"]
-        auth_token = os.environ["TWILIO_AUTH_TOKEN"]
-        from_number = os.environ["TWILIO_WHATSAPP_FROM"]
-        to_number = os.environ["ROVIK_WHATSAPP_NUMBER"]
+        token = os.environ["TELEGRAM_BOT_TOKEN"]
+        chat_id = os.environ["TELEGRAM_CHAT_ID"]
 
-        url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
-        data = {
-            "From": f"whatsapp:{from_number}",
-            "To": f"whatsapp:{to_number}",
-            "Body": message,
-        }
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {"chat_id": chat_id, "text": message}
         with httpx.Client(timeout=10.0) as client:
-            response = client.post(url, data=data, auth=(account_sid, auth_token))
+            response = client.post(url, json=payload)
             response.raise_for_status()
-            logger.info("Error alert sent via Twilio: %s", response.json().get("sid"))
+            logger.info("Error alert sent via Telegram")
     except Exception:
-        logger.warning("Twilio error alert failed", exc_info=True)
+        logger.warning("Telegram error alert failed", exc_info=True)
