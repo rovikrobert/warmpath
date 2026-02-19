@@ -5,14 +5,19 @@ RS256 JWKS-based verification. Tokens are issued by Clerk's frontend
 SDK and verified here against Clerk's public JWKS endpoint.
 """
 
+import logging
 from functools import lru_cache
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 bearer_scheme = HTTPBearer()
 
@@ -45,7 +50,8 @@ def verify_clerk_token(token: str) -> dict:
             issuer=f"https://{settings.CLERK_DOMAIN}",
         )
         return payload
-    except pyjwt.PyJWTError:
+    except pyjwt.PyJWTError as exc:
+        logger.warning("Clerk JWT verification failed: %s (domain=%s)", exc, settings.CLERK_DOMAIN)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
         ) from None
@@ -70,6 +76,7 @@ async def get_current_user(
     )
     user = result.scalar_one_or_none()
     if user is None:
+        logger.warning("No DB user for clerk_user_id=%s", clerk_user_id)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
         )
