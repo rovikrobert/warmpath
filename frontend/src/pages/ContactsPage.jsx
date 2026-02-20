@@ -512,6 +512,38 @@ export default function ContactsPage() {
   const [companyNames, setCompanyNames] = useState([]);
   const [addedCompanies, setAddedCompanies] = useState([]);
 
+  // NLP search state
+  const [searchInput, setSearchInput] = useState('');
+  const [nlpResults, setNlpResults] = useState(null);
+  const [nlpInterpretation, setNlpInterpretation] = useState(null);
+  const [nlpLoading, setNlpLoading] = useState(false);
+  const [nlpError, setNlpError] = useState('');
+
+  const handleNlpSearch = useCallback(async () => {
+    const query = searchInput.trim();
+    if (!query) return;
+    setNlpLoading(true);
+    setNlpError('');
+    try {
+      const res = await contactsApi.nlpSearch(query);
+      setNlpResults(res.data || []);
+      setNlpInterpretation(res.meta?.interpretation || null);
+    } catch (err) {
+      setNlpError(err.message || 'NLP search failed');
+      setNlpResults(null);
+      setNlpInterpretation(null);
+    } finally {
+      setNlpLoading(false);
+    }
+  }, [searchInput]);
+
+  const clearNlpSearch = useCallback(() => {
+    setSearchInput('');
+    setNlpResults(null);
+    setNlpInterpretation(null);
+    setNlpError('');
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -568,25 +600,102 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      {/* Filter bar */}
-      <div className="mb-4 flex items-center gap-3">
-        <label htmlFor="contacts-filter" className="sr-only">Filter by relationship type</label>
-        <select
-          id="contacts-filter"
-          value={filter}
-          onChange={(e) => { setFilter(e.target.value); setPage(1); }}
-          aria-label="Filter contacts by relationship type"
-          className="rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-        >
-          {RELATIONSHIP_TYPES.map((r) => (
-            <option key={r.value} value={r.value}>{r.label}</option>
-          ))}
-          <option value="__none__">Unclassified</option>
-        </select>
-        {meta.total != null && (
+      {/* Search + Filter bar */}
+      <div className="mb-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <label htmlFor="contacts-search" className="sr-only">Search contacts with natural language</label>
+            <input
+              id="contacts-search"
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && searchInput.trim()) handleNlpSearch(); }}
+              placeholder='Search contacts or try "CTOs at big tech in Singapore"...'
+              aria-label="Search contacts using natural language"
+              className="w-full rounded-lg border border-slate-700/50 bg-slate-800 py-2 pl-3 pr-10 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+            {searchInput.trim() && (
+              <button
+                onClick={handleNlpSearch}
+                disabled={nlpLoading}
+                aria-label="Run AI search"
+                title="AI Search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-1.5 py-1 text-amber-400 hover:text-amber-300 disabled:opacity-50"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden="true">
+                  <path d="M10 1l2.39 4.843L17.5 6.91l-3.75 3.654.886 5.16L10 13.21l-4.636 2.513.886-5.16L2.5 6.91l5.11-1.066L10 1z" />
+                </svg>
+              </button>
+            )}
+          </div>
+          <label htmlFor="contacts-filter" className="sr-only">Filter by relationship type</label>
+          <select
+            id="contacts-filter"
+            value={filter}
+            onChange={(e) => { setFilter(e.target.value); setPage(1); }}
+            aria-label="Filter contacts by relationship type"
+            className="rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            {RELATIONSHIP_TYPES.map((r) => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+            <option value="__none__">Unclassified</option>
+          </select>
+        </div>
+        {meta.total != null && !nlpResults && (
           <span className="text-sm text-slate-400">{meta.total} contacts</span>
         )}
       </div>
+
+      {/* NLP Interpretation chips */}
+      {nlpInterpretation && nlpResults && (
+        <div className="mb-4 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3" role="region" aria-label="Search interpretation">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-slate-400">Understood as:</span>
+            {nlpInterpretation.titles?.map((t) => (
+              <span key={`title-${t}`} className="inline-flex rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400">{t}</span>
+            ))}
+            {nlpInterpretation.companies?.map((c) => (
+              <span key={`company-${c}`} className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">{c}</span>
+            ))}
+            {nlpInterpretation.locations?.map((l) => (
+              <span key={`loc-${l}`} className="inline-flex rounded-full bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-400">{l}</span>
+            ))}
+            {nlpInterpretation.seniority?.map((s) => (
+              <span key={`sen-${s}`} className="inline-flex rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">{s}</span>
+            ))}
+            {nlpInterpretation.relationship_types?.map((r) => (
+              <span key={`rel-${r}`} className="inline-flex rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs font-medium text-cyan-400">
+                {RELATIONSHIP_TYPES.find((rt) => rt.value === r)?.label || r}
+              </span>
+            ))}
+            <button
+              onClick={clearNlpSearch}
+              aria-label="Clear NLP search and return to normal contact list"
+              className="ml-auto rounded-md border border-slate-700/50 px-2.5 py-1 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+            >
+              Clear search
+            </button>
+          </div>
+          <p className="mt-1.5 text-xs text-slate-500">
+            {nlpResults.length} {nlpResults.length === 1 ? 'match' : 'matches'} found
+          </p>
+        </div>
+      )}
+
+      {/* NLP error display */}
+      {nlpError && (
+        <div className="mb-4 rounded-lg bg-red-500/10 p-3" role="alert" aria-live="polite">
+          <p className="text-sm text-red-400">{nlpError}</p>
+          <button
+            onClick={clearNlpSearch}
+            className="mt-1 text-xs font-medium text-red-400 hover:text-red-300"
+          >
+            Clear search
+          </button>
+        </div>
+      )}
 
       {/* Post-add prompt */}
       {addedCompanies.length > 0 && (
@@ -602,7 +711,71 @@ export default function ContactsPage() {
         </div>
       )}
 
-      {loading ? (
+      {/* NLP loading spinner */}
+      {nlpLoading ? (
+        <div className="flex items-center justify-center py-20" aria-live="polite" aria-busy="true">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Searching contacts with AI" />
+        </div>
+      ) : nlpResults !== null ? (
+        /* ---- NLP search results mode ---- */
+        nlpResults.length === 0 ? (
+          <div className="rounded-xl bg-slate-900 p-12 text-center border border-slate-700/50">
+            <p className="text-sm text-slate-400">No contacts match your search.</p>
+            <button
+              onClick={clearNlpSearch}
+              className="mt-3 text-sm font-medium text-amber-400 hover:text-amber-300"
+            >
+              Clear search
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {nlpResults.map((c) => (
+              <div key={c.id} className="rounded-xl bg-slate-900 border border-slate-700/50">
+                <div
+                  onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpandedId(expandedId === c.id ? null : c.id); }}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={expandedId === c.id}
+                  aria-label={`${c.full_name}, NLP match score ${c.nlp_match_score != null ? Math.round(c.nlp_match_score) : 'N/A'}, click to ${expandedId === c.id ? 'collapse' : 'expand'} details`}
+                  className="flex cursor-pointer items-center justify-between px-4 py-3 hover:bg-amber-500/5"
+                >
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-50">{c.full_name}</p>
+                      <p className="text-xs text-slate-400">
+                        {c.current_title && `${c.current_title} at `}{c.current_company || ''}
+                      </p>
+                    </div>
+                    <RelBadge
+                      type={c.relationship_type}
+                      onClick={(e) => { e.stopPropagation(); setExpandedId(c.id); }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {c.nlp_match_score != null && (
+                      <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400" title="NLP match score">
+                        {Math.round(c.nlp_match_score)}
+                      </span>
+                    )}
+                    {c.warm_score != null && (
+                      <MatchBadge score={c.warm_score} type="warm" />
+                    )}
+                    <span className="text-xs text-slate-400">{expandedId === c.id ? '\u25B2' : '\u25BC'}</span>
+                  </div>
+                </div>
+                {expandedId === c.id && (
+                  <div className="border-t border-slate-700/50 px-4 py-3">
+                    <ContactDetail contact={c} onUpdate={load} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )
+      ) : loading ? (
+        /* ---- Normal loading spinner ---- */
         <div className="flex items-center justify-center py-20" aria-live="polite" aria-busy="true">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading contacts" />
         </div>
