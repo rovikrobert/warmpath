@@ -37,6 +37,7 @@ BATCH_SIZE = (
 )
 MAX_CONCURRENT_BATCHES = 10
 CLAUDE_MODEL = settings.CLAUDE_MODEL
+CLAUDE_SCORER_MODEL = settings.CLAUDE_SCORER_MODEL
 
 
 # ---------------------------------------------------------------------------
@@ -585,7 +586,7 @@ async def _call_claude_api(
     for attempt in range(max_retries):
         try:
             message = await client.messages.create(
-                model=CLAUDE_MODEL,
+                model=CLAUDE_SCORER_MODEL,
                 max_tokens=8192,
                 system=_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_prompt}],
@@ -921,7 +922,7 @@ async def score_contacts(
             resource_type="search_request",
             resource_id=search.id,
             metadata_={
-                "model": CLAUDE_MODEL,
+                "model": CLAUDE_SCORER_MODEL,
                 "input_tokens": total_input_tokens,
                 "output_tokens": total_output_tokens,
                 "total_tokens": total_input_tokens + total_output_tokens,

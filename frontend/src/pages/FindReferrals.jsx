@@ -28,9 +28,20 @@ function RecommendationCard({ rec, onAdd, isAdded }) {
                 {rec.region}
               </span>
             )}
-            <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
-              {rec.matching_count} matching
-            </span>
+            {rec.matching_count > 0 ? (
+              <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
+                {rec.matching_count} matching
+              </span>
+            ) : rec.network_label ? (
+              <span className="inline-flex rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">
+                {rec.network_label}
+              </span>
+            ) : null}
+            {rec.referral_ready && (
+              <span className="inline-flex rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-400">
+                Referral Ready
+              </span>
+            )}
           </div>
           <div className="mt-2 space-y-0.5">
             {rec.top_titles?.slice(0, 2).map((title, i) => (
