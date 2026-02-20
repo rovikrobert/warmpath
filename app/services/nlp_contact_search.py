@@ -17,7 +17,12 @@ from __futu[RESEND_KEY_REDACTED] import annotations
 
 import logging
 import re
+import uuid
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +59,7 @@ _COMPANY_GROUPS: dict[str, list[str]] = {
 # Patterns that match "at <Company>" or "from <Company>"
 _COMPANY_PREPOSITION_RE = re.compile(
     r"\b(?:at|from|working\s+at|who\s+work(?:s)?\s+at)\s+"
-    r"([A-Z][A-Za-z0-9&.\-\s]+?)(?:\s+(?:in|who|that|and|or|,)|$)",
+    r"([A-Z][A-Za-z0-9&.\-\s]+?)(?:\s+(?:in|who|that|and|or|,)|[?.!]?\s*$)",
     re.IGNORECASE,
 )
 
@@ -608,3 +613,138 @@ def parse_query(query: str) -> ParsedQuery:
     if _settings.AI_MOCK_MODE:
         return parse_query_mock(query)
     return parse_query_real(query)
+
+
+# ---------------------------------------------------------------------------
+# Service function: search a user's contacts via NLP query
+# ---------------------------------------------------------------------------
+
+
+async def search_user_contacts(
+    user_id: uuid.UUID,
+    query_text: str,
+    db: AsyncSession,
+    limit: int = 20,
+) -> dict:
+    """Search a user's contacts using natural-language query parsing and scoring.
+
+    Returns a dict with keys: ``results``, ``interpretation``, ``total_scanned``,
+    ``total_matched``.  Each result contains ``full_name``, ``current_company``,
+    ``current_title``, ``warm_score``, ``nlp_match_score``, ``relationship_type``,
+    ``location``.
+    """
+    from sqlalchemy import func as sa_func
+    from sqlalchemy import select as sa_select
+
+    from app.models.company import Company
+    from app.models.contact import Contact
+    from app.models.match_result import WarmScore
+
+    parsed = parse_query(query_text)
+
+    # Resolve company names to IDs
+    resolved_company_ids: list[uuid.UUID] = []
+    if parsed.companies:
+        for company_name in parsed.companies:
+            result = await db.execute(
+                sa_select(Company.id).where(
+                    sa_func.lower(Company.name) == company_name.lower()
+                )
+            )
+            cid = result.scalar_one_or_none()
+            if cid is not None:
+                resolved_company_ids.append(cid)
+
+    # Build base query
+    base_query = (
+        sa_select(Contact, WarmScore.total_score)
+        .outerjoin(
+            WarmScore,
+            (WarmScore.contact_id == Contact.id)
+            & (WarmScore.user_id == Contact.user_id),
+        )
+        .where(
+            Contact.user_id == user_id,
+            Contact.deleted_at.is_(None),
+        )
+    )
+
+    if parsed.relationship_types:
+        base_query = base_query.where(
+            Contact.relationship_type.in_(parsed.relationship_types)
+        )
+    if resolved_company_ids:
+        base_query = base_query.where(Contact.company_id.in_(resolved_company_ids))
+
+    result = await db.execute(base_query)
+    all_rows = result.all()
+    total_scanned = len(all_rows)
+
+    if not query_text.strip():
+        # Empty query — return all contacts sorted by warm_score desc
+        all_rows.sort(key=lambda r: (r[1] is not None, r[1] or 0), reverse=True)
+        results = []
+        for contact, sco[RESEND_KEY_REDACTED] in all_rows[:limit]:
+            results.append(
+                {
+                    "full_name": contact.full_name,
+                    "current_company": contact.current_company,
+                    "current_title": contact.current_title,
+                    "warm_score": float(sco[RESEND_KEY_REDACTED]) if sco[RESEND_KEY_REDACTED] is not None else None,
+                    "nlp_match_score": None,
+                    "relationship_type": contact.relationship_type,
+                    "location": contact.location,
+                }
+            )
+        total_matched = total_scanned
+    else:
+        # Score and filter
+        scored: list[tuple] = []
+        resolved_ids_set = set(resolved_company_ids)
+        for contact, sco[RESEND_KEY_REDACTED] in all_rows:
+            company_matched = (
+                contact.company_id is not None
+                and contact.company_id in resolved_ids_set
+            )
+            nlp_score = sco[RESEND_KEY_REDACTED](
+                parsed,
+                contact.current_company,
+                contact.current_title,
+                contact.location,
+                contact.relationship_type,
+                company_matched,
+            )
+            if nlp_score >= 20:
+                scored.append((contact, sco[RESEND_KEY_REDACTED], nlp_score))
+
+        scored.sort(key=lambda r: r[2], reverse=True)
+        total_matched = len(scored)
+        results = []
+        for contact, sco[RESEND_KEY_REDACTED], nlp_score in scored[:limit]:
+            results.append(
+                {
+                    "full_name": contact.full_name,
+                    "current_company": contact.current_company,
+                    "current_title": contact.current_title,
+                    "warm_score": float(sco[RESEND_KEY_REDACTED]) if sco[RESEND_KEY_REDACTED] is not None else None,
+                    "nlp_match_score": round(nlp_score, 2),
+                    "relationship_type": contact.relationship_type,
+                    "location": contact.location,
+                }
+            )
+
+    interpretation = {
+        "titles": parsed.titles,
+        "companies": parsed.companies,
+        "seniority": parsed.seniority,
+        "locations": parsed.locations,
+        "relationship_types": parsed.relationship_types,
+        "raw_query": parsed.raw_query,
+    }
+
+    return {
+        "results": results,
+        "interpretation": interpretation,
+        "total_scanned": total_scanned,
+        "total_matched": total_matched,
+    }

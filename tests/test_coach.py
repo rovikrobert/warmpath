@@ -782,3 +782,262 @@ class TestSessionTracking:
             STAGE_ACTIVE_SEARCH,
             STAGE_STALLED,
         )
+
+
+# ---------------------------------------------------------------------------
+# TestContactSearchDetection
+# ---------------------------------------------------------------------------
+
+
+class TestContactSearchDetection:
+    """Test is_contact_search_query() pattern matching."""
+
+    def test_who_do_i_know_at(self):
+        from ops_team.keevs.coach_service import is_contact_search_query
+
+        assert is_contact_search_query("who do I know at Google?") is True
+
+    def test_contacts_at(self):
+        from ops_team.keevs.coach_service import is_contact_search_query
+
+        assert is_contact_search_query("my contacts at Stripe") is True
+
+    def test_show_people(self):
+        from ops_team.keevs.coach_service import is_contact_search_query
+
+        assert is_contact_search_query("show me my connections at Meta") is True
+
+    def test_anyone_at(self):
+        from ops_team.keevs.coach_service import is_contact_search_query
+
+        assert is_contact_search_query("anyone at Amazon?") is True
+
+    def test_find_contacts(self):
+        from ops_team.keevs.coach_service import is_contact_search_query
+
+        assert is_contact_search_query("find contacts at Netflix") is True
+
+    def test_search_network(self):
+        from ops_team.keevs.coach_service import is_contact_search_query
+
+        assert is_contact_search_query("search my network at Apple") is True
+
+    def test_senior_engineers(self):
+        from ops_team.keevs.coach_service import is_contact_search_query
+
+        assert is_contact_search_query("senior engineers at Google") is True
+
+    def test_company_contacts(self):
+        from ops_team.keevs.coach_service import is_contact_search_query
+
+        assert is_contact_search_query("Google contacts") is True
+
+    def test_generic_question_not_detected(self):
+        from ops_team.keevs.coach_service import is_contact_search_query
+
+        assert is_contact_search_query("How's my pipeline looking?") is False
+
+    def test_credits_question_not_detected(self):
+        from ops_team.keevs.coach_service import is_contact_search_query
+
+        assert is_contact_search_query("How many credits do I have?") is False
+
+    def test_weather_not_detected(self):
+        from ops_team.keevs.coach_service import is_contact_search_query
+
+        assert is_contact_search_query("What's the weather like?") is False
+
+    def test_reversed_order_who_have_at(self):
+        from ops_team.keevs.coach_service import is_contact_search_query
+
+        assert is_contact_search_query("who have I got at Stripe?") is True
+
+    def test_detect_topic_returns_contact_search(self):
+        assert _detect_topic("who do I know at Google?") == "contact_search"
+
+    def test_detect_topic_contact_search_overrides_network(self):
+        """Contact search should take priority over generic 'network' topic."""
+        assert _detect_topic("show me my contacts at Stripe") == "contact_search"
+
+
+# ---------------------------------------------------------------------------
+# TestContactSearchMockFormatting
+# ---------------------------------------------------------------------------
+
+
+class TestContactSearchMockFormatting:
+    """Test mock chat response formatting with contact results."""
+
+    def _base_context(self) -> dict:
+        return {
+            "user": {"name": "Test", "title": None, "company": None, "location": None},
+            "preferences": None,
+            "network": {"total_contacts": 50, "top_companies": []},
+            "pipeline": {"status_counts": {}, "follow_ups_needed": 0, "total": 0},
+            "recent_searches": [],
+            "credits": 0,
+            "market": None,
+        }
+
+    def _sample_contact_results(self, count: int = 3) -> dict:
+        results = []
+        for i in range(count):
+            results.append(
+                {
+                    "full_name": f"Contact {i}",
+                    "current_company": "Google",
+                    "current_title": f"Engineer L{i + 3}",
+                    "warm_score": 80 - i * 10,
+                    "nlp_match_score": 90 - i * 5,
+                    "relationship_type": "former_colleague",
+                    "location": "Singapore",
+                }
+            )
+        return {
+            "results": results,
+            "interpretation": {"raw_query": "engineers at Google"},
+            "total_scanned": 50,
+            "total_matched": count,
+        }
+
+    def test_contact_names_appear_in_response(self):
+        contact_results = self._sample_contact_results(3)
+        text, topic = _mock_chat_response(
+            "who do I know at Google?",
+            self._base_context(),
+            contact_results=contact_results,
+        )
+        assert "Contact 0" in text
+        assert "Contact 1" in text
+        assert "Contact 2" in text
+        assert topic == "contact_search"
+
+    def test_warm_sco[RESEND_KEY_REDACTED](self):
+        contact_results = self._sample_contact_results(1)
+        text, _ = _mock_chat_response(
+            "who do I know at Google?",
+            self._base_context(),
+            contact_results=contact_results,
+        )
+        assert "warm score: 80" in text
+
+    def test_caps_at_ten_results(self):
+        from ops_team.keevs.coach_service import _format_contact_results_markdown
+
+        contact_results = self._sample_contact_results(15)
+        text = _format_contact_results_markdown(contact_results)
+        # Should show overflow message
+        assert "Showing 10 of 15" in text
+        # Should not show all 15
+        assert "Contact 14" not in text
+
+    def test_overflow_text_when_mo[RESEND_KEY_REDACTED](self):
+        from ops_team.keevs.coach_service import _format_contact_results_markdown
+
+        contact_results = self._sample_contact_results(12)
+        text = _format_contact_results_markdown(contact_results)
+        assert "Showing 10 of 12" in text
+        assert "/contacts" in text
+
+    def test_no_overflow_when_within_limit(self):
+        from ops_team.keevs.coach_service import _format_contact_results_markdown
+
+        contact_results = self._sample_contact_results(5)
+        text = _format_contact_results_markdown(contact_results)
+        assert "Showing" not in text
+
+    def test_zero_results_returns_helpful_message(self):
+        from ops_team.keevs.coach_service import _format_contact_results_markdown
+
+        contact_results = {
+            "results": [],
+            "interpretation": {"raw_query": "CTOs at Acme"},
+            "total_scanned": 50,
+            "total_matched": 0,
+        }
+        text = _format_contact_results_markdown(contact_results)
+        assert "No contacts found" in text
+
+    def test_referral_cta_in_response(self):
+        contact_results = self._sample_contact_results(2)
+        text, _ = _mock_chat_response(
+            "who do I know at Google?",
+            self._base_context(),
+            contact_results=contact_results,
+        )
+        assert "referral message" in text.lower()
+
+    def test_no_contact_results_falls_through_to_network(self):
+        """When contact_results is None, contact_search remaps to network topic."""
+        text, topic = _mock_chat_response(
+            "who do I know at Google?",
+            self._base_context(),
+            contact_results=None,
+        )
+        # Should fall through to network handler
+        assert topic == "network"
+        assert len(text) > 0
+
+    def test_build_chat_messages_includes_contact_results(self):
+        context = {"user": {"name": "Test"}, "preferences": None}
+        contact_results = self._sample_contact_results(2)
+        messages = _build_chat_messages(
+            "who do I know at Google?", [], context, contact_results
+        )
+        # Should have: context pair (2) + contact pair (2) + current msg (1) = 5
+        assert len(messages) == 5
+        # The contact injection message should mention "CONTACT SEARCH RESULTS"
+        assert any("CONTACT SEARCH RESULTS" in m["content"] for m in messages)
+
+    def test_build_chat_messages_without_contact_results(self):
+        context = {"user": {"name": "Test"}, "preferences": None}
+        messages = _build_chat_messages("hello", [], context, None)
+        # Should have: context pair (2) + current msg (1) = 3
+        assert len(messages) == 3
+
+
+# ---------------------------------------------------------------------------
+# TestCoachContactSearchIntegration
+# ---------------------------------------------------------------------------
+
+
+class TestCoachContactSearchIntegration:
+    """Integration tests: POST /coach/chat with contact search queries."""
+
+    async def test_contact_names_in_chat_response(
+        self, client: AsyncClient, user_with_data: dict
+    ):
+        """'who do I know at Google?' returns actual contact names."""
+        resp = await client.post(
+            "/api/v1/coach/chat",
+            headers=user_with_data,
+            json={"message": "who do I know at Google?"},
+        )
+        assert resp.status_code == 200
+        response_text = resp.json()["data"]["response"]
+        # user_with_data creates Alice Eng at Google
+        assert "Alice" in response_text
+
+    async def test_contact_names_in_stream_response(
+        self, client: AsyncClient, user_with_data: dict
+    ):
+        """Streaming endpoint also includes contact names."""
+        resp = await client.post(
+            "/api/v1/coach/chat/stream",
+            headers=user_with_data,
+            json={"message": "who do I know at Google?"},
+        )
+        assert resp.status_code == 200
+        assert "Alice" in resp.text
+
+    async def test_no_match_query_returns_generic_response(
+        self, client: AsyncClient, user_with_data: dict
+    ):
+        """Query for a company with no contacts still returns a response."""
+        resp = await client.post(
+            "/api/v1/coach/chat",
+            headers=user_with_data,
+            json={"message": "who do I know at Netflix?"},
+        )
+        assert resp.status_code == 200
+        assert len(resp.json()["data"]["response"]) > 0

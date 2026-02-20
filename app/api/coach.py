@@ -21,6 +21,7 @@ from ops_team.keevs.coach_service import (
     generate_briefing,
     generate_chat_response,
     generate_chat_response_stream,
+    is_contact_search_query,
 )
 from app.utils.security import get_current_user
 
@@ -38,6 +39,28 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     conversation_history: list[dict[str, Any]] | None = None
     context_snapshot: dict[str, Any] | None = None
+
+
+async def _run_contact_search_if_needed(user_id, message: str, db) -> dict | None:
+    """Run NLP contact search if the message looks like a contact query."""
+    if not is_contact_search_query(message):
+        return None
+    from app.services.nlp_contact_search import search_user_contacts
+    from app.utils.tracking import track_action
+
+    search_result = await search_user_contacts(user_id, message, db, limit=10)
+    if search_result["total_matched"] > 0:
+        await track_action(
+            db,
+            user_id,
+            "coach_contact_search",
+            metadata_={
+                "query": message,
+                "total_matched": search_result["total_matched"],
+            },
+        )
+        return search_result
+    return None
 
 
 @router.get("/briefing")
@@ -80,12 +103,18 @@ async def coach_chat(
     )
     await db.commit()
 
+    # Run contact search before generating response
+    contact_results = await _run_contact_search_if_needed(
+        current_user.id, body.message, db
+    )
+
     data = await generate_chat_response(
         user_id=current_user.id,
         message=body.message,
         conversation_history=body.conversation_history,
         context_snapshot=body.context_snapshot,
         db=db,
+        contact_results=contact_results,
     )
     return {"data": data, "meta": {}}
 
@@ -112,6 +141,11 @@ async def coach_chat_stream(
     # Sanitize conversation history
     history = _sanitize_conversation_history(body.conversation_history)
 
+    # Run contact search BEFORE entering SSE generator (db session still alive)
+    contact_results = await _run_contact_search_if_needed(
+        current_user.id, body.message, db
+    )
+
     # Log usage eagerly (captured even if client disconnects mid-stream)
     db.add(
         UsageLog(
@@ -128,7 +162,7 @@ async def coach_chat_stream(
         deadline = asyncio.get_event_loop().time() + _SSE_TIMEOUT_SECONDS
         try:
             async for chunk in generate_chat_response_stream(
-                body.message, history, context
+                body.message, history, context, contact_results
             ):
                 if asyncio.get_event_loop().time() > deadline:
                     logger.warning("SSE stream timed out for user %s", user_key)
