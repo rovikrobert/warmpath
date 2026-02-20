@@ -21,4 +21,6 @@ def rate_limiter_watchdog() -> None:
     from app.utils.rate_limiter import top_up_tokens_sync
 
     top_up_tokens_sync("anthropic", settings.ANTHROPIC_MAX_CONCURRENT)
+    if settings.CLEANUP_PROVIDER == "gemini":
+        top_up_tokens_sync("gemini", settings.GOOGLE_MAX_CONCURRENT)
     logger.debug("Rate limiter watchdog completed")

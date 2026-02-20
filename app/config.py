@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 5
     DB_MAX_OVERFLOW: int = 10
     ANTHROPIC_MAX_CONCURRENT: int = 5
+    GOOGLE_API_KEY: str = ""
+    GOOGLE_MAX_CONCURRENT: int = 10
+    CLEANUP_PROVIDER: str = "gemini"  # "anthropic" | "gemini"
     QUEUE_DEPTH_THRESHOLD: int = 20
     POSTHOG_API_KEY: str = ""
     POSTHOG_PROJECT_ID: str = ""
