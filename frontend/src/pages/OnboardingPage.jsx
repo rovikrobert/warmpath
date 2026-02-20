@@ -313,7 +313,7 @@ export default function OnboardingPage() {
   }, []);
 
   const pollUploadStatus = async (uploadId) => {
-    const maxAttempts = 60; // up to ~60 seconds
+    const maxAttempts = 120; // up to ~2 minutes
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise((r) => setTimeout(r, 1000));
       try {
@@ -748,13 +748,21 @@ export default function OnboardingPage() {
                 <span className="text-xl text-emerald-400">&#10003;</span>
               </div>
               <h2 className="text-lg font-semibold text-slate-50">
-                {(uploadResult.processed_count ?? uploadResult.row_count)
-                  ? `${uploadResult.processed_count ?? uploadResult.row_count} contacts imported!`
-                  : 'CSV uploaded successfully!'}
+                {uploadResult.status === 'queued' || uploadResult.status === 'processing'
+                  ? 'CSV uploaded successfully!'
+                  : (uploadResult.processed_count ?? uploadResult.row_count)
+                    ? `${uploadResult.processed_count ?? uploadResult.row_count} contacts imported!`
+                    : 'CSV uploaded successfully!'}
               </h2>
-              <p className="text-sm text-slate-400">
-                Add your work history to improve referral matching — contacts at your former companies get boosted scores.
-              </p>
+              {uploadResult.status === 'queued' || uploadResult.status === 'processing' ? (
+                <p className="text-sm text-slate-400">
+                  Your contacts are being imported in the background. You can continue — they'll be ready shortly.
+                </p>
+              ) : (
+                <p className="text-sm text-slate-400">
+                  Add your work history to improve referral matching — contacts at your former companies get boosted scores.
+                </p>
+              )}
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={() => { setError(''); setStep(8); }} size="lg" className="px-4">
                   Back

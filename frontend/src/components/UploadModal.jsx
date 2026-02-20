@@ -72,13 +72,36 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
     handleFile(f);
   }, []);
 
+  const pollUploadStatus = async (uploadId) => {
+    const maxAttempts = 120;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        const poll = await contactsApi.getUploadStatus(uploadId);
+        const s = poll.data;
+        if (s.status === 'completed') return s;
+        if (s.status === 'failed') throw new Error(s.error_message || 'CSV processing failed');
+      } catch (err) {
+        if (err.message?.includes('failed')) throw err;
+      }
+    }
+    return null;
+  };
+
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
     setError('');
     try {
       const res = await contactsApi.upload(file);
-      setResult(res.data);
+      let data = res.data;
+
+      if (data.status === 'queued' || data.status === 'processing') {
+        const final = await pollUploadStatus(data.id);
+        if (final) data = final;
+      }
+
+      setResult(data);
       setStep(3);
     } catch (err) {
       setError(err.message);
@@ -226,15 +249,23 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
                 </svg>
               </div>
               <h3 className="mb-1 text-lg font-semibold text-slate-50">
-                Your network is live!
+                {result.status === 'queued' || result.status === 'processing'
+                  ? 'Upload received!'
+                  : 'Your network is live!'}
               </h3>
               <p className="mb-2 text-sm text-slate-400">
-                {result.processed_count ?? result.row_count ?? 0} contacts imported
-                {result.company_count ? ` across ${result.company_count} companies` : ''}
+                {result.status === 'queued' || result.status === 'processing'
+                  ? 'Your contacts are being imported in the background. They\'ll be ready shortly.'
+                  : <>
+                      {result.processed_count ?? result.row_count ?? 0} contacts imported
+                      {result.company_count ? ` across ${result.company_count} companies` : ''}
+                    </>}
               </p>
-              <p className="mx-auto mb-4 max-w-xs text-xs text-slate-500">
-                You earned 100 credits for your first upload. Your contacts are now scored and ready to search.
-              </p>
+              {!(result.status === 'queued' || result.status === 'processing') && (
+                <p className="mx-auto mb-4 max-w-xs text-xs text-slate-500">
+                  You earned 100 credits for your first upload. Your contacts are now scored and ready to search.
+                </p>
+              )}
               <Button
                 onClick={() => { onComplete?.(); onClose(); }}
                 className="w-full"
@@ -248,11 +279,17 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
                 <span className="text-xl text-emerald-400">&#10003;</span>
               </div>
               <h3 className="mb-1 text-base font-medium text-slate-50">
-                You're all set!
+                {result.status === 'queued' || result.status === 'processing'
+                  ? 'Upload received!'
+                  : "You're all set!"}
               </h3>
               <p className="mb-4 text-sm text-slate-400">
-                {result.processed_count ?? result.row_count ?? 0} contacts imported
-                {result.company_count ? ` across ${result.company_count} companies` : ''}
+                {result.status === 'queued' || result.status === 'processing'
+                  ? 'Your contacts are being imported in the background. They\'ll be ready shortly.'
+                  : <>
+                      {result.processed_count ?? result.row_count ?? 0} contacts imported
+                      {result.company_count ? ` across ${result.company_count} companies` : ''}
+                    </>}
               </p>
               <Button
                 onClick={() => { onComplete?.(); onClose(); }}

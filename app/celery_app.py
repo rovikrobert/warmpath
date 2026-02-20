@@ -11,6 +11,9 @@ celery_app.conf.update(
     result_serializer="json",
     accept_content=["json"],
     task_track_started=True,
+    task_soft_time_limit=300,
+    task_time_limit=360,
+    worker_max_tasks_per_child=50,
     beat_schedule={
         "csv-reminder-d1": {
             "task": "app.tasks.email_tasks.send_csv_reminder_d1",
