@@ -319,8 +319,7 @@ export default function OnboardingPage() {
         // Network blip — keep polling
       }
     }
-    // Timed out but upload record exists — let them proceed anyway
-    return null;
+    throw new Error('Upload timed out — please refresh and try again');
   };
 
   const handleUpload = async () => {

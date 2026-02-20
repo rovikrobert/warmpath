@@ -88,7 +88,7 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
         if (err.message?.includes('failed')) throw err;
       }
     }
-    return null;
+    throw new Error('Upload timed out — please refresh and check your contacts');
   };
 
   const handleUpload = async () => {
