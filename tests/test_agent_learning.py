@@ -30,7 +30,7 @@ def _patch_agents_dir(monkeypatch):
 # ---------------------------------------------------------------------------
 # Import after patching setup
 # ---------------------------------------------------------------------------
-from agents.shared.learning import (
+from agents.shared.learning import (  # noqa: E402
     AgentLearningState,
     AttentionWeight,
     FindingSeverity,

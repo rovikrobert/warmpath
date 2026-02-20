@@ -23,7 +23,7 @@ def _patch_intel_cache(monkeypatch):
     yield
 
 
-from agents.shared.intelligence import (
+from agents.shared.intelligence import (  # noqa: E402
     INTEL_CATEGORIES,
     ExternalIntelligence,
     IntelligenceItem,
@@ -35,7 +35,7 @@ from agents.shared.intelligence import (
     get_agent_intel,
     get_all_intelligence,
 )
-from agents.shared.config import AGENT_NAMES
+from agents.shared.config import AGENT_NAMES  # noqa: E402
 
 
 # ===========================================================================
@@ -251,7 +251,7 @@ class TestExternalIntelligence:
 
     def test_mark_adopted(self):
         ei = self._make_ei()
-        ids = self._add_sample_items(ei)
+        self._add_sample_items(ei)
 
         assert ei.mark_adopted("item-1", "deps_manager") is True
         # Reload to verify persistence

@@ -104,17 +104,20 @@ def check_encryption() -> None:
     enc_file = APP_DIR / "utils" / "encryption.py"
     if enc_file.exists():
         enc_content = enc_file.read_text()
-        if "if not key:" in enc_content and "return value" in enc_content:
-            if (
+        if (
+            "if not key:" in enc_content
+            and "return value" in enc_content
+            and (
                 "warning" not in enc_content.lower()
                 and "logger" not in enc_content.lower()
-            ):
-                _add(
-                    "HIGH",
-                    "encryption",
-                    "Encryption passthrough has no warning log when ENCRYPTION_KEY is empty",
-                    str(enc_file.relative_to(PROJECT_ROOT)),
-                )
+            )
+        ):
+            _add(
+                "HIGH",
+                "encryption",
+                "Encryption passthrough has no warning log when ENCRYPTION_KEY is empty",
+                str(enc_file.relative_to(PROJECT_ROOT)),
+            )
 
     # Check config.py for ENCRYPTION_KEY default
     config_file = APP_DIR / "config.py"
@@ -507,17 +510,18 @@ def check_info_leaks() -> None:
         if "def register" in content
         else content[:5000]
     )
-    if "no account" in login_section.lower() or "not found" in login_section.lower():
-        if (
-            "wrong password" in login_section.lower()
-            or "incorrect password" in login_section.lower()
-        ):
-            _add(
-                "MEDIUM",
-                "info_leak",
-                "Login distinguishes between 'no account' and 'wrong password' — enables enumeration",
-                relpath,
-            )
+    if (
+        "no account" in login_section.lower() or "not found" in login_section.lower()
+    ) and (
+        "wrong password" in login_section.lower()
+        or "incorrect password" in login_section.lower()
+    ):
+        _add(
+            "MEDIUM",
+            "info_leak",
+            "Login distinguishes between 'no account' and 'wrong password' — enables enumeration",
+            relpath,
+        )
 
     found = sum(1 for f in findings if f["category"] == "info_leak")
     if found == 0:

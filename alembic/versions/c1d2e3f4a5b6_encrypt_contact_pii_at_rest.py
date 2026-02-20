@@ -52,7 +52,7 @@ def upgrade() -> None:
             col,
             type_=sa.Text(),
             existing_type=sa.String(),
-            existing_nullable=True if col != "full_name" else False,
+            existing_nullable=col != "full_name",
         )
 
 
@@ -74,7 +74,7 @@ def downgrade() -> None:
             col,
             type_=sa.String(size),
             existing_type=sa.Text(),
-            existing_nullable=True if col != "full_name" else False,
+            existing_nullable=col != "full_name",
         )
 
     op.drop_index("ix_contacts_name_company_blind_index", "contacts")

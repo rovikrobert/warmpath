@@ -217,7 +217,7 @@ class TestPrivacyGuard:
         PrivacyViolation = self._get_violation()
         try:
             guard.validate_query("SELECT email FROM contacts WHERE user_id = :uid")
-            assert False, "Should have raised"
+            raise AssertionError("Should have raised")
         except PrivacyViolation as e:
             assert e.violation_type == "pii_in_select"
             assert e.privy_category == "pii_leak"
@@ -588,8 +588,6 @@ class TestDataLearningState:
 
         state_path = tmp_path / agent / "state.json"
         state_path.parent.mkdir(parents=True, exist_ok=True)
-
-        original_save = ls.save
 
         def patched_save():
             state_path.write_text(json.dumps(ls.state, indent=2, default=str))

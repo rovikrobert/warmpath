@@ -414,38 +414,40 @@ def scan_input_validation() -> None:
                 in_model = True
                 continue
             if (
-                in_model
-                and stripped
-                and not stripped.startswith("#")
-                and not stripped.startswith("class")
-            ):
-                if (
+                (
+                    in_model
+                    and stripped
+                    and not stripped.startswith("#")
+                    and not stripped.startswith("class")
+                )
+                and (
                     ": str" in stripped
                     and "max_length" not in stripped
                     and "pattern" not in stripped
-                ):
-                    if (
-                        "EmailStr" not in stripped
-                        and "password" not in stripped.lower()
-                    ):
-                        # Only flag if it looks like a field definition
-                        if "=" in stripped or ":" in stripped:
-                            _add(
-                                "LOW",
-                                "validation",
-                                f"String field without max_length: {stripped[:80]}",
-                                relpath,
-                                lineno,
-                            )
-                            count += 1
-            if (
-                in_model
-                and stripped
-                and not stripped.startswith(" ")
-                and not stripped.startswith("\t")
+                )
+                and ("EmailStr" not in stripped and "password" not in stripped.lower())
+                # Only flag if it looks like a field definition
+                and ("=" in stripped or ":" in stripped)
             ):
-                if not stripped.startswith("#") and not stripped.startswith("@"):
-                    in_model = False
+                _add(
+                    "LOW",
+                    "validation",
+                    f"String field without max_length: {stripped[:80]}",
+                    relpath,
+                    lineno,
+                )
+                count += 1
+            if (
+                (
+                    in_model
+                    and stripped
+                    and not stripped.startswith(" ")
+                    and not stripped.startswith("\t")
+                )
+                and not stripped.startswith("#")
+                and not stripped.startswith("@")
+            ):
+                in_model = False
 
     if count == 0:
         print(f"  {GREEN}All string fields validated{RESET}")

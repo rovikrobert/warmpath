@@ -868,8 +868,6 @@ class TestUXLeadAccessibility:
     def test_accessibility_audit_no_pally(self, monkeypatch):
         import subprocess
 
-        original_run = subprocess.run
-
         def mock_run(*args, **kwargs):
             raise FileNotFoundError("pa11y not found")
 

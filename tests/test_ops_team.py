@@ -328,7 +328,6 @@ class TestNaivScan:
         from ops_team.naiv import naiv
 
         # naiv's save_report resolves path from __file__, so monkeypatch Path
-        original_save = naiv.save_report
 
         def patched_save(report):
             tmp_path.mkdir(parents=True, exist_ok=True)

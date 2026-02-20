@@ -107,7 +107,7 @@ class TestAssessThreatLevels:
         assert len(threat) > 0
 
         # Each competitor should have scores, total, and level
-        for comp_name, data in threat.items():
+        for _comp_name, data in threat.items():
             assert "scores" in data
             assert "total" in data
             assert "level" in data
