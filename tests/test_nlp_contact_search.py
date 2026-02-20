@@ -546,6 +546,67 @@ class TestNlpParsePrecision:
         assert _sco[RESEND_KEY_REDACTED](parsed, "Singapore") == 0.0
         assert _sco[RESEND_KEY_REDACTED](parsed, "San Francisco, CA") > 0.0
 
+    def test_cto_does_not_match_director_title(self):
+        """'CTO' must not match 'Director' via substring ('direCTOr' contains 'cto')."""
+        from app.services.nlp_contact_search import ParsedQuery, sco[RESEND_KEY_REDACTED]
+
+        parsed = ParsedQuery(titles=["CTO"], seniority=["c_suite"])
+        director_score = sco[RESEND_KEY_REDACTED](
+            parsed,
+            company_name=None,
+            title="Senior Director of Marketing",
+            location=None,
+            relationship_type=None,
+            company_matched=False,
+        )
+        cto_score = sco[RESEND_KEY_REDACTED](
+            parsed,
+            company_name=None,
+            title="CTO",
+            location=None,
+            relationship_type=None,
+            company_matched=False,
+        )
+        # Director should score much lower than CTO
+        assert cto_score == 100.0
+        assert director_score < 50.0
+
+    def test_wrong_location_caps_sco[RESEND_KEY_REDACTED](self):
+        """Contacts in wrong country should be excluded, not just penalized."""
+        from app.services.nlp_contact_search import ParsedQuery, sco[RESEND_KEY_REDACTED]
+
+        parsed = ParsedQuery(
+            titles=["CTO"], seniority=["c_suite"], locations=["United States"]
+        )
+        # CTO in Singapore — right title, wrong location
+        score = sco[RESEND_KEY_REDACTED](
+            parsed,
+            company_name=None,
+            title="CTO",
+            location="Singapore",
+            relationship_type=None,
+            company_matched=False,
+        )
+        # Should be capped at 10 (below the 20 filter threshold)
+        assert score <= 10.0
+
+    def test_right_title_right_location_scores_high(self):
+        """CTO in the US should score well above the filter threshold."""
+        from app.services.nlp_contact_search import ParsedQuery, sco[RESEND_KEY_REDACTED]
+
+        parsed = ParsedQuery(
+            titles=["CTO"], seniority=["c_suite"], locations=["United States"]
+        )
+        score = sco[RESEND_KEY_REDACTED](
+            parsed,
+            company_name=None,
+            title="CTO",
+            location="San Francisco, CA",
+            relationship_type=None,
+            company_matched=False,
+        )
+        assert score > 50.0
+
 
 # ---------------------------------------------------------------------------
 # Service function: search_user_contacts()
