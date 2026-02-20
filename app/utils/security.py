@@ -59,6 +59,92 @@ def verify_clerk_token(token: str) -> dict:
         ) from None
 
 
+async def _jit_provision_user(clerk_user_id: str, db: AsyncSession) -> User | None:
+    """Create user on-the-fly from Clerk API when webhook hasn't arrived yet.
+
+    Returns the created User, or None if Clerk API call fails.
+    Handles race conditions (concurrent JIT + webhook) gracefully.
+    """
+    import hashlib
+
+    import httpx
+    from sqlalchemy.exc import IntegrityError
+
+    if not settings.CLERK_SECRET_KEY:
+        return None
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"https://api.clerk.com/v1/users/{clerk_user_id}",
+                headers={"Authorization": f"Bearer {settings.CLERK_SECRET_KEY}"},
+                timeout=5.0,
+            )
+            if resp.status_code != 200:
+                logger.warning(
+                    "Clerk API returned %s for user %s", resp.status_code, clerk_user_id
+                )
+                return None
+            data = resp.json()
+    except httpx.HTTPError as exc:
+        logger.warning("Clerk API call failed for %s: %s", clerk_user_id, exc)
+        return None
+
+    # Extract email and name (same logic as clerk_webhooks._handle_user_created)
+    email_addresses = data.get("email_addresses", [])
+    email = ""
+    email_verified = False
+    if email_addresses:
+        first = email_addresses[0]
+        email = first.get("email_address", "")
+        email_verified = first.get("verification", {}).get("status") == "verified"
+    if not email:
+        logger.warning("No email from Clerk API for %s", clerk_user_id)
+        return None
+
+    parts = [data.get("first_name", ""), data.get("last_name", "")]
+    full_name = " ".join(p for p in parts if p).strip() or "User"
+
+    user = User(
+        email=email,
+        full_name=full_name,
+        clerk_user_id=clerk_user_id,
+        email_verified=email_verified,
+    )
+    db.add(user)
+
+    try:
+        await db.flush()
+    except IntegrityError:
+        # Race condition: webhook or another request created the user first
+        await db.rollback()
+        result = await db.execute(
+            select(User).where(
+                User.clerk_user_id == clerk_user_id, User.deleted_at.is_(None)
+            )
+        )
+        return result.scalar_one_or_none()
+
+    # Award welcome bonus (same logic as webhook handler)
+    from app.models.privacy import SuppressionList
+    from app.services.credits import earn_credits
+
+    email_hash = hashlib.sha256(email.lower().strip().encode()).hexdigest()
+    suppression_result = await db.execute(
+        select(SuppressionList).where(
+            SuppressionList.email_hash == email_hash,
+            SuppressionList.reason == "account_deleted",
+        )
+    )
+    if suppression_result.scalars().first() is None:
+        bonus = 500 if settings.BETA_SANDBOX_MODE else 50
+        await earn_credits(user.id, bonus, "welcome_bonus", db)
+
+    await db.commit()
+    logger.info("JIT-provisioned user %s (clerk_user_id=%s)", user.id, clerk_user_id)
+    return user
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
@@ -77,6 +163,9 @@ async def get_current_user(
         )
     )
     user = result.scalar_one_or_none()
+    if user is None:
+        # JIT provisioning: webhook may not have arrived yet
+        user = await _jit_provision_user(clerk_user_id, db)
     if user is None:
         logger.warning("No DB user for clerk_user_id=%s", clerk_user_id)
         raise HTTPException(
