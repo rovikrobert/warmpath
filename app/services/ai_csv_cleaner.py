@@ -22,7 +22,7 @@ from app.utils.performance import timed
 logger = logging.getLogger(__name__)
 
 CLEANUP_MODEL = getattr(settings, "CLEANUP_MODEL", "claude-haiku-4-5-20251001")
-CLEANUP_BATCH_SIZE = 50
+CLEANUP_BATCH_SIZE = 200
 
 # ---------------------------------------------------------------------------
 # System prompt for Claude cleanup
@@ -379,7 +379,7 @@ def _merge_cleaned_fields(original: dict, cleaned_fields: dict) -> dict:
     return merged
 
 
-MAX_CONCURRENT_BATCHES = 2
+MAX_CONCURRENT_BATCHES = 3
 
 
 async def _clean_batch(
@@ -392,7 +392,7 @@ async def _clean_batch(
         payload = _build_cleanup_payload(batch)
         message = await client.messages.create(
             model=CLEANUP_MODEL,
-            max_tokens=4096,
+            max_tokens=16384,
             system=_CLEANUP_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": json.dumps(payload)}],
         )
