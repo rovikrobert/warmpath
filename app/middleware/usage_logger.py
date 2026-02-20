@@ -35,6 +35,7 @@ _METERED_ROUTES: list[tuple[str, re.Pattern, str]] = [
     ("POST", re.compile(r"^/api/v1/applications$"), "application_create"),
     ("POST", re.compile(r"^/api/v1/marketplace/search$"), "marketplace_search"),
     ("POST", re.compile(r"^/api/v1/marketplace/request-intro$"), "intro_request"),
+    ("POST", re.compile(r"^/api/v1/contacts/nlp-search$"), "nlp_search"),
 ]
 
 _STANDARD_FREE_TIER_LIMITS: dict[str, int] = {
@@ -43,6 +44,7 @@ _STANDARD_FREE_TIER_LIMITS: dict[str, int] = {
     "csv_upload": 1,
     "marketplace_search": 0,
     "intro_request": 0,
+    "nlp_search": 10,
 }
 
 _BETA_FREE_TIER_LIMITS: dict[str, int] = {
@@ -51,6 +53,7 @@ _BETA_FREE_TIER_LIMITS: dict[str, int] = {
     "csv_upload": 5,
     "marketplace_search": 15,
     "intro_request": 10,
+    "nlp_search": 50,
 }
 
 # Backward compat alias (points to standard limits)
@@ -76,6 +79,7 @@ _ACTION_LABELS: dict[str, str] = {
     "csv_upload": "CSV uploads",
     "marketplace_search": "marketplace searches",
     "intro_request": "intro requests",
+    "nlp_search": "NLP searches",
 }
 
 
