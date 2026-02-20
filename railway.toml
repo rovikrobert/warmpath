@@ -1,6 +1,6 @@
 [build]
 dockerfilePath = "Dockerfile"
-watchPatterns = ["app/**", "frontend/**", "alembic/**", "requirements.txt", "Dockerfile", "railway.toml", ".dockerignore"]
+watchPatterns = ["app/**", "frontend/**", "alembic/**", "scripts/**", "requirements.txt", "Dockerfile", "railway.toml", ".dockerignore"]
 
 [deploy]
 preDeployCommand = "alembic upgrade head"

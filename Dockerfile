@@ -37,6 +37,9 @@ COPY finance_team/ ./finance_team/
 COPY gtm_team/ ./gtm_team/
 COPY ops_team/ ./ops_team/
 
+# Copy entrypoint script
+COPY scripts/start.sh ./scripts/start.sh
+
 # Copy project docs (agents read CLAUDE.md for strategy context)
 COPY CLAUDE.md ARCHITECTURE.md COMPETITIVE_STRATEGY.md ./
 
@@ -51,4 +54,4 @@ USER appuser
 ENV PORT=8000
 EXPOSE ${PORT}
 
-CMD ["/bin/sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port $PORT"]
+CMD ["bash", "scripts/start.sh"]

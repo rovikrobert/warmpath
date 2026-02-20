@@ -390,7 +390,11 @@ async def clean_contacts_real(contacts: list[dict]) -> list[dict]:
         return []
 
     try:
-        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        client = anthropic.AsyncAnthropic(
+            api_key=settings.ANTHROPIC_API_KEY,
+            timeout=60.0,
+            max_retries=1,
+        )
         all_cleaned: list[dict] = []
 
         # Process in batches
