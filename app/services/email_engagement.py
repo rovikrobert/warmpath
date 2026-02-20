@@ -793,3 +793,96 @@ async def send_reengagement_d90(db: AsyncSession) -> int:
     await db.commit()
     logger.info("reengagement_d90: sent %d emails", count)
     return count
+
+
+# ---------------------------------------------------------------------------
+# Smart digest (feed-powered) — replaces basic weekly digest
+# ---------------------------------------------------------------------------
+
+
+FEED_ICON_MAP = {
+    "job_alert": "💼",
+    "enrichment_prompt": "❓",
+    "outcome_check": "✅",
+    "marketplace_signal": "🤝",
+    "follow_up_nudge": "🔔",
+    "network_insight": "📊",
+}
+
+
+async def send_smart_digest_email(
+    user_id: uuid.UUID, db: AsyncSession
+) -> bool:
+    """Send a feed-powered digest email with top unseen insights.
+
+    Returns True if email was sent, False if skipped (already sent, opted out,
+    or no relevant items).
+    """
+    from app.services.feed_generator import get_digest_items
+
+    # Load user
+    user_result = await db.execute(
+        select(User).where(
+            User.id == user_id,
+            User.deleted_at.is_(None),
+            User.marketing_opt_out.is_(False),
+        )
+    )
+    user = user_result.scalar_one_or_none()
+    if not user or not user.email:
+        return False
+
+    # Dedup — one smart_digest per day
+    if await _already_sent(db, user_id, "smart_digest"):
+        return False
+
+    # Get top 3 unseen feed items
+    items = await get_digest_items(user_id, db)
+    if not items:
+        return False
+
+    first_name = (user.full_name or "there").split(" ")[0]
+
+    # Build HTML for each item
+    items_html = ""
+    for item in items[:3]:
+        icon = FEED_ICON_MAP.get(item.item_type, "📌")
+        action_html = ""
+        if item.action_url:
+            action_html = (
+                f'<a href="{APP_URL}{item.action_url}" '
+                f'style="display: inline-block; margin-top: 8px; color: #f59e0b; '
+                f'text-decoration: none; font-size: 13px; font-weight: 600;">'
+                f"{item.action_label or 'View'} &rarr;</a>"
+            )
+        items_html += f"""
+  <div style="padding: 12px; margin: 8px 0; border: 1px solid #e5e7eb; border-radius: 8px; border-left: 3px solid #f59e0b;">
+    <div style="font-size: 14px; font-weight: 600; color: #1f2937;">
+      {icon} {item.title}
+    </div>
+    {f'<div style="margin-top: 4px; font-size: 13px; color: #6b7280;">{item.body}</div>' if item.body else ''}
+    {action_html}
+  </div>"""
+
+    html = f"""<div style="{_base_style()}">
+  <h2 style="color: #1f2937; margin: 24px 0 8px;">Hey {first_name}, Keevs found something for you</h2>
+  <p style="color: #6b7280; font-size: 14px; margin: 0 0 16px;">
+    Here's what's new since you last checked in:
+  </p>
+  {items_html}
+  <div style="margin: 20px 0;">
+    <a href="{APP_URL}/coach" style="display: inline-block; background: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Open WarmPath</a>
+  </div>
+  <p style="margin: 16px 0 0; font-size: 13px; color: #9ca3af;">
+    Keevs surfaces insights based on your network and job search activity.
+  </p>
+  {_footer_html()}
+</div>"""
+
+    eid = _send_email(
+        user.email,
+        f"Keevs found {len(items)} new insight{'s' if len(items) > 1 else ''} for you",
+        html,
+    )
+    await _record_send(db, user_id, "smart_digest", external_id=eid)
+    return True

@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { UserButton } from '@clerk/clerk-react';
 import { useAuth } from '../context/AuthContext';
-import { credits as creditsApi, onUsageWarning } from '../api/client';
+import { credits as creditsApi, feed as feedApi, onUsageWarning } from '../api/client';
 import BetaFeedbackButton from './BetaFeedbackButton';
+import KeevsBar from './KeevsBar';
 
 const NAV_ITEMS = [
   {
     to: '/coach',
     label: 'Coach',
+    badge: true, // shows feed unseen count
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
@@ -82,10 +84,17 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [usageWarning, setUsageWarning] = useState(null);
+  const [feedUnseen, setFeedUnseen] = useState(0);
 
   useEffect(() => {
     creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
+    feedApi.count().then((r) => setFeedUnseen(r.data?.unseen ?? 0)).catch(() => {});
     onUsageWarning((msg) => setUsageWarning(msg));
+    // Refresh feed count every 2 minutes
+    const interval = setInterval(() => {
+      feedApi.count().then((r) => setFeedUnseen(r.data?.unseen ?? 0)).catch(() => {});
+    }, 120_000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleLogout = async () => {
@@ -130,7 +139,14 @@ export default function Layout() {
               }
               title={collapsed ? item.label : undefined}
             >
-              {item.icon}
+              <span className="relative">
+                {item.icon}
+                {item.badge && feedUnseen > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-slate-950">
+                    {feedUnseen > 9 ? '9+' : feedUnseen}
+                  </span>
+                )}
+              </span>
               {!collapsed && item.label}
             </NavLink>
           ))}
@@ -305,6 +321,7 @@ export default function Layout() {
 
         <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
+            <KeevsBar />
             <Outlet />
           </div>
         </main>
@@ -329,9 +346,14 @@ export default function Layout() {
                 }`
               }
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
-              </svg>
+              <span className="relative">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
+                </svg>
+                {item.to === '/coach' && feedUnseen > 0 && (
+                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500" />
+                )}
+              </span>
               {item.label}
             </NavLink>
           ))}

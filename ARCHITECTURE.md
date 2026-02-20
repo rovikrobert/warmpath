@@ -58,8 +58,20 @@ PUT /sharing-prefs   → marketplace_indexer.generate_listings → NetworkSharin
 
 #### Applications (`app/api/applications.py`)
 ```
-POST /from-intro/{id} → (prefills from IntroRequest)       → IntroRequest, Contact, Application
+POST /from-intro/{id} → (prefills from IntroRequest)       → IntroRequest, Contact, Application (source_type=own_network)
 PATCH /{id}           → (auto-sets sent_at, responded_at)   → Application
+```
+
+#### Feed (`app/api/feed.py`)
+```
+GET  /feed                     → paginated feed (unseen first)        → FeedItem
+GET  /feed/count               → unread count (badge)                 → FeedItem (aggregate)
+POST /feed/{id}/seen           → mark seen + log interaction          → FeedItem, FeedItemInteraction
+POST /feed/{id}/act            → mark acted on                        → FeedItem, FeedItemInteraction
+POST /feed/{id}/dismiss        → soft-dismiss item                    → FeedItem, FeedItemInteraction
+POST /feed/batch-seen          → batch mark seen                      → FeedItem (bulk update)
+POST /feed/enrichment-response → submit signal (relationship_type etc)→ ContactFreshnessSignal, FeedItem
+POST /feed/generate            → manual trigger (dev/admin)           → feed_generator.generate_feed_for_user()
 ```
 
 ---
@@ -102,6 +114,31 @@ Network holder reviews (GET /marketplace/incoming-requests)
 
 IMPORTANT: Seeker NEVER sees contact PII, even after approval.
 Identity flows through the network holder's active choice (they send the intro).
+```
+
+### Engagement Feed (Keevs)
+```
+Celery Beat (3x daily: 7AM, 1PM, 7PM UTC)
+  → feed_tasks.generate_feed_all_users()
+    → For each active user (activity in last 14 days):
+      1. generate_job_alerts()          — priority 90: new jobs × user's contact network
+      2. generate_enrichment_prompts()  — priority 60: collect relationship_type / would_refer
+      3. generate_outcome_checks()      — priority 70: stale application nudges
+      4. generate_marketplace_signals() — priority 80: new supply at target companies
+      5. generate_follow_up_nudges()    — priority 85: approved intros not acted on
+      6. generate_network_insights()    — priority 40-50: stale contacts, enrichment progress
+
+Feed item dedup: SHA-256 key per user (dismissed items excluded from uniqueness check)
+Feed item lifecycle: created → seen → acted_on / dismissed → expired (TTL-based)
+Feed item interaction log: every view/click/dismiss recorded for relevance training
+
+Frontend surfaces:
+  - KeevsBar (contextual nudge bar on all pages, route-mapped to relevant feed type)
+  - CoachPage feed section (collapsible, top 5 items above chat)
+  - Nav badge (unseen count, refreshes every 2 min)
+
+Smart digest email (Mon + Thu 8:30 AM UTC):
+  → Top 3 unseen items per active user → Resend → email_campaign_logs dedup
 ```
 
 ### Smart Search

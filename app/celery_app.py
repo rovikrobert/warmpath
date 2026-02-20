@@ -44,6 +44,31 @@ celery_app.conf.update(
             "task": "app.tasks.email_tasks.send_reengagement_d90",
             "schedule": crontab(hour=9, minute=45),
         },
+        # --- Feed generation (engagement engine) ---
+        "feed-generate-morning": {
+            "task": "app.tasks.feed_tasks.generate_feed_all_users",
+            "schedule": crontab(hour=7, minute=0),  # 7 AM UTC — before work
+        },
+        "feed-generate-midday": {
+            "task": "app.tasks.feed_tasks.generate_feed_all_users",
+            "schedule": crontab(hour=13, minute=0),  # 1 PM UTC — lunch check
+        },
+        "feed-generate-evening": {
+            "task": "app.tasks.feed_tasks.generate_feed_all_users",
+            "schedule": crontab(hour=19, minute=0),  # 7 PM UTC — evening check
+        },
+        "feed-cleanup-weekly": {
+            "task": "app.tasks.feed_tasks.cleanup_expired_feed_items",
+            "schedule": crontab(day_of_week=0, hour=3, minute=0),  # Sunday 3 AM
+        },
+        "feed-smart-digest-mon": {
+            "task": "app.tasks.feed_tasks.send_smart_digest",
+            "schedule": crontab(day_of_week=1, hour=8, minute=30),  # Monday 8:30 AM
+        },
+        "feed-smart-digest-thu": {
+            "task": "app.tasks.feed_tasks.send_smart_digest",
+            "schedule": crontab(day_of_week=4, hour=8, minute=30),  # Thursday 8:30 AM
+        },
     },
 )
 celery_app.autodiscover_tasks(["app.tasks"])

@@ -20,6 +20,7 @@ from app.api import (
     credits,
     dashboard,
     experiments,
+    feed,
     feedback,
     friends,
     health,
@@ -172,6 +173,7 @@ app.include_router(
 app.include_router(credits.router, prefix="/api/v1/credits", tags=["credits"])
 app.include_router(usage.router, prefix="/api/v1/usage", tags=["usage"])
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
+app.include_router(feed.router, prefix="/api/v1/feed", tags=["feed"])
 app.include_router(coach.router, prefix="/api/v1/coach", tags=["coach"])
 app.include_router(privacy.router, prefix="/api/v1/privacy", tags=["privacy"])
 app.include_router(feedback.router, prefix="/api/v1/feedback", tags=["feedback"])

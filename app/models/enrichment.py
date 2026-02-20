@@ -52,6 +52,13 @@ class UsageLog(Base):
     resource_type: Mapped[str | None] = mapped_column(String(100))
     resource_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB)
+
+    # Event context — tracks WHY the user took an action, not just what
+    # session_id ties to CoachingSession for session-level analytics
+    # source tracks attribution: feed_item, coach_chat, direct, email_click, push
+    session_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    event_source: Mapped[str | None] = mapped_column(String(50))
+
     ip_address: Mapped[str | None] = mapped_column(INET)
     user_agent: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(
