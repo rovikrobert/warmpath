@@ -41,6 +41,7 @@ class CsvUpload(Base):
     )
     contacts_created: Mapped[int | None] = mapped_column(Integer, server_default="0")
     duplicates_skipped: Mapped[int | None] = mapped_column(Integer, server_default="0")
+    progress_phase: Mapped[str | None] = mapped_column(String(50))
     error_message: Mapped[str | None] = mapped_column(Text)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

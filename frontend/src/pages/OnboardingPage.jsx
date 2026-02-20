@@ -175,44 +175,29 @@ export default function OnboardingPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const UPLOAD_STEPS = [
-    'Uploading file...',
-    'Parsing contacts...',
-    'Normalizing names...',
-    'Matching companies...',
-    'Scoring connections...',
-    'Calculating warm scores...',
-    'Analyzing network strength...',
-    'Finalizing import...',
-  ];
+  const PHASE_LABELS = {
+    parsing: 'Parsing contacts...',
+    cleaning: 'Normalizing names and companies...',
+    importing: 'Importing contacts...',
+    scoring: 'Calculating warm scores...',
+  };
 
+  // Gentle ease-in animation for the first ~2s before real data arrives,
+  // then switch to data-driven progress once polling provides numbers.
   useEffect(() => {
-    if (!uploading) { setUploadProgressWidth(0); return; }
+    if (!uploading) { setUploadProgressWidth(0); setUploadProgressMsg('Uploading file...'); return; }
     let frame;
     const start = Date.now();
     const tick = () => {
       const elapsed = (Date.now() - start) / 1000;
-      let w;
-      if (elapsed < 2) w = elapsed * 10;
-      else if (elapsed < 30) w = 20 + (elapsed - 2) * 2;
-      else if (elapsed < 90) w = 76 + (elapsed - 30) * 0.3;
-      else w = 94 + Math.min(elapsed - 90, 60) * 0.01;
-      setUploadProgressWidth(Math.min(w, 95));
+      // Only animate up to 15% — real data takes over after that
+      if (elapsed < 2) {
+        setUploadProgressWidth((prev) => Math.max(prev, elapsed * 7.5));
+      }
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [uploading]);
-
-  useEffect(() => {
-    if (!uploading) return;
-    let idx = 0;
-    setUploadProgressMsg(UPLOAD_STEPS[0]);
-    const interval = setInterval(() => {
-      idx = Math.min(idx + 1, UPLOAD_STEPS.length - 1);
-      setUploadProgressMsg(UPLOAD_STEPS[idx]);
-    }, 5000);
-    return () => clearInterval(interval);
   }, [uploading]);
 
   // Step 10: Work history + resume import
@@ -319,13 +304,14 @@ export default function OnboardingPage() {
     handleFile(e.dataTransfer.files[0]);
   }, []);
 
-  const pollUploadStatus = async (uploadId) => {
-    const maxAttempts = 120; // up to ~2 minutes
+  const pollUploadStatus = async (uploadId, onProgress) => {
+    const maxAttempts = 360; // up to ~6 minutes (matches backend soft_time_limit)
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise((r) => setTimeout(r, 1000));
       try {
         const poll = await contactsApi.getUploadStatus(uploadId);
         const s = poll.data;
+        if (onProgress) onProgress(s);
         if (s.status === 'completed') return s;
         if (s.status === 'failed') throw new Error(s.error_message || 'CSV processing failed');
       } catch (err) {
@@ -347,13 +333,52 @@ export default function OnboardingPage() {
 
       // If async processing, poll until contacts are actually imported
       if (result.status === 'queued' || result.status === 'processing') {
-        const final = await pollUploadStatus(result.id);
+        const final = await pollUploadStatus(result.id, (s) => {
+          // Update progress bar from real backend data
+          const phase = s.progress_phase;
+          if (phase && PHASE_LABELS[phase]) {
+            const label = phase === 'importing' && s.row_count && s.processed_count != null
+              ? `Importing contacts... (${s.processed_count} of ${s.row_count})`
+              : PHASE_LABELS[phase];
+            setUploadProgressMsg(label);
+          }
+          // Compute percentage from processed_count / row_count
+          if (s.row_count && s.row_count > 0) {
+            const processed = s.processed_count || 0;
+            // Reserve 0-15% for initial upload, 15-85% for importing, 85-95% for scoring
+            let pct;
+            if (phase === 'parsing' || phase === 'cleaning') {
+              pct = 15 + Math.min((processed / s.row_count) * 5, 5);
+            } else if (phase === 'importing') {
+              pct = 20 + (processed / s.row_count) * 65;
+            } else if (phase === 'scoring') {
+              pct = 90;
+            } else {
+              pct = 15;
+            }
+            setUploadProgressWidth((prev) => Math.max(prev, Math.min(pct, 95)));
+          } else if (phase) {
+            // No row_count yet — show at least 15%
+            setUploadProgressWidth((prev) => Math.max(prev, 15));
+          }
+        });
         if (final) {
           result = final;
         } else {
-          // Poll timed out — don't let user proceed without imported contacts
-          setError('Import is taking longer than expected. Please wait a moment and try again.');
-          return;
+          // Poll timed out — check if contacts were actually created
+          try {
+            const check = await contactsApi.list({ page: 1, per_page: 1 });
+            if (check.meta?.total > 0) {
+              // Contacts exist — processing completed after timeout, let user proceed
+              result = { processed_count: check.meta.total, status: 'completed' };
+            } else {
+              setError('Import is taking longer than expected. Please wait a moment and try again.');
+              return;
+            }
+          } catch {
+            setError('Import is taking longer than expected. Please wait a moment and try again.');
+            return;
+          }
         }
       }
 
