@@ -532,16 +532,25 @@ async def _call_claude_api(
     channel: str,
 ) -> tuple[list[DraftedMessage], IntroTokenUsage]:
     """Call the real Claude API for referral message generation."""
-    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    from app.utils.anthropic_client import get_async_client
+    from app.utils.rate_limiter import acquire_slot, release_slot
+
+    client = get_async_client()
     prompt = _build_referral_prompt(
         contact, profile, match_result, job_opening, channel
     )
 
-    message = await client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=2048,
-        messages=[{"role": "user", "content": prompt}],
+    used_redis = await acquire_slot(
+        "anthropic", max_concurrent=settings.ANTHROPIC_MAX_CONCURRENT
     )
+    try:
+        message = await client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=2048,
+            messages=[{"role": "user", "content": prompt}],
+        )
+    finally:
+        await release_slot("anthropic", used_redis)
 
     usage = IntroTokenUsage(
         input_tokens=message.usage.input_tokens,

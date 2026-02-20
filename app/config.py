@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     AGENT_RUN_SECRET: str = ""
     CLAUDE_MODEL: str = "claude-sonnet-4-20250514"
     CLAUDE_SCORER_MODEL: str = "claude-haiku-4-5-20251001"
+    # Scaling settings
+    SERVICE_ROLE: str = "all"  # web | worker | beat | all
+    CELERY_CONCURRENCY: int = 2
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    ANTHROPIC_MAX_CONCURRENT: int = 5
+    QUEUE_DEPTH_THRESHOLD: int = 20
     POSTHOG_API_KEY: str = ""
     POSTHOG_PROJECT_ID: str = ""
     POSTHOG_HOST: str = "https://app.posthog.com"

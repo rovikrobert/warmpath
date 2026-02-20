@@ -84,9 +84,10 @@ def _mock_parse() -> dict:
 
 async def _ai_parse(text: str) -> dict:
     """Send extracted resume text to Claude for structured extraction."""
-    import anthropic
+    from app.utils.anthropic_client import get_async_client
+    from app.utils.rate_limiter import acquire_slot, release_slot
 
-    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = get_async_client()
 
     prompt = f"""You are a resume parser. Extract structured profile information from the resume text below.
 
@@ -121,11 +122,15 @@ IMPORTANT:
 Resume text:
 {text[:8000]}"""
 
-    message = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=2048,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    used_redis = await acquire_slot("anthropic")
+    try:
+        message = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2048,
+            messages=[{"role": "user", "content": prompt}],
+        )
+    finally:
+        await release_slot("anthropic", used_redis)
 
     raw = message.content[0].text.strip()
     # Strip markdown fences if present

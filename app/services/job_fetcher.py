@@ -309,7 +309,8 @@ class JobFetcher:
         target_seniority: str | None = None,
     ) -> list[dict]:
         """Use Claude to score job titles for relevance."""
-        import anthropic
+        from app.utils.anthropic_client import get_async_client
+        from app.utils.rate_limiter import acquire_slot, release_slot
 
         titles = [
             {
@@ -330,12 +331,16 @@ Return a JSON array of objects with "index" (integer) and "score" (integer 0-100
 Only include jobs scoring >= 50. Return ONLY the JSON array."""
 
         try:
-            client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-            message = await client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=1024,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            client = get_async_client()
+            used_redis = await acquire_slot("anthropic")
+            try:
+                message = await client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=1024,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+            finally:
+                await release_slot("anthropic", used_redis)
             raw = message.content[0].text.strip()
             if raw.startswith("```"):
                 raw = raw.split("\n", 1)[1]

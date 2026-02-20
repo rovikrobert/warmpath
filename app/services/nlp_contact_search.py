@@ -588,11 +588,10 @@ def parse_query_real(query: str) -> ParsedQuery:
     try:
         import json as _json
 
-        import anthropic
-
         from app.config import settings as _settings
+        from app.utils.anthropic_client import get_sync_client
 
-        client = anthropic.Anthropic(api_key=_settings.ANTHROPIC_API_KEY)
+        client = get_sync_client()
         response = client.messages.create(
             model=_settings.CLAUDE_MODEL,
             max_tokens=512,

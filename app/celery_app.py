@@ -82,10 +82,16 @@ celery_app.conf.update(
             "task": "app.tasks.feed_tasks.recompute_feed_weights",
             "schedule": crontab(hour="0,6,12,18", minute=30),  # Every 6 hours
         },
+        # --- Rate limiter token recovery ---
+        "rate-limiter-watchdog": {
+            "task": "app.tasks.infra_tasks.rate_limiter_watchdog",
+            "schedule": crontab(minute="*/5"),  # Every 5 minutes
+        },
     },
 )
 celery_app.conf.include = [
     "app.tasks.csv_processing",
     "app.tasks.email_tasks",
     "app.tasks.feed_tasks",
+    "app.tasks.infra_tasks",
 ]

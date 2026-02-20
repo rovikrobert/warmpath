@@ -225,11 +225,24 @@ class TestCleanContactsRealMode:
         mock_message.content = [AsyncMock(text=mock_response_text)]
         mock_message.usage = AsyncMock(input_tokens=100, output_tokens=50)
 
-        with patch("app.services.ai_csv_cleaner.anthropic") as mock_anthropic:
-            mock_client = AsyncMock()
-            mock_client.messages.create = AsyncMock(return_value=mock_message)
-            mock_anthropic.AsyncAnthropic.return_value = mock_client
+        mock_client = AsyncMock()
+        mock_client.messages.create = AsyncMock(return_value=mock_message)
 
+        with (
+            patch(
+                "app.services.ai_csv_cleaner._get_anthropic_client",
+                return_value=mock_client,
+            ),
+            patch(
+                "app.utils.rate_limiter.acquire_slot",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                "app.utils.rate_limiter.release_slot",
+                new_callable=AsyncMock,
+            ),
+        ):
             from app.services.ai_csv_cleaner import clean_contacts_real
 
             result = await clean_contacts_real(contacts)
@@ -256,13 +269,26 @@ class TestCleanContactsRealMode:
             }
         ]
 
-        with patch("app.services.ai_csv_cleaner.anthropic") as mock_anthropic:
-            mock_client = AsyncMock()
-            mock_client.messages.create = AsyncMock(
-                side_effect=Exception("API unavailable")
-            )
-            mock_anthropic.AsyncAnthropic.return_value = mock_client
+        mock_client = AsyncMock()
+        mock_client.messages.create = AsyncMock(
+            side_effect=Exception("API unavailable")
+        )
 
+        with (
+            patch(
+                "app.services.ai_csv_cleaner._get_anthropic_client",
+                return_value=mock_client,
+            ),
+            patch(
+                "app.utils.rate_limiter.acquire_slot",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                "app.utils.rate_limiter.release_slot",
+                new_callable=AsyncMock,
+            ),
+        ):
             from app.services.ai_csv_cleaner import clean_contacts_real
 
             result = await clean_contacts_real(contacts)
@@ -292,7 +318,14 @@ class TestCleanContactsPublicAPI:
             }
         ]
 
-        with patch("app.services.ai_csv_cleaner.settings") as mock_settings:
+        with (
+            patch("app.services.ai_csv_cleaner.settings") as mock_settings,
+            patch(
+                "app.utils.rate_limiter.get_queue_depth",
+                new_callable=AsyncMock,
+                return_value=0,
+            ),
+        ):
             mock_settings.AI_MOCK_MODE = True
 
             from app.services.ai_csv_cleaner import clean_contacts
