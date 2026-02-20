@@ -1,23 +1,18 @@
 import { SignIn, SignUp } from '@clerk/clerk-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+
+function hashIndicatesSignup() {
+  return window.location.hash.replace(/\/+$/, '') === '#sign-up';
+}
 
 export default function AuthPage() {
-  const [isSignup, setIsSignup] = useState(
-    () => window.location.hash === '#sign-up',
-  );
+  const [isSignup, setIsSignup] = useState(hashIndicatesSignup);
 
   useEffect(() => {
-    const onHashChange = () =>
-      setIsSignup(window.location.hash === '#sign-up');
+    const onHashChange = () => setIsSignup(hashIndicatesSignup());
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
-
-  const toggle = useCallback(() => {
-    const next = !isSignup;
-    window.location.hash = next ? '#sign-up' : '';
-    setIsSignup(next);
-  }, [isSignup]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4" role="main">
@@ -60,15 +55,6 @@ export default function AuthPage() {
               }}
             />
           )}
-        </div>
-
-        <div className="mt-4 text-center">
-          <button
-            onClick={toggle}
-            className="text-sm text-amber-400 hover:text-amber-300"
-          >
-            {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-          </button>
         </div>
       </div>
     </div>
