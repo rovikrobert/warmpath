@@ -1,4 +1,4 @@
-"""Tests for NLP contact search query parser (mock mode)."""
+"""Tests for NLP contact search query parser and scorer."""
 
 from app.services.nlp_contact_search import parse_query_mock
 
@@ -135,3 +135,124 @@ def test_unparseable_query_returns_empty_lists_gracefully():
     assert result.locations == []
     assert result.relationship_types == []
     assert result.raw_query == "asdfghjkl random nonsense 12345"
+
+
+# ---------------------------------------------------------------------------
+# Contact scorer — score_contact()
+# ---------------------------------------------------------------------------
+
+from app.services.nlp_contact_search import ParsedQuery, score_contact  # noqa: E402
+
+
+def test_exact_company_match_scores_high():
+    parsed = ParsedQuery(companies=["Google"], raw_query="people at Google")
+    score = score_contact(parsed, "Google", None, None, None, company_matched=True)
+    assert score >= 30
+
+
+def test_title_keyword_match():
+    parsed = ParsedQuery(titles=["engineer"], raw_query="engineers")
+    score = score_contact(
+        parsed, None, "Software Engineer", None, None, company_matched=False
+    )
+    assert score >= 28
+
+
+def test_location_match():
+    parsed = ParsedQuery(locations=["Singapore"], raw_query="people in Singapore")
+    score = score_contact(parsed, None, None, "Singapore", None, company_matched=False)
+    assert score >= 20
+
+
+def test_relationship_type_match():
+    parsed = ParsedQuery(
+        relationship_types=["former_colleague"], raw_query="former colleagues"
+    )
+    score = score_contact(
+        parsed, None, None, None, "former_colleague", company_matched=False
+    )
+    assert score >= 10
+
+
+def test_no_match_scores_below_threshold():
+    parsed = ParsedQuery(
+        titles=["engineer"],
+        companies=["Google"],
+        locations=["Singapore"],
+        raw_query="engineers at Google in Singapore",
+    )
+    score = score_contact(
+        parsed, "Acme Corp", "Accountant", "London", None, company_matched=False
+    )
+    assert score < 20
+
+
+def test_compound_match_scores_high():
+    parsed = ParsedQuery(
+        titles=["engineer"],
+        companies=["Google"],
+        locations=["Singapore"],
+        relationship_types=["former_colleague"],
+        raw_query="former colleague engineers at Google in Singapore",
+    )
+    score = score_contact(
+        parsed,
+        "Google",
+        "Software Engineer",
+        "Singapore",
+        "former_colleague",
+        company_matched=True,
+    )
+    assert score >= 80
+
+
+def test_seniority_match_boosts_title_score():
+    parsed = ParsedQuery(
+        seniority=["director"],
+        companies=["Google"],
+        raw_query="directors at Google",
+    )
+    score = score_contact(
+        parsed, "Google", "Director of Engineering", None, None, company_matched=True
+    )
+    assert score >= 35
+
+
+# ---------------------------------------------------------------------------
+# Real Claude API parser — parse_query_real() with mocked API
+# ---------------------------------------------------------------------------
+
+from unittest.mock import MagicMock, patch  # noqa: E402
+
+from app.services.nlp_contact_search import parse_query_real  # noqa: E402
+
+
+def test_parse_query_real_returns_parsed_query():
+    mock_response = MagicMock()
+    mock_response.content = [
+        MagicMock(
+            text='{"titles": ["engineer"], "companies": ["Google"], '
+            '"seniority": ["senior"], "locations": ["Singapore"], '
+            '"relationship_types": []}'
+        )
+    ]
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = mock_response
+
+    with patch("anthropic.Anthropic", return_value=mock_client):
+        result = parse_query_real("senior engineers at Google in Singapore")
+
+    assert "engineer" in result.titles
+    assert "Google" in result.companies
+    assert "senior" in result.seniority
+    assert "Singapore" in result.locations
+    assert result.raw_query == "senior engineers at Google in Singapore"
+
+
+def test_parse_query_real_falls_back_to_mock_on_error():
+    with patch("anthropic.Anthropic", side_effect=RuntimeError("API unavailable")):
+        result = parse_query_real("engineers at Google")
+
+    # Should fall back to mock parser, which still extracts "Google"
+    assert "Google" in result.companies
+    assert result.raw_query == "engineers at Google"
