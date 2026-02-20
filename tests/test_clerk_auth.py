@@ -96,3 +96,158 @@ async def test_get_current_user_rejects_garbage_token(client: AsyncClient):
         "invalid" in resp.json()["detail"].lower()
         or "expired" in resp.json()["detail"].lower()
     )
+
+
+async def test_jit_provision_creates_user_when_webhook_missing(
+    client: AsyncClient,
+    monkeypatch,
+):
+    """JIT provisioning creates DB user from Clerk API when webhook hasn't arrived."""
+    import httpx
+
+    clerk_id = f"user_{uuid.uuid4().hex[:12]}"
+
+    # Mock Clerk API response
+    clerk_api_response = {
+        "id": clerk_id,
+        "email_addresses": [
+            {
+                "email_address": "jit@test.com",
+                "verification": {"status": "verified"},
+            }
+        ],
+        "first_name": "JIT",
+        "last_name": "User",
+    }
+
+    class MockResponse:
+        status_code = 200
+
+        def json(self):
+            return clerk_api_response
+
+    class MockClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def get(self, url, **kwargs):
+            return MockResponse()
+
+    monkeypatch.setattr(httpx, "AsyncClient", MockClient)
+    monkeypatch.setattr("app.config.settings.CLERK_SECRET_KEY", "[STRIPE_KEY_REDACTED]")
+
+    token = create_test_clerk_token(clerk_id)
+    resp = await client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["email"] == "jit@test.com"
+    assert resp.json()["data"]["full_name"] == "JIT User"
+
+
+async def test_jit_provision_falls_back_to_401_when_clerk_api_fails(
+    client: AsyncClient,
+    monkeypatch,
+):
+    """JIT provisioning returns 401 when Clerk API is unreachable."""
+    import httpx
+
+    clerk_id = f"user_{uuid.uuid4().hex[:12]}"
+
+    class MockClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def get(self, url, **kwargs):
+            raise httpx.ConnectError("Connection refused")
+
+    monkeypatch.setattr(httpx, "AsyncClient", MockClient)
+    monkeypatch.setattr("app.config.settings.CLERK_SECRET_KEY", "[STRIPE_KEY_REDACTED]")
+
+    token = create_test_clerk_token(clerk_id)
+    resp = await client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 401
+    assert "not found" in resp.json()["detail"].lower()
+
+
+async def test_jit_provision_skipped_when_no_clerk_secret(client: AsyncClient):
+    """JIT provisioning is skipped when CLERK_SECRET_KEY is empty (test default)."""
+    token = create_test_clerk_token("user_no_secret_xyz")
+    resp = await client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    # Default CLERK_SECRET_KEY is empty, so JIT is skipped, falls through to 401
+    assert resp.status_code == 401
+    assert "not found" in resp.json()["detail"].lower()
+
+
+async def test_jit_provision_handles_race_condition(
+    client: AsyncClient,
+    monkeypatch,
+):
+    """JIT provisioning handles IntegrityError (webhook arrived first) gracefully."""
+    import httpx
+
+    clerk_id = f"user_{uuid.uuid4().hex[:12]}"
+
+    # Pre-create the user (simulating webhook arriving first)
+    async with TestSessionLocal() as db:
+        user = User(
+            email="race@test.com",
+            full_name="Race User",
+            clerk_user_id=clerk_id,
+        )
+        db.add(user)
+        await db.commit()
+
+    # Mock Clerk API to return the same user (JIT will try to create, hit IntegrityError)
+    clerk_api_response = {
+        "id": clerk_id,
+        "email_addresses": [
+            {
+                "email_address": "race@test.com",
+                "verification": {"status": "verified"},
+            }
+        ],
+        "first_name": "Race",
+        "last_name": "User",
+    }
+
+    class MockResponse:
+        status_code = 200
+
+        def json(self):
+            return clerk_api_response
+
+    class MockClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def get(self, url, **kwargs):
+            return MockResponse()
+
+    monkeypatch.setattr(httpx, "AsyncClient", MockClient)
+    monkeypatch.setattr("app.config.settings.CLERK_SECRET_KEY", "[STRIPE_KEY_REDACTED]")
+
+    token = create_test_clerk_token(clerk_id)
+    resp = await client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    # Should succeed — either JIT finds existing user or normal lookup works
+    assert resp.status_code == 200
+    assert resp.json()["data"]["email"] == "race@test.com"
