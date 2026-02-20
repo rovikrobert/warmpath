@@ -250,3 +250,32 @@ class NetworkHolderAvailability(Base):
     # Relationships
     user: Mapped["User"] = relationship(back_populates="network_holder_availability")
     company: Mapped["Company"] = relationship()
+
+
+class RecommendationDemandSignal(Base):
+    """Captures unmet demand: when recommendations return sparse results.
+
+    When 5+ unique users generate the same company+role signal,
+    it triggers network holder recruitment at that company.
+    """
+
+    __tablename__ = "recommendation_demand_signals"
+    __table_args__ = (
+        Index("ix_demand_signals_company", "company_name"),
+        Index("ix_demand_signals_role_company", "target_role", "company_name"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    company_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    target_role: Mapped[str] = mapped_column(String(255), nullable=False)
+    target_location: Mapped[str | None] = mapped_column(String(255))
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )

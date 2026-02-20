@@ -264,3 +264,73 @@ class TestRecommendationCache:
 
             result = await get_cached_jobs("expired-co", db)
             assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Test: RecommendationDemandSignal model round-trip
+# ---------------------------------------------------------------------------
+
+
+class TestDemandSignals:
+    async def test_create_and_query_demand_signal(self):
+        """A demand signal can be persisted and queried back with all fields."""
+        from sqlalchemy import select
+
+        from app.models.marketplace import RecommendationDemandSignal
+        from tests.conftest import create_test_user_in_db
+
+        async with TestSessionLocal() as db:
+            user, _ = await create_test_user_in_db(
+                db, email="demand-signal@test.com", full_name="Demand Tester"
+            )
+
+            signal = RecommendationDemandSignal(
+                company_name="Stripe",
+                target_role="Senior Software Engineer",
+                target_location="Singapore",
+                user_id=user.id,
+            )
+            db.add(signal)
+            await db.commit()
+
+            stmt = select(RecommendationDemandSignal).where(
+                RecommendationDemandSignal.user_id == user.id
+            )
+            result = await db.execute(stmt)
+            row = result.scalar_one()
+
+            assert row.company_name == "Stripe"
+            assert row.target_role == "Senior Software Engineer"
+            assert row.target_location == "Singapore"
+            assert row.user_id == user.id
+            assert row.id is not None
+            assert row.created_at is not None
+
+    async def test_demand_signal_nullable_location(self):
+        """target_location is optional and defaults to None."""
+        from sqlalchemy import select
+
+        from app.models.marketplace import RecommendationDemandSignal
+        from tests.conftest import create_test_user_in_db
+
+        async with TestSessionLocal() as db:
+            user, _ = await create_test_user_in_db(
+                db, email="demand-noloc@test.com", full_name="No Loc Tester"
+            )
+
+            signal = RecommendationDemandSignal(
+                company_name="Grab",
+                target_role="Product Manager",
+                user_id=user.id,
+            )
+            db.add(signal)
+            await db.commit()
+
+            stmt = select(RecommendationDemandSignal).where(
+                RecommendationDemandSignal.id == signal.id
+            )
+            result = await db.execute(stmt)
+            row = result.scalar_one()
+
+            assert row.target_location is None
+            assert row.company_name == "Grab"
