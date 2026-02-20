@@ -722,7 +722,7 @@ export default function OnboardingPage() {
               <div className="space-y-3">
                 {workHistory.map((entry, i) => (
                   <div key={i} className="rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <label htmlFor={`wh-company-${i}`} className="mb-1 block text-xs font-medium text-slate-300">Company</label>
                         <input
@@ -746,7 +746,7 @@ export default function OnboardingPage() {
                         />
                       </div>
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-3">
+                    <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <label htmlFor={`wh-start-${i}`} className="mb-1 block text-xs font-medium text-slate-300">Start</label>
                         <input

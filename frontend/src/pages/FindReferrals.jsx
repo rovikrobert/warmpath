@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { search as searchApi, credits as creditsApi, preferences as prefsApi } from '../api/client';
 import TagInput from '../components/TagInput';
 import { trackEvent } from '../utils/analytics';
@@ -17,6 +17,10 @@ function ShimmerCard() {
 }
 
 function RecommendationCard({ rec, onAdd, isAdded }) {
+  const jobLabel =
+    rec.matching_count > 0
+      ? `${rec.matching_count} job${rec.matching_count !== 1 ? 's' : ''} matching your criteria`
+      : null;
   return (
     <div className="rounded-lg border border-slate-700/50 bg-slate-900 p-4">
       <div className="flex items-start justify-between">
@@ -28,13 +32,14 @@ function RecommendationCard({ rec, onAdd, isAdded }) {
                 {rec.region}
               </span>
             )}
-            {rec.matching_count > 0 ? (
-              <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
-                {rec.matching_count} matching
-              </span>
-            ) : rec.network_label ? (
+            {rec.network_label ? (
               <span className="inline-flex rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">
                 {rec.network_label}
+              </span>
+            ) : null}
+            {jobLabel ? (
+              <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
+                {jobLabel}
               </span>
             ) : null}
             {rec.referral_ready && (
@@ -139,6 +144,12 @@ export default function FindReferrals() {
       <p className="mb-6 text-sm text-slate-400">
         Search your network and the marketplace for people who can refer you.
       </p>
+
+      <div className="mb-6 flex items-center gap-3 text-sm">
+        <Link to="/applications" className="text-slate-400 hover:text-slate-300">Track applications</Link>
+        <span className="text-slate-600">&middot;</span>
+        <Link to="/help/scores" className="text-slate-400 hover:text-slate-300">How scores work</Link>
+      </div>
 
       {hasPrefs === false && (
         <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-400">

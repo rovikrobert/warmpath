@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { applications as appsApi } from '../api/client';
 import FeedbackModal from '../components/FeedbackModal';
 import Button from '../components/ui/Button';
@@ -225,7 +226,7 @@ export default function ApplicationsPage() {
       {showCreate && (
         <form id="create-application-form" onSubmit={handleCreate} aria-label="Track a new application" className="mb-6 rounded-xl bg-slate-900 p-5 border border-slate-700/50">
           <h2 className="mb-3 text-base font-semibold text-slate-50">Track a New Application</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input
               id="new-app-company"
               type="text"
@@ -297,6 +298,9 @@ export default function ApplicationsPage() {
           >
             Track Your First Application
           </Button>
+          <Link to="/referrals" className="mt-2 inline-block text-sm text-amber-400 hover:text-amber-300">
+            or find referral paths first &rarr;
+          </Link>
         </div>
       ) : (
         <div className="overflow-x-auto pb-4">
@@ -332,6 +336,15 @@ export default function ApplicationsPage() {
           </div>
         </div>
       )}
+
+      {/* Quick actions */}
+      <div className="mt-6 flex flex-wrap items-center gap-3 text-sm">
+        <Link to="/referrals" className="text-amber-400 hover:text-amber-300">Find referral paths &rarr;</Link>
+        <span className="text-slate-600">&middot;</span>
+        <Link to="/credits" className="text-slate-400 hover:text-slate-300">View credits</Link>
+        <span className="text-slate-600">&middot;</span>
+        <Link to="/coach" className="text-slate-400 hover:text-slate-300">Back to Coach</Link>
+      </div>
 
       {showFeedback && (
         <FeedbackModal

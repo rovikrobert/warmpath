@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { referrals as referralsApi } from '../api/client';
 import Spinner from '../components/ui/Spinner';
 
@@ -85,10 +86,10 @@ export default function ReferralCodesPage() {
         </p>
 
         {myCode ? (
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <code className="rounded-lg bg-slate-800 px-4 py-2 font-mono text-lg text-slate-100">{myCode.code}</code>
             <CopyButton text={myCode.code} />
-            <div className="flex items-center gap-4 text-sm text-slate-400">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400 sm:gap-4">
               <span>{myCode.uses_count ?? 0} uses</span>
               <span>{myCode.credits_per_conversion ?? 25} credits each</span>
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -144,6 +145,15 @@ export default function ReferralCodesPage() {
           </div>
         )}
       </section>
+
+      {/* Quick links */}
+      <div className="mt-6 flex flex-wrap items-center gap-3 text-sm">
+        <Link to="/credits" className="text-amber-400 hover:text-amber-300">View credits &rarr;</Link>
+        <span className="text-slate-600">&middot;</span>
+        <Link to="/coach" className="text-slate-400 hover:text-slate-300">Back to Coach</Link>
+        <span className="text-slate-600">&middot;</span>
+        <Link to="/referrals" className="text-slate-400 hover:text-slate-300">Find referrals</Link>
+      </div>
     </div>
   );
 }
