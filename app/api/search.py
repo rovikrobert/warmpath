@@ -159,6 +159,7 @@ async def get_recommendations_endpoint(
     )
 
     result = await get_recommendations(
+        user_id=current_user.id,
         target_role=prefs.target_role,
         target_seniority=prefs.target_seniority,
         target_locations=prefs.target_locations,

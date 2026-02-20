@@ -12,7 +12,7 @@ from app.services.board_registry import (
     get_display_name,
     get_region,
 )
-from tests.conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 # ---------------------------------------------------------------------------
@@ -269,6 +269,78 @@ class TestRecommendationCache:
 # ---------------------------------------------------------------------------
 # Test: RecommendationDemandSignal model round-trip
 # ---------------------------------------------------------------------------
+
+
+class TestNetworkFirstCascade:
+    async def test_recommendations_include_network_fields(self, client):
+        """Recommendations include network_density and network_label fields."""
+        from app.models.company import Company
+        from app.models.contact import Contact
+
+        async with TestSessionLocal() as db:
+            user, headers = await create_test_user_in_db(db, email="netfield@test.com")
+            user_id = user.id
+
+        # Set preferences via API (avoids SQLite JSONB server_default issue)
+        await client.put(
+            "/api/v1/preferences/job",
+            headers=headers,
+            json={
+                "target_role": "Software Engineer",
+                "target_locations": ["Singapore"],
+            },
+        )
+
+        # Seed a company + contact so network layer finds it
+        async with TestSessionLocal() as db:
+            company = Company(name="Grab", domain="grab.com")
+            db.add(company)
+            await db.flush()
+
+            contact = Contact(
+                user_id=user_id,
+                first_name="Test",
+                last_name="Contact",
+                full_name="Test Contact",
+                fingerprint="nettest123",
+                company_id=company.id,
+            )
+            db.add(contact)
+            await db.commit()
+
+        resp = await client.get(
+            "/api/v1/search/recommendations?limit=10", headers=headers
+        )
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        recs = data["recommendations"]
+
+        # Should find Grab via network signal
+        grab = next((r for r in recs if r["company"] == "grab"), None)
+        assert grab is not None
+        assert "network_density" in grab
+        assert grab["network_density"] >= 1
+        assert "network_label" in grab
+        assert grab["source"] == "network_signal"
+
+    async def test_recommendations_scan_stats_include_network(self, client):
+        """scan_stats includes network_matches count."""
+        async with TestSessionLocal() as db:
+            _user, headers = await create_test_user_in_db(db, email="stats@test.com")
+
+        # Set preferences via API
+        await client.put(
+            "/api/v1/preferences/job",
+            headers=headers,
+            json={"target_role": "Designer"},
+        )
+
+        resp = await client.get(
+            "/api/v1/search/recommendations?limit=5", headers=headers
+        )
+        assert resp.status_code == 200
+        stats = resp.json()["data"]["scan_stats"]
+        assert "network_matches" in stats
 
 
 class TestDemandSignals:
