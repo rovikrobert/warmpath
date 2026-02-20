@@ -334,6 +334,26 @@ async def get_recommendations(
 
     network_count = sum(1 for r in merged if r.get("network_density", 0) > 0)
 
+    # --- Demand signal capture: log when results are sparse ---
+    if len(merged) < 3:
+        from app.models.marketplace import RecommendationDemandSignal
+
+        signal = RecommendationDemandSignal(
+            company_name=target_role.lower(),
+            target_role=target_role,
+            target_location=target_locations[0] if target_locations else None,
+            user_id=user_id,
+        )
+        db.add(signal)
+        await db.flush()
+        logger.info(
+            "Demand signal captured: role=%s location=%s user=%s (only %d results)",
+            target_role,
+            target_locations,
+            user_id,
+            len(merged),
+        )
+
     return {
         "recommendations": merged,
         "scan_stats": {

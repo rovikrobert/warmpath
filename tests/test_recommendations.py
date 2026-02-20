@@ -406,3 +406,46 @@ class TestDemandSignals:
 
             assert row.target_location is None
             assert row.company_name == "Grab"
+
+
+# ---------------------------------------------------------------------------
+# Test: Demand Signal Capture (end-to-end via recommendations endpoint)
+# ---------------------------------------------------------------------------
+
+
+class TestDemandSignalCapture:
+    async def test_sparse_results_log_demand_signal(self, client: AsyncClient):
+        """When recommendations return < 3 results, a demand signal is logged."""
+        from sqlalchemy import select
+
+        from app.models.marketplace import RecommendationDemandSignal
+
+        async with TestSessionLocal() as db:
+            user, headers = await create_test_user_in_db(db)
+            user_id = user.id
+
+        # Set preferences via API (avoids SQLite JSONB server_default issue)
+        await client.put(
+            "/api/v1/preferences/job",
+            headers=headers,
+            json={
+                "target_role": "Quantum Computing Engineer",
+                "target_locations": ["Mars"],
+            },
+        )
+
+        resp = await client.get(
+            "/api/v1/search/recommendations?limit=10", headers=headers
+        )
+        assert resp.status_code == 200
+
+        # Check demand signal was logged
+        async with TestSessionLocal() as db:
+            result = await db.execute(
+                select(RecommendationDemandSignal).where(
+                    RecommendationDemandSignal.user_id == user_id
+                )
+            )
+            signals = list(result.scalars().all())
+            assert len(signals) >= 1
+            assert signals[0].target_role == "Quantum Computing Engineer"
