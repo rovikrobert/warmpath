@@ -763,7 +763,7 @@ async def _fetch_and_filter_openings(
 
     if raw_jobs:
         company_result = await db.execute(
-            select(Company).where(Company.name.ilike(f"%{company_name}%"))
+            select(Company).where(Company.name.ilike(f"%{company_name}%")).limit(1)
         )
         company_record = company_result.scalar_one_or_none()
         await _upsert_openings(
