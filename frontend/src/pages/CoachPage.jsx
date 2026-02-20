@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { coach as coachApi, contacts as contactsApi, dashboard as dashboardApi, feed as feedApi } from '../api/client';
+import { coach as coachApi, feed as feedApi } from '../api/client';
 import ErrorBoundary from '../components/ErrorBoundary';
 import FeedbackModal from '../components/FeedbackModal';
 import FeedCard from '../components/FeedCard';
@@ -50,41 +50,9 @@ function renderWithLinks(text) {
 
 const QUICK_ACTIONS = [
   { label: 'Find referrals', prompt: 'Help me find referral paths at my target companies' },
+  { label: 'Draft an intro', prompt: 'Help me draft a referral intro message' },
   { label: 'Review my network', prompt: 'Analyze my network and tell me my strongest connections' },
-  { label: 'Draft an intro message', prompt: 'Help me draft a referral intro message' },
-  { label: 'Job market for my role', prompt: 'What does the job market look like for my target role?' },
-  { label: 'Classify my contacts', prompt: 'Help me classify and tag my contacts by relationship type' },
-  { label: 'My applications status', prompt: 'Give me a summary of my application pipeline status' },
 ];
-
-function StatCard({ value, label }) {
-  return (
-    <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-3">
-      <div className="text-xl font-bold text-slate-50 tabular-nums">{value}</div>
-      <div className="text-xs text-slate-500 uppercase tracking-wider">{label}</div>
-    </div>
-  );
-}
-
-function computeStats(insights, contextSnapshot) {
-  // Prefer dashboard insights (richer, cached server-side), fall back to briefing snapshot
-  const network = insights?.network_analysis ?? contextSnapshot?.network;
-  const totalContacts = network?.total_contacts ?? 0;
-
-  const breakdown = network?.relationship_breakdown ?? {};
-  const totalClassified = Object.entries(breakdown).reduce((sum, [key, count]) => {
-    if (key !== 'unclassified') return sum + count;
-    return sum;
-  }, 0);
-  const classifiedPct = totalContacts > 0
-    ? Math.round((totalClassified / totalContacts) * 100)
-    : 0;
-
-  const searchCount = (contextSnapshot?.recent_searches ?? []).length;
-  const companiesHiring = insights?.job_market_trends?.companies_hiring ?? null;
-
-  return { totalContacts, classifiedPct, searchCount, companiesHiring };
-}
 
 export default function CoachPage() {
   const { user } = useAuth();
@@ -98,8 +66,6 @@ export default function CoachPage() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedItems, setFeedItems] = useState([]);
   const [feedExpanded, setFeedExpanded] = useState(true);
-  const [insights, setInsights] = useState(null);
-  const insightsRef = useRef(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const quickActionsRef = useRef(null);
@@ -115,40 +81,6 @@ export default function CoachPage() {
     feedApi.list({ limit: 5 })
       .then((res) => { if (!cancelled) setFeedItems(res.data || []); })
       .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
-
-  // Load dashboard insights on mount (cached in ref to survive re-renders)
-  useEffect(() => {
-    if (insightsRef.current) {
-      setInsights(insightsRef.current);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await dashboardApi.insights();
-        if (cancelled) return;
-        insightsRef.current = res.data;
-        setInsights(res.data);
-      } catch {
-        // Fallback: fetch contact count from contacts.list
-        try {
-          const contactRes = await contactsApi.list({ per_page: 1 });
-          if (cancelled) return;
-          const fallback = {
-            network_analysis: {
-              total_contacts: contactRes.meta?.total ?? 0,
-              relationship_breakdown: {},
-            },
-          };
-          insightsRef.current = fallback;
-          setInsights(fallback);
-        } catch {
-          // Silently fail — stat cards will use briefing snapshot
-        }
-      }
-    })();
     return () => { cancelled = true; };
   }, []);
 
@@ -266,8 +198,6 @@ export default function CoachPage() {
     return <CoachPageSkeleton />;
   }
 
-  const stats = computeStats(insights, contextSnapshot);
-
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col" role="main">
       {/* Onboarding checklist for new users */}
@@ -318,18 +248,6 @@ export default function CoachPage() {
         </div>
       </div>
 
-      {/* Stat cards */}
-      <div className="flex-none px-4 pt-3 pb-1">
-        <div className={`grid gap-3 ${stats.companiesHiring !== null ? 'grid-cols-4' : 'grid-cols-3'}`}>
-          <StatCard value={stats.totalContacts} label="contacts uploaded" />
-          <StatCard value={`${stats.classifiedPct}%`} label="relationships tagged" />
-          <StatCard value={stats.searchCount} label="referral searches" />
-          {stats.companiesHiring !== null && (
-            <StatCard value={stats.companiesHiring} label="companies hiring" />
-          )}
-        </div>
-      </div>
-
       {/* Quick Actions */}
       <div className="flex-none px-4 py-2">
         <div
@@ -338,12 +256,22 @@ export default function CoachPage() {
           role="toolbar"
           aria-label="Quick actions"
         >
+          {suggestedPrompts.map((prompt) => (
+            <button
+              key={prompt}
+              onClick={() => sendMessage(prompt)}
+              disabled={sending}
+              className="flex-shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {prompt}
+            </button>
+          ))}
           {QUICK_ACTIONS.map((action) => (
             <button
               key={action.label}
               onClick={() => sendMessage(action.prompt)}
               disabled={sending}
-              className="bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-full px-4 py-2 text-sm text-slate-300 hover:text-slate-100 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-shrink-0 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-full px-4 py-2 text-sm text-slate-300 hover:text-slate-100 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {action.label}
             </button>
@@ -354,17 +282,21 @@ export default function CoachPage() {
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" aria-live="polite" aria-label="Conversation messages">
         <ErrorBoundary>
-        {messages.map((msg, i) => (
+        {messages.map((msg, i) => {
+          const isBriefing = i === 0 && msg.role === 'keevs';
+          return (
           <div
             key={i}
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div>
               <div
-                className={`max-w-[95%] rounded-2xl px-4 py-3 text-sm leading-relaxed sm:max-w-[85%] ${
+                className={`rounded-2xl text-sm leading-relaxed ${
                   msg.role === 'user'
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-slate-800 text-slate-200'
+                    ? 'max-w-[95%] sm:max-w-[85%] px-4 py-3 bg-amber-500 text-white'
+                    : isBriefing
+                      ? 'max-w-[98%] sm:max-w-[90%] px-5 py-4 border-l-2 border-amber-500/30 bg-slate-800 text-slate-200'
+                      : 'max-w-[95%] sm:max-w-[85%] px-4 py-3 bg-slate-800 text-slate-200'
                 }`}
               >
                 {msg.role === 'keevs'
@@ -387,7 +319,8 @@ export default function CoachPage() {
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
         </ErrorBoundary>
 
         {/* Typing indicator */}
@@ -399,21 +332,6 @@ export default function CoachPage() {
               <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
             <span className="text-xs text-slate-500">Keevs is thinking...</span>
-          </div>
-        )}
-
-        {/* Suggested prompts */}
-        {suggestedPrompts.length > 0 && !sending && (
-          <div className="flex flex-wrap gap-2">
-            {suggestedPrompts.map((prompt) => (
-              <button
-                key={prompt}
-                onClick={() => sendMessage(prompt)}
-                className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition-colors"
-              >
-                {prompt}
-              </button>
-            ))}
           </div>
         )}
 
