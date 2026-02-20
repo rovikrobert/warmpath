@@ -172,12 +172,14 @@ export default function OnboardingPage() {
   }, []);
 
   const UPLOAD_STEPS = [
-    'Reading file...',
+    'Uploading file...',
     'Parsing contacts...',
     'Normalizing names...',
     'Matching companies...',
+    'Scoring connections...',
     'Calculating warm scores...',
-    'Almost done...',
+    'Analyzing network strength...',
+    'Finalizing import...',
   ];
 
   useEffect(() => {
@@ -187,9 +189,10 @@ export default function OnboardingPage() {
     const tick = () => {
       const elapsed = (Date.now() - start) / 1000;
       let w;
-      if (elapsed < 1) w = elapsed * 30;
-      else if (elapsed < 8) w = 30 + (elapsed - 1) * 8.5;
-      else w = 90 + Math.min(elapsed - 8, 10) * 0.5;
+      if (elapsed < 2) w = elapsed * 10;
+      else if (elapsed < 30) w = 20 + (elapsed - 2) * 2;
+      else if (elapsed < 90) w = 76 + (elapsed - 30) * 0.3;
+      else w = 94 + Math.min(elapsed - 90, 60) * 0.01;
       setUploadProgressWidth(Math.min(w, 95));
       frame = requestAnimationFrame(tick);
     };
@@ -204,7 +207,7 @@ export default function OnboardingPage() {
     const interval = setInterval(() => {
       idx = Math.min(idx + 1, UPLOAD_STEPS.length - 1);
       setUploadProgressMsg(UPLOAD_STEPS[idx]);
-    }, 1500);
+    }, 5000);
     return () => clearInterval(interval);
   }, [uploading]);
 
