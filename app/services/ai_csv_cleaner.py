@@ -8,6 +8,7 @@ Real mode: Claude API for fuzzy name/company resolution.
 Follows the same mock/real pattern as ai_matcher.py.
 """
 
+import asyncio
 import json
 import logging
 import re
@@ -20,7 +21,7 @@ from app.utils.performance import timed
 
 logger = logging.getLogger(__name__)
 
-CLAUDE_MODEL = settings.CLAUDE_MODEL
+CLEANUP_MODEL = getattr(settings, "CLEANUP_MODEL", "claude-haiku-4-5-20251001")
 CLEANUP_BATCH_SIZE = 50
 
 # ---------------------------------------------------------------------------
@@ -378,13 +379,51 @@ def _merge_cleaned_fields(original: dict, cleaned_fields: dict) -> dict:
     return merged
 
 
+MAX_CONCURRENT_BATCHES = 5
+
+
+async def _clean_batch(
+    client: anthropic.AsyncAnthropic,
+    batch: list[dict],
+    semaphore: asyncio.Semaphore,
+) -> list[dict]:
+    """Clean a single batch via Claude API, guarded by semaphore."""
+    async with semaphore:
+        payload = _build_cleanup_payload(batch)
+        message = await client.messages.create(
+            model=CLEANUP_MODEL,
+            max_tokens=4096,
+            system=_CLEANUP_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": json.dumps(payload)}],
+        )
+
+        raw = message.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1]
+            raw = raw.rsplit("```", 1)[0].strip()
+
+        parsed = json.loads(raw)
+        cleaned = []
+        for i, cleaned_fields in enumerate(parsed):
+            if i < len(batch):
+                cleaned.append(_merge_cleaned_fields(batch[i], cleaned_fields))
+
+        logger.info(
+            "Cleaned batch of %d contacts via Claude API (tokens: %d in / %d out)",
+            len(batch),
+            message.usage.input_tokens,
+            message.usage.output_tokens,
+        )
+        return cleaned
+
+
 @timed("csv_clean_real")
 async def clean_contacts_real(contacts: list[dict]) -> list[dict]:
     """Clean contacts using the Claude API for fuzzy name/company resolution.
 
-    Batches contacts (CLEANUP_BATCH_SIZE per API call), sends minimal payload,
-    merges cleaned fields back into original dicts. Falls back to mock cleaner
-    on any error (graceful degradation).
+    Batches contacts (CLEANUP_BATCH_SIZE per API call) and runs up to
+    MAX_CONCURRENT_BATCHES in parallel via asyncio.gather. Falls back to
+    mock cleaner on any error (graceful degradation).
     """
     if not contacts:
         return []
@@ -395,43 +434,36 @@ async def clean_contacts_real(contacts: list[dict]) -> list[dict]:
             timeout=60.0,
             max_retries=1,
         )
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_BATCHES)
+
+        batches = [
+            contacts[i : i + CLEANUP_BATCH_SIZE]
+            for i in range(0, len(contacts), CLEANUP_BATCH_SIZE)
+        ]
+
+        results = await asyncio.gather(
+            *[_clean_batch(client, batch, semaphore) for batch in batches],
+            return_exceptions=True,
+        )
+
         all_cleaned: list[dict] = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.warning(
+                    "Batch %d failed (%s), using mock for %d contacts",
+                    i,
+                    result,
+                    len(batches[i]),
+                )
+                all_cleaned.extend(clean_contacts_mock(batches[i]))
+            else:
+                all_cleaned.extend(result)
 
-        # Process in batches
-        for batch_start in range(0, len(contacts), CLEANUP_BATCH_SIZE):
-            batch = contacts[batch_start : batch_start + CLEANUP_BATCH_SIZE]
-            payload = _build_cleanup_payload(batch)
-
-            message = await client.messages.create(
-                model=CLAUDE_MODEL,
-                max_tokens=4096,
-                system=_CLEANUP_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": json.dumps(payload)}],
-            )
-
-            raw = message.content[0].text.strip()
-
-            # Handle markdown fences in response
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1]
-                raw = raw.rsplit("```", 1)[0].strip()
-
-            parsed = json.loads(raw)
-
-            # Merge Claude's cleaned fields back into originals
-            for i, cleaned_fields in enumerate(parsed):
-                if i < len(batch):
-                    merged = _merge_cleaned_fields(batch[i], cleaned_fields)
-                    all_cleaned.append(merged)
-
-            logger.info(
-                "Cleaned batch of %d contacts via Claude API (tokens: %d in / %d out)",
-                len(batch),
-                message.usage.input_tokens,
-                message.usage.output_tokens,
-            )
-
-        logger.info("Cleaned %d contacts total (real mode)", len(all_cleaned))
+        logger.info(
+            "Cleaned %d contacts total (real mode, %d parallel batches)",
+            len(all_cleaned),
+            len(batches),
+        )
         return all_cleaned
 
     except Exception:
