@@ -238,3 +238,126 @@ async def test_enrichment_marks_feed_item_acted_on(
         item = item_result.scalar_one()
         assert item.acted_on_at is not None
         assert item.seen_at is not None
+
+
+@pytest.mark.asyncio
+async def test_enrichment_response_awards_milestone_when_threshold_crossed(
+    client: AsyncClient,
+):
+    """When enrichment pushes percentage past a milestone, bonus credits are awarded."""
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email="milestone@test.com", full_name="Milestone Tester"
+        )
+        # Create 10 contacts, 0 enriched (need 1 to cross 10%)
+        contacts_list = []
+        for i in range(10):
+            c = Contact(
+                user_id=user.id,
+                full_name=f"Contact M{i}",
+                current_company=f"Company M{i}",
+                source="linkedin_csv",
+            )
+            db.add(c)
+            contacts_list.append(c)
+        await db.flush()
+
+        # Create feed item for first contact
+        feed_item = FeedItem(
+            user_id=user.id,
+            item_type="enrichment_prompt",
+            title="How do you know Contact M0?",
+            priority=60,
+            metadata_={
+                "contact_id": str(contacts_list[0].id),
+                "prompt_type": "relationship_type",
+            },
+        )
+        db.add(feed_item)
+        await db.commit()
+        await db.refresh(feed_item)
+        feed_item_id = feed_item.id
+
+    resp = await client.post(
+        "/api/v1/feed/enrichment-response",
+        json={
+            "feed_item_id": str(feed_item_id),
+            "signal_type": "relationship_type",
+            "signal_value": "colleague",
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["credits_awarded"] == 5  # base enrichment credits
+    assert data["milestone_reached"] is not None
+    assert data["milestone_reached"]["percent"] == 10
+    assert data["milestone_reached"]["credits"] == 10
+
+    # Verify milestone was persisted
+    async with TestSessionLocal() as db:
+        from app.models.milestone import UserMilestone
+
+        result = await db.execute(
+            select(UserMilestone).where(
+                UserMilestone.user_id == user.id,
+                UserMilestone.milestone_type == "enrichment",
+            )
+        )
+        milestone = result.scalar_one()
+        assert milestone.milestone_value == 10
+        assert milestone.credits_awarded == 10
+
+
+@pytest.mark.asyncio
+async def test_enrichment_response_no_milestone_when_not_crossed(
+    client: AsyncClient,
+):
+    """When enrichment doesn't cross a milestone, no milestone_reached in response."""
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email="no_milestone@test.com", full_name="No Milestone"
+        )
+        # 100 contacts, 5 already enriched (5%), enriching 1 more = 6% (no milestone)
+        target_contact = None
+        for i in range(100):
+            c = Contact(
+                user_id=user.id,
+                full_name=f"NM Contact {i}",
+                current_company=f"NM Company {i}",
+                source="linkedin_csv",
+            )
+            if i < 5:
+                c.relationship_type = "colleague"
+            db.add(c)
+            if i == 5:
+                target_contact = c
+        await db.flush()
+
+        feed_item = FeedItem(
+            user_id=user.id,
+            item_type="enrichment_prompt",
+            title="How do you know NM Contact 5?",
+            priority=60,
+            metadata_={
+                "contact_id": str(target_contact.id),
+                "prompt_type": "relationship_type",
+            },
+        )
+        db.add(feed_item)
+        await db.commit()
+        await db.refresh(feed_item)
+        fi_id = feed_item.id
+
+    resp = await client.post(
+        "/api/v1/feed/enrichment-response",
+        json={
+            "feed_item_id": str(fi_id),
+            "signal_type": "relationship_type",
+            "signal_value": "friend",
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["milestone_reached"] is None
