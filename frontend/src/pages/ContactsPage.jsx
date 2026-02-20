@@ -515,7 +515,6 @@ export default function ContactsPage() {
   // NLP search state
   const [searchInput, setSearchInput] = useState('');
   const [nlpResults, setNlpResults] = useState(null);
-  const [nlpInterpretation, setNlpInterpretation] = useState(null);
   const [nlpLoading, setNlpLoading] = useState(false);
   const [nlpError, setNlpError] = useState('');
 
@@ -527,11 +526,9 @@ export default function ContactsPage() {
     try {
       const res = await contactsApi.nlpSearch(query);
       setNlpResults(res.data || []);
-      setNlpInterpretation(res.meta?.interpretation || null);
     } catch (err) {
       setNlpError(err.message || 'NLP search failed');
       setNlpResults(null);
-      setNlpInterpretation(null);
     } finally {
       setNlpLoading(false);
     }
@@ -648,39 +645,19 @@ export default function ContactsPage() {
         )}
       </div>
 
-      {/* NLP Interpretation chips */}
-      {nlpInterpretation && nlpResults && (
-        <div className="mb-4 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3" role="region" aria-label="Search interpretation">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-slate-400">Understood as:</span>
-            {nlpInterpretation.titles?.map((t) => (
-              <span key={`title-${t}`} className="inline-flex rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400">{t}</span>
-            ))}
-            {nlpInterpretation.companies?.map((c) => (
-              <span key={`company-${c}`} className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">{c}</span>
-            ))}
-            {nlpInterpretation.locations?.map((l) => (
-              <span key={`loc-${l}`} className="inline-flex rounded-full bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-400">{l}</span>
-            ))}
-            {nlpInterpretation.seniority?.map((s) => (
-              <span key={`sen-${s}`} className="inline-flex rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">{s}</span>
-            ))}
-            {nlpInterpretation.relationship_types?.map((r) => (
-              <span key={`rel-${r}`} className="inline-flex rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs font-medium text-cyan-400">
-                {RELATIONSHIP_TYPES.find((rt) => rt.value === r)?.label || r}
-              </span>
-            ))}
-            <button
-              onClick={clearNlpSearch}
-              aria-label="Clear NLP search and return to normal contact list"
-              className="ml-auto rounded-md border border-slate-700/50 px-2.5 py-1 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-            >
-              Clear search
-            </button>
-          </div>
-          <p className="mt-1.5 text-xs text-slate-500">
+      {/* NLP search result summary */}
+      {nlpResults && (
+        <div className="mb-4 flex items-center gap-3">
+          <span className="text-sm text-slate-400">
             {nlpResults.length} {nlpResults.length === 1 ? 'match' : 'matches'} found
-          </p>
+          </span>
+          <button
+            onClick={clearNlpSearch}
+            aria-label="Clear NLP search and return to normal contact list"
+            className="rounded-md border border-slate-700/50 px-2.5 py-1 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+          >
+            Clear search
+          </button>
         </div>
       )}
 

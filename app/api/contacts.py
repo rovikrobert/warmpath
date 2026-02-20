@@ -207,11 +207,11 @@ async def nlp_search(
 ) -> dict:
     """Search contacts using natural language queries."""
     from app.models.company import Company
-    from app.services.nlp_contact_search import parse_query, sco[RESEND_KEY_REDACTED]
+    from app.services.nlp_contact_search import parse_query_real, sco[RESEND_KEY_REDACTED]
     from app.utils.tracking import track_action
 
     query_text = body.query.strip()
-    parsed = parse_query(query_text)
+    parsed = parse_query_real(query_text)
 
     # Resolve company names to company_id UUIDs (case-insensitive)
     resolved_company_ids: list[uuid.UUID] = []
