@@ -312,14 +312,40 @@ export default function OnboardingPage() {
     handleFile(e.dataTransfer.files[0]);
   }, []);
 
+  const pollUploadStatus = async (uploadId) => {
+    const maxAttempts = 60; // up to ~60 seconds
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        const poll = await contactsApi.getUploadStatus(uploadId);
+        const s = poll.data;
+        if (s.status === 'completed') return s;
+        if (s.status === 'failed') throw new Error(s.error_message || 'CSV processing failed');
+      } catch (err) {
+        if (err.message?.includes('failed')) throw err;
+        // Network blip — keep polling
+      }
+    }
+    // Timed out but upload record exists — let them proceed anyway
+    return null;
+  };
+
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
     setError('');
     try {
       const res = await contactsApi.upload(file);
-      setUploadResult(res.data);
-      trackEvent('csv_uploaded', { contact_count: res.data?.processed_count ?? res.data?.row_count ?? 0 });
+      let result = res.data;
+
+      // If async processing, poll until contacts are actually imported
+      if (result.status === 'queued' || result.status === 'processing') {
+        const final = await pollUploadStatus(result.id);
+        if (final) result = final;
+      }
+
+      setUploadResult(result);
+      trackEvent('csv_uploaded', { contact_count: result?.processed_count ?? result?.row_count ?? 0 });
       // Always save sharing prefs for NH/both users so the checklist
       // can detect that onboarding sharing was completed.
       if (isHolder) {
@@ -722,7 +748,9 @@ export default function OnboardingPage() {
                 <span className="text-xl text-emerald-400">&#10003;</span>
               </div>
               <h2 className="text-lg font-semibold text-slate-50">
-                {uploadResult.processed_count ?? uploadResult.row_count ?? 0} contacts imported!
+                {(uploadResult.processed_count ?? uploadResult.row_count)
+                  ? `${uploadResult.processed_count ?? uploadResult.row_count} contacts imported!`
+                  : 'CSV uploaded successfully!'}
               </h2>
               <p className="text-sm text-slate-400">
                 Add your work history to improve referral matching — contacts at your former companies get boosted scores.
