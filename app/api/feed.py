@@ -5,8 +5,9 @@ The feed is the "inbound" experience the user asked for —
 WarmPath doing work on their behalf and showing results.
 
 Endpoints:
-  GET  /feed           — paginated feed items (unseen first, then seen)
+  GET  /feed           — paginated feed items (ranked by learned weights)
   GET  /feed/count     — unread count (for badge/notification dot)
+  GET  /feed/stats     — admin/debug engagement stats per item type
   POST /feed/{id}/seen — mark item as seen
   POST /feed/{id}/act  — mark item as acted on (clicked through)
   POST /feed/{id}/dismiss — dismiss item
@@ -29,6 +30,11 @@ from app.models.contact import Contact
 from app.models.feed import ContactFreshnessSignal, FeedItem, FeedItemInteraction
 from app.models.user import User
 from app.services.credits import earn_credits
+from app.services.feed_ranker import (
+    compute_feed_stats,
+    get_type_weights,
+    rank_feed_items,
+)
 from app.utils.security import get_current_user
 from app.utils.tracking import track_action
 
@@ -68,8 +74,26 @@ class EnrichmentResponseRequest(BaseModel):
     signal_value: str  # e.g. "colleague", "definitely", "2026-01-15"  # {"type": "colleague"} or {"likelihood": "definitely"}
 
 
+def _serialize_feed_item(item: FeedItem) -> dict:
+    """Convert a FeedItem ORM object to API response dict."""
+    return {
+        "id": str(item.id),
+        "item_type": item.item_type,
+        "title": item.title,
+        "body": item.body,
+        "icon": item.icon,
+        "action_url": item.action_url,
+        "action_label": item.action_label,
+        "priority": item.priority,
+        "metadata": item.metadata_,
+        "seen_at": item.seen_at.isoformat() if item.seen_at else None,
+        "acted_on_at": (item.acted_on_at.isoformat() if item.acted_on_at else None),
+        "created_at": item.created_at.isoformat(),
+    }
+
+
 # ---------------------------------------------------------------------------
-# GET /feed — paginated feed
+# GET /feed — paginated feed with learned ranking
 # ---------------------------------------------------------------------------
 
 
@@ -81,10 +105,10 @@ async def get_feed(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Get the user's activity feed, ordered by priority and recency.
+    """Get the user's activity feed, ranked by learned type weights.
 
-    Unseen items appear first (sorted by priority desc, created_at desc),
-    followed by seen items.
+    Unseen items appear first. Within each group, items are ranked by
+    priority * type_weight * recency_boost (auto-tuned from interaction data).
     """
     await track_action(db, current_user.id, "feed_view")
 
@@ -100,47 +124,25 @@ async def get_feed(
     if item_type:
         query = query.where(FeedItem.item_type == item_type)
 
-    # Order: unseen first (seen_at IS NULL), then by priority and recency
-    query = (
-        query.order_by(
-            FeedItem.seen_at.is_(None).desc(),  # NULL (unseen) sorts first
-            FeedItem.priority.desc(),
-            FeedItem.created_at.desc(),
-        )
-        .offset(offset)
-        .limit(limit)
-    )
-
+    # Fetch all matching items (ranking happens in Python via learned weights)
     result = await db.execute(query)
-    items = result.scalars().all()
+    all_items = list(result.scalars().all())
 
-    # Build response
-    feed_items = []
-    for item in items:
-        feed_items.append(
-            {
-                "id": str(item.id),
-                "item_type": item.item_type,
-                "title": item.title,
-                "body": item.body,
-                "icon": item.icon,
-                "action_url": item.action_url,
-                "action_label": item.action_label,
-                "priority": item.priority,
-                "metadata": item.metadata_,
-                "seen_at": item.seen_at.isoformat() if item.seen_at else None,
-                "acted_on_at": (
-                    item.acted_on_at.isoformat() if item.acted_on_at else None
-                ),
-                "created_at": item.created_at.isoformat(),
-            }
-        )
+    # Split unseen / seen, rank each group independently, then concatenate
+    unseen = [i for i in all_items if i.seen_at is None]
+    seen = [i for i in all_items if i.seen_at is not None]
+
+    type_weights = await get_type_weights(db)
+    ranked = rank_feed_items(unseen, type_weights) + rank_feed_items(seen, type_weights)
+
+    # Apply pagination
+    page = ranked[offset : offset + limit]
 
     await db.commit()
 
     return {
-        "data": feed_items,
-        "meta": {"offset": offset, "limit": limit, "count": len(feed_items)},
+        "data": [_serialize_feed_item(item) for item in page],
+        "meta": {"offset": offset, "limit": limit, "count": len(page)},
     }
 
 
@@ -177,6 +179,27 @@ async def get_feed_count(
     total = total_result.scalar_one()
 
     return {"data": {"unseen": unseen, "total": total}, "meta": {}}
+
+
+# ---------------------------------------------------------------------------
+# GET /feed/stats — admin/debug engagement stats
+# ---------------------------------------------------------------------------
+
+
+@router.get("/stats")
+async def get_feed_stats(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Return feed engagement statistics for debugging and tuning.
+
+    Per-type: generated_count, seen_count, act_count, dismiss_count,
+    engagement_score, current_weight.
+    Overall: total_items, avg_engagement, most/least engaging types.
+    Time series: daily engagement scores for last 14 days.
+    """
+    stats = await compute_feed_stats(db)
+    return {"data": stats, "meta": {}}
 
 
 # ---------------------------------------------------------------------------
