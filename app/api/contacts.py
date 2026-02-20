@@ -197,6 +197,20 @@ async def compute_scores(
     }
 
 
+@router.get("/enrichment-progress")
+async def get_enrichment_progress(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Get enrichment progress stats and milestone information."""
+    from app.services.enrichment_progress import (
+        get_enrichment_progress as _get_progress,
+    )
+
+    progress = await _get_progress(current_user.id, db)
+    return {"data": progress, "meta": {}}
+
+
 @router.post("/nlp-search")
 @timed("nlp_search_endpoint")
 async def nlp_search(
