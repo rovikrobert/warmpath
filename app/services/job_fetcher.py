@@ -21,7 +21,16 @@ _REMOTE_PATTERNS = re.compile(
     r"\b(remote|anywhere|distributed|work from home|wfh)\b", re.IGNORECASE
 )
 
+# Some ATS systems prepend numeric IDs to job titles
+_LEADING_ID_PATTERN = re.compile(r"^\d{6,}\s+")
+
 HTTPX_TIMEOUT = 3.0
+
+
+def _clean_job_title(title: str) -> str:
+    """Strip leading numeric IDs and normalize whitespace in job titles."""
+    title = _LEADING_ID_PATTERN.sub("", title).strip()
+    return title
 
 
 class JobFetcher:
@@ -66,7 +75,7 @@ class JobFetcher:
 
             results.append(
                 {
-                    "title": job.get("title", ""),
+                    "title": _clean_job_title(job.get("title", "")),
                     "department": department or None,
                     "location": location_name or None,
                     "url": job.get("absolute_url", ""),
@@ -117,7 +126,7 @@ class JobFetcher:
 
             results.append(
                 {
-                    "title": posting.get("text", ""),
+                    "title": _clean_job_title(posting.get("text", "")),
                     "department": department or None,
                     "location": location_name or None,
                     "url": posting.get("hostedUrl", ""),
@@ -168,10 +177,10 @@ class JobFetcher:
 
             results.append(
                 {
-                    "title": job.get("title", ""),
+                    "title": _clean_job_title(job.get("title", "")),
                     "department": department or None,
                     "location": location_name or None,
-                    "url": job.get("jobUrl", ""),
+                    "url": job.get("jobUrl") or job.get("applyUrl") or "",
                     "source": "ashby",
                     "source_job_id": str(job.get("id", "")),
                     "posted_at": posted_at,
