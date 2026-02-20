@@ -126,7 +126,11 @@ async def upload_csv(
         await db.commit()
         from app.tasks.csv_processing import process_csv_upload
 
-        process_csv_upload.delay(str(csv_upload.id), str(current_user.id), content_b64)
+        import logging
+
+        _log = logging.getLogger(__name__)
+        result = process_csv_upload.delay(str(csv_upload.id), str(current_user.id), content_b64)
+        _log.info("Dispatched CSV task %s for upload %s (broker: %s)", result.id, csv_upload.id, process_csv_upload.app.conf.broker_url[:40])
     else:
         # Inline processing (tests, or when no Redis available)
         from app.tasks.csv_processing import process_csv_upload_core
