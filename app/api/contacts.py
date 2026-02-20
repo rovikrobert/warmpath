@@ -396,6 +396,93 @@ async def list_contacts(
     }
 
 
+@router.get("/export")
+@timed("contacts_export")
+async def export_contacts_csv(
+    search: str | None = Query(None),
+    relationship_type: str | None = Query(None),
+    source: str | None = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export contacts as CSV, respecting current search/filter."""
+    import csv
+    import io
+
+    from fastapi.responses import StreamingResponse
+
+    base_query = (
+        select(Contact, WarmScore.total_score)
+        .outerjoin(
+            WarmScore,
+            (WarmScore.contact_id == Contact.id)
+            & (WarmScore.user_id == Contact.user_id),
+        )
+        .where(
+            Contact.user_id == current_user.id,
+            Contact.deleted_at.is_(None),
+        )
+    )
+
+    if relationship_type:
+        base_query = base_query.where(Contact.relationship_type == relationship_type)
+    if source:
+        base_query = base_query.where(Contact.source == source)
+
+    result = await db.execute(base_query)
+    all_rows = result.all()
+
+    # Apply in-memory text search if provided
+    if search:
+        s = search.lower()
+        all_rows = [
+            (c, sc)
+            for c, sc in all_rows
+            if s in (c.full_name or "").lower()
+            or s in (c.current_company or "").lower()
+            or s in (c.current_title or "").lower()
+            or s in (c.email or "").lower()
+        ]
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "Name",
+            "Title",
+            "Company",
+            "Email",
+            "Location",
+            "Relationship",
+            "Warm Score",
+            "Connected On",
+            "Source",
+        ]
+    )
+    for contact, sco[RESEND_KEY_REDACTED] in all_rows:
+        writer.writerow(
+            [
+                contact.full_name or "",
+                contact.current_title or "",
+                contact.current_company or "",
+                contact.email or "",
+                contact.location or "",
+                contact.relationship_type or "",
+                round(float(sco[RESEND_KEY_REDACTED]), 1) if sco[RESEND_KEY_REDACTED] is not None else "",
+                str(contact.connected_on) if contact.connected_on else "",
+                contact.source or "",
+            ]
+        )
+
+    buf.seek(0)
+    filename = f"warmpath-contacts-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/{contact_id}")
 async def get_contact(
     contact_id: uuid.UUID,

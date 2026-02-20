@@ -11,6 +11,9 @@ const RELATIONSHIP_TYPES = [
   { value: 'industry_peer', label: 'Industry peer' },
   { value: 'friend', label: 'Friend' },
   { value: 'mentor', label: 'Mentor' },
+  { value: 'client', label: 'Client' },
+  { value: 'vendor', label: 'Vendor / Supplier' },
+  { value: 'investor', label: 'Investor' },
   { value: 'recruiter', label: 'Recruiter' },
 ];
 
@@ -22,6 +25,9 @@ const REL_BADGE_COLORS = {
   industry_peer: 'bg-cyan-500/10 text-cyan-400',
   friend: 'bg-amber-500/10 text-amber-400',
   mentor: 'bg-teal-500/10 text-teal-400',
+  client: 'bg-orange-500/10 text-orange-400',
+  vendor: 'bg-lime-500/10 text-lime-400',
+  investor: 'bg-rose-500/10 text-rose-400',
   recruiter: 'bg-slate-700/50 text-slate-400',
 };
 
@@ -31,6 +37,9 @@ const REL_SCORE_BONUSES = {
   current_colleague: '+10 referral score bonus',
   alumni: '+10 referral score bonus',
   mentor: '+10 referral score bonus',
+  client: '+10 referral score bonus',
+  vendor: '+5 referral score bonus',
+  investor: '+5 referral score bonus',
   friend: '+5 referral score bonus',
   recruiter: '-20 referral score penalty',
 };
@@ -420,16 +429,20 @@ function BulkImportModal({ onClose, onSuccess }) {
 function ContactDetail({ contact, onUpdate }) {
   const [relType, setRelType] = useState(contact.relationship_type || '');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const handleRelChange = async (e) => {
     const val = e.target.value;
     setRelType(val);
     setSaving(true);
+    setSaveError('');
     try {
       await contactsApi.patch(contact.id, { relationship_type: val || null });
-      onUpdate();
-    } catch {
+      // Don't call onUpdate() — optimistic state is enough.
+      // Full reload unmounts this component and can cause a flash/revert.
+    } catch (err) {
       setRelType(contact.relationship_type || '');
+      setSaveError(err.message || 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -477,6 +490,9 @@ function ContactDetail({ contact, onUpdate }) {
               {bonus}
             </p>
           )}
+          {saveError && (
+            <p className="mt-1 text-xs text-red-400">{saveError}</p>
+          )}
         </div>
         {contact.how_you_know && (
           <div>
@@ -511,6 +527,9 @@ export default function ContactsPage() {
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [companyNames, setCompanyNames] = useState([]);
   const [addedCompanies, setAddedCompanies] = useState([]);
+
+  // Export state
+  const [exporting, setExporting] = useState(false);
 
   // NLP search state
   const [searchInput, setSearchInput] = useState('');
@@ -575,6 +594,20 @@ export default function ContactsPage() {
     if (newCompanies?.length) setAddedCompanies(newCompanies);
   };
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params = {};
+      if (filter) params.relationship_type = filter;
+      if (searchInput.trim()) params.search = searchInput.trim();
+      await contactsApi.exportCsv(params);
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const totalPages = meta.total_pages || Math.ceil((meta.total || contactsList.length) / 50);
 
   return (
@@ -593,6 +626,14 @@ export default function ContactsPage() {
             className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/10"
           >
             Import Multiple
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            aria-label="Export contacts as CSV"
+            className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+          >
+            {exporting ? 'Exporting...' : 'Export CSV'}
           </button>
         </div>
       </div>

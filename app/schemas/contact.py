@@ -13,6 +13,9 @@ VALID_RELATIONSHIP_TYPES = {
     "friend",
     "mentor",
     "recruiter",
+    "client",
+    "vendor",
+    "investor",
     "other",
 }
 

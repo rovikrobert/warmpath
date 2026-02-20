@@ -115,6 +115,27 @@ export const contacts = {
       track('nlp_search', { query_length: query.length });
       return r;
     }),
+  exportCsv: async (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') qs.set(k, v);
+    });
+    const tokenOrPromise = _getToken();
+    const token = tokenOrPromise instanceof Promise ? await tokenOrPromise : tokenOrPromise;
+    const headers = {};
+    if (token && token !== 'clerk-managed') {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const res = await fetch(`${BASE_URL}/api/v1/contacts/export?${qs}`, { headers });
+    if (!res.ok) throw new Error('Export failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = res.headers.get('content-disposition')?.match(/filename="(.+)"/)?.[1] || 'contacts.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 };
 
 export const companies = {

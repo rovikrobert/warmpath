@@ -354,3 +354,45 @@ async def test_upload_requires_auth(client: AsyncClient):
         files=_csv_file(SAMPLE_CSV),
     )
     assert resp.status_code in (401, 403)
+
+
+async def test_export_csv_returns_all_contacts(client: AsyncClient):
+    headers = await _get_auth_headers(client)
+    await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
+
+    resp = await client.get("/api/v1/contacts/export", headers=headers)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/csv")
+    assert "warmpath-contacts-" in resp.headers["content-disposition"]
+
+    lines = resp.text.strip().split("\n")
+    # Header + 5 data rows
+    assert len(lines) == 6
+    assert lines[0].startswith("Name,")
+    assert "Alice Smith" in lines[1]
+
+
+async def test_export_csv_respects_relationship_filter(client: AsyncClient):
+    headers = await _get_auth_headers(client)
+    await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file(SAMPLE_CSV)
+    )
+
+    # Tag one contact as a friend
+    list_resp = await client.get("/api/v1/contacts", headers=headers)
+    cid = list_resp.json()["data"][0]["id"]
+    await client.patch(
+        f"/api/v1/contacts/{cid}",
+        headers=headers,
+        json={"relationship_type": "friend"},
+    )
+
+    resp = await client.get(
+        "/api/v1/contacts/export?relationship_type=friend", headers=headers
+    )
+    assert resp.status_code == 200
+    lines = resp.text.strip().split("\n")
+    # Header + 1 matching contact
+    assert len(lines) == 2
