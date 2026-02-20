@@ -129,8 +129,6 @@ def send_smart_digest():
 
     async def _run():
         from app.models.enrichment import UsageLog
-        from app.models.feed import FeedItem
-        from app.services.feed_generator import get_digest_items
 
         async with _get_session_factory()() as db:
             try:

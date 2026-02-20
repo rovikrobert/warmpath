@@ -23,20 +23,16 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.contact import Contact
-from app.models.enrichment import EnrichmentCache
 from app.models.feed import ContactFreshnessSignal, FeedItem
 from app.models.job import Application, JobOpening, UserJobPreferences
 from app.models.marketplace import (
     IntroFacilitation,
     MarketplaceListing,
-    NetworkSharingPreferences,
 )
-from app.models.match_result import WarmScore
-from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -130,9 +126,7 @@ async def generate_job_alerts(
     for company_id, company_jobs in by_company.items():
         # Simple title matching against target role
         target_lower = prefs.target_role.lower()
-        matching = [
-            j for j in company_jobs if target_lower in (j.title or "").lower()
-        ]
+        matching = [j for j in company_jobs if target_lower in (j.title or "").lower()]
         if not matching:
             # Broader match: any new jobs at a company where they have contacts
             matching = company_jobs[:3]
@@ -363,8 +357,7 @@ async def generate_marketplace_signals(
         select(SearchRequest.metadata_)
         .where(
             SearchRequest.user_id == user_id,
-            SearchRequest.created_at
-            >= datetime.now(timezone.utc) - timedelta(days=30),
+            SearchRequest.created_at >= datetime.now(timezone.utc) - timedelta(days=30),
         )
         .order_by(SearchRequest.created_at.desc())
         .limit(10)
@@ -374,9 +367,7 @@ async def generate_marketplace_signals(
     for row in recent_searches.all():
         meta = row[0] or {}
         if "company_names" in meta:
-            target_company_names.update(
-                name.lower() for name in meta["company_names"]
-            )
+            target_company_names.update(name.lower() for name in meta["company_names"])
 
     if not target_company_names:
         return []
@@ -627,9 +618,7 @@ async def generate_feed_for_user(
                     user_id,
                 )
         except Exception:
-            logger.exception(
-                "Feed generator %s failed for user %s", name, user_id
-            )
+            logger.exception("Feed generator %s failed for user %s", name, user_id)
 
     return all_items
 
