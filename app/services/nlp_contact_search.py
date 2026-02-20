@@ -185,7 +185,21 @@ _LOCATION_KEYWORDS: dict[str, str] = {
     "edinburgh": "Edinburgh",
     "manchester": "Manchester",
     "stockholm": "Stockholm",
-    # Other
+    # Countries / regions
+    "united states": "United States",
+    "usa": "United States",
+    "us": "United States",
+    "united kingdom": "United Kingdom",
+    "uk": "United Kingdom",
+    "canada": "Canada",
+    "australia": "Australia",
+    "germany": "Germany",
+    "france": "France",
+    "netherlands": "Netherlands",
+    "ireland": "Ireland",
+    "sweden": "Sweden",
+    "israel": "Israel",
+    # Other cities
     "toronto": "Toronto",
     "vancouver": "Vancouver",
     "sydney": "Sydney",
@@ -262,29 +276,53 @@ def _extract_companies(query_lower: str, original_query: str) -> tuple[list[str]
     return companies, q_lower
 
 
-def _extract_seniority(query_lower: str) -> list[str]:
-    """Extract seniority levels from the query."""
+def _extract_seniority(query_lower: str) -> tuple[list[str], list[str]]:
+    """Extract seniority levels and specific C-suite title acronyms from the query.
+
+    Returns (seniority_levels, specific_titles).  For example "CIOs/CTOs" returns
+    (["c_suite"], ["CIO", "CTO"]) so the scorer can differentiate between
+    requested C-suite roles and generic C-suite matches.
+    """
     seniority: list[str] = []
+    specific_titles: list[str] = []
+
     for level, pattern in _SENIORITY_PATTERNS:
-        if pattern.search(query_lower) and level not in seniority:
+        match = pattern.search(query_lower)
+        if match and level not in seniority:
             seniority.append(level)
-    return seniority
+
+    # Extract specific C-suite acronyms (CTO, CIO, CFO, etc.) as titles
+    if "c_suite" in seniority:
+        csuite_acronym_re = re.compile(
+            r"\b(ctos?|ceos?|cfos?|coos?|cios?|cmos?|csos?)\b", re.IGNORECASE
+        )
+        for m in csuite_acronym_re.finditer(query_lower):
+            acronym = m.group(1).upper().rstrip("S")  # CTOs -> CTO
+            if acronym not in specific_titles:
+                specific_titles.append(acronym)
+
+    return seniority, specific_titles
 
 
 def _extract_titles(query_lower: str) -> list[str]:
-    """Extract title keywords from the query."""
+    """Extract title keywords from the query using word-boundary matching."""
     titles: list[str] = []
     for kw in _TITLE_KEYWORDS:
-        if kw in query_lower and kw not in titles:
+        # Word boundary + optional plural "s" to match "engineers" → "engineer"
+        if re.search(r"\b" + re.escape(kw) + r"s?\b", query_lower) and kw not in titles:
             titles.append(kw)
     return titles
 
 
 def _extract_locations(query_lower: str) -> list[str]:
-    """Extract locations from the query."""
+    """Extract locations from the query using word-boundary matching."""
     locations: list[str] = []
     for loc_key, loc_canonical in _LOCATION_ENTRIES:
-        if loc_key in query_lower and loc_canonical not in locations:
+        # Word boundary matching prevents "us" matching inside "focus"
+        if (
+            re.search(r"\b" + re.escape(loc_key) + r"\b", query_lower)
+            and loc_canonical not in locations
+        ):
             locations.append(loc_canonical)
     return locations
 
@@ -316,8 +354,12 @@ def parse_query_mock(query: str) -> ParsedQuery:
     q_lower = query.lower().strip()
 
     result.companies, q_lower = _extract_companies(q_lower, query)
-    result.seniority = _extract_seniority(q_lower)
+    result.seniority, csuite_titles = _extract_seniority(q_lower)
     result.titles = _extract_titles(q_lower)
+    # Merge specific C-suite acronyms into titles for precise scoring
+    for t in csuite_titles:
+        if t not in result.titles:
+            result.titles.append(t)
     result.locations = _extract_locations(q_lower)
     result.relationship_types = _extract_relationship_types(q_lower)
 
@@ -344,9 +386,9 @@ def _sco[RESEND_KEY_REDACTED](parsed: ParsedQuery, title: str | None) -> float:
         return 0.0
     title_lower = title.lower()
 
-    # Exact keyword match in title
+    # Exact keyword match in title (case-insensitive)
     for kw in parsed.titles:
-        if kw in title_lower:
+        if kw.lower() in title_lower:
             return 100.0
 
     # Seniority-level match: check if contact title matches requested seniority
@@ -360,7 +402,7 @@ def _sco[RESEND_KEY_REDACTED](parsed: ParsedQuery, title: str | None) -> float:
     # substring of the contact title or vice versa
     for kw in parsed.titles:
         # Partial overlap (e.g. "engineer" in "engineering manager")
-        if any(word in title_lower for word in kw.split()):
+        if any(word.lower() in title_lower for word in kw.split() if len(word) > 2):
             return 70.0
 
     return 0.0
@@ -381,19 +423,72 @@ def _sco[RESEND_KEY_REDACTED](
     return 0.0
 
 
+# Country → location substrings that indicate a contact is in that country.
+# Used by _sco[RESEND_KEY_REDACTED] to match "United States" against "San Francisco, CA".
+_COUNTRY_INDICATORS: dict[str, list[str]] = {
+    "united states": [
+        ", ca",
+        ", ny",
+        ", wa",
+        ", tx",
+        ", ma",
+        ", il",
+        ", co",
+        ", ga",
+        ", or",
+        ", pa",
+        ", fl",
+        ", nc",
+        ", oh",
+        ", va",
+        ", md",
+        ", az",
+        ", nj",
+        ", ct",
+        ", mn",
+        ", ut",
+        ", tn",
+        ", dc",
+        "san francisco",
+        "new york",
+        "seattle",
+        "austin",
+        "boston",
+        "chicago",
+        "los angeles",
+        "denver",
+        "portland",
+        "atlanta",
+    ],
+    "united kingdom": [
+        "london",
+        "manchester",
+        "edinburgh",
+        ", uk",
+    ],
+    "canada": ["toronto", "vancouver", "montreal", ", canada"],
+    "australia": ["sydney", "melbourne", ", australia"],
+    "germany": ["berlin", "munich", ", germany"],
+    "france": ["paris", ", france"],
+    "india": ["bangalore", "bengaluru", "mumbai", "delhi", "hyderabad", ", india"],
+}
+
+
 def _sco[RESEND_KEY_REDACTED](parsed: ParsedQuery, location: str | None) -> float:
     """Score a contact's location against parsed query criteria (0-100)."""
     if not location or not parsed.locations:
         return 0.0
     location_lower = location.lower()
     for queried_loc in parsed.locations:
-        if queried_loc.lower() == location_lower:
+        ql = queried_loc.lower()
+        if ql == location_lower:
             return 100.0
-        # Same country heuristic: check if one contains the other
-        if (
-            queried_loc.lower() in location_lower
-            or location_lower in queried_loc.lower()
-        ):
+        # Direct substring match (e.g. "Singapore" in "Singapore, SG")
+        if ql in location_lower or location_lower in ql:
+            return 60.0
+        # Country-level match: "United States" matches "San Francisco, CA"
+        indicators = _COUNTRY_INDICATORS.get(ql, [])
+        if any(ind in location_lower for ind in indicators):
             return 60.0
     return 0.0
 

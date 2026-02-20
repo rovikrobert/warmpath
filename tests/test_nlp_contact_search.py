@@ -480,3 +480,68 @@ class TestNlpSearchMetering:
         from app.middleware.usage_logger import _BETA_FREE_TIER_LIMITS
 
         assert _BETA_FREE_TIER_LIMITS["nlp_search"] == 50
+
+
+# ---------------------------------------------------------------------------
+# Bug regression tests: precision issues
+# ---------------------------------------------------------------------------
+
+
+class TestNlpParsePrecision:
+    """Regression tests for parser precision bugs."""
+
+    def test_cios_ctos_extracts_specific_titles_not_just_c_suite(self):
+        """'CIOs/CTOs' should extract CIO and CTO as specific titles."""
+        result = parse_query_mock("strictly CIOs/CTOs in the US")
+        title_lower = [t.lower() for t in result.titles]
+        assert "cio" in title_lower or "cios" in title_lower
+        assert "cto" in title_lower or "ctos" in title_lower
+
+    def test_cios_does_not_false_positive_ios_title(self):
+        """'CIOs' should NOT match the 'ios' title keyword."""
+        result = parse_query_mock("CIOs at Google")
+        title_lower = [t.lower() for t in result.titles]
+        assert "ios" not in title_lower
+
+    def test_us_location_detected(self):
+        """'in the US' should extract United States as a location."""
+        result = parse_query_mock("CTOs in the US")
+        assert len(result.locations) >= 1
+        loc_lower = [loc.lower() for loc in result.locations]
+        assert any("united states" in loc or "us" in loc for loc in loc_lower)
+
+    def test_usa_location_detected(self):
+        """'in the USA' should extract United States as a location."""
+        result = parse_query_mock("engineers in the USA")
+        assert len(result.locations) >= 1
+
+    def test_specific_csuite_titles_sco[RESEND_KEY_REDACTED](self):
+        """When user asks for CTO, a CTO should score higher than a CFO."""
+        from app.services.nlp_contact_search import ParsedQuery, sco[RESEND_KEY_REDACTED]
+
+        parsed = ParsedQuery(titles=["CTO"], seniority=["c_suite"])
+        cto_score = sco[RESEND_KEY_REDACTED](
+            parsed,
+            company_name=None,
+            title="CTO",
+            location=None,
+            relationship_type=None,
+            company_matched=False,
+        )
+        cfo_score = sco[RESEND_KEY_REDACTED](
+            parsed,
+            company_name=None,
+            title="CFO",
+            location=None,
+            relationship_type=None,
+            company_matched=False,
+        )
+        assert cto_score > cfo_score
+
+    def test_location_filters_out_wrong_country(self):
+        """When user asks 'in the US', someone in Singapore should score 0 for location."""
+        from app.services.nlp_contact_search import ParsedQuery, _sco[RESEND_KEY_REDACTED]
+
+        parsed = ParsedQuery(locations=["United States"])
+        assert _sco[RESEND_KEY_REDACTED](parsed, "Singapore") == 0.0
+        assert _sco[RESEND_KEY_REDACTED](parsed, "San Francisco, CA") > 0.0
