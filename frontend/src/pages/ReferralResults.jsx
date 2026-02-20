@@ -120,21 +120,34 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
           </h4>
           {visibleOpenings.length > 0 ? (
             <div className="space-y-2">
-              {visibleOpenings.map((job, i) => (
-                <div key={i} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <FitBadge score={job.fit_score} />
-                    <span className="text-slate-50">{job.title}</span>
-                    {job.location && <span className="text-xs text-slate-500">{job.location}</span>}
-                    {job.is_remote && <Badge color="blue" size="sm">Remote</Badge>}
+              {visibleOpenings.map((job, i) => {
+                // Show divider before the first out-of-region job
+                const showRegionDivider =
+                  job.in_target_region === false &&
+                  (i === 0 || visibleOpenings[i - 1]?.in_target_region !== false);
+                return (
+                  <div key={i}>
+                    {showRegionDivider && (
+                      <p className="py-1 text-xs text-slate-500 italic">
+                        No more openings in your target region — showing other locations
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <FitBadge score={job.fit_score} />
+                        <span className="text-slate-50">{job.title}</span>
+                        {job.location && <span className="text-xs text-slate-500">{job.location}</span>}
+                        {job.is_remote && <Badge color="blue" size="sm">Remote</Badge>}
+                      </div>
+                      {job.url && (
+                        <a href={job.url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-xs text-amber-400 hover:text-amber-300">
+                          View &rarr;
+                        </a>
+                      )}
+                    </div>
                   </div>
-                  {job.url && (
-                    <a href={job.url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-xs text-amber-400 hover:text-amber-300">
-                      View &rarr;
-                    </a>
-                  )}
-                </div>
-              ))}
+                );
+              })}
               {hasHiddenOnPage && (
                 <button
                   onClick={() => setShowAll(true)}

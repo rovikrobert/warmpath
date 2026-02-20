@@ -309,11 +309,13 @@ class TestFilterAndRankJobs:
         result = fetcher.filter_and_rank_jobs(
             jobs, "Software Engineer", target_locations=["Singapore"]
         )
-        # Only Singapore + remote + unknown-location jobs should pass
-        locations = [j.get("location") for j in result]
-        for loc in locations:
-            if loc is not None:
-                assert "singapore" in loc.lower() or "remote" in loc.lower()
+        # Target-region jobs should be tagged and sorted first
+        in_region = [j for j in result if j["in_target_region"]]
+        for j in in_region:
+            loc = (j.get("location") or "").lower()
+            assert "singapore" in loc or "remote" in loc or not loc
+        # Out-of-region jobs still appear but are ranked after in-region
+        assert result[: len(in_region)] == in_region
 
     def test_seniority_boost(self):
         fetcher = JobFetcher()
@@ -351,7 +353,7 @@ class TestFilterAndRankJobs:
         fetcher = JobFetcher()
         assert fetcher.filter_and_rank_jobs([], "Engineer") == []
 
-    def test_location_filter_excludes_non_matching(self):
+    def test_location_filter_tags_non_matching(self):
         fetcher = JobFetcher()
         jobs = [
             {
@@ -367,8 +369,9 @@ class TestFilterAndRankJobs:
             target_locations=["Singapore"],
             open_to_remote=False,
         )
-        # London should be filtered out when looking for Singapore and not open to remote
-        assert len(result) == 0
+        # London still appears but is tagged as out-of-region
+        assert len(result) == 1
+        assert result[0]["in_target_region"] is False
 
 
 # ---------------------------------------------------------------------------
