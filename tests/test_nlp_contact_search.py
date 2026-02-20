@@ -545,3 +545,73 @@ class TestNlpParsePrecision:
         parsed = ParsedQuery(locations=["United States"])
         assert _score_location(parsed, "Singapore") == 0.0
         assert _score_location(parsed, "San Francisco, CA") > 0.0
+
+
+# ---------------------------------------------------------------------------
+# Service function: search_user_contacts()
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_search_user_contacts_returns_dict_shape(
+    nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list, nlp_user_id
+):
+    """search_user_contacts() returns expected dict keys."""
+    from app.services.nlp_contact_search import search_user_contacts
+
+    async with TestSessionLocal() as db:
+        result = await search_user_contacts(nlp_user_id, "CTOs at Google", db)
+
+    assert "results" in result
+    assert "interpretation" in result
+    assert "total_scanned" in result
+    assert "total_matched" in result
+    assert isinstance(result["results"], list)
+    assert result["total_matched"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_search_user_contacts_result_fields(
+    nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list, nlp_user_id
+):
+    """Each result has full_name, current_company, current_title, warm_score, nlp_match_score."""
+    from app.services.nlp_contact_search import search_user_contacts
+
+    async with TestSessionLocal() as db:
+        result = await search_user_contacts(nlp_user_id, "engineers at Google", db)
+
+    for r in result["results"]:
+        assert "full_name" in r
+        assert "current_company" in r
+        assert "current_title" in r
+        assert "warm_score" in r
+        assert "nlp_match_score" in r
+        assert "relationship_type" in r
+        assert "location" in r
+
+
+@pytest.mark.asyncio
+async def test_search_user_contacts_respects_limit(
+    nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list, nlp_user_id
+):
+    """Limit parameter caps the number of results."""
+    from app.services.nlp_contact_search import search_user_contacts
+
+    async with TestSessionLocal() as db:
+        result = await search_user_contacts(nlp_user_id, "", db, limit=2)
+
+    assert len(result["results"]) <= 2
+
+
+@pytest.mark.asyncio
+async def test_search_user_contacts_empty_query_returns_all(
+    nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list, nlp_user_id
+):
+    """Empty query returns all contacts."""
+    from app.services.nlp_contact_search import search_user_contacts
+
+    async with TestSessionLocal() as db:
+        result = await search_user_contacts(nlp_user_id, "", db)
+
+    assert result["total_matched"] == 4
+    assert len(result["results"]) == 4
