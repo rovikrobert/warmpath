@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { marketplace } from '../api/client';
 import { trackEvent } from '../utils/analytics';
+import { MarketplaceBadge } from '../utils/marketplace';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 
@@ -35,13 +36,14 @@ export default function RequestIntroModal({ listing, creditBalance, onClose, onS
       <div className="space-y-4">
         {/* Listing summary */}
         <div className="rounded-lg bg-slate-800/50 p-3">
-          <p className="text-sm font-medium text-slate-50">
-            {listing.listing.role_level}
-          </p>
-          <p className="text-xs text-slate-400">
-            {listing.listing.department_category && `${listing.listing.department_category} · `}
-            {listing.listing.warm_score_range} connection
-          </p>
+          <div className="flex items-center gap-2 text-sm font-medium text-slate-50">
+            <MarketplaceBadge value={listing.listing.role_level} type="role" />
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+            {listing.listing.department_category && <span>{listing.listing.department_category}</span>}
+            {listing.listing.department_category && <span>&middot;</span>}
+            <MarketplaceBadge value={listing.listing.warm_score_range} type="strength" />
+          </div>
           {listing.network_holder_reputation && (
             <p className="mt-1 text-xs text-slate-500">
               Holder reputation: {listing.network_holder_reputation.avg_rating?.toFixed(1) ?? '—'}

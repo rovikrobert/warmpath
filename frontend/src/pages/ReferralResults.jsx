@@ -6,6 +6,7 @@ import FeedbackModal from '../components/FeedbackModal';
 import MatchBadge from '../components/MatchBadge';
 import ScoreExplainer from '../components/ScoreExplainer';
 import { WARM_TIERS } from '../utils/scores';
+import { MarketplaceBadge } from '../utils/marketplace';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -234,14 +235,16 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
             <div className="space-y-2">
               {marketPaths.map((path, i) => (
                 <div key={i} className="rounded-lg border border-dashed border-slate-600 bg-slate-800/30 p-3">
-                  <p className="text-sm font-medium text-slate-50">
-                    {path.listing.role_level} at {company.name}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {path.listing.department_category && `${path.listing.department_category} · `}
-                    {path.listing.warm_score_range} connection
-                    {path.listing.connection_recency && ` · ${path.listing.connection_recency}`}
-                  </p>
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-50">
+                    <MarketplaceBadge value={path.listing.role_level} type="role" />
+                    <span>at {company.name}</span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+                    {path.listing.department_category && <span>{path.listing.department_category}</span>}
+                    {path.listing.department_category && <span>&middot;</span>}
+                    <MarketplaceBadge value={path.listing.warm_score_range} type="strength" />
+                    {path.listing.connection_recency && <><span>&middot;</span><span>{path.listing.connection_recency}</span></>}
+                  </div>
                   {path.network_holder_reputation && (
                     <p className="mt-1 text-xs text-slate-500">
                       Reputation: {path.network_holder_reputation.avg_rating?.toFixed(1) ?? '—'}
