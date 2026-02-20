@@ -29,17 +29,22 @@ export default function MarketplaceOverview() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
   const [approvedCoaching, setApprovedCoaching] = useState(null); // id of request showing coaching
+  const [sharingPrefs, setSharingPrefs] = useState(null);
+  const [excludedIds, setExcludedIds] = useState([]);
 
   const load = async () => {
     try {
-      const [listingsRes, incomingRes, balRes] = await Promise.all([
+      const [listingsRes, incomingRes, balRes, prefsRes] = await Promise.all([
         mpApi.myListings().catch(() => ({ data: [] })),
         mpApi.incomingRequests().catch(() => ({ data: [] })),
         creditsApi.balance().catch(() => ({ data: { balance: 0 } })),
+        mpApi.getSharingPrefs().catch(() => ({ data: {} })),
       ]);
       setListings(listingsRes.data || []);
       setIncoming(incomingRes.data || []);
       setBalance(balRes.data?.balance ?? 0);
+      setSharingPrefs(prefsRes.data || {});
+      setExcludedIds(prefsRes.data?.excluded_contact_ids || []);
     } catch (err) {
       console.error(err);
     } finally {
