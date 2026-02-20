@@ -68,11 +68,14 @@ if settings.SECURE_HEADERS:
             + "; ".join(_boot_errors)
         )
 
-if not settings.AI_MOCK_MODE and not settings.ANTHROPIC_API_KEY.strip():
-    raise RuntimeError(
-        "AI_MOCK_MODE is disabled but ANTHROPIC_API_KEY is not set. "
-        "Either set AI_MOCK_MODE=true or provide a valid API key."
-    )
+if not settings.AI_MOCK_MODE:
+    if not settings.ANTHROPIC_API_KEY.strip():
+        raise RuntimeError(
+            "AI_MOCK_MODE is disabled but ANTHROPIC_API_KEY is not set. "
+            "Either set AI_MOCK_MODE=true or provide a valid API key."
+        )
+    if settings.CLEANUP_PROVIDER == "gemini" and not settings.GOOGLE_API_KEY.strip():
+        raise RuntimeError("CLEANUP_PROVIDER=gemini but GOOGLE_API_KEY is not set.")
 
 # ---------------------------------------------------------------------------
 # CORS

@@ -8,12 +8,18 @@ Real mode: Claude API for fuzzy name/company resolution.
 Follows the same mock/real pattern as ai_matcher.py.
 """
 
+from __futu[RESEND_KEY_REDACTED] import annotations
+
 import asyncio
 import json
 import logging
 import re
+from typing import TYPE_CHECKING
 
 import anthropic
+
+if TYPE_CHECKING:
+    from google import genai
 
 from app.config import settings
 from app.services.csv_parser import generate_fingerprint
@@ -22,6 +28,7 @@ from app.utils.performance import timed
 logger = logging.getLogger(__name__)
 
 CLEANUP_MODEL = getattr(settings, "CLEANUP_MODEL", "claude-haiku-4-5-20251001")
+GEMINI_CLEANUP_MODEL = "gemini-2.0-flash"
 CLEANUP_BATCH_SIZE = 200
 
 # ---------------------------------------------------------------------------
@@ -674,28 +681,78 @@ async def _clean_batch(
         await release_slot("anthropic", used_redis)
 
 
+async def _clean_batch_gemini(
+    client: "genai.Client",
+    batch: list[dict],
+) -> list[dict]:
+    """Clean a single batch via Gemini API, guarded by global rate limiter."""
+    from google import genai
+
+    from app.utils.rate_limiter import acqui[RESEND_KEY_REDACTED], release_slot
+
+    used_redis = await acqui[RESEND_KEY_REDACTED](
+        "gemini", max_concurrent=settings.GOOGLE_MAX_CONCURRENT
+    )
+    try:
+        payload = _build_cleanup_payload(batch)
+        response = await client.aio.models.generate_content(
+            model=GEMINI_CLEANUP_MODEL,
+            contents=json.dumps(payload),
+            config=genai.types.GenerateContentConfig(
+                system_instruction=_CLEANUP_SYSTEM_PROMPT,
+                response_mime_type="application/json",
+            ),
+        )
+
+        parsed = json.loads(response.text)
+        cleaned = []
+        for i, cleaned_fields in enumerate(parsed):
+            if i < len(batch):
+                cleaned.append(_merge_cleaned_fields(batch[i], cleaned_fields))
+
+        logger.info(
+            "Cleaned batch of %d contacts via Gemini API",
+            len(batch),
+        )
+        return cleaned
+    except Exception:
+        logger.exception("Gemini batch clean failed (batch=%d)", len(batch))
+        raise
+    finally:
+        await release_slot("gemini", used_redis)
+
+
 @timed("csv_clean_real")
 async def clean_contacts_real(contacts: list[dict]) -> list[dict]:
-    """Clean contacts using the Claude API for fuzzy name/company resolution.
+    """Clean contacts using AI for fuzzy name/company resolution.
 
     Batches contacts (CLEANUP_BATCH_SIZE per API call) with global rate
     limiting across all workers. Falls back to mock cleaner on any error.
+    Provider selected by settings.CLEANUP_PROVIDER (anthropic | gemini).
     """
     if not contacts:
         return []
 
     try:
-        client = _get_anthropic_client()
-
         batches = [
             contacts[i : i + CLEANUP_BATCH_SIZE]
             for i in range(0, len(contacts), CLEANUP_BATCH_SIZE)
         ]
 
-        results = await asyncio.gather(
-            *[_clean_batch(client, batch) for batch in batches],
-            return_exceptions=True,
-        )
+        if settings.CLEANUP_PROVIDER == "gemini":
+            from app.utils.gemini_client import get_gemini_client
+
+            client = get_gemini_client()
+            results = await asyncio.gather(
+                *[_clean_batch_gemini(client, batch) for batch in batches],
+                return_exceptions=True,
+            )
+        else:
+            client = _get_anthropic_client()
+            results = await asyncio.gather(
+                *[_clean_batch(client, batch) for batch in batches],
+                return_exceptions=True,
+            )
 
         all_cleaned: list[dict] = []
         for i, result in enumerate(results):
