@@ -416,52 +416,14 @@ def _mock_score_contacts(
 # Real Claude API
 # ---------------------------------------------------------------------------
 
-_SYSTEM_PROMPT = """You are a career networking advisor. The user is job hunting and needs employee referrals. For each contact, assess:
+_SYSTEM_PROMPT = """Score each contact's referral potential for the user's target role. Return a JSON array. Only include contacts scoring 20+.
 
-1. Can this person refer the user to the target company?
-2. How likely are they to actually do it?
-3. What's the best approach given the contact's likely communication style?
+Each object: {"contact_id":"<exact id>","relevance_score":<0-100>,"referral_likelihood":"high|medium|low","match_type":"direct|adjacent|senior_advocate|alumni","recommended_channel":"linkedin_message|email|whatsapp"}
 
-For each contact, return a JSON array of objects. Only include contacts that score 20 or above. Each object must have:
+Scoring: 90-100=same company+dept, 70-89=same company adjacent dept, 50-69=same company weak path, 20-49=former employee or industry peer, <20=omit.
+Match types: direct=same dept, adjacent=related dept, senior_advocate=senior enough to refer anywhere, alumni=former employee.
 
-- "contact_id": the exact contact_id string from the input
-- "relevance_score": integer 0-100
-- "referral_likelihood": "high" | "medium" | "low"
-- "reasoning": why this person can/would refer the user
-- "match_type": one of "direct", "adjacent", "senior_advocate", "alumni"
-- "cultural_context": {
-    "approach_style": "direct" | "formal-indirect" | "casual" | "relationship-first",
-    "recommended_channel": "linkedin_message" | "linkedin_inmail" | "email" | "whatsapp",
-    "cultural_notes": "Free text advice on how to approach this person given their likely communication norms. Consider their location, company culture, seniority level, and the user's relationship with them.",
-    "warm_up_suggested": true | false,
-    "message_sequence": ["reconnect", "ask"] or ["reconnect", "explore", "ask"] or ["direct_ask"]
-  }
-
-MATCH TYPES:
-- direct: Works in same department as target role
-- adjacent: Works in related department, can introduce to hiring manager
-- senior_advocate: Senior enough to refer to any role
-- alumni: Former employee who still has connections there
-
-CULTURAL CONTEXT GUIDELINES:
-- US tech companies, IC-to-IC: usually "direct" or "casual"
-- US tech companies, to senior leader: "formal-indirect"
-- East Asian business culture (Japan, Korea, China): almost always "relationship-first", suggest warm_up first
-- Singapore/Southeast Asia: mix of Western and Asian norms, default to "formal-indirect"
-- Europe varies: UK/Netherlands tend direct, France/Germany more formal, Nordics direct but understated
-- Indian tech companies: relationship-oriented, but Indian professionals at US companies often adapt to US norms
-- If location is ambiguous, default to the company's HQ culture
-
-IMPORTANT: Frame cultural notes as "communication style suggestions" not "cultural profiles." Be specific and actionable.
-
-Scoring guidelines (be strict — differentiate aggressively):
-- 90-100: Works at target company, same department, strong shared context
-- 70-89: Works at target company, adjacent department or senior enough to refer
-- 50-69: Works at target company but limited referral path, or very strong indirect connection
-- 20-49: Tangential connection — former employee, same industry, loose overlap
-- Below 20: No meaningful referral path — omit from results
-
-Return ONLY the JSON array. No markdown fences, no explanation."""
+Return ONLY the JSON array."""
 
 
 def _build_user_prompt(
@@ -493,7 +455,7 @@ def _build_user_prompt(
     target_role = getattr(search, "target_role", None) or "General"
     target_seniority = getattr(search, "target_seniority", None) or "Any"
 
-    # Contact data
+    # Contact data — keep lean for fast scoring
     contacts_data = []
     for c in contacts:
         entry: dict = {
@@ -501,32 +463,7 @@ def _build_user_prompt(
             "name": c.full_name,
             "title": c.current_title,
             "company": c.current_company,
-            "location": c.location,
-            "connected_on": str(c.connected_on) if c.connected_on else None,
         }
-
-        # Add shared context notes
-        shared: list[str] = []
-        if profile:
-            if (
-                profile.current_company
-                and c.current_company
-                and profile.current_company.strip().lower()
-                == c.current_company.strip().lower()
-            ):
-                shared.append("Same current company")
-            if (
-                profile.location
-                and c.location
-                and (
-                    profile.location.strip().lower() in c.location.lower()
-                    or c.location.strip().lower() in profile.location.lower()
-                )
-            ):
-                shared.append("Same location area")
-        if shared:
-            entry["shared_context"] = "; ".join(shared)
-
         contacts_data.append(entry)
 
     return f"""USER PROFILE:
@@ -639,7 +576,6 @@ async def _call_claude_api(
             logger.warning("Claude returned unknown contact_id: %s — skipping", cid)
             continue
 
-        cultural_ctx = item.get("cultural_context", {})
         results.append(
             ContactMatch(
                 contact_id=uuid.UUID(cid),
@@ -647,13 +583,9 @@ async def _call_claude_api(
                 reasoning=item.get("reasoning", ""),
                 match_type=item.get("match_type", "alumni"),
                 referral_likelihood=item.get("referral_likelihood", "low"),
-                cultural_context=cultural_ctx,
-                recommended_channel=cultural_ctx.get(
-                    "recommended_channel", "linkedin_message"
-                ),
-                message_sequence=cultural_ctx.get(
-                    "message_sequence", ["reconnect", "ask"]
-                ),
+                cultural_context={},
+                recommended_channel=item.get("recommended_channel", "linkedin_message"),
+                message_sequence=["reconnect", "ask"],
             )
         )
 
