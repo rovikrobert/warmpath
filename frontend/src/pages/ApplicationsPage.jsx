@@ -183,12 +183,13 @@ export default function ApplicationsPage() {
 
   return (
     <div role="main">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-50">My Applications</h1>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h1 className="min-w-0 text-xl font-bold text-slate-50">My Applications</h1>
         <Button
           onClick={() => setShowCreate(!showCreate)}
           aria-expanded={showCreate}
           aria-controls="create-application-form"
+          className="shrink-0"
         >
           {showCreate ? 'Cancel' : 'Track Application'}
         </Button>
@@ -196,7 +197,7 @@ export default function ApplicationsPage() {
 
       {/* Stats */}
       {stats && (
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <div className="rounded-lg bg-slate-900 p-3 border border-slate-700/50">
             <p className="text-xs text-slate-400">Total</p>
             <p className="text-xl font-bold font-mono text-slate-50">{stats.total}</p>
@@ -215,9 +216,9 @@ export default function ApplicationsPage() {
               {stats.avg_days_to_response != null ? `${Math.round(stats.avg_days_to_response)}d` : '—'}
             </p>
           </div>
-          <div className="rounded-lg bg-slate-900 p-3 border border-slate-700/50">
+          <div className="rounded-lg bg-slate-900 p-3 border border-slate-700/50 overflow-hidden">
             <p className="text-xs text-slate-400">Best Channel</p>
-            <p className="text-xl font-bold font-mono text-slate-50">{stats.best_channel || '—'}</p>
+            <p className="truncate text-xl font-bold font-mono text-slate-50">{stats.best_channel || '—'}</p>
           </div>
         </div>
       )}
@@ -298,7 +299,7 @@ export default function ApplicationsPage() {
           >
             Track Your First Application
           </Button>
-          <Link to="/referrals" className="mt-2 inline-block text-sm text-amber-400 hover:text-amber-300">
+          <Link to="/referrals" className="mt-3 block text-sm text-amber-400 hover:text-amber-300">
             or find referral paths first &rarr;
           </Link>
         </div>
