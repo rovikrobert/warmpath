@@ -300,7 +300,13 @@ async def process_csv_upload_core(
         raise
 
 
-@celery_app.task(bind=True, soft_time_limit=600, time_limit=660)
+@celery_app.task(
+    bind=True,
+    soft_time_limit=600,
+    time_limit=660,
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
 def process_csv_upload(
     self, csv_upload_id: str, user_id: str, file_content_b64: str
 ) -> None:

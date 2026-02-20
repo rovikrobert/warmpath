@@ -188,6 +188,17 @@ async def get_upload_status(
             detail="Upload not found",
         )
 
+    # Auto-fail stale uploads (worker crashed without setting error status)
+    if csv_upload.status == "processing" and csv_upload.started_at:
+        from datetime import datetime, timezone
+
+        age = (datetime.now(timezone.utc) - csv_upload.started_at).total_seconds()
+        if age > 600:  # 10 minutes
+            csv_upload.status = "failed"
+            csv_upload.error_message = "Processing timed out — please re-upload"
+            csv_upload.completed_at = datetime.now(timezone.utc)
+            await db.commit()
+
     return {
         "data": CsvUploadResponse.model_validate(csv_upload).model_dump(mode="json"),
         "meta": {},
