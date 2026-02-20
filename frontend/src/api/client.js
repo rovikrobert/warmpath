@@ -134,6 +134,7 @@ export const contacts = {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 100);
   },
+  enrichmentProgress: () => api('/api/v1/contacts/enrichment-progress'),
 };
 
 export const companies = {
