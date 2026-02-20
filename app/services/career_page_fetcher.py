@@ -11,6 +11,8 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
+from app.services.job_fetcher import _clean_job_title
+
 logger = logging.getLogger(__name__)
 
 HTTPX_TIMEOUT = 3.0
@@ -143,7 +145,7 @@ def _extract_jobs_from_html(html: str, base_url: str) -> list[dict]:
 
         jobs.append(
             {
-                "title": title,
+                "title": _clean_job_title(title),
                 "department": None,
                 "location": None,
                 "url": full_url,

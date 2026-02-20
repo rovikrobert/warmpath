@@ -214,6 +214,11 @@ def lookup_careers_url(company_name: str) -> str | None:
     return CAREERS_URLS.get(key)
 
 
+def is_known_tech_company(company_key: str) -> bool:
+    """Return True if the company is in the board registry (all tech/SaaS)."""
+    return company_key.strip().lower() in BOARD_REGISTRY
+
+
 def get_display_name(company_key: str) -> str:
     """Return a human-readable display name for a board registry key.
 

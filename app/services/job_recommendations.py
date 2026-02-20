@@ -177,6 +177,7 @@ async def get_recommendations(
     exclude_companies: list[str] | None,
     limit: int,
     db: AsyncSession,
+    target_industries: list[str] | None = None,
 ) -> dict:
     """Return top companies with live openings matching the user's target role.
 
@@ -213,6 +214,7 @@ async def get_recommendations(
         user_id=user_id,
         target_locations=target_locations,
         exclude_companies=exclude_companies,
+        target_industries=target_industries,
         limit=limit * 2,
         db=db,
     )
