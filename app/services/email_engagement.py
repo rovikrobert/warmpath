@@ -810,9 +810,7 @@ FEED_ICON_MAP = {
 }
 
 
-async def send_smart_digest_email(
-    user_id: uuid.UUID, db: AsyncSession
-) -> bool:
+async def send_smart_digest_email(user_id: uuid.UUID, db: AsyncSession) -> bool:
     """Send a feed-powered digest email with top unseen insights.
 
     Returns True if email was sent, False if skipped (already sent, opted out,
@@ -860,7 +858,7 @@ async def send_smart_digest_email(
     <div style="font-size: 14px; font-weight: 600; color: #1f2937;">
       {icon} {item.title}
     </div>
-    {f'<div style="margin-top: 4px; font-size: 13px; color: #6b7280;">{item.body}</div>' if item.body else ''}
+    {f'<div style="margin-top: 4px; font-size: 13px; color: #6b7280;">{item.body}</div>' if item.body else ""}
     {action_html}
   </div>"""
 

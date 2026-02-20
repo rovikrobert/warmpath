@@ -85,29 +85,28 @@ async def get_feed(
     """
     await track_action(db, current_user.id, "feed_view")
 
-    query = (
-        select(FeedItem)
-        .where(
-            FeedItem.user_id == current_user.id,
-            FeedItem.dismissed_at.is_(None),
-        )
+    query = select(FeedItem).where(
+        FeedItem.user_id == current_user.id,
+        FeedItem.dismissed_at.is_(None),
     )
 
     # Filter expired items
     now = datetime.now(timezone.utc)
-    query = query.where(
-        (FeedItem.expires_at.is_(None)) | (FeedItem.expires_at > now)
-    )
+    query = query.where((FeedItem.expires_at.is_(None)) | (FeedItem.expires_at > now))
 
     if item_type:
         query = query.where(FeedItem.item_type == item_type)
 
     # Order: unseen first (seen_at IS NULL), then by priority and recency
-    query = query.order_by(
-        FeedItem.seen_at.is_(None).desc(),  # NULL (unseen) sorts first
-        FeedItem.priority.desc(),
-        FeedItem.created_at.desc(),
-    ).offset(offset).limit(limit)
+    query = (
+        query.order_by(
+            FeedItem.seen_at.is_(None).desc(),  # NULL (unseen) sorts first
+            FeedItem.priority.desc(),
+            FeedItem.created_at.desc(),
+        )
+        .offset(offset)
+        .limit(limit)
+    )
 
     result = await db.execute(query)
     items = result.scalars().all()
@@ -350,7 +349,9 @@ async def submit_enrichment_response(
     # Build privacy-safe cross-user hash
     import hashlib
 
-    name_company = f"{(contact.full_name or '').lower()}|{(contact.current_company or '').lower()}"
+    name_company = (
+        f"{(contact.full_name or '').lower()}|{(contact.current_company or '').lower()}"
+    )
     name_company_hash = hashlib.sha256(name_company.encode()).hexdigest()
 
     # Create freshness signal

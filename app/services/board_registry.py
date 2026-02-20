@@ -364,7 +364,7 @@ async def _probe_ats(slug: str) -> dict[str, str] | None:
             async with httpx.AsyncClient(timeout=_PROBE_TIMEOUT) as client:
                 resp = await client.head(url)
                 return (source, resp.status_code == 200)
-        except httpx.HTTPError:
+        except (httpx.HTTPError, ImportError):
             return (source, False)
 
     results = await asyncio.gather(*[_check(src, url) for src, url in urls])
