@@ -29,6 +29,7 @@ export default function MarketplaceOverview() {
   const [approvedCoaching, setApprovedCoaching] = useState(null); // id of request showing coaching
   const [sharingPrefs, setSharingPrefs] = useState(null);
   const [excludedIds, setExcludedIds] = useState([]);
+  const [toggleLoading, setToggleLoading] = useState(null);
 
   const load = async () => {
     try {
@@ -65,6 +66,33 @@ export default function MarketplaceOverview() {
       console.error(err);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const toggleContactVisibility = async (contactId) => {
+    if (toggleLoading) return;
+    setToggleLoading(contactId);
+    const prevExcluded = [...excludedIds];
+    // Optimistic update
+    const newExcluded = excludedIds.includes(contactId)
+      ? excludedIds.filter((id) => id !== contactId)
+      : [...excludedIds, contactId];
+    setExcludedIds(newExcluded);
+
+    try {
+      const body = {
+        opt_in_marketplace: sharingPrefs?.opt_in_marketplace ?? true,
+        is_paused: sharingPrefs?.is_paused ?? false,
+        category_filters: sharingPrefs?.category_filters || null,
+        excluded_contact_ids: newExcluded.length > 0 ? newExcluded : null,
+      };
+      const res = await mpApi.updateSharingPrefs(body);
+      setSharingPrefs(res.data);
+    } catch (err) {
+      console.error('Failed to update visibility:', err);
+      setExcludedIds(prevExcluded); // Revert on error
+    } finally {
+      setToggleLoading(null);
     }
   };
 
@@ -299,46 +327,70 @@ export default function MarketplaceOverview() {
 
           {/* Card grid */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {listings.map((l) => (
-              <div key={l.id} className="rounded-lg bg-slate-900 border border-slate-700/50 p-4 relative">
-                {/* Eye toggle button (placeholder — wired in Task 3) */}
-                <button
-                  type="button"
-                  className="absolute top-3 right-3 text-slate-500 hover:text-slate-300"
-                  aria-label="Toggle listing visibility"
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                  </svg>
-                </button>
+            {listings.map((l) => {
+              const contactId = l.contact_id || l.id;
+              const isHidden = excludedIds.includes(contactId);
+              return (
+                <div key={l.id} className={`rounded-lg bg-slate-900 border border-slate-700/50 p-4 relative${isHidden ? ' opacity-50' : ''}`}>
+                  {/* Eye toggle button */}
+                  <button
+                    type="button"
+                    onClick={() => toggleContactVisibility(contactId)}
+                    disabled={toggleLoading === contactId}
+                    className="absolute top-3 right-3 text-slate-500 hover:text-slate-300 disabled:opacity-50"
+                    aria-label={isHidden ? 'Show contact on marketplace' : 'Hide contact from marketplace'}
+                  >
+                    {isHidden ? (
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                      </svg>
+                    ) : (
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                      </svg>
+                    )}
+                  </button>
 
-                {/* Top zone — NH's private view */}
-                <div className="pr-8">
-                  <p className="font-bold text-slate-50">{l.contact_name || '—'}</p>
-                  <p className="text-sm text-slate-400">
-                    {l.contact_title || '—'}{l.contact_company ? ` at ${l.contact_company}` : ''}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">Only you see this</p>
-                </div>
+                  {/* Top zone — NH's private view */}
+                  <div className="pr-8">
+                    <p className="font-bold text-slate-50">{l.contact_name || '—'}</p>
+                    <p className="text-sm text-slate-400">
+                      {l.contact_title || '—'}{l.contact_company ? ` at ${l.contact_company}` : ''}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">Only you see this</p>
+                  </div>
 
-                {/* Dashed divider */}
-                <div className="border-t border-dashed border-slate-700 my-3" />
+                  {/* Dashed divider */}
+                  <div className="border-t border-dashed border-slate-700 my-3" />
 
-                {/* Bottom zone — job seeker anonymized view */}
-                <div>
-                  <p className="mb-1.5 text-xs text-slate-500">Job seekers see</p>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <MarketplaceBadge value={l.role_level} type="role" />
-                    <span className="text-slate-600">&middot;</span>
-                    <MarketplaceBadge value={l.department_category} type="department" />
-                    <span className="text-slate-600">&middot;</span>
-                    <MarketplaceBadge value={l.warm_sco[RESEND_KEY_REDACTED]} type="strength" />
+                  {/* Bottom zone — job seeker anonymized view */}
+                  <div>
+                    {isHidden ? (
+                      <p className="text-sm text-slate-500">Hidden from marketplace</p>
+                    ) : (
+                      <>
+                        <p className="mb-1.5 text-xs text-slate-500">Job seekers see</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <MarketplaceBadge value={l.role_level} type="role" />
+                          <span className="text-slate-600">&middot;</span>
+                          <MarketplaceBadge value={l.department_category} type="department" />
+                          <span className="text-slate-600">&middot;</span>
+                          <MarketplaceBadge value={l.warm_sco[RESEND_KEY_REDACTED]} type="strength" />
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+          <p className="text-xs text-slate-500">
+            Hidden contacts can be restored in{' '}
+            <Link to="/settings?tab=sharing" className="text-amber-400 hover:text-amber-300">
+              Sharing Settings &rarr;
+            </Link>
+          </p>
         </div>
       ) : (
         <div className="rounded-xl bg-slate-900 p-12 text-center border border-slate-700/50">
