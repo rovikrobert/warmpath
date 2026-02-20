@@ -379,16 +379,24 @@ def _merge_cleaned_fields(original: dict, cleaned_fields: dict) -> dict:
     return merged
 
 
-MAX_CONCURRENT_BATCHES = 3
+def _get_anthropic_client() -> anthropic.AsyncAnthropic:
+    """Shared singleton Anthropic client."""
+    from app.utils.anthropic_client import get_async_client
+
+    return get_async_client()
 
 
 async def _clean_batch(
     client: anthropic.AsyncAnthropic,
     batch: list[dict],
-    semaphore: asyncio.Semaphore,
 ) -> list[dict]:
-    """Clean a single batch via Claude API, guarded by semaphore."""
-    async with semaphore:
+    """Clean a single batch via Claude API, guarded by global rate limiter."""
+    from app.utils.rate_limiter import acqui[RESEND_KEY_REDACTED], release_slot
+
+    used_redis = await acqui[RESEND_KEY_REDACTED](
+        "anthropic", max_concurrent=settings.ANTHROPIC_MAX_CONCURRENT
+    )
+    try:
         payload = _build_cleanup_payload(batch)
         message = await client.messages.create(
             model=CLEANUP_MODEL,
@@ -415,26 +423,35 @@ async def _clean_batch(
             message.usage.output_tokens,
         )
         return cleaned
+    except anthropic.RateLimitError as exc:
+        hdrs = getattr(getattr(exc, "response", None), "headers", {})
+        logger.warning(
+            "Claude rate limit during CSV clean (batch=%d): "
+            "requests=%s/%s, tokens=%s/%s, retry-after=%s",
+            len(batch),
+            hdrs.get("x-ratelimit-remaining-requests", "?"),
+            hdrs.get("x-ratelimit-limit-requests", "?"),
+            hdrs.get("x-ratelimit-remaining-tokens", "?"),
+            hdrs.get("x-ratelimit-limit-tokens", "?"),
+            hdrs.get("retry-after", "?"),
+        )
+        raise
+    finally:
+        await release_slot("anthropic", used_redis)
 
 
 @timed("csv_clean_real")
 async def clean_contacts_real(contacts: list[dict]) -> list[dict]:
     """Clean contacts using the Claude API for fuzzy name/company resolution.
 
-    Batches contacts (CLEANUP_BATCH_SIZE per API call) and runs up to
-    MAX_CONCURRENT_BATCHES in parallel via asyncio.gather. Falls back to
-    mock cleaner on any error (graceful degradation).
+    Batches contacts (CLEANUP_BATCH_SIZE per API call) with global rate
+    limiting across all workers. Falls back to mock cleaner on any error.
     """
     if not contacts:
         return []
 
     try:
-        client = anthropic.AsyncAnthropic(
-            api_key=settings.ANTHROPIC_API_KEY,
-            timeout=60.0,
-            max_retries=1,
-        )
-        semaphore = asyncio.Semaphore(MAX_CONCURRENT_BATCHES)
+        client = _get_anthropic_client()
 
         batches = [
             contacts[i : i + CLEANUP_BATCH_SIZE]
@@ -442,7 +459,7 @@ async def clean_contacts_real(contacts: list[dict]) -> list[dict]:
         ]
 
         results = await asyncio.gather(
-            *[_clean_batch(client, batch, semaphore) for batch in batches],
+            *[_clean_batch(client, batch) for batch in batches],
             return_exceptions=True,
         )
 
@@ -481,7 +498,21 @@ async def clean_contacts(contacts: list[dict]) -> list[dict]:
 
     When AI_MOCK_MODE is true, uses deterministic heuristics (no API calls).
     When false, uses the Claude API for fuzzy name/company resolution.
+    Degrades to mock when task queue depth exceeds threshold.
     """
     if settings.AI_MOCK_MODE:
         return clean_contacts_mock(contacts)
+
+    # Degrade to mock under heavy load to prevent queue buildup
+    from app.utils.rate_limiter import get_queue_depth
+
+    depth = await get_queue_depth()
+    if depth > settings.QUEUE_DEPTH_THRESHOLD:
+        logger.warning(
+            "Queue depth %d exceeds threshold %d — using mock cleaner",
+            depth,
+            settings.QUEUE_DEPTH_THRESHOLD,
+        )
+        return clean_contacts_mock(contacts)
+
     return await clean_contacts_real(contacts)
