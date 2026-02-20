@@ -311,6 +311,18 @@ def _mock_sco[RESEND_KEY_REDACTED](
                 elif adjacent_dept:
                     score += 15
                     reasons.append(f"Adjacent department ({contact_dept})")
+                elif target_dept and contact_dept:
+                    # Cross-functional: unrelated department.
+                    # C-suite/VP can still refer across depts; others get penalised.
+                    if is_csuite or is_vp_dir:
+                        reasons.append(
+                            f"Different department ({contact_dept}) — senior cross-dept advocate"
+                        )
+                    else:
+                        score -= 20
+                        reasons.append(
+                            f"Different department ({contact_dept}) — weak referral path"
+                        )
 
                 # Seniority bonus
                 if is_csuite:

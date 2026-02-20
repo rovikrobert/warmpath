@@ -166,6 +166,7 @@ async def get_recommendations_endpoint(
         exclude_companies=exclude_companies,
         limit=limit,
         db=db,
+        target_industries=prefs.target_industries,
     )
 
     return {

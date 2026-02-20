@@ -88,6 +88,7 @@ class TestNetworkRecommendations:
             user_id=seeker.id,
             target_locations=None,
             exclude_companies=None,
+            target_industries=None,
             limit=10,
             db=db_session,
         )
@@ -148,6 +149,7 @@ class TestNetworkRecommendations:
             user_id=seeker.id,
             target_locations=None,
             exclude_companies=None,
+            target_industries=None,
             limit=10,
             db=db_session,
         )
@@ -183,6 +185,7 @@ class TestNetworkRecommendations:
             user_id=user.id,
             target_locations=None,
             exclude_companies=None,
+            target_industries=None,
             limit=10,
             db=db_session,
         )
@@ -220,6 +223,7 @@ class TestNetworkRecommendations:
             user_id=user.id,
             target_locations=None,
             exclude_companies=["google"],
+            target_industries=None,
             limit=10,
             db=db_session,
         )
@@ -253,6 +257,7 @@ class TestNetworkRecommendations:
             user_id=user.id,
             target_locations=None,
             exclude_companies=None,
+            target_industries=None,
             limit=10,
             db=db_session,
         )

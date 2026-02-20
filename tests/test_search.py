@@ -88,14 +88,15 @@ class TestMockScoringReferral:
     """Tests for the new referral-focused mock scorer."""
 
     def test_company_match_primary_signal(self):
-        """Working at a target company is the strongest signal (+50)."""
+        """Working at a target company is the strongest signal (+50), minus cross-dept penalty."""
         search = _search(
             target_companies=["Stripe"],
             target_role="Software Engineer",
         )
         contact = _contact(current_company="Stripe", current_title="Designer")
         results = _mock_sco[RESEND_KEY_REDACTED](search, [contact])
-        assert results[0].relevance_score == 50.0
+        # 50 (company match) - 20 (design ≠ engineering, cross-dept penalty) = 30
+        assert results[0].relevance_score == 30.0
         assert "target company" in results[0].reasoning.lower()
 
     def test_company_plus_same_dept(self):

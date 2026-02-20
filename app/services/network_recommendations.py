@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.company import Company
 from app.models.contact import Contact
 from app.models.marketplace import MarketplaceListing, NetworkSharingPreferences
-from app.services.board_registry import lookup_careers_url
+from app.services.board_registry import is_known_tech_company, lookup_careers_url
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +40,34 @@ _EXCLUDED_COMPANIES = {
 }
 
 
+_TECH_INDUSTRY_KEYWORDS = {
+    "tech",
+    "technology",
+    "saas",
+    "software",
+    "fintech",
+    "ai",
+    "cloud",
+    "internet",
+    "platform",
+    "digital",
+}
+
+
+def _wants_tech(target_industries: list[str] | None) -> bool:
+    """Return True if the user's target industries indicate tech/SaaS preference."""
+    if not target_industries:
+        return False
+    return any(
+        kw in ind.lower() for ind in target_industries for kw in _TECH_INDUSTRY_KEYWORDS
+    )
+
+
 async def get_network_recommendations(
     user_id: uuid.UUID,
     target_locations: list[str] | None,
     exclude_companies: list[str] | None,
+    target_industries: list[str] | None,
     limit: int,
     db: AsyncSession,
 ) -> list[dict]:
@@ -130,9 +154,14 @@ async def get_network_recommendations(
     # ------------------------------------------------------------------
     # Build result list
     # ------------------------------------------------------------------
+    tech_filter = _wants_tech(target_industries)
+
     results: list[dict] = []
     for key, data in merged.items():
         if key in excluded or key in _EXCLUDED_COMPANIES:
+            continue
+        # When user targets tech/SaaS, skip companies not in the board registry
+        if tech_filter and not is_known_tech_company(key):
             continue
 
         own = data["own"]
