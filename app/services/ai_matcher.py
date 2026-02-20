@@ -32,7 +32,9 @@ from app.models.user import ConnectorProfile, User
 
 logger = logging.getLogger(__name__)
 
-BATCH_SIZE = 100  # contacts per Claude API call
+BATCH_SIZE = (
+    25  # contacts per Claude API call (keep small to avoid response truncation)
+)
 MAX_CONCURRENT_BATCHES = 10
 CLAUDE_MODEL = settings.CLAUDE_MODEL
 
@@ -538,6 +540,32 @@ CONTACTS:
 {json.dumps(contacts_data, indent=2)}"""
 
 
+def _repair_truncated_json(raw: str) -> list[dict] | None:
+    """Attempt to recover a valid JSON array from a truncated Claude response.
+
+    Strategy: find the last complete object in the array by progressively
+    trimming from the end until json.loads succeeds.
+    """
+    # Only attempt repair on array-like responses
+    if not raw.lstrip().startswith("["):
+        return None
+
+    # Find the last complete }, then close the array
+    for i in range(len(raw) - 1, 0, -1):
+        if raw[i] == "}":
+            candidate = raw[: i + 1] + "]"
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, list) and parsed:
+                    logger.warning(
+                        "Repaired truncated JSON: recovered %d items", len(parsed)
+                    )
+                    return parsed
+            except json.JSONDecodeError:
+                continue
+    return None
+
+
 @timed("ai_call_claude")
 async def _call_claude_api(
     search: SearchRequest,
@@ -558,7 +586,7 @@ async def _call_claude_api(
         try:
             message = await client.messages.create(
                 model=CLAUDE_MODEL,
-                max_tokens=2048,
+                max_tokens=8192,
                 system=_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_prompt}],
             )
@@ -587,7 +615,20 @@ async def _call_claude_api(
         raw = raw.split("\n", 1)[1]
         raw = raw.rsplit("```", 1)[0].strip()
 
-    parsed = json.loads(raw)
+    # Try parsing JSON, repairing truncated responses if needed
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        parsed = _repair_truncated_json(raw)
+        if parsed is None:
+            logger.error(
+                "Claude response not valid JSON even after repair (len=%d, tail=%r)",
+                len(raw),
+                raw[-100:] if raw else "",
+            )
+            return _mock_sco[RESEND_KEY_REDACTED](search, contacts), TokenUsage(
+                message.usage.input_tokens, message.usage.output_tokens
+            )
     valid_ids = {str(c.id) for c in contacts}
 
     results: list[ContactMatch] = []

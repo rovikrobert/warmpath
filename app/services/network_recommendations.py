@@ -22,6 +22,23 @@ from app.services.board_registry import lookup_careers_url
 
 logger = logging.getLogger(__name__)
 
+# Companies that are not real employers — exclude from recommendations
+_EXCLUDED_COMPANIES = {
+    "freelance",
+    "self-employed",
+    "self employed",
+    "independent",
+    "independent consultant",
+    "freelancer",
+    "consultant",
+    "unemployed",
+    "retired",
+    "student",
+    "n/a",
+    "none",
+    "-",
+}
+
 
 async def get_network_recommendations(
     user_id: uuid.UUID,
@@ -115,7 +132,7 @@ async def get_network_recommendations(
     # ------------------------------------------------------------------
     results: list[dict] = []
     for key, data in merged.items():
-        if key in excluded:
+        if key in excluded or key in _EXCLUDED_COMPANIES:
             continue
 
         own = data["own"]

@@ -16,7 +16,7 @@ function ShimmerCard() {
   );
 }
 
-function RecommendationCard({ rec, onAdd }) {
+function RecommendationCard({ rec, onAdd, isAdded }) {
   return (
     <div className="rounded-lg border border-slate-700/50 bg-slate-900 p-4">
       <div className="flex items-start justify-between">
@@ -38,13 +38,22 @@ function RecommendationCard({ rec, onAdd }) {
             ))}
           </div>
         </div>
-        <button
-          onClick={() => onAdd(rec.display_name)}
-          aria-label={`Add ${rec.display_name} to target companies`}
-          className="ml-3 shrink-0 rounded-md border border-amber-500 px-2.5 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/10"
-        >
-          + Add
-        </button>
+        {isAdded ? (
+          <span
+            className="ml-3 shrink-0 rounded-md border border-emerald-500 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400"
+            aria-label={`${rec.display_name} added`}
+          >
+            Added
+          </span>
+        ) : (
+          <button
+            onClick={() => onAdd(rec.display_name)}
+            aria-label={`Add ${rec.display_name} to target companies`}
+            className="ml-3 shrink-0 rounded-md border border-amber-500 px-2.5 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/10"
+          >
+            + Add
+          </button>
+        )}
       </div>
     </div>
   );
@@ -56,6 +65,7 @@ export default function FindReferrals() {
   const [scope, setScope] = useState('own_network');
   const [balance, setBalance] = useState(null);
   const [hasPrefs, setHasPrefs] = useState(null);
+  const [targetRole, setTargetRole] = useState(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
   const [recommendations, setRecommendations] = useState([]);
@@ -64,7 +74,10 @@ export default function FindReferrals() {
 
   useEffect(() => {
     creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
-    prefsApi.getJob().then(() => setHasPrefs(true)).catch((e) => {
+    prefsApi.getJob().then((r) => {
+      setHasPrefs(true);
+      setTargetRole(r.data?.target_role ?? null);
+    }).catch((e) => {
       setHasPrefs(e.status === 404 ? false : null);
     });
   }, []);
@@ -184,9 +197,18 @@ export default function FindReferrals() {
       {/* Recommendations section */}
       {(loadingRecs || recommendations.length > 0) && (
         <div className="mt-8">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
-            Hiring for Your Role
-          </h2>
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+              Hiring {targetRole ? `for "${targetRole}"` : 'for Your Role'}
+            </h2>
+            <button
+              onClick={() => navigate('/settings?tab=profile')}
+              className="text-xs text-amber-400 hover:text-amber-300"
+              aria-label="Edit target role"
+            >
+              Edit
+            </button>
+          </div>
           {loadingRecs && recsStale && (
             <p className="mb-2 text-xs text-slate-500" aria-live="polite">
               Scanning job boards — this may take a moment...
@@ -196,7 +218,12 @@ export default function FindReferrals() {
             {loadingRecs
               ? Array.from({ length: 4 }).map((_, i) => <ShimmerCard key={i} />)
               : recommendations.map((rec) => (
-                  <RecommendationCard key={rec.company} rec={rec} onAdd={handleAddRec} />
+                  <RecommendationCard
+                    key={rec.company}
+                    rec={rec}
+                    onAdd={handleAddRec}
+                    isAdded={companies.includes(rec.display_name)}
+                  />
                 ))}
           </div>
         </div>
