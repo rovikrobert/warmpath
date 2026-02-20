@@ -42,7 +42,9 @@ from app.models.feed import (  # noqa: E402, F401
     ContactFreshnessSignal,
     FeedItem,
     FeedItemInteraction,
+    FreshnessPropagationLog,
 )
+from app.models.milestone import UserMilestone  # noqa: E402, F401
 from app.models.gtm import (  # noqa: E402, F401
     CompetitorProfile,
     GTMExperiment,

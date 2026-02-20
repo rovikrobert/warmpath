@@ -259,3 +259,35 @@ class ContactFreshnessSignal(Base):
     # Relationships
     user: Mapped["User"] = relationship()
     contact: Mapped["Contact"] = relationship()
+
+
+class FreshnessPropagationLog(Base):
+    """Log of cross-user freshness signal propagation events.
+
+    Privacy: NO user_ids stored. Only hashed identifiers and aggregate counts.
+    Records when consensus was reached and how many contacts were updated.
+    """
+
+    __tablename__ = "freshness_propagation_log"
+    __table_args__ = (
+        Index(
+            "idx_propagation_log_hash_type",
+            "name_company_hash",
+            "signal_type",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    name_company_hash: Mapped[str] = mapped_column(
+        String(64), nullable=False, index=True
+    )
+    signal_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    consensus_value: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    source_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    contacts_updated: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )

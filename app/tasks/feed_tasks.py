@@ -110,6 +110,50 @@ def cleanup_expired_feed_items():
 
 
 # ---------------------------------------------------------------------------
+# Cross-user freshness aggregation task — runs daily before feed generation
+# ---------------------------------------------------------------------------
+
+
+@celery_app.task(name="app.tasks.feed_tasks.aggregate_freshness")
+def aggregate_freshness():
+    """Aggregate cross-user freshness signals and propagate consensus.
+
+    Runs daily at 5 AM UTC, before the 7 AM feed generation. When 2+
+    users agree on a contact's data (via name_company_hash), propagates
+    the consensus to contacts with NULL fields. Company-change signals
+    generate feed items instead of direct updates.
+
+    Schedule: Daily 5:00 AM UTC
+    """
+
+    async def _run():
+        from app.services.freshness_aggregator import aggregate_freshness_signals
+
+        async with _get_session_factory()() as db:
+            try:
+                result = await aggregate_freshness_signals(db)
+                await db.commit()
+                logger.info(
+                    "Freshness aggregation complete: %d signals, %d contacts updated, "
+                    "%d feed items created",
+                    result.signals_processed,
+                    result.contacts_updated,
+                    result.feed_items_created,
+                )
+                return {
+                    "signals_processed": result.signals_processed,
+                    "contacts_updated": result.contacts_updated,
+                    "feed_items_created": result.feed_items_created,
+                }
+            except Exception:
+                logger.exception("Freshness aggregation task failed")
+                await db.rollback()
+                return {"error": "task_failed"}
+
+    return _run_async(_run())
+
+
+# ---------------------------------------------------------------------------
 # Smart digest email task — replaces basic weekly digest with feed-powered one
 # ---------------------------------------------------------------------------
 
