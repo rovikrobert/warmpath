@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { contacts as contactsApi, companies as companiesApi } from '../api/client';
 import MatchBadge from '../components/MatchBadge';
+import { getNlpMatchTier } from '../utils/scores';
 
 const RELATIONSHIP_TYPES = [
   { value: '', label: 'All types' },
@@ -690,7 +691,16 @@ export default function ContactsPage() {
       {nlpResults && (
         <div className="mb-4 flex items-center gap-3">
           <span className="text-sm text-slate-400">
-            {nlpResults.length} {nlpResults.length === 1 ? 'match' : 'matches'} found
+            {(() => {
+              const best = nlpResults.filter((r) => (r.nlp_match_score ?? 0) >= 65).length;
+              const possible = nlpResults.filter((r) => (r.nlp_match_score ?? 0) >= 35 && (r.nlp_match_score ?? 0) < 65).length;
+              const parts = [];
+              if (best) parts.push(`${best} best ${best === 1 ? 'match' : 'matches'}`);
+              if (possible) parts.push(`${possible} possible`);
+              const rest = nlpResults.length - best - possible;
+              if (rest) parts.push(`${rest} partial`);
+              return parts.join(', ') || `${nlpResults.length} matches`;
+            })()}
           </span>
           <button
             onClick={clearNlpSearch}
@@ -748,48 +758,77 @@ export default function ContactsPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {nlpResults.map((c) => (
-              <div key={c.id} className="rounded-xl bg-slate-900 border border-slate-700/50">
-                <div
-                  onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpandedId(expandedId === c.id ? null : c.id); }}
-                  role="button"
-                  tabIndex={0}
-                  aria-expanded={expandedId === c.id}
-                  aria-label={`${c.full_name}, NLP match score ${c.nlp_match_score != null ? Math.round(c.nlp_match_score) : 'N/A'}, click to ${expandedId === c.id ? 'collapse' : 'expand'} details`}
-                  className="flex cursor-pointer items-center justify-between px-4 py-3 hover:bg-amber-500/5"
-                >
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-slate-50">{c.full_name}</p>
-                      <p className="text-xs text-slate-400">
-                        {c.current_title && `${c.current_title} at `}{c.current_company || ''}
-                      </p>
+            {(() => {
+              // Group results by NLP match tier
+              const groups = [
+                { min: 65, label: 'Best matches', items: [] },
+                { min: 35, label: 'Possible matches', items: [] },
+                { min: 0,  label: 'Partial matches', items: [] },
+              ];
+              for (const c of nlpResults) {
+                const s = c.nlp_match_score ?? 0;
+                const g = groups.find((g) => s >= g.min);
+                if (g) g.items.push(c);
+              }
+              const nonEmpty = groups.filter((g) => g.items.length > 0);
+              const showDividers = nonEmpty.length > 1;
+
+              return nonEmpty.map((group) => (
+                <div key={group.label}>
+                  {showDividers && (
+                    <div className="flex items-center gap-3 py-2">
+                      <span className="text-xs font-medium uppercase tracking-wider text-slate-500">{group.label}</span>
+                      <div className="h-px flex-1 bg-slate-700/50" />
                     </div>
-                    <RelBadge
-                      type={c.relationship_type}
-                      onClick={(e) => { e.stopPropagation(); setExpandedId(c.id); }}
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {c.nlp_match_score != null && (
-                      <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400" title="NLP match score">
-                        {Math.round(c.nlp_match_score)}
-                      </span>
-                    )}
-                    {c.warm_score != null && (
-                      <MatchBadge score={c.warm_score} type="warm" />
-                    )}
-                    <span className="text-xs text-slate-400">{expandedId === c.id ? '\u25B2' : '\u25BC'}</span>
+                  )}
+                  <div className="space-y-2">
+                    {group.items.map((c) => {
+                      const nlpTier = getNlpMatchTier(c.nlp_match_score ?? 0);
+                      return (
+                        <div key={c.id} className="rounded-xl bg-slate-900 border border-slate-700/50">
+                          <div
+                            onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpandedId(expandedId === c.id ? null : c.id); }}
+                            role="button"
+                            tabIndex={0}
+                            aria-expanded={expandedId === c.id}
+                            aria-label={`${c.full_name}, ${nlpTier.label}${c.warm_score != null ? `, ${c.warm_score >= 70 ? 'Strong' : c.warm_score >= 40 ? 'Moderate' : 'Weak'} connection` : ''}, click to ${expandedId === c.id ? 'collapse' : 'expand'} details`}
+                            className="flex cursor-pointer items-center justify-between px-4 py-3 hover:bg-amber-500/5"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div>
+                                <p className="text-sm font-medium text-slate-50">{c.full_name}</p>
+                                <p className="text-xs text-slate-400">
+                                  {c.current_title && `${c.current_title} at `}{c.current_company || ''}
+                                </p>
+                              </div>
+                              <RelBadge
+                                type={c.relationship_type}
+                                onClick={(e) => { e.stopPropagation(); setExpandedId(c.id); }}
+                              />
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${nlpTier.color}`}>
+                                {nlpTier.label}
+                              </span>
+                              {c.warm_score != null && (
+                                <MatchBadge score={c.warm_score} type="warm" />
+                              )}
+                              <span className="text-xs text-slate-400">{expandedId === c.id ? '\u25B2' : '\u25BC'}</span>
+                            </div>
+                          </div>
+                          {expandedId === c.id && (
+                            <div className="border-t border-slate-700/50 px-4 py-3">
+                              <ContactDetail contact={c} onUpdate={load} />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-                {expandedId === c.id && (
-                  <div className="border-t border-slate-700/50 px-4 py-3">
-                    <ContactDetail contact={c} onUpdate={load} />
-                  </div>
-                )}
-              </div>
-            ))}
+              ));
+            })()}
           </div>
         )
       ) : loading ? (

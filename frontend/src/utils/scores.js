@@ -38,6 +38,14 @@ export const LIKELIHOOD_MAP = {
   low:    { label: 'Unlikely',        color: 'bg-slate-700/50 text-slate-400' },
 };
 
+// -- NLP Match Quality (search result relevance) ----------------------------
+
+export const NLP_MATCH_TIERS = [
+  { min: 65, label: 'Best match',    color: 'bg-emerald-500/10 text-emerald-400' },
+  { min: 35, label: 'Possible match', color: 'bg-amber-500/10 text-amber-400' },
+  { min: 0,  label: 'Partial match',  color: 'bg-slate-700/50 text-slate-400' },
+];
+
 // -- Helpers ----------------------------------------------------------------
 
 export function getMatchTier(score) {
@@ -50,6 +58,10 @@ export function getWarmTier(score) {
 
 export function getFitTier(score) {
   return FIT_TIERS.find((t) => score >= t.min) || FIT_TIERS[FIT_TIERS.length - 1];
+}
+
+export function getNlpMatchTier(score) {
+  return NLP_MATCH_TIERS.find((t) => score >= t.min) || NLP_MATCH_TIERS[NLP_MATCH_TIERS.length - 1];
 }
 
 export function getLikelihood(level) {
