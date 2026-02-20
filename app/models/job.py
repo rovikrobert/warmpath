@@ -97,6 +97,25 @@ class Application(Base):
     match_result_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("match_results.id", ondelete="SET NULL")
     )
+
+    # Outcome attribution — tracks how this application was sourced
+    # Feeds medium-term B2B analytics: "X referrals routed via WarmPath → Y hires"
+    source_type: Mapped[str | None] = mapped_column(
+        String(50), index=True
+    )  # own_network | marketplace | manual | external
+    source_listing_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("marketplace_listings.id", ondelete="SET NULL"),
+    )
+    source_intro_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("intro_facilitations.id", ondelete="SET NULL"),
+    )
+    outcome: Mapped[str | None] = mapped_column(
+        String(50)
+    )  # hired | not_hired | no_response | withdrew — closed-loop tracking
+    outcome_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     company_name: Mapped[str] = mapped_column(String(255), nullable=False)
     role_title: Mapped[str | None] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(

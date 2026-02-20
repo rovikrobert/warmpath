@@ -174,6 +174,7 @@ async def create_application(
         channel=body.channel,
         notes=body.notes,
         status="draft",
+        source_type="manual" if not body.contact_id else "own_network",
     )
     db.add(app_record)
     await db.flush()
@@ -579,6 +580,7 @@ async def create_from_intro(
         company_id=company_id,
         channel=channel,
         status="draft",
+        source_type="own_network",
     )
     db.add(app_record)
     await db.commit()

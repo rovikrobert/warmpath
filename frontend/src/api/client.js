@@ -284,6 +284,32 @@ export const feedback = {
     }),
 };
 
+export const feed = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries({ limit: 20, offset: 0, ...params }).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') qs.set(k, v);
+    });
+    return api(`/api/v1/feed?${qs}`);
+  },
+  count: () => api('/api/v1/feed/count'),
+  markSeen: (id) => api(`/api/v1/feed/${id}/seen`, { method: 'POST' }),
+  act: (id) =>
+    api(`/api/v1/feed/${id}/act`, { method: 'POST' }).then((r) => {
+      track('feed_item_click');
+      return r;
+    }),
+  dismiss: (id) => api(`/api/v1/feed/${id}/dismiss`, { method: 'POST' }),
+  batchSeen: (itemIds) =>
+    api('/api/v1/feed/batch-seen', { method: 'POST', body: { item_ids: itemIds } }),
+  enrichmentResponse: (body) =>
+    api('/api/v1/feed/enrichment-response', { method: 'POST', body }).then((r) => {
+      track('enrichment_response', { signal_type: body.signal_type });
+      return r;
+    }),
+  generate: () => api('/api/v1/feed/generate', { method: 'POST' }),
+};
+
 export const health = {
   check: () => api('/health'),
   usage: () => api('/api/v1/usage/me'),

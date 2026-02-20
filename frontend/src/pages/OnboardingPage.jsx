@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { auth as authApi, contacts as contactsApi, preferences, marketplace } from '../api/client';
 import TagInput from '../components/TagInput';
+import KeevsAvatar from '../components/KeevsAvatar';
 import { trackEvent } from '../utils/analytics';
 import Button from '../components/ui/Button';
 import Spinner from '../components/ui/Spinner';
@@ -52,7 +53,8 @@ const EMPTY_WORK = { company: '', title: '', start_date: '', end_date: '', is_cu
 const SENIORITY_OPTIONS = ['Staff / Principal', 'Manager', 'Director', 'VP', 'C-Suite'];
 
 // Steps vary by user type — NHs skip job prefs (step 1), get bonus pitch instead
-const TOTAL_STEPS = 9;
+// Steps: 1=Job Prefs, 2=Intent, 3=Bonus Pitch (NH only), 4-7=Privacy, 8=Meet Keevs, 9=Upload CSV, 10=Work History
+const TOTAL_STEPS = 10;
 
 // Privacy step data (steps 4-7)
 const PRIVACY_STEPS = [
@@ -124,7 +126,7 @@ export default function OnboardingPage() {
   // Step 2: Intent
   const [intent, setIntent] = useState('');
 
-  // Step 7: Upload
+  // Step 9: Upload
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
@@ -158,10 +160,10 @@ export default function OnboardingPage() {
         // Jump to first incomplete step
         if (!hasPrefs) { setStep(1); return; }
         if (!hasIntent) { setStep(2); return; }
-        // Steps 3-7 are informational — skip to data steps
-        if (!hasContacts) { setStep(8); return; }
+        // Steps 3-7 are informational, 8 is Meet Keevs — skip to data steps
+        if (!hasContacts) { setStep(9); return; }
         // Work history is the last step
-        setStep(9);
+        setStep(10);
       } catch {
         // Default to step 1 on error
       }
@@ -206,7 +208,7 @@ export default function OnboardingPage() {
     return () => clearInterval(interval);
   }, [uploading]);
 
-  // Step 8: Work history + resume import
+  // Step 10: Work history + resume import
   const [workHistory, setWorkHistory] = useState([]);
   const [resumePreview, setResumePreview] = useState(null);
   const [resumeProfileData, setResumeProfileData] = useState(null);
@@ -583,8 +585,61 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 8: Upload CSV */}
-          {step === 8 && !uploadResult && (
+          {/* Step 8: Meet Keevs */}
+          {step === 8 && (
+            <div className="space-y-5">
+              <div className="text-center">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">Your AI career coach</p>
+                <h2 className="text-lg font-semibold text-slate-50">Meet Keevs</h2>
+              </div>
+
+              <div className="flex flex-col items-center rounded-xl border border-amber-500/30 bg-amber-500/5 p-8">
+                <KeevsAvatar size="xl" pulse />
+                <p className="mt-4 text-center text-base font-medium text-slate-100">
+                  Hey! I'm Keevs.
+                </p>
+                <p className="mt-2 text-center text-sm leading-relaxed text-slate-400 max-w-sm">
+                  I'm your AI career coach built into WarmPath. I work in the background to find opportunities, warm introductions, and insights you'd miss on your own.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
+                  <span className="mt-0.5 text-lg" aria-hidden="true">🔔</span>
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">Proactive alerts</p>
+                    <p className="text-xs text-slate-400">I'll surface job matches, follow-up reminders, and network insights before you even ask.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
+                  <span className="mt-0.5 text-lg" aria-hidden="true">💬</span>
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">Ask me anything</p>
+                    <p className="text-xs text-slate-400">Strategy questions, intro message drafts, company research — I'm here whenever you need me.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
+                  <span className="mt-0.5 text-lg" aria-hidden="true">📈</span>
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">Gets smarter over time</p>
+                    <p className="text-xs text-slate-400">The more you use WarmPath, the better I understand your goals and network — and the better my recommendations get.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button variant="secondary" onClick={() => { setError(''); setStep(7); }} className="flex-1" size="lg">
+                  Back
+                </Button>
+                <Button onClick={() => setStep(9)} className="flex-1" size="lg">
+                  Let's Go
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 9: Upload CSV */}
+          {step === 9 && !uploadResult && (
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-50">Upload your LinkedIn connections</h2>
@@ -650,7 +705,7 @@ export default function OnboardingPage() {
               )}
 
               <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => { setError(''); setStep(7); }} size="lg" className="px-4">
+                <Button variant="secondary" onClick={() => { setError(''); setStep(8); }} size="lg" className="px-4">
                   Back
                 </Button>
                 <Button onClick={handleUpload} disabled={!file} loading={uploading} className="flex-1" size="lg">
@@ -660,8 +715,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 8 done — prompt for work history */}
-          {step === 8 && uploadResult && (
+          {/* Step 9 done — prompt for work history */}
+          {step === 9 && uploadResult && (
             <div className="space-y-4 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
                 <span className="text-xl text-emerald-400">&#10003;</span>
@@ -673,18 +728,18 @@ export default function OnboardingPage() {
                 Add your work history to improve referral matching — contacts at your former companies get boosted scores.
               </p>
               <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => { setError(''); setStep(7); }} size="lg" className="px-4">
+                <Button variant="secondary" onClick={() => { setError(''); setStep(8); }} size="lg" className="px-4">
                   Back
                 </Button>
-                <Button onClick={() => setStep(9)} className="flex-1" size="lg">
+                <Button onClick={() => setStep(10)} className="flex-1" size="lg">
                   Add Work History
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Step 9: Work History */}
-          {step === 9 && (
+          {/* Step 10: Work History */}
+          {step === 10 && (
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-50">Your work history</h2>
@@ -808,7 +863,7 @@ export default function OnboardingPage() {
               {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
 
               <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => { setError(''); setStep(8); }} size="lg" className="px-4">
+                <Button variant="secondary" onClick={() => { setError(''); setStep(9); }} size="lg" className="px-4">
                   Back
                 </Button>
                 <Button

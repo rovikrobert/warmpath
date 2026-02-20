@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { coach as coachApi } from '../api/client';
+import { coach as coachApi, feed as feedApi } from '../api/client';
 import FeedbackModal from '../components/FeedbackModal';
+import FeedCard from '../components/FeedCard';
+import KeevsAvatar from '../components/KeevsAvatar';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import Spinner from '../components/ui/Spinner';
 
@@ -53,6 +55,8 @@ export default function CoachPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [feedItems, setFeedItems] = useState([]);
+  const [feedExpanded, setFeedExpanded] = useState(true);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -60,6 +64,15 @@ export default function CoachPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sending]);
+
+  // Load feed items on mount
+  useEffect(() => {
+    let cancelled = false;
+    feedApi.list({ limit: 5 })
+      .then((res) => { if (!cancelled) setFeedItems(res.data || []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Load briefing on mount
   useEffect(() => {
@@ -187,10 +200,44 @@ export default function CoachPage() {
       {/* Onboarding checklist for new users */}
       <OnboardingChecklist />
 
+      {/* Feed section */}
+      {feedItems.length > 0 && (
+        <div className="flex-none border-b border-slate-700/50">
+          <button
+            type="button"
+            onClick={() => setFeedExpanded(!feedExpanded)}
+            className="flex w-full items-center justify-between px-4 py-2.5 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <KeevsAvatar size="sm" />
+              <span className="text-sm font-medium text-amber-400">
+                {feedItems.filter((f) => !f.seen_at).length > 0
+                  ? `${feedItems.filter((f) => !f.seen_at).length} new insights`
+                  : 'Recent insights'}
+              </span>
+            </div>
+            <svg className={`h-4 w-4 text-slate-500 transition-transform ${feedExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+            </svg>
+          </button>
+          {feedExpanded && (
+            <div className="space-y-2 px-4 pb-3">
+              {feedItems.map((item) => (
+                <FeedCard
+                  key={item.id}
+                  item={item}
+                  onDismiss={(id) => setFeedItems((prev) => prev.filter((f) => f.id !== id))}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex-none border-b border-slate-700/50 px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white" aria-hidden="true">~</span>
+          <KeevsAvatar size={32} />
           <div>
             <h1 className="text-base font-semibold text-slate-50">Keevs</h1>
             <p className="text-xs text-slate-400">AI Career Coach</p>
