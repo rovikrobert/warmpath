@@ -664,6 +664,235 @@ class TestFromIntro:
 
 
 # ---------------------------------------------------------------------------
+# Test From-Facilitation (Marketplace Attribution)
+# ---------------------------------------------------------------------------
+
+
+class TestFromFacilitation:
+    async def test_create_from_approved_facilitation_sets_marketplace_attribution(
+        self, client: AsyncClient, auth_headers: dict, user_id: str
+    ):
+        """Approved marketplace facilitation creates app with source_type=marketplace."""
+        from app.models.company import Company
+        from app.models.marketplace import IntroFacilitation, MarketplaceListing
+
+        uid = uuid_mod.UUID(user_id)
+        async with TestSessionLocal() as db:
+            # Network holder
+            from app.models.user import User
+
+            nh = User(
+                clerk_user_id="nh_facilitation_test",
+                email="nh@facilitation.test",
+                full_name="Network Holder",
+                onboarding_completed_at=datetime.now(timezone.utc),
+            )
+            db.add(nh)
+            await db.flush()
+
+            company = Company(name="Google", domain="google.com")
+            db.add(company)
+            await db.flush()
+
+            contact = Contact(
+                user_id=nh.id,
+                full_name="Contact Person",
+                current_company="Google",
+                company_id=company.id,
+            )
+            db.add(contact)
+            await db.flush()
+
+            listing = MarketplaceListing(
+                network_holder_id=nh.id,
+                contact_id=contact.id,
+                company_id=company.id,
+                role_level="senior",
+                department_category="engineering",
+                warm_sco[RESEND_KEY_REDACTED]="60-80",
+                connection_recency="recent",
+            )
+            db.add(listing)
+            await db.flush()
+
+            facilitation = IntroFacilitation(
+                job_seeker_id=uid,
+                network_holder_id=nh.id,
+                marketplace_listing_id=listing.id,
+                status="approved",
+                reviewed_at=datetime.now(timezone.utc),
+            )
+            db.add(facilitation)
+            await db.commit()
+            await db.refresh(facilitation)
+            facilitation_id = str(facilitation.id)
+            listing_id = str(listing.id)
+
+        resp = await client.post(
+            f"/api/v1/applications/from-facilitation/{facilitation_id}",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201
+        data = resp.json()["data"]
+        assert data["company_name"] == "Google"
+        assert data["source_type"] == "marketplace"
+        assert data["source_intro_id"] == facilitation_id
+        assert data["source_listing_id"] == listing_id
+        assert data["status"] == "draft"
+
+    async def test_from_facilitation_rejects_pending_status(
+        self, client: AsyncClient, auth_headers: dict, user_id: str
+    ):
+        """Cannot create application from non-approved facilitation."""
+        from app.models.marketplace import IntroFacilitation, MarketplaceListing
+
+        uid = uuid_mod.UUID(user_id)
+        async with TestSessionLocal() as db:
+            from app.models.company import Company
+            from app.models.user import User
+
+            nh = User(
+                clerk_user_id="nh_pending_test",
+                email="nh@pending.test",
+                full_name="NH Pending",
+                onboarding_completed_at=datetime.now(timezone.utc),
+            )
+            db.add(nh)
+            await db.flush()
+
+            company = Company(name="Meta", domain="meta.com")
+            db.add(company)
+            await db.flush()
+
+            contact = Contact(
+                user_id=nh.id,
+                full_name="Meta Contact",
+                current_company="Meta",
+                company_id=company.id,
+            )
+            db.add(contact)
+            await db.flush()
+
+            listing = MarketplaceListing(
+                network_holder_id=nh.id,
+                contact_id=contact.id,
+                company_id=company.id,
+                role_level="mid",
+                department_category="product",
+                warm_sco[RESEND_KEY_REDACTED]="40-60",
+                connection_recency="recent",
+            )
+            db.add(listing)
+            await db.flush()
+
+            facilitation = IntroFacilitation(
+                job_seeker_id=uid,
+                network_holder_id=nh.id,
+                marketplace_listing_id=listing.id,
+                status="requested",
+            )
+            db.add(facilitation)
+            await db.commit()
+            await db.refresh(facilitation)
+            facilitation_id = str(facilitation.id)
+
+        resp = await client.post(
+            f"/api/v1/applications/from-facilitation/{facilitation_id}",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 400
+        assert "approved" in resp.json()["detail"].lower()
+
+    async def test_from_facilitation_not_found(
+        self, client: AsyncClient, auth_headers: dict
+    ):
+        """Returns 404 for nonexistent facilitation ID."""
+        resp = await client.post(
+            "/api/v1/applications/from-facilitation/00000000-0000-0000-0000-000000000099",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"].lower()
+
+    async def test_from_facilitation_wrong_user(
+        self, client: AsyncClient, user_id: str
+    ):
+        """Returns 404 when facilitation belongs to a different job seeker."""
+        from app.models.marketplace import IntroFacilitation, MarketplaceListing
+
+        async with TestSessionLocal() as db:
+            from app.models.company import Company
+            from app.models.user import User
+
+            other_seeker = User(
+                clerk_user_id="other_seeker_test",
+                email="other@seeker.test",
+                full_name="Other Seeker",
+                onboarding_completed_at=datetime.now(timezone.utc),
+            )
+            nh = User(
+                clerk_user_id="nh_wrong_user_test",
+                email="nh@wronguser.test",
+                full_name="NH Wrong User",
+                onboarding_completed_at=datetime.now(timezone.utc),
+            )
+            db.add_all([other_seeker, nh])
+            await db.flush()
+
+            company = Company(name="Apple", domain="apple.com")
+            db.add(company)
+            await db.flush()
+
+            contact = Contact(
+                user_id=nh.id,
+                full_name="Apple Contact",
+                current_company="Apple",
+                company_id=company.id,
+            )
+            db.add(contact)
+            await db.flush()
+
+            listing = MarketplaceListing(
+                network_holder_id=nh.id,
+                contact_id=contact.id,
+                company_id=company.id,
+                role_level="senior",
+                department_category="engineering",
+                warm_sco[RESEND_KEY_REDACTED]="80-100",
+                connection_recency="recent",
+            )
+            db.add(listing)
+            await db.flush()
+
+            # Facilitation belongs to other_seeker, not current user
+            facilitation = IntroFacilitation(
+                job_seeker_id=other_seeker.id,
+                network_holder_id=nh.id,
+                marketplace_listing_id=listing.id,
+                status="approved",
+                reviewed_at=datetime.now(timezone.utc),
+            )
+            db.add(facilitation)
+            await db.commit()
+            await db.refresh(facilitation)
+            facilitation_id = str(facilitation.id)
+
+        # Auth headers for user_id (not other_seeker)
+        _, wrong_headers = None, None
+        async with TestSessionLocal() as db:
+            _, wrong_headers = await create_test_user_in_db(
+                db, email="wronguser@test.com", full_name="Wrong User"
+            )
+
+        resp = await client.post(
+            f"/api/v1/applications/from-facilitation/{facilitation_id}",
+            headers=wrong_headers,
+        )
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"].lower()
+
+
+# ---------------------------------------------------------------------------
 # Test Suggest Track on Message Select
 # ---------------------------------------------------------------------------
 

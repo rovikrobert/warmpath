@@ -54,6 +54,13 @@ class ApplicationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Outcome attribution
+    source_type: str | None = None
+    source_listing_id: uuid.UUID | None = None
+    source_intro_id: uuid.UUID | None = None
+    outcome: str | None = None
+    outcome_at: datetime | None = None
+
     # Enriched fields (populated from joins)
     contact_name: str | None = None
     company_info: dict | None = None

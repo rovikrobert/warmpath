@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { marketplace as mpApi, credits as creditsApi } from '../api/client';
 import { trackEvent } from '../utils/analytics';
 import { MarketplaceBadge } from '../utils/marketplace';
+import EmptyState from '../components/ui/EmptyState';
+import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
 
 function StatusBadge({ status }) {
   const labels = { requested: 'Pending', reviewing: 'Reviewing', approved: 'Approved', declined: 'Declined', completed: 'Completed' };
@@ -30,6 +32,8 @@ export default function MarketplaceOverview() {
   const [sharingPrefs, setSharingPrefs] = useState(null);
   const [excludedIds, setExcludedIds] = useState([]);
   const [toggleLoading, setToggleLoading] = useState(null);
+  const [decliningId, setDecliningId] = useState(null);
+  const [statsAnimating, setStatsAnimating] = useState(false);
 
   const load = async () => {
     try {
@@ -55,15 +59,33 @@ export default function MarketplaceOverview() {
 
   const handleAction = async (id, action) => {
     setActionLoading(id);
+    const prevIncoming = [...incoming];
+
+    // Trigger stat animation
+    setStatsAnimating(true);
+    setTimeout(() => setStatsAnimating(false), 300);
+
+    if (action === 'approve') {
+      trackEvent('intro_approved');
+      setApprovedCoaching(id);
+      // Optimistic: move to approved state immediately
+      setIncoming((prev) => prev.map((r) => r.id === id ? { ...r, status: 'approved' } : r));
+    } else if (action === 'decline') {
+      // Animate out, then remove after animation completes
+      setDecliningId(id);
+      setTimeout(() => {
+        setIncoming((prev) => prev.filter((r) => r.id !== id));
+        setDecliningId(null);
+      }, 300);
+    }
+
     try {
       await mpApi.updateRequest(id, { action });
-      if (action === 'approve') {
-        trackEvent('intro_approved');
-        setApprovedCoaching(id);
-      }
-      await load();
     } catch (err) {
       console.error(err);
+      // Revert on failure
+      setIncoming(prevIncoming);
+      setDecliningId(null);
     } finally {
       setActionLoading(null);
     }
@@ -97,11 +119,7 @@ export default function MarketplaceOverview() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20" aria-live="polite" aria-busy="true">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading marketplace" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   const pendingRequests = incoming.filter((r) => r.status === 'requested');
@@ -113,7 +131,7 @@ export default function MarketplaceOverview() {
   return (
     <div className="space-y-6" role="main">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-50">Marketplace Overview</h1>
+        <h1 className="page-title">Marketplace Overview</h1>
         <Link to="/settings?tab=sharing" className="rounded-md border border-slate-700/50 px-3 py-1.5 text-sm text-slate-400 hover:bg-slate-800">
           Sharing Settings
         </Link>
@@ -121,6 +139,9 @@ export default function MarketplaceOverview() {
 
       {/* Quick navigation */}
       <div className="flex flex-wrap items-center gap-3 text-sm">
+        <Link to="/marketplace/browse" className="rounded-lg border border-amber-500/30 px-3 py-1.5 text-amber-400 hover:bg-amber-500/10">
+          Browse Marketplace
+        </Link>
         <Link to="/marketplace/requests" className="rounded-lg border border-slate-700/50 px-3 py-1.5 text-slate-400 hover:bg-slate-800">
           My Requests {pendingRequests.length > 0 && <span className="ml-1 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-400">{pendingRequests.length}</span>}
         </Link>
@@ -148,32 +169,32 @@ export default function MarketplaceOverview() {
 
       {/* Reputation + Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <div className="rounded-lg bg-slate-900 p-4 border border-slate-700/50">
-          <p className="text-xs text-slate-400">Active Listings</p>
-          <p className="text-2xl font-bold font-mono text-slate-50">{listings.length}</p>
+        <div className="surface-raised p-4">
+          <p className="stat-label">Active Listings</p>
+          <p className="stat-number">{listings.length}</p>
         </div>
-        <div className="rounded-lg bg-slate-900 p-4 border border-slate-700/50">
-          <p className="text-xs text-slate-400">Pending Requests</p>
-          <p className="text-2xl font-bold font-mono text-amber-400">{pendingRequests.length}</p>
+        <div className="surface-raised p-4">
+          <p className="stat-label">Pending Requests</p>
+          <p className={`stat-number text-amber-400 ${statsAnimating ? 'animate-count-change' : ''}`}>{pendingRequests.length}</p>
         </div>
-        <div className="rounded-lg bg-slate-900 p-4 border border-slate-700/50">
-          <p className="text-xs text-slate-400">Intros Facilitated</p>
-          <p className="text-2xl font-bold font-mono text-slate-50">{approvedCount}</p>
+        <div className="surface-raised p-4">
+          <p className="stat-label">Intros Facilitated</p>
+          <p className={`stat-number ${statsAnimating ? 'animate-count-change' : ''}`}>{approvedCount}</p>
         </div>
-        <div className="rounded-lg bg-slate-900 p-4 border border-slate-700/50">
-          <p className="text-xs text-slate-400">Response Rate</p>
-          <p className="text-2xl font-bold font-mono text-slate-50">{responseRate}%</p>
+        <div className="surface-raised p-4">
+          <p className="stat-label">Response Rate</p>
+          <p className="stat-number">{responseRate}%</p>
         </div>
-        <div className="rounded-lg bg-slate-900 p-4 border border-slate-700/50">
-          <p className="text-xs text-slate-400">Credits</p>
-          <p className="text-2xl font-bold font-mono text-amber-400">{balance}</p>
+        <div className="surface-raised p-4">
+          <p className="stat-label">Credits</p>
+          <p className="stat-number text-amber-400">{balance}</p>
         </div>
       </div>
 
       {/* Incoming Requests (Pending) */}
-      <div className="rounded-xl bg-slate-900 border border-slate-700/50">
+      <div className="surface-raised">
         <div className="border-b border-slate-700/50 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-50">
+          <h2 className="section-title">
             Incoming Requests
             {pendingRequests.length > 0 && (
               <span className="ml-2 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">
@@ -184,14 +205,21 @@ export default function MarketplaceOverview() {
         </div>
 
         {pendingRequests.length === 0 && pastRequests.length === 0 ? (
-          <div className="p-8 text-center text-sm text-slate-400">
-            No intro requests yet. When candidates find your contacts on the marketplace, their requests will appear here.
-          </div>
+          <EmptyState
+            icon={
+              <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z" />
+              </svg>
+            }
+            title="Requests will appear here"
+            description="When job seekers find your contacts on the marketplace, you'll review their profile and decide whether to make an intro. You earn referral bonuses from your employer for successful hires."
+            stats={[{ value: '$2-10K', label: 'avg referral bonus' }]}
+          />
         ) : (
           <div className="divide-y divide-slate-700/50">
             {/* Pending first */}
             {pendingRequests.map((req) => (
-              <div key={req.id} className="px-5 py-4">
+              <div key={req.id} className={`px-5 py-4 transition-all duration-150 ${decliningId === req.id ? 'animate-fade-out-up' : ''}`}>
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -257,7 +285,7 @@ export default function MarketplaceOverview() {
 
             {/* Past requests */}
             {pastRequests.map((req) => (
-              <div key={req.id} className="px-5 py-4">
+              <div key={req.id} className="px-5 py-4 transition-all duration-150">
                 <div className="flex items-center gap-2">
                   <StatusBadge status={req.status} />
                   <span className="text-sm text-slate-300">
@@ -309,7 +337,7 @@ export default function MarketplaceOverview() {
       {listings.length > 0 ? (
         <div className="space-y-4">
           {/* Section header */}
-          <h2 className="text-base font-semibold text-slate-50">
+          <h2 className="section-title">
             Marketplace Visibility
             <span className="ml-2 text-sm font-normal text-slate-400">
               {listings.length} contact{listings.length !== 1 ? 's' : ''} shared
@@ -340,7 +368,7 @@ export default function MarketplaceOverview() {
               const contactId = l.contact_id || l.id;
               const isHidden = excludedIds.includes(contactId);
               return (
-                <div key={l.id} className={`rounded-lg bg-slate-900 border border-slate-700/50 p-4 relative${isHidden ? ' opacity-50' : ''}`}>
+                <div key={l.id} className={`surface-raised p-4 relative${isHidden ? ' opacity-50' : ''}`}>
                   {/* Eye toggle button */}
                   <button
                     type="button"
@@ -402,7 +430,7 @@ export default function MarketplaceOverview() {
           </p>
         </div>
       ) : (
-        <div className="rounded-xl bg-slate-900 p-12 text-center border border-slate-700/50">
+        <div className="surface-raised p-12 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800" aria-hidden="true">
             <svg className="h-7 w-7 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />

@@ -56,7 +56,7 @@ function getPriorityColor(priority) {
  * Enrichment prompt inline response component.
  * Renders quick-tap buttons for relationship type, would_refer, etc.
  */
-function EnrichmentActions({ item, onRespond }) {
+export function EnrichmentActions({ item, onRespond }) {
   const meta = item.metadata || {};
   const signalType = meta.signal_type || 'relationship_type';
   const contactName = meta.contact_name || 'this contact';

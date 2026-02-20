@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { contacts as contactsApi, companies as companiesApi } from '../api/client';
+import { contacts as contactsApi, companies as companiesApi, feed as feedApi } from '../api/client';
 import MatchBadge from '../components/MatchBadge';
 import { getNlpMatchTier } from '../utils/scores';
 import EnrichmentProgress from '../components/EnrichmentProgress';
+import { EnrichmentActions } from '../components/FeedCard';
+import KeevsAvatar from '../components/KeevsAvatar';
 import EmptyState from '../components/ui/EmptyState';
 import ContactsPageSkeleton from '../components/skeletons/ContactsPageSkeleton';
 import SlideOver from '../components/SlideOver';
@@ -218,6 +220,10 @@ export default function ContactsPage() {
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState(null);
   const [toast, setToast] = useState(null);
 
+  // Enrichment prompt feed items
+  const [enrichmentPrompts, setEnrichmentPrompts] = useState([]);
+  const [enrichmentRefreshKey, setEnrichmentRefreshKey] = useState(0);
+
   // Export state
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
@@ -280,6 +286,37 @@ export default function ContactsPage() {
       setCompanyNames((res.data || []).map((c) => c.name).filter(Boolean));
     }).catch(() => {});
   }, []);
+
+  // Load enrichment prompt feed items (once)
+  useEffect(() => {
+    feedApi.list({ item_type: 'enrichment_prompt', limit: 3 })
+      .then((r) => setEnrichmentPrompts(r.data?.items || r.data || []))
+      .catch(() => {});
+  }, []);
+
+  const handleEnrichmentResponse = async (item, signalType, signalValue) => {
+    try {
+      await feedApi.enrichmentResponse({
+        feed_item_id: item.id,
+        contact_id: item.metadata?.contact_id,
+        signal_type: signalType,
+        signal_value: signalValue,
+      });
+      setEnrichmentPrompts((prev) => prev.filter((p) => p.id !== item.id));
+      setEnrichmentRefreshKey((k) => k + 1);
+    } catch {
+      // Silently fail — prompt remains visible
+    }
+  };
+
+  const handleEnrichmentDismiss = async (item) => {
+    try {
+      await feedApi.dismiss(item.id);
+      setEnrichmentPrompts((prev) => prev.filter((p) => p.id !== item.id));
+    } catch {
+      // Silently fail
+    }
+  };
 
   const handleAddSuccess = () => {
     setShowAddModal(false);
@@ -401,7 +438,43 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      <EnrichmentProgress />
+      <EnrichmentProgress key={enrichmentRefreshKey} />
+
+      {/* Enrichment prompt feed items */}
+      {enrichmentPrompts.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+          {enrichmentPrompts.slice(0, 1).map((prompt) => (
+            <div key={prompt.id} className="flex items-start gap-3">
+              <div className="mt-0.5 shrink-0">
+                <KeevsAvatar size="sm" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-slate-200">{prompt.title}</p>
+                {prompt.body && (
+                  <p className="mt-0.5 text-xs text-slate-400">{prompt.body}</p>
+                )}
+                <EnrichmentActions
+                  item={prompt}
+                  onRespond={handleEnrichmentResponse}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleEnrichmentDismiss(prompt)}
+                className="shrink-0 text-xs text-slate-500 hover:text-slate-400 transition-colors"
+                aria-label="Dismiss enrichment prompt"
+              >
+                Dismiss
+              </button>
+            </div>
+          ))}
+          {enrichmentPrompts.length > 1 && (
+            <p className="mt-2 text-xs text-slate-500">
+              +{enrichmentPrompts.length - 1} more {enrichmentPrompts.length - 1 === 1 ? 'question' : 'questions'}
+            </p>
+          )}
+        </div>
+      )}
 
       {exportError && (
         <p role="alert" className="mb-4 rounded-md bg-red-500/10 p-2 text-sm text-red-400">{exportError}</p>

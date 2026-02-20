@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { referrals as referralsApi } from '../api/client';
+import EmptyState from '../components/ui/EmptyState';
 import Spinner from '../components/ui/Spinner';
 
 function CopyButton({ text }) {
@@ -76,11 +77,11 @@ export default function ReferralCodesPage() {
 
   return (
     <div className="mx-auto max-w-3xl" role="main">
-      <h1 className="mb-6 text-xl font-bold text-slate-50">Invite &amp; Earn</h1>
+      <h1 className="page-title mb-6">Invite &amp; Earn</h1>
 
       {/* My Referral Code */}
-      <section className="mb-6 rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="My referral code">
-        <h2 className="mb-1 text-base font-semibold text-slate-50">Your Referral Code</h2>
+      <section className="mb-6 surface-raised p-5" aria-label="My referral code">
+        <h2 className="section-title mb-1">Your Referral Code</h2>
         <p className="mb-4 text-sm text-slate-400">
           Share your code with friends. You earn 25 credits each time they complete a key action (upload contacts, search, or subscribe).
         </p>
@@ -115,13 +116,24 @@ export default function ReferralCodesPage() {
 
       {/* Leaderboard */}
       <section aria-label="Referral leaderboard">
-        <h2 className="mb-3 text-base font-semibold text-slate-50">Leaderboard</h2>
+        <h2 className="section-title mb-3">Leaderboard</h2>
         {leaderboard.length === 0 ? (
-          <div className="rounded-xl bg-slate-900 p-8 text-center border border-slate-700/50">
-            <p className="text-sm text-slate-400">No conversions yet. Be the first!</p>
-          </div>
+          <EmptyState
+            icon={
+              <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1 1 14.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+              </svg>
+            }
+            title="Earn credits by inviting friends"
+            description="Share your referral code. You earn 25 credits each time a friend uploads contacts, runs a search, or subscribes."
+            stats={[
+              { value: '25', label: 'credits per conversion' },
+              { value: '\u221E', label: 'invite limit' },
+            ]}
+            primaryAction={!myCode ? { label: 'Create My Referral Code', onClick: handleCreate } : undefined}
+          />
         ) : (
-          <div className="overflow-hidden rounded-xl bg-slate-900 border border-slate-700/50">
+          <div className="overflow-hidden surface-raised">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-700/50 bg-slate-800">

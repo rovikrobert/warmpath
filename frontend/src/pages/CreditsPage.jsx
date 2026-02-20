@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { credits as creditsApi, usage as usageApi } from '../api/client';
 import Spinner from '../components/ui/Spinner';
+import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
 
 const REASON_LABELS = {
   welcome_bonus: 'Welcome bonus',
@@ -89,29 +90,25 @@ export default function CreditsPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20" aria-live="polite" aria-busy="true">
-        <Spinner size="lg" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6" role="main">
-      <h1 className="text-xl font-bold text-slate-50">Credits</h1>
+      <h1 className="page-title">Credits</h1>
 
       {/* Balance card */}
-      <div className="rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 p-6 text-white shadow-sm">
-        <p className="text-sm font-medium text-amber-100">Available Balance</p>
-        <p className="mt-1 text-4xl font-bold font-mono">{balance?.balance ?? 0}</p>
+      <div className="surface-elevated p-6">
+        <p className="stat-label">Available Balance</p>
+        <p className="stat-number mt-1 text-4xl text-amber-400">{balance?.balance ?? 0}</p>
         <div className="mt-4 flex gap-6 text-sm">
           <div>
-            <p className="text-amber-200">Total Earned</p>
-            <p className="font-semibold font-mono">{balance?.earned_total ?? 0}</p>
+            <p className="text-slate-400">Total Earned</p>
+            <p className="font-semibold font-mono text-slate-50">{balance?.earned_total ?? 0}</p>
           </div>
           <div>
-            <p className="text-amber-200">Total Spent</p>
-            <p className="font-semibold font-mono">{balance?.spent_total ?? 0}</p>
+            <p className="text-slate-400">Total Spent</p>
+            <p className="font-semibold font-mono text-slate-50">{balance?.spent_total ?? 0}</p>
           </div>
         </div>
       </div>
@@ -127,9 +124,9 @@ export default function CreditsPage() {
 
       {/* Usage this month */}
       {usageData && (
-        <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
+        <div className="surface-raised p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-50">Usage This Month</h2>
+            <h2 className="section-title">Usage This Month</h2>
             <span className="rounded-full bg-slate-700/50 px-2.5 py-0.5 text-xs font-medium text-slate-400">
               {usageData.beta_sandbox ? 'Beta' : usageData.plan_tier === 'free' ? 'Free plan' : usageData.plan_tier}
             </span>
@@ -181,8 +178,8 @@ export default function CreditsPage() {
       )}
 
       {/* How to earn credits */}
-      <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
-        <h2 className="mb-3 text-base font-semibold text-slate-50">How to Earn Credits</h2>
+      <div className="surface-raised p-5">
+        <h2 className="section-title mb-3">How to Earn Credits</h2>
         <div className="space-y-3">
           {[
             { action: 'Upload your LinkedIn CSV', amount: '+100', desc: 'Import your connections to get started' },
@@ -202,8 +199,8 @@ export default function CreditsPage() {
       </div>
 
       {/* How credits are spent */}
-      <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
-        <h2 className="mb-3 text-base font-semibold text-slate-50">How Credits Are Spent</h2>
+      <div className="surface-raised p-5">
+        <h2 className="section-title mb-3">How Credits Are Spent</h2>
         <div className="space-y-3">
           {[
             { action: 'Marketplace search', amount: '-5', desc: 'Search other people\'s networks' },
@@ -222,10 +219,10 @@ export default function CreditsPage() {
 
       {/* Buy credits stub — hidden during beta */}
       {!(usageData?.beta_sandbox) && (
-        <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
+        <div className="surface-raised p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-semibold text-slate-50">Buy Credits</h2>
+              <h2 className="section-title">Buy Credits</h2>
               <p className="text-sm text-slate-400">$1 = 5 credits. Credits expire after 12 months.</p>
             </div>
             <button
@@ -240,9 +237,9 @@ export default function CreditsPage() {
       )}
 
       {/* Transaction history */}
-      <div className="rounded-xl bg-slate-900 border border-slate-700/50">
+      <div className="surface-raised">
         <div className="border-b border-slate-700/50 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-50">Transaction History</h2>
+          <h2 className="section-title">Transaction History</h2>
         </div>
         {history.length === 0 ? (
           <div className="p-8 text-center text-sm text-slate-400">
@@ -276,8 +273,8 @@ export default function CreditsPage() {
       </div>
 
       {/* Next action footer */}
-      <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
-        <h2 className="mb-3 text-base font-semibold text-slate-50">Put Your Credits to Work</h2>
+      <div className="surface-raised p-5">
+        <h2 className="section-title mb-3">Put Your Credits to Work</h2>
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link
             to="/referrals"

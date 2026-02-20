@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 import { useAuth } from './context/AuthContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import Spinner from './components/ui/Spinner';
 import AuthPage from './pages/AuthPage';
@@ -10,6 +11,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import FindReferrals from './pages/FindReferrals';
 import ReferralResults from './pages/ReferralResults';
 import MarketplaceOverview from './pages/MarketplaceOverview';
+import MarketplaceBrowse from './pages/MarketplaceBrowse';
 import MyRequests from './pages/MyRequests';
 import CreditsPage from './pages/CreditsPage';
 import SharingSettings from './pages/SharingSettings';
@@ -77,8 +79,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<RootRedirect />} />
       <Route path="/privacy" element={<PrivacyPage />} />
-      <Route path="/onboarding" element={<ProtectedRoute allowIncomplete><OnboardingPage /></ProtectedRoute>} />
-      <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+      <Route path="/onboarding" element={<ProtectedRoute allowIncomplete><ErrorBoundary><OnboardingPage /></ErrorBoundary></ProtectedRoute>} />
+      <Route element={<ProtectedRoute><ErrorBoundary><Layout /></ErrorBoundary></ProtectedRoute>}>
         <Route path="/coach" element={<CoachPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/search/new" element={<FindReferrals />} />
@@ -87,6 +89,7 @@ export default function App() {
         <Route path="/referrals/:id" element={<ReferralResults />} />
         <Route path="/applications" element={<ApplicationsPage />} />
         <Route path="/marketplace" element={<MarketplaceOverview />} />
+        <Route path="/marketplace/browse" element={<MarketplaceBrowse />} />
         <Route path="/marketplace/requests" element={<MyRequests />} />
         <Route path="/credits" element={<CreditsPage />} />
         <Route path="/invite" element={<ReferralCodesPage />} />
