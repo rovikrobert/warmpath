@@ -402,30 +402,20 @@ Only include jobs scoring >= 50. Return ONLY the JSON array."""
             is_remote = job.get("is_remote", False)
             role_relevance = job.get("role_relevance", 0)
 
-            # --- Location filter ---
+            # --- Location tagging (soft: tag, don't hard-filter) ---
+            in_target_region = False
             if loc_terms:
-                location_match = False
                 if not job_location:
-                    # Unknown location — don't filter out
-                    location_match = True
-                elif (
-                    any(term in job_location for term in loc_terms)
-                    or is_remote
-                    and open_to_remote
+                    in_target_region = False
+                elif any(term in job_location for term in loc_terms) or (
+                    is_remote and open_to_remote
                 ):
-                    location_match = True
-
-                if not location_match:
-                    continue
+                    in_target_region = True
 
             # --- Location bonus ---
             location_bonus = 0
-            if (
-                loc_terms
-                and job_location
-                and any(term in job_location for term in loc_terms)
-            ):
-                location_bonus = 10
+            if in_target_region:
+                location_bonus = 20
             elif is_remote and open_to_remote:
                 location_bonus = 5
 
@@ -442,7 +432,13 @@ Only include jobs scoring >= 50. Return ONLY the JSON array."""
                     seniority_bonus = -20
 
             fit_score = role_relevance + location_bonus + seniority_bonus
-            scored.append({**job, "fit_score": max(0, fit_score)})
+            scored.append(
+                {
+                    **job,
+                    "fit_score": max(0, fit_score),
+                    "in_target_region": in_target_region,
+                }
+            )
 
-        scored.sort(key=lambda x: x["fit_score"], reverse=True)
+        scored.sort(key=lambda x: (-x["in_target_region"], -x["fit_score"]))
         return scored

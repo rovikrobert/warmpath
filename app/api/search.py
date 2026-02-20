@@ -798,6 +798,7 @@ async def _fetch_and_filter_openings(
             "relevance": job.get("role_relevance", 0),
             "fit_score": job.get("fit_score", 0),
             "source": job.get("source", ""),
+            "in_target_region": job.get("in_target_region", True),
         }
         for job in filtered_jobs[:10]
     ]
