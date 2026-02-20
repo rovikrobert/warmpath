@@ -305,7 +305,7 @@ export default function OnboardingPage() {
   }, []);
 
   const pollUploadStatus = async (uploadId, onProgress) => {
-    const maxAttempts = 360; // up to ~6 minutes (matches backend soft_time_limit)
+    const maxAttempts = 540; // up to ~9 minutes (matches backend soft_time_limit)
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise((r) => setTimeout(r, 1000));
       try {

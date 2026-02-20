@@ -76,7 +76,7 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
   }, []);
 
   const pollUploadStatus = async (uploadId) => {
-    const maxAttempts = 120;
+    const maxAttempts = 540; // up to ~9 minutes (matches backend soft_time_limit)
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise((r) => setTimeout(r, 1000));
       try {
