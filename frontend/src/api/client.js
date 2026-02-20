@@ -120,21 +120,18 @@ export const contacts = {
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') qs.set(k, v);
     });
-    const tokenOrPromise = _getToken();
-    const token = tokenOrPromise instanceof Promise ? await tokenOrPromise : tokenOrPromise;
-    const headers = {};
-    if (token && token !== 'clerk-managed') {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    const res = await fetch(`${BASE_URL}/api/v1/contacts/export?${qs}`, { headers });
+    const res = await _rawFetch(`/api/v1/contacts/export?${qs}`);
     if (!res.ok) throw new Error('Export failed');
     const blob = await res.blob();
+    if (blob.size === 0) throw new Error('Export returned empty file');
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = res.headers.get('content-disposition')?.match(/filename="(.+)"/)?.[1] || 'contacts.csv';
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   },
 };
 
