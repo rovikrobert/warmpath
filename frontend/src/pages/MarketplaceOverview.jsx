@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import { marketplace as mpApi, credits as creditsApi } from '../api/client';
 import { trackEvent } from '../utils/analytics';
 import { MarketplaceBadge } from '../utils/marketplace';
-import ScoreExplainer from '../components/ScoreExplainer';
-import { WARM_TIERS } from '../utils/scores';
 
 function StatusBadge({ status }) {
   const labels = { requested: 'Pending', reviewing: 'Reviewing', approved: 'Approved', declined: 'Declined', completed: 'Completed' };
@@ -270,48 +268,77 @@ export default function MarketplaceOverview() {
         )}
       </div>
 
-      {/* My Listings */}
+      {/* Marketplace Visibility */}
       {listings.length > 0 ? (
-        <div className="overflow-hidden rounded-xl bg-slate-900 border border-slate-700/50">
-          <div className="border-b border-slate-700/50 px-5 py-4">
-            <h2 className="text-base font-semibold text-slate-50">My Listings ({listings.length})</h2>
-            <p className="text-xs text-slate-400">These contacts appear anonymized on the marketplace.</p>
+        <div className="space-y-4">
+          {/* Section header */}
+          <h2 className="text-base font-semibold text-slate-50">
+            Marketplace Visibility
+            <span className="ml-2 text-sm font-normal text-slate-400">
+              {listings.length} contact{listings.length !== 1 ? 's' : ''} shared
+            </span>
+          </h2>
+
+          {/* Privacy explainer */}
+          <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
+            <p className="text-sm text-blue-400">
+              Job seekers searching the marketplace see anonymized listings only — role level, department, and connection strength.
+              They never see names, titles, emails, or companies. When someone requests an intro, you review their profile and decide whether to connect them.
+            </p>
           </div>
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-700/50 bg-slate-800/50">
-              <tr>
-                <th className="px-5 py-3 font-medium text-slate-400">Contact</th>
-                <th className="px-5 py-3 font-medium text-slate-400">Title</th>
-                <th className="hidden px-5 py-3 font-medium text-slate-400 sm:table-cell">Company</th>
-                <th className="px-5 py-3 font-medium text-slate-400">
-                  Role Level
-                  <ScoreExplainer
-                    title="Role Level"
-                    body="Seniority of your contact at their company. Higher-level contacts can carry more weight in referrals, but peers and ICs are often more likely to actually refer you."
-                  />
-                </th>
-                <th className="px-5 py-3 font-medium text-slate-400">
-                  Connection Strength
-                  <ScoreExplainer
-                    title="Connection Strength"
-                    body="How warm your relationship is with this contact, based on recency, interaction history, and relationship type."
-                    tiers={WARM_TIERS}
-                  />
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {listings.map((l) => (
-                <tr key={l.id} className="hover:bg-slate-800/50">
-                  <td className="px-5 py-3 text-slate-50">{l.contact_name || '—'}</td>
-                  <td className="px-5 py-3 text-slate-400">{l.contact_title || '—'}</td>
-                  <td className="hidden px-5 py-3 text-slate-400 sm:table-cell">{l.contact_company || '—'}</td>
-                  <td className="px-5 py-3"><MarketplaceBadge value={l.role_level} type="role" /></td>
-                  <td className="px-5 py-3"><MarketplaceBadge value={l.warm_score_range} type="strength" /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+          {/* Active filter summary */}
+          {sharingPrefs?.category_filters?.include_departments?.length > 0 && (
+            <p className="text-sm text-slate-400">
+              Sharing {sharingPrefs.category_filters.include_departments.join(' and ')} contacts.{' '}
+              <Link to="/settings?tab=sharing" className="text-amber-400 hover:text-amber-300">
+                Change in Settings &rarr;
+              </Link>
+            </p>
+          )}
+
+          {/* Card grid */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {listings.map((l) => (
+              <div key={l.id} className="rounded-lg bg-slate-900 border border-slate-700/50 p-4 relative">
+                {/* Eye toggle button (placeholder — wired in Task 3) */}
+                <button
+                  type="button"
+                  className="absolute top-3 right-3 text-slate-500 hover:text-slate-300"
+                  aria-label="Toggle listing visibility"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                  </svg>
+                </button>
+
+                {/* Top zone — NH's private view */}
+                <div className="pr-8">
+                  <p className="font-bold text-slate-50">{l.contact_name || '—'}</p>
+                  <p className="text-sm text-slate-400">
+                    {l.contact_title || '—'}{l.contact_company ? ` at ${l.contact_company}` : ''}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">Only you see this</p>
+                </div>
+
+                {/* Dashed divider */}
+                <div className="border-t border-dashed border-slate-700 my-3" />
+
+                {/* Bottom zone — job seeker anonymized view */}
+                <div>
+                  <p className="mb-1.5 text-xs text-slate-500">Job seekers see</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <MarketplaceBadge value={l.role_level} type="role" />
+                    <span className="text-slate-600">&middot;</span>
+                    <MarketplaceBadge value={l.department_category} type="department" />
+                    <span className="text-slate-600">&middot;</span>
+                    <MarketplaceBadge value={l.warm_score_range} type="strength" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="rounded-xl bg-slate-900 p-12 text-center border border-slate-700/50">
