@@ -118,6 +118,9 @@ class Contact(Base):
     )
     how_you_know: Mapped[str | None] = mapped_column(EncryptedText())
     last_interaction_date: Mapped[date | None] = mapped_column(Date)
+    would_refer: Mapped[str | None] = mapped_column(
+        String(20)
+    )  # definitely/probably/maybe/no
 
     # Raw and enriched data
     raw_csv_row: Mapped[dict | None] = mapped_column(JSONB)
