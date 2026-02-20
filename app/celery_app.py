@@ -84,4 +84,8 @@ celery_app.conf.update(
         },
     },
 )
-celery_app.autodiscover_tasks(["app.tasks"])
+celery_app.conf.include = [
+    "app.tasks.csv_processing",
+    "app.tasks.email_tasks",
+    "app.tasks.feed_tasks",
+]
