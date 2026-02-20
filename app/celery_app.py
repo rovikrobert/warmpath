@@ -44,6 +44,11 @@ celery_app.conf.update(
             "task": "app.tasks.email_tasks.send_reengagement_d90",
             "schedule": crontab(hour=9, minute=45),
         },
+        # --- Cross-user freshness aggregation (before feed generation) ---
+        "freshness-aggregation-daily": {
+            "task": "app.tasks.feed_tasks.aggregate_freshness",
+            "schedule": crontab(hour=5, minute=0),  # 5 AM UTC — before 7 AM feed gen
+        },
         # --- Feed generation (engagement engine) ---
         "feed-generate-morning": {
             "task": "app.tasks.feed_tasks.generate_feed_all_users",
