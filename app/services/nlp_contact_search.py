@@ -385,15 +385,23 @@ _SENIORITY_RANK: dict[str, int] = {
 }
 
 
+def _word_boundary_match(keyword: str, text: str) -> bool:
+    """Check if keyword appears in text as a whole word (not as a substring).
+
+    Uses word-boundary regex to prevent e.g. 'cto' matching 'director'.
+    """
+    return bool(re.search(r"\b" + re.escape(keyword) + r"\b", text))
+
+
 def _score_title(parsed: ParsedQuery, title: str | None) -> float:
     """Score a contact's title against parsed query criteria (0-100)."""
     if not title:
         return 0.0
     title_lower = title.lower()
 
-    # Exact keyword match in title (case-insensitive)
+    # Exact keyword match in title (word-boundary, case-insensitive)
     for kw in parsed.titles:
-        if kw.lower() in title_lower:
+        if _word_boundary_match(kw.lower(), title_lower):
             return 100.0
 
     # Seniority-level match: check if contact title matches requested seniority
@@ -404,11 +412,11 @@ def _score_title(parsed: ParsedQuery, title: str | None) -> float:
                 return 50.0 + _SENIORITY_RANK.get(level, 0) * 6.0
 
     # Fuzzy / synonym match: check if any query title keyword appears as a
-    # substring of the contact title or vice versa
+    # whole word in the contact title (e.g. "engineer" in "engineering manager")
     for kw in parsed.titles:
-        # Partial overlap (e.g. "engineer" in "engineering manager")
-        if any(word.lower() in title_lower for word in kw.split() if len(word) > 2):
-            return 70.0
+        for word in kw.split():
+            if len(word) > 2 and _word_boundary_match(word.lower(), title_lower):
+                return 70.0
 
     return 0.0
 
@@ -531,8 +539,11 @@ def score_contact(
         criteria.append((0.40, _score_title(parsed, title)))
     if parsed.companies:
         criteria.append((0.30, _score_company(parsed, company_name, company_matched)))
+
+    loc_score: float | None = None
     if parsed.locations:
-        criteria.append((0.20, _score_location(parsed, location)))
+        loc_score = _score_location(parsed, location)
+        criteria.append((0.20, loc_score))
     if parsed.relationship_types:
         criteria.append((0.10, _score_relationship(parsed, relationship_type)))
 
@@ -540,7 +551,15 @@ def score_contact(
         return 0.0
 
     total_weight = sum(w for w, _ in criteria)
-    return sum((w / total_weight) * s for w, s in criteria)
+    weighted = sum((w / total_weight) * s for w, s in criteria)
+
+    # Hard penalty: when the user explicitly requests a location and the
+    # contact doesn't match at all, cap the score below the filter threshold
+    # so non-matching contacts are excluded rather than just slightly penalized.
+    if loc_score is not None and loc_score == 0.0:
+        weighted = min(weighted, 10.0)
+
+    return weighted
 
 
 # ---------------------------------------------------------------------------
