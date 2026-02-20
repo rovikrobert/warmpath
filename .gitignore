@@ -92,3 +92,6 @@ agents/chief_of_staff/reports/telegram/*.txt
 
 # One-off spec files
 finance_team_spec.json
+
+# Git worktrees
+.worktrees/
