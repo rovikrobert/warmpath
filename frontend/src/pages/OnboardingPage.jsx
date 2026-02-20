@@ -344,7 +344,13 @@ export default function OnboardingPage() {
       // If async processing, poll until contacts are actually imported
       if (result.status === 'queued' || result.status === 'processing') {
         const final = await pollUploadStatus(result.id);
-        if (final) result = final;
+        if (final) {
+          result = final;
+        } else {
+          // Poll timed out — don't let user proceed without imported contacts
+          setError('Import is taking longer than expected. Please wait a moment and try again.');
+          return;
+        }
       }
 
       setUploadResult(result);
