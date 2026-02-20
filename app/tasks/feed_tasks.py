@@ -62,6 +62,38 @@ def generate_feed_all_users():
 
 
 # ---------------------------------------------------------------------------
+# Recompute feed ranking weights — runs every 6 hours
+# ---------------------------------------------------------------------------
+
+
+@celery_app.task(name="app.tasks.feed_tasks.recompute_feed_weights")
+def recompute_feed_weights():
+    """Recompute engagement-based feed type weights and cache in Redis.
+
+    Analyzes the last 30 days of interaction data to determine which feed
+    item types are most engaging, then pre-caches the weights in Redis
+    for use by the feed list endpoint.
+
+    Schedule: Every 6 hours (0:00, 6:00, 12:00, 18:00 UTC)
+    """
+
+    async def _run():
+        from app.services.feed_ranker import compute_type_weights, set_cached_weights
+
+        async with _get_session_factory()() as db:
+            try:
+                weights = await compute_type_weights(db)
+                await set_cached_weights(weights)
+                logger.info("Feed weights recomputed: %s", weights)
+                return weights
+            except Exception:
+                logger.exception("Feed weight recomputation failed")
+                return {}
+
+    return _run_async(_run())
+
+
+# ---------------------------------------------------------------------------
 # Cleanup task — remove expired feed items weekly
 # ---------------------------------------------------------------------------
 

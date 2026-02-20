@@ -74,6 +74,11 @@ celery_app.conf.update(
             "task": "app.tasks.feed_tasks.send_smart_digest",
             "schedule": crontab(day_of_week=4, hour=8, minute=30),  # Thursday 8:30 AM
         },
+        # --- Feed ranking weight recomputation ---
+        "feed-recompute-weights": {
+            "task": "app.tasks.feed_tasks.recompute_feed_weights",
+            "schedule": crontab(hour="0,6,12,18", minute=30),  # Every 6 hours
+        },
     },
 )
 celery_app.autodiscover_tasks(["app.tasks"])
