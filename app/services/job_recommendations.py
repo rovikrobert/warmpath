@@ -8,6 +8,7 @@ matching_count * avg_relevance.
 import asyncio
 import contextlib
 import logging
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from app.utils.performance import timed
@@ -169,6 +170,7 @@ async def _match_and_build(
 
 @timed("job_recommendations")
 async def get_recommendations(
+    user_id: uuid.UUID,
     target_role: str,
     target_seniority: str | None,
     target_locations: list[str] | None,
@@ -196,31 +198,25 @@ async def get_recommendations(
     fetcher = JobFetcher()
     max_results = min(limit, settings.RECOMMENDATION_MAX_RESULTS * 3)
 
-    # Build candidate list, scoped to target locations
-    all_candidates = companies_for_locations(target_locations)
+    # Build candidate list, scoped to target locations.
+    # companies_for_locations already prioritizes matched-region companies first,
+    # so ATS-backed companies in the user's region are checked before others.
+    # We use the full prioritized list so that regions with few ATS-compatible
+    # companies (e.g. SEA with mostly career_page entries) still get results
+    # from globally-hiring companies as a fallback.
+    candidates = companies_for_locations(target_locations)
 
-    # When locations specified, only scan the prioritized (matched-region) companies.
-    # companies_for_locations returns matched first, then rest. We limit to the
-    # matched portion to avoid scanning irrelevant regions.
-    if target_locations:
-        from app.services.board_registry import _LOCATION_TO_REGIONS, REGIONS
+    # --- Network layer (primary): referral paths from WarmPath's own data ---
+    from app.services.network_recommendations import get_network_recommendations
 
-        matched_regions: set[str] = set()
-        for loc in target_locations:
-            loc_lower = loc.strip().lower()
-            for keyword, regions in _LOCATION_TO_REGIONS.items():
-                if keyword in loc_lower or loc_lower in keyword:
-                    matched_regions.update(regions)
-
-        if matched_regions:
-            region_keys: set[str] = set()
-            for region in matched_regions:
-                region_keys.update(REGIONS.get(region, []))
-            candidates = [c for c in all_candidates if c in region_keys]
-        else:
-            candidates = all_candidates
-    else:
-        candidates = all_candidates
+    network_recs = await get_network_recommendations(
+        user_id=user_id,
+        target_locations=target_locations,
+        exclude_companies=exclude_companies,
+        limit=limit * 2,
+        db=db,
+    )
+    network_by_company: dict[str, dict] = {r["company_name"]: r for r in network_recs}
 
     # Apply exclusions
     exclude_set = set()
@@ -292,16 +288,59 @@ async def get_recommendations(
 
         await db.flush()
 
-    # Sort by score descending, then limit
-    recommendations.sort(key=lambda r: r["score"], reverse=True)
-    recommendations = recommendations[:max_results]
+    # --- Merge network signals into ATS results + add network-only entries ---
+    merged: list[dict] = []
+
+    # Enrich ATS results with network data
+    for rec in recommendations:
+        net = network_by_company.pop(rec["company"], None)
+        rec["network_density"] = net["network_density"] if net else 0
+        rec["network_label"] = net["network_label"] if net else ""
+        rec["careers_url"] = rec.get("careers_url") or (
+            net["careers_url"] if net else None
+        )
+        merged.append(rec)
+
+    # Add network-only companies (no ATS data)
+    for _key, net in network_by_company.items():
+        merged.append(
+            {
+                "company": net["company_name"],
+                "display_name": net["display_name"],
+                "region": None,
+                "matching_openings": [],
+                "matching_count": 0,
+                "total_openings": 0,
+                "top_titles": [],
+                "score": 0,
+                "source": "network_signal",
+                "network_density": net["network_density"],
+                "network_label": net["network_label"],
+                "careers_url": net["careers_url"],
+            }
+        )
+
+    # Re-score with network-first weighting:
+    # network_density * 0.4 + job_relevance * 0.3 + ats_quality * 0.2 + recency * 0.1
+    max_density = max((r["network_density"] for r in merged), default=1) or 1
+    for rec in merged:
+        nd = rec["network_density"] / max_density  # normalize 0-1
+        jr = min(rec.get("score", 0) / 100, 1.0)  # normalize 0-1
+        aq = 1.0 if rec["source"] == "ats_board" else 0.0
+        rec["score"] = round(nd * 0.4 + jr * 0.3 + aq * 0.2, 3)
+
+    merged.sort(key=lambda r: r["score"], reverse=True)
+    merged = merged[:max_results]
+
+    network_count = sum(1 for r in merged if r.get("network_density", 0) > 0)
 
     return {
-        "recommendations": recommendations,
+        "recommendations": merged,
         "scan_stats": {
             "companies_scanned": cache_hits + fresh_scanned,
             "cache_hits": cache_hits,
             "fresh_scans": fresh_scanned,
+            "network_matches": network_count,
         },
     }
 
