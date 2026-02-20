@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { auth as authApi, contacts as contactsApi, preferences, marketplace } from '../api/client';
+import { auth as authApi, contacts as contactsApi, preferences, marketplace, referrals as referralsApi } from '../api/client';
 import TagInput from '../components/TagInput';
 import KeevsAvatar from '../components/KeevsAvatar';
 import { trackEvent } from '../utils/analytics';
@@ -122,6 +122,10 @@ export default function OnboardingPage() {
     target_locations: [],
     open_to_remote: true,
   });
+
+  // Step 1: Referral code (captured early, redeemed on completion)
+  const [referralCode, setReferralCode] = useState('');
+  const [referralExpanded, setReferralExpanded] = useState(false);
 
   // Step 2: Intent
   const [intent, setIntent] = useState('');
@@ -463,6 +467,33 @@ export default function OnboardingPage() {
                 />
                 Open to remote roles
               </label>
+
+              <div>
+                {!referralExpanded ? (
+                  <button
+                    type="button"
+                    onClick={() => setReferralExpanded(true)}
+                    className="text-sm text-slate-400 hover:text-amber-400 transition"
+                  >
+                    Have a referral code?
+                  </button>
+                ) : (
+                  <div className="space-y-1">
+                    <label htmlFor="onboard-referral-code" className="mb-1 block text-sm font-medium text-slate-300">Referral Code</label>
+                    <input
+                      id="onboard-referral-code"
+                      type="text"
+                      value={referralCode}
+                      onChange={(e) => setReferralCode(e.target.value.trim())}
+                      className={inputClass}
+                      placeholder="e.g. WARM-ABC123"
+                      maxLength={32}
+                      autoFocus
+                    />
+                    <p className="text-xs text-slate-500">Optional — enter a code from a friend to earn bonus credits.</p>
+                  </div>
+                )}
+              </div>
 
               {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
 
@@ -931,6 +962,14 @@ export default function OnboardingPage() {
                         });
                       }
                       await authApi.upsertProfile(profilePayload);
+                      // Redeem referral code if provided (non-blocking — don't prevent onboarding)
+                      if (referralCode) {
+                        try {
+                          await referralsApi.redeem({ code: referralCode });
+                        } catch {
+                          // Invalid/expired/already-redeemed — silently continue
+                        }
+                      }
                       await authApi.completeOnboarding();
                       await refreshUser();
                       navigate('/coach');
