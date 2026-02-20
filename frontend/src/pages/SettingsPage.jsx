@@ -223,7 +223,7 @@ function ProfileTab() {
               {importLoading === 'resume' ? 'Parsing...' : 'Import from Resume (PDF)'}
             </button>
           </div>
-          <button type="button" onClick={handleLinkedInImport} disabled={importLoading === 'linkedin'} className="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: '#0A66C2' }}>
+          <button type="button" onClick={handleLinkedInImport} disabled={importLoading === 'linkedin'} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
             {importLoading === 'linkedin' ? 'Redirecting...' : 'Import from LinkedIn'}
           </button>
         </div>
@@ -1128,10 +1128,10 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-4xl" role="main">
       <h1 className="mb-6 text-xl font-bold text-slate-50">Settings</h1>
 
-      <div className="flex gap-8">
+      <div className="flex flex-col gap-6 sm:flex-row sm:gap-8">
         {/* Side tab nav */}
-        <nav className="w-44 shrink-0" aria-label="Settings tabs">
-          <ul className="space-y-1" role="tablist">
+        <nav className="w-full sm:w-44 sm:shrink-0" aria-label="Settings tabs">
+          <ul className="flex gap-1 overflow-x-auto sm:flex-col sm:space-y-1 sm:gap-0" role="tablist">
             {visibleTabs.map((tab) => (
               <li key={tab.key}>
                 <button
@@ -1139,7 +1139,7 @@ export default function SettingsPage() {
                   aria-selected={activeTab === tab.key}
                   aria-controls={`settings-panel-${tab.key}`}
                   onClick={() => switchTab(tab.key)}
-                  className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
+                  className={`whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm font-medium transition sm:w-full ${
                     activeTab === tab.key
                       ? 'bg-amber-500/10 text-amber-400'
                       : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'

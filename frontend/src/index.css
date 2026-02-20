@@ -3,6 +3,14 @@
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Brand colors */
+  --color-brand: var(--color-amber-500);
+  --color-brand-hover: var(--color-amber-400);
+  --color-surface: var(--color-slate-900);
+  --color-surface-elevated: var(--color-slate-800);
+  --color-border: rgba(51, 65, 85, 0.5);
+
   --animate-in: slide-in 0.25s ease-out;
 }
 

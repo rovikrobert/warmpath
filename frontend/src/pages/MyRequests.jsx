@@ -50,7 +50,7 @@ export default function MyRequests() {
 
   return (
     <div role="main">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-bold text-slate-50">Marketplace Requests</h1>
         <Link to="/referrals" className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-400">
           Find Referrals
@@ -59,7 +59,7 @@ export default function MyRequests() {
 
       {/* Filter tabs */}
       {requests.length > 0 && (
-        <div className="mb-4 flex gap-2" role="group" aria-label="Filter requests by status">
+        <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filter requests by status">
           {[
             { key: 'all', label: 'All' },
             { key: 'requested', label: 'Pending' },

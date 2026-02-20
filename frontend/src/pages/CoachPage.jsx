@@ -206,7 +206,7 @@ export default function CoachPage() {
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+              className={`max-w-[95%] rounded-2xl px-4 py-3 text-sm leading-relaxed sm:max-w-[85%] ${
                 msg.role === 'user'
                   ? 'bg-amber-500 text-white'
                   : 'bg-slate-800 text-slate-200'

@@ -357,7 +357,7 @@ export default function ReferralResults() {
 
   return (
     <div className="mx-auto max-w-3xl" role="main">
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-50">Referral Results</h1>
           {searchedNames.length > 0 && (

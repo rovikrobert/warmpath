@@ -337,7 +337,7 @@ export default function PrivacyPage() {
         </Paragraph>
 
         {/* Tabs */}
-        <div className="flex gap-1 rounded-lg bg-slate-800 p-1" role="tablist" aria-label="Privacy rights by jurisdiction">
+        <div className="flex gap-1 overflow-x-auto rounded-lg bg-slate-800 p-1" role="tablist" aria-label="Privacy rights by jurisdiction">
           {[
             { key: 'gdpr', label: 'GDPR (EU/EEA)' },
             { key: 'ccpa', label: 'CCPA (California)' },
@@ -350,7 +350,7 @@ export default function PrivacyPage() {
               aria-controls={`tabpanel-${tab.key}`}
               id={`tab-${tab.key}`}
               onClick={() => setRightsTab(tab.key)}
-              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
+              className={`flex-1 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition ${
                 rightsTab === tab.key
                   ? 'bg-slate-900 text-amber-400 shadow-sm'
                   : 'text-slate-400 hover:text-slate-300'

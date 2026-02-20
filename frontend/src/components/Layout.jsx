@@ -214,11 +214,11 @@ export default function Layout() {
       {/* Mobile slide-out menu */}
       {mobileNav && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileNav(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileNav(false)} aria-hidden="true" />
           <div className="absolute right-0 top-0 bottom-0 w-64 bg-slate-900 border-l border-slate-700/50 animate-in">
             <div className="flex items-center justify-between border-b border-slate-700/50 px-4 py-4">
               <span className="text-sm font-medium text-slate-300">{user?.full_name}</span>
-              <button onClick={() => setMobileNav(false)} className="text-slate-500 hover:text-slate-300">
+              <button onClick={() => setMobileNav(false)} aria-label="Close menu" className="text-slate-500 hover:text-slate-300">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -296,7 +296,7 @@ export default function Layout() {
                   </Link>
                 )}
               </p>
-              <button onClick={() => setUsageWarning(null)} className="ml-4 text-amber-400 hover:text-amber-300">
+              <button onClick={() => setUsageWarning(null)} aria-label="Dismiss warning" className="ml-4 text-amber-400 hover:text-amber-300">
                 &times;
               </button>
             </div>

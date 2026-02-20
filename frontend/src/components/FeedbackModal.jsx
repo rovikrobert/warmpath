@@ -85,7 +85,8 @@ export default function FeedbackModal({ feature, resourceId, onClose }) {
               />
               <button
                 onClick={handleSubmit}
-                disabled={sending}
+                disabled={sending || rating === null}
+                aria-label="Submit feedback"
                 className="w-full rounded-lg bg-amber-500 py-2 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50"
               >
                 {sending ? 'Sending...' : 'Submit'}

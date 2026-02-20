@@ -67,6 +67,13 @@ export default function ScoreGlossary() {
             Formula: Match Strength = (Relevance &times; 0.5) + (Warm Score &times; 0.5)
           </p>
         </div>
+
+        {/* Navigation */}
+        <div className="flex flex-wrap items-center gap-3 pt-2 text-sm">
+          <Link to="/referrals" className="text-amber-400 hover:text-amber-300">Find referral paths &rarr;</Link>
+          <span className="text-slate-600">&middot;</span>
+          <Link to="/coach" className="text-slate-400 hover:text-slate-300">Back to Coach</Link>
+        </div>
       </div>
     </div>
   );

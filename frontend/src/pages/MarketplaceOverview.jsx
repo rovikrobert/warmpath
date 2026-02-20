@@ -119,6 +119,15 @@ export default function MarketplaceOverview() {
         </Link>
       </div>
 
+      {/* Quick navigation */}
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <Link to="/marketplace/requests" className="rounded-lg border border-slate-700/50 px-3 py-1.5 text-slate-400 hover:bg-slate-800">
+          My Requests {pendingRequests.length > 0 && <span className="ml-1 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-400">{pendingRequests.length}</span>}
+        </Link>
+        <Link to="/contacts" className="text-slate-400 hover:text-slate-300">Manage Contacts</Link>
+        <Link to="/credits" className="text-slate-400 hover:text-slate-300">View Credits</Link>
+      </div>
+
       {/* Referral bonus callout */}
       {approvedCount === 0 && (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
@@ -183,7 +192,7 @@ export default function MarketplaceOverview() {
             {/* Pending first */}
             {pendingRequests.map((req) => (
               <div key={req.id} className="px-5 py-4">
-                <div className="flex items-start gap-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <StatusBadge status={req.status} />
