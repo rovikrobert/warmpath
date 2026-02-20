@@ -9,11 +9,11 @@ def _passthrough_filter(jobs, role, **kwargs):
     return [{**j, "fit_score": j.get("role_relevance", 50)} for j in jobs]
 
 
-import pytest_asyncio
-from httpx import AsyncClient
+import pytest_asyncio  # noqa: E402
+from httpx import AsyncClient  # noqa: E402
 
-from app.models.contact import Contact
-from tests.conftest import TestSessionLocal, create_test_user_in_db
+from app.models.contact import Contact  # noqa: E402
+from tests.conftest import TestSessionLocal, create_test_user_in_db  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

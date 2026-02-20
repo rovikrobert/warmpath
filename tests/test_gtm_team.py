@@ -549,7 +549,7 @@ class TestGTMLearningState:
 
     def test_detect_recurring_pattern(self):
         ls = self._make_ls()
-        for i in range(6):
+        for _i in range(6):
             ls.record_finding(
                 {
                     "id": "STRAT-001",
@@ -620,7 +620,7 @@ class TestGTMIntelligence:
     def test_categories_exist(self):
         from gtm_team.shared.intelligence import GTMIntelligence
 
-        gi = GTMIntelligence.__new__(GTMIntelligence)
+        GTMIntelligence.__new__(GTMIntelligence)
         # Access CATEGORIES class attribute
         cats = (
             GTMIntelligence.CATEGORIES if hasattr(GTMIntelligence, "CATEGORIES") else {}

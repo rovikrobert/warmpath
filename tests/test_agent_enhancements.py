@@ -275,9 +275,11 @@ class TestArchitectDeadCode:
         findings: list[Finding] = []
         py_files = [tmp_path / "module.py"]
 
-        with patch("agents.architect.architect.PROJECT_ROOT", tmp_path):
-            with patch("agents.architect.architect._py_files", return_value=[]):
-                count = _scan_dead_code(py_files, findings)
+        with (
+            patch("agents.architect.architect.PROJECT_ROOT", tmp_path),
+            patch("agents.architect.architect._py_files", return_value=[]),
+        ):
+            _scan_dead_code(py_files, findings)
 
         dead = [f for f in findings if f.category == "dead_code"]
         dead_names = [f.title for f in dead]
@@ -294,9 +296,11 @@ class TestArchitectDeadCode:
         )
 
         findings: list[Finding] = []
-        with patch("agents.architect.architect.PROJECT_ROOT", tmp_path):
-            with patch("agents.architect.architect._py_files", return_value=[]):
-                _scan_dead_code([tmp_path / "module.py"], findings)
+        with (
+            patch("agents.architect.architect.PROJECT_ROOT", tmp_path),
+            patch("agents.architect.architect._py_files", return_value=[]),
+        ):
+            _scan_dead_code([tmp_path / "module.py"], findings)
 
         dead = [f for f in findings if f.category == "dead_code"]
         assert not any("_private_helper" in f.title for f in dead)
@@ -384,12 +388,14 @@ class TestPerfMonitorProductionHealth:
     def test_graceful_when_api_client_unavailable(self):
         from agents.perf_monitor.perf_monitor import _scan_production_health
 
-        with patch.dict("sys.modules", {"agents.shared.api_client": None}):
-            with patch(
+        with (
+            patch.dict("sys.modules", {"agents.shared.api_client": None}),
+            patch(
                 "agents.perf_monitor.perf_monitor._scan_production_health",
                 wraps=_scan_production_health,
-            ):
-                findings, metrics = _scan_production_health()
+            ),
+        ):
+            findings, metrics = _scan_production_health()
 
         # Should not crash — either returns data or skips gracefully
         assert isinstance(findings, list)

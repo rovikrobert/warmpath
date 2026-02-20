@@ -1018,7 +1018,7 @@ class TestCosLearning:
         )
 
         record_resolution("C001", "compromise", "Done", escalated=False)
-        state1 = get_learning_summary()
+        get_learning_summary()
 
         # Load again — should persist
         state2 = get_learning_summary()
@@ -1562,7 +1562,7 @@ class TestRequestRouting:
             route_and_track_request,
         )
 
-        tracked = route_and_track_request(
+        route_and_track_request(
             {
                 "source_agent": "architect",
                 "request": "Old request",
@@ -1650,7 +1650,7 @@ class TestBudgetEnforcer:
             },
         }
         actions = enforce_budget(costs)
-        throttled = [a for a in actions if a.action == "throttle"]
+        [a for a in actions if a.action == "throttle"]
         # engineering cap is $1.50, total $0.80 of agents = within
         # but data, product, etc. are $0 so no throttle for them
         # This depends on exact caps — check total
