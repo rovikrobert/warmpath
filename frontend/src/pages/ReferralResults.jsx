@@ -439,17 +439,37 @@ export default function ReferralResults() {
       {alsoHiring.length > 0 && (
         <div className="mt-6">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
-            Also hiring for your role
+            Companies where you can get referred
           </h2>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {alsoHiring.map((rec) => (
               <button
                 key={rec.company}
                 onClick={() => navigate('/referrals')}
-                className="inline-flex items-center gap-1.5 rounded-full border border-slate-700/50 bg-slate-900 px-3 py-1.5 text-sm text-slate-300 hover:border-amber-500/30 hover:bg-amber-500/10"
+                className="group flex flex-col gap-1 rounded-lg border border-slate-700/50 bg-slate-900 p-3 text-left hover:border-amber-500/30 hover:bg-amber-500/5 transition-colors"
+                aria-label={`Search referrals at ${rec.display_name}`}
               >
-                {rec.display_name}
-                <span className="text-xs text-slate-500">{rec.matching_count} openings</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-slate-200">
+                    {rec.display_name}
+                  </span>
+                  {rec.referral_ready && (
+                    <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-400">
+                      Referral Ready
+                    </span>
+                  )}
+                </div>
+                {rec.network_label && (
+                  <span className="text-xs text-slate-400">{rec.network_label}</span>
+                )}
+                {rec.matching_count > 0 && (
+                  <span className="text-xs text-slate-500">
+                    {rec.matching_count} matching opening{rec.matching_count !== 1 ? 's' : ''}
+                  </span>
+                )}
+                <span className="mt-1 text-xs text-amber-500/70 group-hover:text-amber-400">
+                  {rec.matching_count > 0 ? 'View openings →' : rec.careers_url ? 'View careers →' : 'Search →'}
+                </span>
               </button>
             ))}
           </div>
