@@ -256,3 +256,202 @@ def test_parse_query_real_falls_back_to_mock_on_error():
     # Should fall back to mock parser, which still extracts "Google"
     assert "Google" in result.companies
     assert result.raw_query == "engineers at Google"
+
+
+# ---------------------------------------------------------------------------
+# Integration tests — POST /contacts/nlp-search endpoint
+# ---------------------------------------------------------------------------
+
+import uuid  # noqa: E402
+
+import pytest  # noqa: E402
+import pytest_asyncio  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+
+from app.main import app as _app  # noqa: E402
+from app.models.company import Company  # noqa: E402
+from app.models.contact import Contact  # noqa: E402
+from tests.conftest import (  # noqa: E402
+    TestSessionLocal,
+    create_test_user_in_db,
+)
+
+NLP_SEARCH_URL = "/api/v1/contacts/nlp-search"
+
+
+@pytest_asyncio.fixture
+async def nlp_client() -> AsyncClient:  # type: ignore[misc]
+    transport = ASGITransport(app=_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture
+async def nlp_auth_headers():
+    """Create a test user and return auth headers."""
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email="nlp-test@example.com", full_name="NLP Test User"
+        )
+    return headers
+
+
+@pytest_asyncio.fixture
+async def nlp_user_id(nlp_client: AsyncClient, nlp_auth_headers: dict) -> uuid.UUID:
+    """Get user ID from /auth/me."""
+    resp = await nlp_client.get("/api/v1/auth/me", headers=nlp_auth_headers)
+    assert resp.status_code == 200
+    return uuid.UUID(resp.json()["data"]["id"])
+
+
+@pytest_asyncio.fixture
+async def nlp_contacts(nlp_user_id: uuid.UUID):
+    """Seed 4 contacts with company_id set, plus Company rows."""
+    async with TestSessionLocal() as db:
+        # Create companies
+        google = Company(id=uuid.uuid4(), name="Google")
+        meta = Company(id=uuid.uuid4(), name="Meta")
+        stripe = Company(id=uuid.uuid4(), name="Stripe")
+        db.add_all([google, meta, stripe])
+        await db.flush()
+
+        # Create contacts
+        alice = Contact(
+            user_id=nlp_user_id,
+            first_name="Alice",
+            last_name="Chen",
+            full_name="Alice Chen",
+            current_title="CTO",
+            current_company="Google",
+            company_id=google.id,
+            location="Singapore",
+            relationship_type="former_colleague",
+            source="manual",
+        )
+        bob = Contact(
+            user_id=nlp_user_id,
+            first_name="Bob",
+            last_name="Smith",
+            full_name="Bob Smith",
+            current_title="Senior Software Engineer",
+            current_company="Meta",
+            company_id=meta.id,
+            location="San Francisco",
+            source="manual",
+        )
+        carol = Contact(
+            user_id=nlp_user_id,
+            first_name="Carol",
+            last_name="Jones",
+            full_name="Carol Jones",
+            current_title="Product Manager",
+            current_company="Stripe",
+            company_id=stripe.id,
+            location="New York",
+            relationship_type="alumni",
+            source="manual",
+        )
+        dave = Contact(
+            user_id=nlp_user_id,
+            first_name="Dave",
+            last_name="Wilson",
+            full_name="Dave Wilson",
+            current_title="VP of Engineering",
+            current_company="Google",
+            company_id=google.id,
+            location="Singapore",
+            source="manual",
+        )
+        db.add_all([alice, bob, carol, dave])
+        await db.commit()
+
+    return [alice, bob, carol, dave]
+
+
+@pytest.mark.asyncio
+async def test_nlp_search_returns_ranked_results(
+    nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list
+):
+    """'CTOs at Google' finds Alice (CTO at Google) ranked first."""
+    resp = await nlp_client.post(
+        NLP_SEARCH_URL, json={"query": "CTOs at Google"}, headers=nlp_auth_headers
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["data"]) >= 1
+    # Alice should be the top result (CTO at Google)
+    top = body["data"][0]
+    assert "Alice" in top["full_name"]
+    assert body["meta"]["total_matched"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_nlp_search_big_tech_query(
+    nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list
+):
+    """'engineers at big tech' finds Bob (Senior SWE at Meta)."""
+    resp = await nlp_client.post(
+        NLP_SEARCH_URL,
+        json={"query": "engineers at big tech"},
+        headers=nlp_auth_headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    names = [d["full_name"] for d in body["data"]]
+    assert any("Bob" in n for n in names)
+
+
+@pytest.mark.asyncio
+async def test_nlp_search_empty_query_returns_all(
+    nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list
+):
+    """Empty query returns all 4 contacts without scoring."""
+    resp = await nlp_client.post(
+        NLP_SEARCH_URL, json={"query": ""}, headers=nlp_auth_headers
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["data"]) == 4
+    assert body["meta"]["total_scanned"] == 4
+    assert body["meta"]["total_matched"] == 4
+
+
+@pytest.mark.asyncio
+async def test_nlp_search_requires_auth(nlp_client: AsyncClient):
+    """No auth header returns 401."""
+    resp = await nlp_client.post(NLP_SEARCH_URL, json={"query": "engineers"})
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_nlp_search_location_filter(
+    nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list
+):
+    """'people in Singapore' finds Alice + Dave (both in Singapore)."""
+    resp = await nlp_client.post(
+        NLP_SEARCH_URL,
+        json={"query": "people in Singapore"},
+        headers=nlp_auth_headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    names = [d["full_name"] for d in body["data"]]
+    assert any("Alice" in n for n in names)
+    assert any("Dave" in n for n in names)
+    assert body["meta"]["interpretation"]["locations"] == ["Singapore"]
+
+
+@pytest.mark.asyncio
+async def test_nlp_search_response_includes_match_score(
+    nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list
+):
+    """Response items have an nlp_match_score field."""
+    resp = await nlp_client.post(
+        NLP_SEARCH_URL, json={"query": "CTOs at Google"}, headers=nlp_auth_headers
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["data"]) >= 1
+    for item in body["data"]:
+        assert "nlp_match_score" in item
+        assert isinstance(item["nlp_match_score"], (int, float))

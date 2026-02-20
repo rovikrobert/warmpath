@@ -21,6 +21,8 @@ from app.schemas.contact import (
     CsvUploadResponse,
     ManualContactBulkCreate,
     ManualContactCreate,
+    NlpInterpretation,
+    NlpSearchRequest,
     PaginationMeta,
 )
 from app.services.company_normalizer import link_contact_to_company
@@ -193,6 +195,128 @@ async def compute_scores(
     return {
         "data": {"scores_computed": len(scores)},
         "meta": {},
+    }
+
+
+@router.post("/nlp-search")
+@timed("nlp_search_endpoint")
+async def nlp_search(
+    body: NlpSearchRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Search contacts using natural language queries."""
+    from app.models.company import Company
+    from app.services.nlp_contact_search import parse_query, score_contact
+    from app.utils.tracking import track_action
+
+    query_text = body.query.strip()
+    parsed = parse_query(query_text)
+
+    # Resolve company names to company_id UUIDs (case-insensitive)
+    resolved_company_ids: list[uuid.UUID] = []
+    if parsed.companies:
+        for company_name in parsed.companies:
+            result = await db.execute(
+                select(Company.id).where(
+                    func.lower(Company.name) == company_name.lower()
+                )
+            )
+            cid = result.scalar_one_or_none()
+            if cid is not None:
+                resolved_company_ids.append(cid)
+
+    # Build base query: user's non-deleted contacts LEFT JOIN WarmScore
+    base_query = (
+        select(Contact, WarmScore.total_score)
+        .outerjoin(
+            WarmScore,
+            (WarmScore.contact_id == Contact.id)
+            & (WarmScore.user_id == Contact.user_id),
+        )
+        .where(
+            Contact.user_id == current_user.id,
+            Contact.deleted_at.is_(None),
+        )
+    )
+
+    # SQL pre-filters
+    if parsed.relationship_types:
+        base_query = base_query.where(
+            Contact.relationship_type.in_(parsed.relationship_types)
+        )
+    if resolved_company_ids:
+        base_query = base_query.where(Contact.company_id.in_(resolved_company_ids))
+
+    result = await db.execute(base_query)
+    all_rows = result.all()
+    total_scanned = len(all_rows)
+
+    if not query_text:
+        # Empty query — return all contacts sorted by warm_score desc
+        all_rows.sort(key=lambda r: (r[1] is not None, r[1] or 0), reverse=True)
+        data = []
+        for contact, score_val in all_rows:
+            resp = ContactResponse.model_validate(contact).model_dump(mode="json")
+            resp["warm_score"] = float(score_val) if score_val is not None else None
+            resp["nlp_match_score"] = None
+            data.append(resp)
+    else:
+        # Score each contact and filter out < 20
+        scored: list[tuple[Contact, float | None, float]] = []
+        resolved_ids_set = set(resolved_company_ids)
+        for contact, score_val in all_rows:
+            company_matched = (
+                contact.company_id is not None
+                and contact.company_id in resolved_ids_set
+            )
+            nlp_score = score_contact(
+                parsed,
+                contact.current_company,
+                contact.current_title,
+                contact.location,
+                contact.relationship_type,
+                company_matched,
+            )
+            if nlp_score >= 20:
+                scored.append((contact, score_val, nlp_score))
+
+        scored.sort(key=lambda r: r[2], reverse=True)
+        data = []
+        for contact, score_val, nlp_score in scored:
+            resp = ContactResponse.model_validate(contact).model_dump(mode="json")
+            resp["warm_score"] = float(score_val) if score_val is not None else None
+            resp["nlp_match_score"] = round(nlp_score, 2)
+            data.append(resp)
+
+    interpretation = NlpInterpretation(
+        titles=parsed.titles,
+        companies=parsed.companies,
+        seniority=parsed.seniority,
+        locations=parsed.locations,
+        relationship_types=parsed.relationship_types,
+        raw_query=parsed.raw_query,
+    )
+
+    await track_action(
+        db,
+        current_user.id,
+        "nlp_search",
+        metadata_={
+            "query": query_text,
+            "total_scanned": total_scanned,
+            "total_matched": len(data),
+        },
+    )
+    await db.commit()
+
+    return {
+        "data": data,
+        "meta": {
+            "interpretation": interpretation.model_dump(),
+            "total_scanned": total_scanned,
+            "total_matched": len(data),
+        },
     }
 
 
