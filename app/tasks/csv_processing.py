@@ -11,10 +11,9 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.celery_app import celery_app
-from app.config import settings
 from app.models.contact import Contact, CsvUpload
 from app.models.privacy import SuppressionList
 from app.models.user import ConnectorProfile
@@ -28,12 +27,23 @@ from app.utils.hashing import hash_for_suppression
 from app.utils.performance import timed
 
 
+async def _publish_progress(factory, upload_id: uuid.UUID, **fields) -> None:
+    """Commit progress fields in a separate transaction so polling sees them."""
+    async with factory() as s:
+        result = await s.execute(select(CsvUpload).where(CsvUpload.id == upload_id))
+        upload = result.scalar_one()
+        for k, v in fields.items():
+            setattr(upload, k, v)
+        await s.commit()
+
+
 @timed("csv_process")
 async def process_csv_upload_core(
     csv_upload_id: str,
     user_id: str,
     file_content_b64: str,
     db: AsyncSession,
+    progress_callback=None,
 ) -> None:
     """Core CSV processing logic — reusable from Celery task or inline mode.
 
@@ -42,6 +52,8 @@ async def process_csv_upload_core(
         user_id: UUID string of the owning user.
         file_content_b64: Base64-encoded raw CSV bytes.
         db: An async SQLAlchemy session (caller manages commit/rollback).
+        progress_callback: Optional async callable(upload_id, **fields) to
+            publish progress milestones in a separate transaction.
     """
     upload_uuid = uuid.UUID(csv_upload_id)
     user_uuid = uuid.UUID(user_id)
@@ -53,11 +65,29 @@ async def process_csv_upload_core(
 
     csv_upload.status = "processing"
     csv_upload.started_at = datetime.now(timezone.utc)
+    csv_upload.progress_phase = "parsing"
     await db.flush()
+
+    # Publish processing status so polling sees it immediately
+    if progress_callback:
+        await progress_callback(
+            upload_uuid,
+            status="processing",
+            progress_phase="parsing",
+            started_at=csv_upload.started_at,
+        )
 
     try:
         parsed = parse_linkedin_csv(raw_bytes)
         csv_upload.row_count = len(parsed)
+
+        # Publish row_count + cleaning phase
+        if progress_callback:
+            await progress_callback(
+                upload_uuid,
+                row_count=len(parsed),
+                progress_phase="cleaning",
+            )
 
         # AI-powered data cleanup (mock or real based on AI_MOCK_MODE)
         parsed = await clean_contacts(parsed)
@@ -73,6 +103,11 @@ async def process_csv_upload_core(
             if profile and hasattr(profile, "work_history")
             else None
         )
+
+        # Publish importing phase
+        csv_upload.progress_phase = "importing"
+        if progress_callback:
+            await progress_callback(upload_uuid, progress_phase="importing")
 
         created = 0
         duplicates = 0
@@ -195,12 +230,24 @@ async def process_csv_upload_core(
                     existing_by_fp[fingerprint] = contact
                 created += 1
 
+            # Publish incremental progress every 50 contacts
+            processed_so_far = created + duplicates + suppressed_count
+            if progress_callback and processed_so_far % 50 == 0:
+                await progress_callback(upload_uuid, processed_count=processed_so_far)
+
         csv_upload.contacts_created = created
         csv_upload.duplicates_skipped = duplicates
         csv_upload.processed_count = created + duplicates
         csv_upload.error_count = 0
-        csv_upload.status = "completed"
-        csv_upload.completed_at = datetime.now(timezone.utc)
+        csv_upload.progress_phase = "scoring"
+
+        # Publish scoring phase
+        if progress_callback:
+            await progress_callback(
+                upload_uuid,
+                processed_count=created + duplicates,
+                progress_phase="scoring",
+            )
 
         # Auto-compute warm scores after upload
         await batch_compute_scores(user_uuid, db)
@@ -230,6 +277,10 @@ async def process_csv_upload_core(
                 user_uuid, 10, "data_freshness", db, reference_id=upload_uuid
             )
 
+        csv_upload.status = "completed"
+        csv_upload.completed_at = datetime.now(timezone.utc)
+        csv_upload.progress_phase = None
+
         # Clear raw CSV data after processing — matches privacy policy:
         # "CSV files deleted after processing"
         clear_result = await db.execute(
@@ -244,17 +295,18 @@ async def process_csv_upload_core(
         csv_upload.status = "failed"
         csv_upload.error_message = str(exc)
         csv_upload.completed_at = datetime.now(timezone.utc)
+        csv_upload.progress_phase = None
         await db.flush()
         raise
 
 
-@celery_app.task(bind=True)
+@celery_app.task(bind=True, soft_time_limit=600, time_limit=660)
 def process_csv_upload(
     self, csv_upload_id: str, user_id: str, file_content_b64: str
 ) -> None:
     """Celery task: process a CSV upload in the background.
 
-    Creates its own async engine + session, then delegates to the core function.
+    Uses shared DB engine from database.py, delegates to the core function.
     """
     import logging
 
@@ -265,21 +317,48 @@ def process_csv_upload(
 
 
 async def _celery_run(task, csv_upload_id, user_id, file_content_b64):
-    """Async wrapper for the Celery task — owns its own DB connection."""
-    url = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
-    engine = create_async_engine(url, echo=False)
-    session_factory = async_sessionmaker(
-        engine, class_=AsyncSession, expi[RESEND_KEY_REDACTED]=False
-    )
+    """Async wrapper for the Celery task — uses shared DB engine."""
+    import logging
 
-    async with session_factory() as session:
+    from app.database import _get_session_factory
+
+    logger = logging.getLogger(__name__)
+    factory = _get_session_factory()
+
+    async def publish(upload_id, **fields):
+        await _publish_progress(factory, upload_id, **fields)
+
+    async with factory() as session:
         try:
             await process_csv_upload_core(
-                csv_upload_id, user_id, file_content_b64, session
+                csv_upload_id,
+                user_id,
+                file_content_b64,
+                session,
+                progress_callback=publish,
             )
             await session.commit()
-        except Exception:
+        except Exception as exc:
             await session.rollback()
+            # Write error status in a separate transaction so it survives
+            # the rollback above (the flush in process_csv_upload_core is
+            # lost when we rollback the main transaction).
+            try:
+                async with factory() as err_session:
+                    result = await err_session.execute(
+                        select(CsvUpload).where(
+                            CsvUpload.id == uuid.UUID(csv_upload_id)
+                        )
+                    )
+                    upload = result.scalar_one_or_none()
+                    if upload and upload.status != "completed":
+                        upload.status = "failed"
+                        upload.error_message = str(exc)[:500]
+                        upload.completed_at = datetime.now(timezone.utc)
+                        await err_session.commit()
+            except Exception:
+                logger.exception(
+                    "Failed to persist error status for upload %s",
+                    csv_upload_id,
+                )
             raise
-        finally:
-            await engine.dispose()

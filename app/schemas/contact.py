@@ -33,6 +33,7 @@ class CsvUploadResponse(BaseModel):
     contacts_created: int | None = None
     duplicates_skipped: int | None = None
     completed_at: datetime | None = None
+    progress_phase: str | None = None
     error_message: str | None = None
     created_at: datetime
 
