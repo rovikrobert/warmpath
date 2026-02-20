@@ -10,14 +10,15 @@ import base64
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.celery_app import celery_app
+from app.models.company import Company
 from app.models.contact import Contact, CsvUpload
 from app.models.privacy import SuppressionList
 from app.models.user import ConnectorProfile
-from app.services.company_normalizer import link_contact_to_company
+from app.services.company_normalizer import normalize_company_name
 from app.services.credits import earn_credits
 from app.services.ai_csv_cleaner import clean_contacts
 from app.services.csv_parser import classify_relationship, parse_linkedin_csv
@@ -25,6 +26,51 @@ from app.services.warm_scorer import batch_compute_scores
 from app.utils.encryption import compute_blind_index
 from app.utils.hashing import hash_for_suppression
 from app.utils.performance import timed
+
+IMPORT_BATCH_SIZE = 500
+
+
+def _link_companies_from_cache(
+    contacts: list[Contact],
+    company_cache: dict[str, uuid.UUID | Company],
+    db: AsyncSession,
+) -> None:
+    """Link contacts to companies using in-memory cache. Create new companies in batch.
+
+    Cache values are either uuid.UUID (for pre-existing companies) or Company ORM
+    objects (for companies created in this batch, not yet flushed).  After flush,
+    call _promote_company_cache to replace ORM objects with their real UUIDs.
+    """
+    for contact in contacts:
+        if not contact.current_company:
+            continue
+        normalized = normalize_company_name(contact.current_company)
+        if not normalized:
+            continue
+        cache_key = normalized.lower()
+        cached = company_cache.get(cache_key)
+        if cached is not None:
+            if isinstance(cached, uuid.UUID):
+                contact.company_id = cached
+            else:
+                # ORM object created in this batch — use relationship
+                contact.company = cached
+        else:
+            # Create new company — will get an id after the caller flushes
+            company = Company(name=normalized)
+            db.add(company)
+            contact.company = company
+            # Store ORM object so subsequent contacts in same batch reuse it
+            company_cache[cache_key] = company
+
+
+def _promote_company_cache(
+    company_cache: dict[str, uuid.UUID | Company],
+) -> None:
+    """Replace Company ORM objects in cache with their real UUIDs after flush."""
+    for key, val in company_cache.items():
+        if isinstance(val, Company):
+            company_cache[key] = val.id
 
 
 async def _publish_progress(factory, upload_id: uuid.UUID, **fields) -> None:
@@ -136,6 +182,15 @@ async def process_csv_upload_core(
         suppressed_email_hashes = {r[0] for r in supp_rows if r[0]}
         suppressed_name_co_hashes = {r[1] for r in supp_rows if r[1]}
 
+        # Pre-load company cache (1 query instead of per-contact lookups)
+        co_result = await db.execute(select(Company))
+        company_cache: dict[str, uuid.UUID | None] = {
+            co.name.lower(): co.id for co in co_result.scalars()
+        }
+
+        pending_new: list[Contact] = []
+        pending_link: list[Contact] = []
+
         for row in parsed:
             # Check suppression list via set membership (O(1) per row)
             email = row.get("email")
@@ -198,7 +253,7 @@ async def process_csv_upload_core(
                     existing.email_blind_index = email_bi
                 if name_co_bi:
                     existing.name_company_blind_index = name_co_bi
-                await link_contact_to_company(existing, db)
+                pending_link.append(existing)
                 duplicates += 1
             else:
                 contact = Contact(
@@ -223,17 +278,34 @@ async def process_csv_upload_core(
                     name_company_blind_index=name_co_bi,
                 )
                 db.add(contact)
-                await db.flush()
-                await link_contact_to_company(contact, db)
+                pending_new.append(contact)
+                pending_link.append(contact)
                 # Track in map so duplicate rows within same CSV are caught
                 if fingerprint:
                     existing_by_fp[fingerprint] = contact
                 created += 1
 
-            # Publish incremental progress every 50 contacts
-            processed_so_far = created + duplicates + suppressed_count
-            if progress_callback and processed_so_far % 50 == 0:
-                await progress_callback(upload_uuid, processed_count=processed_so_far)
+            # Batch flush every IMPORT_BATCH_SIZE new contacts
+            if len(pending_new) >= IMPORT_BATCH_SIZE:
+                await db.flush()  # batch INSERT new contacts
+                _link_companies_from_cache(pending_link, company_cache, db)
+                await db.flush()  # persist new companies + company_id FKs
+                _promote_company_cache(company_cache)
+                pending_new.clear()
+                pending_link.clear()
+                if progress_callback:
+                    await progress_callback(
+                        upload_uuid,
+                        processed_count=created + duplicates + suppressed_count,
+                    )
+
+        # Final batch flush
+        if pending_new or pending_link:
+            await db.flush()
+            _link_companies_from_cache(pending_link, company_cache, db)
+            await db.flush()
+            pending_new.clear()
+            pending_link.clear()
 
         csv_upload.contacts_created = created
         csv_upload.duplicates_skipped = duplicates
@@ -282,12 +354,12 @@ async def process_csv_upload_core(
         csv_upload.progress_phase = None
 
         # Clear raw CSV data after processing — matches privacy policy:
-        # "CSV files deleted after processing"
-        clear_result = await db.execute(
-            select(Contact).where(Contact.csv_upload_id == csv_upload.id)
+        # "CSV files deleted after processing" (single SQL UPDATE, not per-row ORM)
+        await db.execute(
+            update(Contact)
+            .where(Contact.csv_upload_id == csv_upload.id)
+            .values(raw_csv_row=None)
         )
-        for c in clear_result.scalars():
-            c.raw_csv_row = None
 
         await db.flush()
 
@@ -302,8 +374,8 @@ async def process_csv_upload_core(
 
 @celery_app.task(
     bind=True,
-    soft_time_limit=600,
-    time_limit=660,
+    soft_time_limit=900,
+    time_limit=960,
     acks_late=True,
     reject_on_worker_lost=True,
 )

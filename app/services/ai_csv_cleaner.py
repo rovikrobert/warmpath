@@ -50,9 +50,76 @@ Return ONLY the JSON array. No markdown fences, no explanation."""
 # Well-known company normalization
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Title abbreviation expansion (applied word-boundary in mock cleaner)
+# ---------------------------------------------------------------------------
+
+_TITLE_ABBREVS: dict[str, str] = {
+    # Role abbreviations (informal → standard)
+    "swe": "Software Engineer",
+    "sde": "Software Development Engineer",
+    "pm": "Product Manager",
+    "tpm": "Technical Program Manager",
+    "sr": "Senior",
+    "jr": "Junior",
+    "mgr": "Manager",
+    "dir": "Director",
+    "eng": "Engineer",
+    "engr": "Engineer",
+    "dev": "Developer",
+    "qa": "QA Engineer",
+    "ops": "Operations",
+    "hr": "Human Resources",
+    "bd": "Business Development",
+    "acct": "Account",
+    "assoc": "Associate",
+    "asst": "Assistant",
+    "admin": "Administrator",
+    "coord": "Coordinator",
+    "mgmt": "Management",
+    "mktg": "Marketing",
+    "biz": "Business",
+    "tech": "Technical",
+    "exec": "Executive",
+    "rep": "Representative",
+    "spec": "Specialist",
+    "anal": "Analyst",
+    "arch": "Architect",
+    "consult": "Consultant",
+    "dba": "Database Administrator",
+    "devops": "DevOps Engineer",
+    "sre": "Site Reliability Engineer",
+    "ml": "Machine Learning",
+    "ds": "Data Scientist",
+    "da": "Data Analyst",
+    "de": "Data Engineer",
+    "fe": "Frontend",
+    "be": "Backend",
+    "fs": "Full Stack",
+    "gm": "General Manager",
+    "ea": "Executive Assistant",
+    "pa": "Personal Assistant",
+    "infra": "Infrastructure",
+    # NOTE: VP, SVP, EVP, CEO, CTO, CFO, COO, CMO, CPO, CIO, CISO, MD, AI,
+    # IT, UX, UI are NOT expanded — they are standard professional abbreviations
+    # universally understood in the industry.
+}
+
+# Pre-compile title abbreviation patterns for performance
+_TITLE_ABBREV_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"\b" + re.escape(abbr) + r"\b", re.IGNORECASE), expansion)
+    for abbr, expansion in sorted(_TITLE_ABBREVS.items(), key=lambda x: -len(x[0]))
+]
+
+# LinkedIn-specific noise patterns
+_OPEN_TO_WORK_RE = re.compile(r"\(open to work\)", re.IGNORECASE)
+_TITLE_NOISE_RE = re.compile(r"[^\w\s,.\-/&()+]")  # strip emojis from titles
+_NAME_NOISE_RE = re.compile(r"[^\w\s\-'.@]")  # strip emojis from names
+
 # Maps lowercase canonical form -> display name.
 # Input is matched after lowercasing and stripping common suffixes.
 _COMPANY_CANONICAL: dict[str, str] = {
+    # Big Tech / FAANG+
     "google": "Google",
     "meta": "Meta",
     "facebook": "Meta",
@@ -60,56 +127,132 @@ _COMPANY_CANONICAL: dict[str, str] = {
     "amazon": "Amazon",
     "microsoft": "Microsoft",
     "netflix": "Netflix",
+    # Dev Tools / Cloud
     "stripe": "Stripe",
     "shopify": "Shopify",
     "salesforce": "Salesforce",
+    "github": "GitHub",
+    "gitlab": "GitLab",
+    "atlassian": "Atlassian",
+    "cloudflare": "Cloudflare",
+    "datadog": "Datadog",
+    "mongodb": "MongoDB",
+    "elastic": "Elastic",
+    "twilio": "Twilio",
+    "vercel": "Vercel",
+    "supabase": "Supabase",
+    "retool": "Retool",
+    "hashicorp": "HashiCorp",
+    # Ride-hailing / Delivery
     "uber": "Uber",
     "lyft": "Lyft",
     "airbnb": "Airbnb",
+    "doordash": "DoorDash",
+    "instacart": "Instacart",
+    # Social / Media
     "twitter": "Twitter",
     "x": "X",
     "snap": "Snap",
     "snapchat": "Snap",
     "linkedin": "LinkedIn",
+    "tiktok": "TikTok",
+    "bytedance": "ByteDance",
+    "pinterest": "Pinterest",
+    "reddit": "Reddit",
+    "spotify": "Spotify",
+    # Enterprise / Legacy Tech
     "oracle": "Oracle",
     "ibm": "IBM",
     "intel": "Intel",
     "nvidia": "NVIDIA",
     "tesla": "Tesla",
-    "spotify": "Spotify",
-    "tiktok": "TikTok",
-    "bytedance": "ByteDance",
-    "palantir": "Palantir",
-    "databricks": "Databricks",
-    "snowflake": "Snowflake",
-    "coinbase": "Coinbase",
-    "robinhood": "Robinhood",
-    "figma": "Figma",
-    "notion": "Notion",
-    "slack": "Slack",
-    "zoom": "Zoom",
-    "dropbox": "Dropbox",
-    "twilio": "Twilio",
-    "datadog": "Datadog",
-    "cloudflare": "Cloudflare",
-    "mongodb": "MongoDB",
-    "elastic": "Elastic",
-    "github": "GitHub",
-    "gitlab": "GitLab",
-    "atlassian": "Atlassian",
     "adobe": "Adobe",
     "vmware": "VMware",
     "dell": "Dell",
     "cisco": "Cisco",
     "samsung": "Samsung",
     "sony": "Sony",
+    "sap": "SAP",
+    "workday": "Workday",
+    "servicenow": "ServiceNow",
+    "splunk": "Splunk",
+    "palo alto networks": "Palo Alto Networks",
+    "crowdstrike": "CrowdStrike",
+    "hp": "HP",
+    "hpe": "HPE",
+    "hewlett packard": "HP",
+    # Data / AI
+    "palantir": "Palantir",
+    "databricks": "Databricks",
+    "snowflake": "Snowflake",
+    "openai": "OpenAI",
+    "anthropic": "Anthropic",
+    # Fintech / Crypto
+    "coinbase": "Coinbase",
+    "robinhood": "Robinhood",
+    "wise": "Wise",
+    "transferwise": "Wise",
+    "revolut": "Revolut",
+    "plaid": "Plaid",
+    "square": "Square",
+    "block": "Block",
+    "adyen": "Adyen",
+    "klarna": "Klarna",
+    "ripple": "Ripple",
+    # Productivity / SaaS
+    "figma": "Figma",
+    "notion": "Notion",
+    "slack": "Slack",
+    "zoom": "Zoom",
+    "dropbox": "Dropbox",
+    "linear": "Linear",
+    "loom": "Loom",
+    "airtable": "Airtable",
+    "miro": "Miro",
+    "asana": "Asana",
+    "monday": "Monday.com",
+    "canva": "Canva",
+    # Consulting
+    "mckinsey": "McKinsey",
+    "mckinsey & company": "McKinsey",
+    "bcg": "BCG",
+    "boston consulting group": "BCG",
+    "bain": "Bain & Company",
+    "bain & company": "Bain & Company",
+    "deloitte": "Deloitte",
+    "pwc": "PwC",
+    "pricewaterhousecoopers": "PwC",
+    "ey": "EY",
+    "ernst & young": "EY",
+    "ernst and young": "EY",
+    "kpmg": "KPMG",
+    "accenture": "Accenture",
+    # SEA
     "grab": "Grab",
     "sea": "Sea",
     "gojek": "Gojek",
     "lazada": "Lazada",
+    "shopee": "Shopee",
+    "tokopedia": "Tokopedia",
+    "bukalapak": "Bukalapak",
+    "traveloka": "Traveloka",
+    "razer": "Razer",
+    "propertyguru": "PropertyGuru",
+    "carousell": "Carousell",
+    # SEA Banks
     "dbs": "DBS",
     "ocbc": "OCBC",
     "uob": "UOB",
+    # Finance / Banking
+    "jpmorgan": "JPMorgan",
+    "jp morgan": "JPMorgan",
+    "goldman sachs": "Goldman Sachs",
+    "morgan stanley": "Morgan Stanley",
+    "citibank": "Citibank",
+    "citi": "Citibank",
+    "barclays": "Barclays",
+    "hsbc": "HSBC",
+    "standard chartered": "Standard Chartered",
 }
 
 # Maps email domain -> canonical company name (for inferring company from email).
@@ -169,13 +312,65 @@ _EMAIL_DOMAIN_TO_COMPANY: dict[str, str] = {
     "dbs.com": "DBS",
     "ocbc.com": "OCBC",
     "uob.com": "UOB",
+    # Consulting
+    "mckinsey.com": "McKinsey",
+    "bcg.com": "BCG",
+    "bain.com": "Bain & Company",
+    "deloitte.com": "Deloitte",
+    "pwc.com": "PwC",
+    "ey.com": "EY",
+    "kpmg.com": "KPMG",
+    "accenture.com": "Accenture",
+    # Fintech
+    "wise.com": "Wise",
+    "revolut.com": "Revolut",
+    "plaid.com": "Plaid",
+    "squareup.com": "Square",
+    "adyen.com": "Adyen",
+    "klarna.com": "Klarna",
+    # SEA
+    "shopee.com": "Shopee",
+    "traveloka.com": "Traveloka",
+    "razer.com": "Razer",
+    "propertyguru.com": "PropertyGuru",
+    "carousell.com": "Carousell",
+    # Enterprise
+    "sap.com": "SAP",
+    "workday.com": "Workday",
+    "servicenow.com": "ServiceNow",
+    "splunk.com": "Splunk",
+    "paloaltonetworks.com": "Palo Alto Networks",
+    "crowdstrike.com": "CrowdStrike",
+    # Productivity
+    "vercel.com": "Vercel",
+    "linear.app": "Linear",
+    "loom.com": "Loom",
+    "airtable.com": "Airtable",
+    "miro.com": "Miro",
+    "asana.com": "Asana",
+    "canva.com": "Canva",
+    "openai.com": "OpenAI",
+    "anthropic.com": "Anthropic",
+    "hashicorp.com": "HashiCorp",
+    "supabase.io": "Supabase",
+    "retool.com": "Retool",
+    "doordash.com": "DoorDash",
+    "instacart.com": "Instacart",
+    "pinterest.com": "Pinterest",
+    "reddit.com": "Reddit",
 }
 
 # Regex to strip common corporate suffixes for lookup matching.
 _SUFFIX_PATTERN = re.compile(
     r",?\s*\b(inc\.?|llc\.?|ltd\.?|corp\.?|corporation|incorporated|"
     r"limited|co\.?|plc\.?|pte\.?\s*ltd\.?|gmbh|ag|s\.?a\.?|"
-    r"n\.?v\.?|b\.?v\.?|pty\.?\s*ltd\.?)\s*$",
+    r"n\.?v\.?|b\.?v\.?|pty\.?\s*ltd\.?|"
+    # Asian
+    r"sdn\.?\s*bhd\.?|berhad|kk|pt\.?|"
+    # European
+    r"ab|a/s|oy|as|"
+    # Additional
+    r"se|sarl|srl)\s*$",
     re.IGNORECASE,
 )
 
@@ -240,19 +435,58 @@ def _infer_company_from_email(email: str | None) -> str | None:
     return _EMAIL_DOMAIN_TO_COMPANY.get(domain)
 
 
+def _normalize_name_case(name: str | None) -> str | None:
+    """Fix name casing: all-caps or all-lower → title case. Strip noise."""
+    if not name:
+        return None
+    # Strip emojis and special chars from names
+    name = _NAME_NOISE_RE.sub("", name).strip()
+    if not name:
+        return None
+    # All-caps or all-lower → title case
+    if name.isupper() or name.islower():
+        return name.title()
+    return name
+
+
+def _expand_title_abbreviations(title: str) -> str:
+    """Expand common job title abbreviations using word-boundary matching."""
+    for pattern, expansion in _TITLE_ABBREV_PATTERNS:
+        title = pattern.sub(expansion, title)
+    return title
+
+
+def _clean_title(title: str | None) -> str | None:
+    """Clean a job title: remove noise, expand abbreviations."""
+    if not title:
+        return None
+    title = title.strip()
+    if not title:
+        return None
+    # Remove "(Open to Work)" and similar LinkedIn noise
+    title = _OPEN_TO_WORK_RE.sub("", title).strip()
+    # Strip emojis and special characters
+    title = _TITLE_NOISE_RE.sub("", title).strip()
+    if not title:
+        return None
+    # Expand abbreviations (sr → Senior, swe → Software Engineer, etc.)
+    title = _expand_title_abbreviations(title)
+    return title
+
+
 def _clean_contact(contact: dict) -> dict:
     """Clean a single contact dict. Returns a new dict (no mutation)."""
     cleaned = dict(contact)
 
     # --- Names ---
-    first_name = _strip_and_title(cleaned.get("first_name"))
-    last_name = _strip_and_title(cleaned.get("last_name"))
+    first_name = _normalize_name_case(_strip(cleaned.get("first_name")))
+    last_name = _normalize_name_case(_strip(cleaned.get("last_name")))
 
     # Split combined name in first_name when last_name is empty
     if first_name and not last_name and " " in first_name:
         parts = first_name.split(None, 1)
-        first_name = parts[0]
-        last_name = parts[1] if len(parts) > 1 else None
+        first_name = _normalize_name_case(parts[0])
+        last_name = _normalize_name_case(parts[1]) if len(parts) > 1 else None
 
     cleaned["first_name"] = first_name
     cleaned["last_name"] = last_name
@@ -274,7 +508,7 @@ def _clean_contact(contact: dict) -> dict:
     cleaned["current_company"] = company
 
     # --- Title ---
-    cleaned["current_title"] = _strip(cleaned.get("current_title"))
+    cleaned["current_title"] = _clean_title(cleaned.get("current_title"))
 
     # --- Regenerate fingerprint ---
     cleaned["fingerprint"] = generate_fingerprint(

@@ -193,7 +193,7 @@ async def get_upload_status(
         from datetime import datetime, timezone
 
         age = (datetime.now(timezone.utc) - csv_upload.started_at).total_seconds()
-        if age > 600:  # 10 minutes
+        if age > 900:  # 15 minutes (matches Celery soft_time_limit)
             csv_upload.status = "failed"
             csv_upload.error_message = "Processing timed out — please re-upload"
             csv_upload.completed_at = datetime.now(timezone.utc)

@@ -518,8 +518,9 @@ async def batch_compute_scores(
         )
         existing_ws_map = {ws.contact_id: ws for ws in ws_result.scalars()}
 
+    SCORE_BATCH = 2000
     scores: list[WarmScore] = []
-    for contact in contacts:
+    for i, contact in enumerate(contacts):
         ref_result = compute_referral_score(contact, profile, target_role=target_role)
 
         existing = existing_ws_map.get(contact.id)
@@ -552,5 +553,10 @@ async def batch_compute_scores(
             db.add(ws)
             scores.append(ws)
 
+        # Flush in chunks to reduce peak memory and avoid giant single flushes
+        if (i + 1) % SCORE_BATCH == 0:
+            await db.flush()
+
+    # Final flush for remaining scores
     await db.flush()
     return scores
