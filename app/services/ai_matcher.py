@@ -528,7 +528,9 @@ async def _call_claude_api(
     Retries once on rate limit (429) with exponential backoff.
     Falls back to mock scoring on persistent API failures.
     """
-    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    from app.utils.anthropic_client import get_async_client
+
+    client = get_async_client()
     user_prompt = _build_user_prompt(search, contacts, profile, user_name)
 
     max_retries = 2
@@ -541,10 +543,26 @@ async def _call_claude_api(
                 messages=[{"role": "user", "content": user_prompt}],
             )
             break
-        except anthropic.RateLimitError:
+        except anthropic.RateLimitError as exc:
+            hdrs = getattr(getattr(exc, "response", None), "headers", {})
+            logger.warning(
+                "Claude rate limit hit (attempt %d/%d): "
+                "requests=%s/%s, tokens=%s/%s, retry-after=%s",
+                attempt + 1,
+                max_retries,
+                hdrs.get("x-ratelimit-remaining-requests", "?"),
+                hdrs.get("x-ratelimit-limit-requests", "?"),
+                hdrs.get("x-ratelimit-remaining-tokens", "?"),
+                hdrs.get("x-ratelimit-limit-tokens", "?"),
+                hdrs.get("retry-after", "?"),
+            )
             if attempt < max_retries - 1:
-                wait = 2 ** (attempt + 1)
-                logger.warning("Claude rate limit hit, retrying in %ds...", wait)
+                wait_str = hdrs.get("retry-after")
+                wait = (
+                    int(wait_str)
+                    if wait_str and wait_str.isdigit()
+                    else 2 ** (attempt + 1)
+                )
                 await asyncio.sleep(wait)
             else:
                 logger.error(
@@ -800,51 +818,54 @@ async def score_contacts(
     if settings.AI_MOCK_MODE:
         return _mock_score_contacts(search, contacts, profile)
 
-    semaphore = asyncio.Semaphore(MAX_CONCURRENT_BATCHES)
+    from app.utils.rate_limiter import acquire_slot, release_slot
+
     batches = [
         contacts[i : i + BATCH_SIZE] for i in range(0, len(contacts), BATCH_SIZE)
     ]
     num_batches = len(batches)
     logger.info(
-        "Scoring %d contacts in %d batches (concurrency: %d)",
+        "Scoring %d contacts in %d batches (global rate limiter)",
         len(contacts),
         num_batches,
-        MAX_CONCURRENT_BATCHES,
     )
 
     async def _process_batch(
         batch_num: int, batch: list[Contact]
     ) -> tuple[list[ContactMatch], int, int]:
-        async with semaphore:
-            try:
-                batch_results, usage = await _call_claude_api(
-                    search, batch, profile, user_name
-                )
-                logger.info(
-                    "Batch %d/%d: scored %d contacts, %d matches "
-                    "(tokens: %d in / %d out)",
-                    batch_num,
-                    num_batches,
-                    len(batch),
-                    len(batch_results),
-                    usage.input_tokens,
-                    usage.output_tokens,
-                )
-                return batch_results, usage.input_tokens, usage.output_tokens
-            except anthropic.APIError as exc:
-                logger.error(
-                    "Claude API error on batch %d (%d contacts): %s — skipping",
-                    batch_num,
-                    len(batch),
-                    exc,
-                )
-            except (json.JSONDecodeError, KeyError, ValueError) as exc:
-                logger.error(
-                    "Failed to parse Claude response for batch %d: %s — skipping",
-                    batch_num,
-                    exc,
-                )
-            return [], 0, 0
+        used_redis = await acquire_slot(
+            "anthropic", max_concurrent=settings.ANTHROPIC_MAX_CONCURRENT
+        )
+        try:
+            batch_results, usage = await _call_claude_api(
+                search, batch, profile, user_name
+            )
+            logger.info(
+                "Batch %d/%d: scored %d contacts, %d matches (tokens: %d in / %d out)",
+                batch_num,
+                num_batches,
+                len(batch),
+                len(batch_results),
+                usage.input_tokens,
+                usage.output_tokens,
+            )
+            return batch_results, usage.input_tokens, usage.output_tokens
+        except anthropic.APIError as exc:
+            logger.error(
+                "Claude API error on batch %d (%d contacts): %s — skipping",
+                batch_num,
+                len(batch),
+                exc,
+            )
+        except (json.JSONDecodeError, KeyError, ValueError) as exc:
+            logger.error(
+                "Failed to parse Claude response for batch %d: %s — skipping",
+                batch_num,
+                exc,
+            )
+        finally:
+            await release_slot("anthropic", used_redis)
+        return [], 0, 0
 
     results = await asyncio.gather(
         *(_process_batch(i + 1, batch) for i, batch in enumerate(batches))
