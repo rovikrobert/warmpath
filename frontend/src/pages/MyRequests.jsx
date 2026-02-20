@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { marketplace as mpApi } from '../api/client';
+import { MarketplaceBadge } from '../utils/marketplace';
 
 function StatusBadge({ status }) {
   const labels = { requested: 'Pending', reviewing: 'Reviewing', approved: 'Approved', declined: 'Declined', completed: 'Completed', expired: 'Expired' };
@@ -122,13 +123,15 @@ export default function MyRequests() {
 
                     {req.listing_summary && (
                       <div className="mt-2">
-                        <p className="text-sm font-medium text-slate-50">
-                          {req.listing_summary.role_level} at {req.listing_summary.company_name}
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          {req.listing_summary.department_category && `${req.listing_summary.department_category} · `}
-                          {req.listing_summary.warm_sco[RESEND_KEY_REDACTED]} connection
-                        </p>
+                        <div className="flex items-center gap-2 text-sm font-medium text-slate-50">
+                          <MarketplaceBadge value={req.listing_summary.role_level} type="role" />
+                          <span>at {req.listing_summary.company_name}</span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+                          {req.listing_summary.department_category && <span>{req.listing_summary.department_category}</span>}
+                          {req.listing_summary.department_category && <span>&middot;</span>}
+                          <MarketplaceBadge value={req.listing_summary.warm_sco[RESEND_KEY_REDACTED]} type="strength" />
+                        </div>
                       </div>
                     )}
                   </div>

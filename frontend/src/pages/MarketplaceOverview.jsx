@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { marketplace as mpApi, credits as creditsApi } from '../api/client';
 import { trackEvent } from '../utils/analytics';
+import { MarketplaceBadge } from '../utils/marketplace';
+import ScoreExplainer from '../components/ScoreExplainer';
+import { WARM_TIERS } from '../utils/scores';
 
 function StatusBadge({ status }) {
   const labels = { requested: 'Pending', reviewing: 'Reviewing', approved: 'Approved', declined: 'Declined', completed: 'Completed' };
@@ -275,8 +278,21 @@ export default function MarketplaceOverview() {
                 <th className="px-5 py-3 font-medium text-slate-400">Contact</th>
                 <th className="px-5 py-3 font-medium text-slate-400">Title</th>
                 <th className="hidden px-5 py-3 font-medium text-slate-400 sm:table-cell">Company</th>
-                <th className="hidden px-5 py-3 font-medium text-slate-400 md:table-cell">Role Level</th>
-                <th className="hidden px-5 py-3 font-medium text-slate-400 md:table-cell">Strength</th>
+                <th className="px-5 py-3 font-medium text-slate-400">
+                  Role Level
+                  <ScoreExplainer
+                    title="Role Level"
+                    body="Seniority of your contact at their company. Higher-level contacts can carry more weight in referrals, but peers and ICs are often more likely to actually refer you."
+                  />
+                </th>
+                <th className="px-5 py-3 font-medium text-slate-400">
+                  Connection Strength
+                  <ScoreExplainer
+                    title="Connection Strength"
+                    body="How warm your relationship is with this contact, based on recency, interaction history, and relationship type."
+                    tiers={WARM_TIERS}
+                  />
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
@@ -285,8 +301,8 @@ export default function MarketplaceOverview() {
                   <td className="px-5 py-3 text-slate-50">{l.contact_name || '—'}</td>
                   <td className="px-5 py-3 text-slate-400">{l.contact_title || '—'}</td>
                   <td className="hidden px-5 py-3 text-slate-400 sm:table-cell">{l.contact_company || '—'}</td>
-                  <td className="hidden px-5 py-3 text-slate-400 md:table-cell">{l.role_level}</td>
-                  <td className="hidden px-5 py-3 text-slate-400 md:table-cell">{l.warm_sco[RESEND_KEY_REDACTED]}</td>
+                  <td className="px-5 py-3"><MarketplaceBadge value={l.role_level} type="role" /></td>
+                  <td className="px-5 py-3"><MarketplaceBadge value={l.warm_sco[RESEND_KEY_REDACTED]} type="strength" /></td>
                 </tr>
               ))}
             </tbody>
