@@ -99,6 +99,11 @@ def _enrich_response(app: Application, now: datetime) -> dict:
         follow_up_at=follow_up_at,
         created_at=created_at or app.created_at,
         updated_at=_make_tz_aware(app.updated_at) or app.updated_at,
+        source_type=app.source_type,
+        source_listing_id=app.source_listing_id,
+        source_intro_id=app.source_intro_id,
+        outcome=app.outcome,
+        outcome_at=_make_tz_aware(app.outcome_at),
         contact_name=contact_name,
         company_info=company_info,
         job_opening_title=job_opening_title,
@@ -581,6 +586,76 @@ async def create_from_intro(
         channel=channel,
         status="draft",
         source_type="own_network",
+    )
+    db.add(app_record)
+    await db.commit()
+    await db.refresh(app_record)
+
+    app_record = await _load_application(db, app_record.id, current_user.id)
+    now = datetime.now(timezone.utc)
+    return {
+        "data": _enrich_response(app_record, now),
+        "meta": {},
+    }
+
+
+# ---------------------------------------------------------------------------
+# POST /applications/from-facilitation/{facilitation_id}
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/from-facilitation/{facilitation_id}", status_code=status.HTTP_201_CREATED
+)
+async def create_from_facilitation(
+    facilitation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Create an application from an approved marketplace intro facilitation."""
+    from app.models.marketplace import IntroFacilitation, MarketplaceListing
+
+    result = await db.execute(
+        select(IntroFacilitation).where(
+            IntroFacilitation.id == facilitation_id,
+            IntroFacilitation.job_seeker_id == current_user.id,
+        )
+    )
+    facilitation = result.scalar_one_or_none()
+    if facilitation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Intro facilitation not found",
+        )
+
+    if facilitation.status != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Facilitation must be approved before creating an application",
+        )
+
+    # Load listing for company info
+    listing_result = await db.execute(
+        select(MarketplaceListing)
+        .options(selectinload(MarketplaceListing.company))
+        .where(MarketplaceListing.id == facilitation.marketplace_listing_id)
+    )
+    listing = listing_result.scalar_one_or_none()
+
+    company_name = "Unknown"
+    company_id = None
+    if listing and listing.company:
+        company_name = listing.company.name
+        company_id = listing.company_id
+
+    app_record = Application(
+        user_id=current_user.id,
+        company_name=company_name,
+        company_id=company_id,
+        status="draft",
+        source_type="marketplace",
+        source_intro_id=facilitation.id,
+        source_listing_id=facilitation.marketplace_listing_id,
     )
     db.add(app_record)
     await db.commit()

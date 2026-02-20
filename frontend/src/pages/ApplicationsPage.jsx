@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { applications as appsApi } from '../api/client';
 import FeedbackModal from '../components/FeedbackModal';
 import Button from '../components/ui/Button';
+import EmptyState from '../components/ui/EmptyState';
+import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
 
 const PIPELINE_STAGES = [
   { key: 'draft', label: 'Draft', color: 'bg-slate-700/50 text-slate-400' },
@@ -40,7 +42,7 @@ function AppCard({ app, onStatusChange, updating }) {
   const nextStatuses = getNextStatuses(app.status);
 
   return (
-    <div className="rounded-lg bg-slate-900 border border-slate-700/50 p-3">
+    <div className="surface-raised p-3">
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-slate-50">{app.company_name}</p>
@@ -116,6 +118,14 @@ export default function ApplicationsPage() {
   const [newApp, setNewApp] = useState({ company_name: '', role_title: '', channel: '', notes: '' });
   const [creating, setCreating] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [mobileFilter, setMobileFilter] = useState('all');
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   const load = async () => {
     try {
@@ -174,17 +184,13 @@ export default function ApplicationsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20" role="main" aria-live="polite" aria-busy="true">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" role="status" aria-label="Loading applications" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
     <div role="main">
       <div className="mb-6 flex items-center justify-between gap-3">
-        <h1 className="min-w-0 text-xl font-bold text-slate-50">My Applications</h1>
+        <h1 className="min-w-0 page-title">My Applications</h1>
         <Button
           onClick={() => setShowCreate(!showCreate)}
           aria-expanded={showCreate}
@@ -198,35 +204,35 @@ export default function ApplicationsPage() {
       {/* Stats */}
       {stats && (
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <div className="rounded-lg bg-slate-900 p-3 border border-slate-700/50">
-            <p className="text-xs text-slate-400">Total</p>
-            <p className="text-xl font-bold font-mono text-slate-50">{stats.total}</p>
+          <div className="surface-raised p-3">
+            <p className="stat-label">Total</p>
+            <p className="stat-number">{stats.total}</p>
           </div>
-          <div className="rounded-lg bg-slate-900 p-3 border border-slate-700/50">
-            <p className="text-xs text-slate-400">Response Rate</p>
-            <p className="text-xl font-bold font-mono text-slate-50">{Math.round(stats.response_rate * 100)}%</p>
+          <div className="surface-raised p-3">
+            <p className="stat-label">Response Rate</p>
+            <p className="stat-number">{Math.round(stats.response_rate * 100)}%</p>
           </div>
-          <div className="rounded-lg bg-slate-900 p-3 border border-slate-700/50">
-            <p className="text-xs text-slate-400">Interview Rate</p>
-            <p className="text-xl font-bold font-mono text-slate-50">{Math.round(stats.interview_rate * 100)}%</p>
+          <div className="surface-raised p-3">
+            <p className="stat-label">Interview Rate</p>
+            <p className="stat-number">{Math.round(stats.interview_rate * 100)}%</p>
           </div>
-          <div className="rounded-lg bg-slate-900 p-3 border border-slate-700/50">
-            <p className="text-xs text-slate-400">Avg Response</p>
-            <p className="text-xl font-bold font-mono text-slate-50">
+          <div className="surface-raised p-3">
+            <p className="stat-label">Avg Response</p>
+            <p className="stat-number">
               {stats.avg_days_to_response != null ? `${Math.round(stats.avg_days_to_response)}d` : '—'}
             </p>
           </div>
-          <div className="rounded-lg bg-slate-900 p-3 border border-slate-700/50 overflow-hidden">
-            <p className="text-xs text-slate-400">Best Channel</p>
-            <p className="truncate text-xl font-bold font-mono text-slate-50">{stats.best_channel || '—'}</p>
+          <div className="surface-raised p-3 overflow-hidden">
+            <p className="stat-label">Best Channel</p>
+            <p className="stat-number truncate">{stats.best_channel || '—'}</p>
           </div>
         </div>
       )}
 
       {/* Create form */}
       {showCreate && (
-        <form id="create-application-form" onSubmit={handleCreate} aria-label="Track a new application" className="mb-6 rounded-xl bg-slate-900 p-5 border border-slate-700/50">
-          <h2 className="mb-3 text-base font-semibold text-slate-50">Track a New Application</h2>
+        <form id="create-application-form" onSubmit={handleCreate} aria-label="Track a new application" className="mb-6 surface-raised p-5">
+          <h2 className="section-title mb-3">Track a New Application</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input
               id="new-app-company"
@@ -285,25 +291,87 @@ export default function ApplicationsPage() {
 
       {/* Kanban board */}
       {apps.length === 0 ? (
-        <div className="rounded-xl bg-slate-900 p-12 text-center border border-slate-700/50">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800">
-            <span className="text-xl text-slate-400">~</span>
+        <EmptyState
+          icon={
+            <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.251 2.251 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z" />
+            </svg>
+          }
+          title="Your application pipeline"
+          description="Track every application from first message to offer. Applications from marketplace intros appear automatically."
+          stats={[
+            { value: '4x', label: 'higher interview rate with referrals' },
+            { value: '10-40%', label: 'referral conversion rate' },
+          ]}
+          preview={
+            <div className="flex items-center justify-center gap-2">
+              {['Draft', 'Sent', 'Interview', 'Offer'].map((col) => (
+                <span key={col} className="rounded-md bg-slate-800 px-3 py-1 text-xs text-slate-500">
+                  {col}
+                </span>
+              ))}
+            </div>
+          }
+          primaryAction={{ label: 'Find Your First Referral Path', to: '/referrals' }}
+          secondaryAction={{ label: 'or track a manual application', onClick: () => setShowCreate(true) }}
+        />
+      ) : isMobile ? (
+        /* Mobile: filter chips + vertical card list */
+        <div>
+          <div className="mb-4 flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="Filter by status">
+            <button
+              role="tab"
+              aria-selected={mobileFilter === 'all'}
+              onClick={() => setMobileFilter('all')}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                mobileFilter === 'all'
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              All ({apps.length})
+            </button>
+            {KANBAN_COLUMNS.map((col) => {
+              const count = getColumnApps(col).length;
+              return (
+                <button
+                  key={col.key}
+                  role="tab"
+                  aria-selected={mobileFilter === col.key}
+                  onClick={() => setMobileFilter(col.key)}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                    mobileFilter === col.key
+                      ? 'bg-amber-500/20 text-amber-300'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  }`}
+                >
+                  {col.label} ({count})
+                </button>
+              );
+            })}
           </div>
-          <h2 className="mb-2 text-base font-semibold text-slate-50">No applications yet</h2>
-          <p className="mx-auto mb-4 max-w-sm text-sm text-slate-400">
-            Track your job applications here. Applications from marketplace intros will appear automatically.
-          </p>
-          <Button
-            onClick={() => setShowCreate(true)}
-            size="lg"
-          >
-            Track Your First Application
-          </Button>
-          <Link to="/referrals" className="mt-3 block text-sm text-amber-400 hover:text-amber-300">
-            or find referral paths first &rarr;
-          </Link>
+          <div className="space-y-2" role="tabpanel">
+            {(mobileFilter === 'all'
+              ? [...apps].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+              : getColumnApps(KANBAN_COLUMNS.find((c) => c.key === mobileFilter))
+            ).map((app) => (
+              <AppCard
+                key={app.id}
+                app={app}
+                onStatusChange={handleStatusChange}
+                updating={updating}
+              />
+            ))}
+            {mobileFilter !== 'all' &&
+              getColumnApps(KANBAN_COLUMNS.find((c) => c.key === mobileFilter)).length === 0 && (
+                <div className="rounded-lg border-2 border-dashed border-slate-700 bg-slate-800/30 p-4 text-center text-xs text-slate-500">
+                  No applications
+                </div>
+              )}
+          </div>
         </div>
       ) : (
+        /* Desktop: horizontal kanban */
         <div className="overflow-x-auto pb-4">
           <div className="flex gap-3" style={{ minWidth: `${KANBAN_COLUMNS.length * 220}px` }}>
             {KANBAN_COLUMNS.map((col) => {

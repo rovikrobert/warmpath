@@ -7,6 +7,7 @@ import { MATCH_TIERS } from '../utils/scores';
 import Button from '../components/ui/Button';
 import Spinner from '../components/ui/Spinner';
 import Modal from '../components/ui/Modal';
+import { useToast } from '../components/ui/Toast';
 
 function IntroModal({ intro, onClose }) {
   if (!intro) return null;
@@ -36,6 +37,7 @@ function IntroModal({ intro, onClose }) {
 
 export default function SearchResults() {
   const { id } = useParams();
+  const toast = useToast();
   const [searchInfo, setSearchInfo] = useState(null);
   const [results, setResults] = useState([]);
   const [meta, setMeta] = useState({});
@@ -83,7 +85,7 @@ export default function SearchResults() {
       });
       setIntroModal(res.data);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setIntroLoading(null);
     }

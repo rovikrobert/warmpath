@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { UserButton } from '@clerk/clerk-react';
 import { useAuth } from '../context/AuthContext';
 import { credits as creditsApi, feed as feedApi, onUsageWarning } from '../api/client';
 import BetaFeedbackButton from './BetaFeedbackButton';
+import CommandPalette from './CommandPalette';
+import KeyboardShortcutsModal from './KeyboardShortcutsModal';
 import KeevsBar from './KeevsBar';
+import TrustShield from './TrustShield';
+import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
 
 const NAV_ITEMS = [
   {
@@ -80,11 +84,29 @@ const BOTTOM_NAV_ITEMS = [
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [balance, setBalance] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [usageWarning, setUsageWarning] = useState(null);
   const [feedUnseen, setFeedUnseen] = useState(0);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  useKeyboardShortcuts([
+    { key: '/', action: () => {
+      const el = document.querySelector('[data-search-input]');
+      if (el) {
+        const input = el.tagName === 'INPUT' ? el : el.querySelector('input');
+        if (input) input.focus();
+      }
+    }},
+    { key: 'n', action: () => {
+      if (location.pathname === '/contacts') navigate('/contacts?upload=true');
+      else if (location.pathname === '/applications') navigate('/applications?add=true');
+      else if (location.pathname.startsWith('/referrals') || location.pathname.startsWith('/search')) navigate('/referrals');
+    }},
+    { key: '?', action: () => setShowShortcuts(true) },
+  ], [location.pathname]);
 
   useEffect(() => {
     creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
@@ -96,6 +118,34 @@ export default function Layout() {
     }, 120_000);
     return () => clearInterval(interval);
   }, []);
+
+  // Refetch balance on route change (debounced: 10s minimum between fetches)
+  const lastBalanceFetchRef = useRef(0);
+  useEffect(() => {
+    const now = Date.now();
+    if (now - lastBalanceFetchRef.current > 10000) {
+      lastBalanceFetchRef.current = now;
+      creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
+    }
+  }, [location.pathname]);
+
+  // Detect balance changes and trigger animation
+  const prevBalanceRef = useRef(null);
+  const [creditAnimating, setCreditAnimating] = useState(false);
+  const [creditDecreased, setCreditDecreased] = useState(false);
+  useEffect(() => {
+    if (prevBalanceRef.current !== null && balance !== null && balance !== prevBalanceRef.current) {
+      setCreditAnimating(true);
+      setCreditDecreased(balance < prevBalanceRef.current);
+      const timer = setTimeout(() => {
+        setCreditAnimating(false);
+        setCreditDecreased(false);
+      }, 600);
+      prevBalanceRef.current = balance;
+      return () => clearTimeout(timer);
+    }
+    prevBalanceRef.current = balance;
+  }, [balance]);
 
   const handleLogout = async () => {
     await logout();
@@ -177,11 +227,14 @@ export default function Layout() {
         <div className="border-t border-slate-700/50 p-4">
           {!collapsed && (
             <>
+              <div className="mb-2">
+                <TrustShield />
+              </div>
               <Link to="/credits" className="mb-3 flex items-center gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20 transition-colors">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
                 </svg>
-                {balance ?? '—'} credits
+                <span className={`inline-block ${creditAnimating ? 'animate-count-change' : ''} ${creditDecreased ? 'text-amber-300' : ''} transition-colors`}>{balance ?? '—'}</span> credits
               </Link>
               <div className="flex items-center gap-2">
                 <UserButton signInUrl="/" />
@@ -207,7 +260,7 @@ export default function Layout() {
         </Link>
         <div className="flex items-center gap-3">
           <Link to="/credits" className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-400">
-            {balance ?? '—'}
+            <span className={`inline-block ${creditAnimating ? 'animate-count-change' : ''} ${creditDecreased ? 'text-amber-300' : ''} transition-colors`}>{balance ?? '—'}</span>
           </Link>
           <button
             onClick={() => setMobileNav(!mobileNav)}
@@ -277,6 +330,10 @@ export default function Layout() {
                 Settings
               </NavLink>
               <div className="mx-4 my-2 border-t border-slate-700/50" />
+              <div className="px-4 py-2">
+                <TrustShield />
+              </div>
+              <div className="mx-4 my-2 border-t border-slate-700/50" />
               <div className="flex items-center gap-3 px-4 py-2.5">
                 <UserButton signInUrl="/" />
                 <span className="text-sm text-slate-400">Account</span>
@@ -322,7 +379,9 @@ export default function Layout() {
         <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
             <KeevsBar />
-            <Outlet />
+            <div key={location.pathname} className="page-enter">
+              <Outlet />
+            </div>
           </div>
         </main>
 
@@ -330,7 +389,15 @@ export default function Layout() {
         <footer className="border-t border-slate-700/50 px-4 py-4 sm:px-6 lg:px-8">
           <div className="mx-auto flex max-w-6xl items-center justify-between">
             <p className="text-xs text-slate-500">WarmPath &mdash; Majiq Pte Ltd</p>
-            <Link to="/privacy" className="text-xs text-slate-500 hover:text-slate-400">Privacy Policy</Link>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowShortcuts(true)}
+                className="hidden text-xs text-slate-600 hover:text-slate-400 lg:block"
+              >
+                Press <kbd className="rounded bg-slate-800 px-1 py-0.5 text-slate-500">?</kbd> for shortcuts
+              </button>
+              <Link to="/privacy" className="text-xs text-slate-500 hover:text-slate-400">Privacy Policy</Link>
+            </div>
           </div>
         </footer>
 
@@ -364,6 +431,12 @@ export default function Layout() {
 
       {/* Beta feedback button */}
       {import.meta.env.VITE_BETA_MODE === 'true' && <BetaFeedbackButton />}
+
+      {/* Command palette (Cmd+K) */}
+      <CommandPalette />
+
+      {/* Keyboard shortcuts modal */}
+      <KeyboardShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
+import { useToast } from '../components/ui/Toast';
 
 const REL_LABELS = {
   current_colleague: 'current colleague',
@@ -273,6 +274,7 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
 export default function ReferralResults() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const [data, setData] = useState(null);
   const [searchMeta, setSearchMeta] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -329,7 +331,7 @@ export default function ReferralResults() {
       });
       setDraftModal(res.data);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setIntroLoading(null);
     }

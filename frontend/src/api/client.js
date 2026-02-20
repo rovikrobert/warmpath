@@ -140,6 +140,12 @@ export const contacts = {
 export const companies = {
   list: (page = 1, perPage = 50) =>
     api(`/api/v1/companies?page=${page}&per_page=${perPage}`),
+  search: ({ query, limit = 8 } = {}) => {
+    const qs = new URLSearchParams();
+    if (query) qs.set('search', query);
+    qs.set('per_page', String(limit));
+    return api(`/api/v1/companies?${qs}`);
+  },
 };
 
 export const search = {

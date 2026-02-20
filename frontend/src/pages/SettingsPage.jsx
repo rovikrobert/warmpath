@@ -213,7 +213,7 @@ function ProfileTab() {
   return (
     <>
       {/* Import Profile Card */}
-      <div className="mb-6 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
+      <div className="mb-6 surface-raised p-6">
         <h2 className="text-sm font-semibold text-slate-50">Import Profile</h2>
         <p className="mt-1 text-xs text-slate-400">Pre-fill your profile from a resume or LinkedIn.</p>
         <div className="mt-3 flex gap-3">
@@ -231,7 +231,7 @@ function ProfileTab() {
 
       <ResumePreviewModal data={resumePreview} onApply={applyResumeData} onClose={() => setResumePreview(null)} />
 
-      <form onSubmit={handleSubmit} className="space-y-4 rounded-xl bg-slate-900 p-6 border border-slate-700/50">
+      <form onSubmit={handleSubmit} className="space-y-4 surface-raised p-6">
         <p className="text-sm text-slate-400">Your profile is used as context when AI drafts intro messages on your behalf.</p>
 
         <div>
@@ -426,7 +426,7 @@ function PrivacyTab() {
       {error && <div role="alert" aria-live="polite" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-400">{error}</div>}
 
       {/* Data Export */}
-      <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Data export">
+      <section className="surface-raised p-5" aria-label="Data export">
         <h2 className="mb-1 text-base font-semibold text-slate-50">Download My Data</h2>
         <p className="mb-3 text-sm text-slate-400">Export all your personal data as a JSON file.</p>
         <button onClick={handleExport} disabled={exporting} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50">
@@ -436,7 +436,7 @@ function PrivacyTab() {
       </section>
 
       {/* Processing Restriction */}
-      <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Processing restriction">
+      <section className="surface-raised p-5" aria-label="Processing restriction">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-slate-50">Restrict Processing</h2>
@@ -450,7 +450,7 @@ function PrivacyTab() {
       </section>
 
       {/* Marketing Preferences */}
-      <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Marketing preferences">
+      <section className="surface-raised p-5" aria-label="Marketing preferences">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-slate-50">Marketing Communications</h2>
@@ -464,7 +464,7 @@ function PrivacyTab() {
       </section>
 
       {/* Consent Records */}
-      <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Consent records">
+      <section className="surface-raised p-5" aria-label="Consent records">
         <h2 className="mb-3 text-base font-semibold text-slate-50">Consent Records</h2>
         {consentRecords.length === 0 ? (
           <p className="text-sm text-slate-400">No consent records on file.</p>
@@ -489,7 +489,7 @@ function PrivacyTab() {
       </section>
 
       {/* Formal Data Request */}
-      <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Formal data request">
+      <section className="surface-raised p-5" aria-label="Formal data request">
         <h2 className="mb-1 text-base font-semibold text-slate-50">Formal Data Request</h2>
         <p className="mb-3 text-sm text-slate-400">Submit a formal data subject access request (DSAR).</p>
         <form onSubmit={handleDataRequest} className="space-y-3">
@@ -599,7 +599,7 @@ function SharingTab() {
       </div>
 
       {/* Share toggle */}
-      <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
+      <div className="surface-raised p-5">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-slate-50">Share my network on the marketplace</h2>
@@ -617,7 +617,7 @@ function SharingTab() {
       </div>
 
       {/* Pause toggle */}
-      <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
+      <div className="surface-raised p-5">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-slate-50">Temporarily hide all my listings</h2>
@@ -631,7 +631,7 @@ function SharingTab() {
       </div>
 
       {/* Category filters */}
-      <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
+      <div className="surface-raised p-5">
         <h2 className="mb-1 text-base font-semibold text-slate-50">Department Filters</h2>
         <p className="mb-3 text-sm text-slate-400">Only share contacts in selected departments. Leave all unchecked to share all.</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -645,7 +645,7 @@ function SharingTab() {
       </div>
 
       {/* Excluded contacts */}
-      <div className="rounded-xl bg-slate-900 p-5 border border-slate-700/50">
+      <div className="surface-raised p-5">
         <h2 className="mb-1 text-base font-semibold text-slate-50">Excluded Contacts</h2>
         <p className="mb-3 text-sm text-slate-400">Search and select contacts to exclude from the marketplace.</p>
         <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by name, company, or title..." aria-label="Search contacts to exclude" className={'mb-3 ' + inputClass} />
@@ -714,7 +714,7 @@ function PasswordSection({ clerkUser }) {
   const inputClass = 'w-full rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
 
   return (
-    <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Password">
+    <section className="surface-raised p-5" aria-label="Password">
       <h2 className="mb-3 text-base font-semibold text-slate-50">Password</h2>
       <form onSubmit={handleSubmit} className="space-y-3 max-w-sm">
         <div>
@@ -806,7 +806,7 @@ function TwoFactorSection({ clerkUser }) {
   const isEnabled = clerkUser?.totpEnabled;
 
   return (
-    <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Two-factor authentication">
+    <section className="surface-raised p-5" aria-label="Two-factor authentication">
       <div className="mb-3 flex items-center gap-3">
         <h2 className="text-base font-semibold text-slate-50">Two-Factor Authentication</h2>
         {isEnabled ? (
@@ -945,7 +945,7 @@ function ConnectedAccountsSection({ clerkUser }) {
   };
 
   return (
-    <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Connected accounts">
+    <section className="surface-raised p-5" aria-label="Connected accounts">
       <h2 className="mb-3 text-base font-semibold text-slate-50">Connected Accounts</h2>
 
       {error && <p className="mb-3 rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert">{error}</p>}
@@ -1023,7 +1023,7 @@ function AccountTab() {
   return (
     <div className="space-y-6">
       {/* Account info — sourced from Clerk */}
-      <section className="rounded-xl bg-slate-900 p-5 border border-slate-700/50" aria-label="Account info">
+      <section className="surface-raised p-5" aria-label="Account info">
         <h2 className="mb-3 text-base font-semibold text-slate-50">Account Info</h2>
         <div className="flex items-start gap-4">
           {clerkUser?.imageUrl && (
@@ -1126,7 +1126,7 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-4xl" role="main">
-      <h1 className="mb-6 text-xl font-bold text-slate-50">Settings</h1>
+      <h1 className="page-title mb-6">Settings</h1>
 
       <div className="flex flex-col gap-6 sm:flex-row sm:gap-8">
         {/* Side tab nav */}
