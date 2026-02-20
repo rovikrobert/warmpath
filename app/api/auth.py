@@ -201,17 +201,30 @@ async def complete_onboarding(
     if not prefs or not prefs.target_role:
         missing.append("Job preferences with target role not set (step 1)")
 
-    # Step 8: at least one contact
-    contact_count = (
+    # Step 8: at least one contact OR a queued/processing CSV upload
+    # Check CsvUpload first — it exists immediately even when async processing
+    # hasn't finished creating Contact rows yet.
+    from app.models.contact import CsvUpload
+
+    csv_upload_count = (
         await db.scalar(
             select(func.count())
-            .select_from(Contact)
-            .where(Contact.user_id == current_user.id)
+            .select_from(CsvUpload)
+            .where(CsvUpload.user_id == current_user.id)
         )
         or 0
     )
-    if contact_count == 0:
-        missing.append("No contacts uploaded (step 8)")
+    if csv_upload_count == 0:
+        contact_count = (
+            await db.scalar(
+                select(func.count())
+                .select_from(Contact)
+                .where(Contact.user_id == current_user.id)
+            )
+            or 0
+        )
+        if contact_count == 0:
+            missing.append("No contacts uploaded (step 8)")
 
     # Step 9: connector profile with work history
     profile = (

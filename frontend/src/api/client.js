@@ -98,6 +98,7 @@ export const contacts = {
       return r;
     });
   },
+  getUploadStatus: (uploadId) => api(`/api/v1/contacts/uploads/${uploadId}`),
   list: (params = {}) => {
     const qs = new URLSearchParams();
     Object.entries({ page: 1, per_page: 50, ...params }).forEach(([k, v]) => {

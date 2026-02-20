@@ -274,6 +274,46 @@ async def test_onboarding_complete_succeeds_with_all_steps(client: AsyncClient):
     assert body["data"]["onboarding_complete"] is True
 
 
+async def test_onboarding_complete_succeeds_with_csv_upload_but_no_contacts_yet(
+    client: AsyncClient,
+):
+    """POST /onboarding-complete passes when CsvUpload exists but Celery
+    hasn't created Contact rows yet (async processing race condition)."""
+    from app.models.contact import CsvUpload
+    from app.models.job import UserJobPreferences
+    from app.models.user import ConnectorProfile
+
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email="asynccsv@test.com", full_name="Async CSV"
+        )
+        user.intent = "find_referrals"
+        prefs = UserJobPreferences(
+            user_id=user.id,
+            target_role="Engineer",
+            target_industries=[],
+            target_locations=[],
+        )
+        db.add(prefs)
+        # CsvUpload record exists (created immediately) but no Contact rows yet
+        csv_upload = CsvUpload(
+            user_id=user.id,
+            filename="connections.csv",
+            file_size_bytes=1024,
+            status="queued",
+        )
+        db.add(csv_upload)
+        profile = ConnectorProfile(
+            user_id=user.id,
+            work_history=[{"company": "Acme", "title": "SWE"}],
+        )
+        db.add(profile)
+        await db.commit()
+    resp = await client.post("/api/v1/auth/onboarding-complete", headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["data"]["onboarding_complete"] is True
+
+
 async def test_onboarding_complete_is_idempotent(client: AsyncClient):
     """POST /onboarding-complete twice returns 200 both times."""
     from app.models.contact import Contact
