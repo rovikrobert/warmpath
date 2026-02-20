@@ -4,37 +4,11 @@ import { search as searchApi, credits as creditsApi, matches as matchesApi } fro
 import RequestIntroModal from '../components/RequestIntroModal';
 import FeedbackModal from '../components/FeedbackModal';
 import MatchBadge from '../components/MatchBadge';
-import ScoreExplainer from '../components/ScoreExplainer';
-import { WARM_TIERS } from '../utils/scores';
 import { MarketplaceBadge } from '../utils/marketplace';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
-
-/* ------------------------------------------------------------------ */
-/* Channel + likelihood labels                                        */
-/* ------------------------------------------------------------------ */
-
-const CHANNEL_LABELS = {
-  linkedin: 'LinkedIn',
-  linkedin_message: 'LinkedIn message',
-  email: 'Email',
-  whatsapp: 'WhatsApp',
-  phone: 'Phone',
-  in_person: 'In person',
-  slack: 'Slack',
-  text: 'Text message',
-};
-
-function channelLabel(raw) {
-  if (!raw) return null;
-  return CHANNEL_LABELS[raw] || raw.replace(/_/g, ' ');
-}
-
-function LikelihoodBadge({ level }) {
-  return <MatchBadge level={level} type="likelihood" />;
-}
 
 const REL_LABELS = {
   current_colleague: 'current colleague',
@@ -199,26 +173,28 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
             <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-400">Your Network</h4>
             <div className="space-y-2">
               {ownPaths.map((path, i) => (
-                <div key={i} className="flex items-center justify-between rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
-                  <div>
-                    <p className="text-sm font-medium text-slate-50">
-                      {path.contact.name} — {path.contact.title} at {path.contact.company}
-                      {path.contact.relationship_type && (
-                        <span className="ml-1 text-slate-500">({REL_LABELS[path.contact.relationship_type] || path.contact.relationship_type})</span>
-                      )}
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      <MatchBadge score={path.contact.warm_score} type="warm" showScore />
-                      <LikelihoodBadge level={path.contact.referral_likelihood} />
-                      {path.recommended_channel && (
-                        <span className="text-xs text-slate-500">via {channelLabel(path.recommended_channel)}</span>
-                      )}
+                <div key={i} className="flex items-center justify-between gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-medium text-slate-50" title={path.contact.name}>
+                        {path.contact.name}
+                      </p>
+                      <MatchBadge score={path.contact.warm_score} type="warm" />
                     </div>
+                    <p className="truncate text-xs text-slate-400" title={`${path.contact.title} at ${path.contact.company}`}>
+                      {path.contact.title} · {path.contact.company}
+                    </p>
+                    {path.contact.relationship_type && (
+                      <p className="text-xs text-slate-500">
+                        {REL_LABELS[path.contact.relationship_type] || path.contact.relationship_type}
+                      </p>
+                    )}
                   </div>
                   <Button
                     onClick={() => onDraftIntro(path.contact.id)}
                     loading={introLoading === path.contact.id}
                     size="sm"
+                    className="shrink-0"
                   >
                     Draft Intro
                   </Button>
@@ -490,7 +466,7 @@ export default function ReferralResults() {
 
       {draftModal && <IntroModal intro={draftModal} onClose={() => setDraftModal(null)} />}
 
-      {showFeedback && (
+      {showFeedback && import.meta.env.VITE_BETA_MODE !== 'true' && (
         <FeedbackModal
           feature="referral_search"
           resourceId={id}
