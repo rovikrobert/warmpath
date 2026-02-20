@@ -24,24 +24,22 @@ celery -A app.celery_app:celery_app worker \
     --pool=prefork \
     --without-heartbeat \
     --without-mingle \
-    --without-gossip \
-    2>&1 | sed 's/^/[worker] /' &
+    --without-gossip &
 PIDS+=($!)
+echo "[entrypoint] Worker started (PID ${PIDS[0]})"
 
 # --- Celery Beat ---
 celery -A app.celery_app:celery_app beat \
-    --loglevel=info \
-    2>&1 | sed 's/^/[beat] /' &
+    --loglevel=info &
 PIDS+=($!)
+echo "[entrypoint] Beat started (PID ${PIDS[1]})"
 
 # --- Uvicorn (foreground for healthcheck) ---
 uvicorn app.main:app \
     --host 0.0.0.0 \
-    --port "${PORT:-8000}" \
-    2>&1 | sed 's/^/[web] /' &
+    --port "${PORT:-8000}" &
 PIDS+=($!)
-
-echo "[entrypoint] Started worker (PID ${PIDS[0]}), beat (PID ${PIDS[1]}), web (PID ${PIDS[2]})"
+echo "[entrypoint] Web started (PID ${PIDS[2]})"
 
 # Wait for any child to exit — then tear down all
 wait -n
