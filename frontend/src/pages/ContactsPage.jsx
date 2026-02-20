@@ -531,6 +531,7 @@ export default function ContactsPage() {
 
   // Export state
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   // NLP search state
   const [searchInput, setSearchInput] = useState('');
@@ -597,13 +598,13 @@ export default function ContactsPage() {
 
   const handleExport = async () => {
     setExporting(true);
+    setExportError('');
     try {
       const params = {};
       if (filter) params.relationship_type = filter;
-      if (searchInput.trim()) params.search = searchInput.trim();
       await contactsApi.exportCsv(params);
     } catch (err) {
-      console.error('Export failed:', err);
+      setExportError(err.message || 'Export failed');
     } finally {
       setExporting(false);
     }
@@ -638,6 +639,10 @@ export default function ContactsPage() {
           </button>
         </div>
       </div>
+
+      {exportError && (
+        <p role="alert" className="mb-4 rounded-md bg-red-500/10 p-2 text-sm text-red-400">{exportError}</p>
+      )}
 
       {/* Search + Filter bar */}
       <div className="mb-4 space-y-3">
