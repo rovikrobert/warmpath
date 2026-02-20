@@ -14,8 +14,10 @@ Endpoints:
   POST /feed/generate  — manual trigger for feed generation (dev/admin)
 """
 
+import hashlib
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
@@ -23,8 +25,10 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models.contact import Contact
 from app.models.feed import ContactFreshnessSignal, FeedItem, FeedItemInteraction
 from app.models.user import User
+from app.services.credits import earn_credits
 from app.utils.security import get_current_user
 from app.utils.tracking import track_action
 
@@ -60,9 +64,8 @@ class FeedCountResponse(BaseModel):
 
 class EnrichmentResponseRequest(BaseModel):
     feed_item_id: str
-    contact_id: str
-    signal_type: str  # relationship_type, would_refer, etc.
-    signal_value: dict  # {"type": "colleague"} or {"likelihood": "definitely"}
+    signal_type: Literal["relationship_type", "would_refer", "recency"]
+    signal_value: str  # e.g. "colleague", "definitely", "2026-01-15"  # {"type": "colleague"} or {"likelihood": "definitely"}
 
 
 # ---------------------------------------------------------------------------
@@ -306,6 +309,38 @@ async def dismiss_item(
 # ---------------------------------------------------------------------------
 
 
+_SIGNAL_KEY_MAP = {
+    "relationship_type": "type",
+    "would_refer": "likelihood",
+    "recency": "recency",
+}
+
+# API uses "recency" but DB CHECK constraint expects "last_interaction"
+_SIGNAL_TYPE_TO_DB = {
+    "relationship_type": "relationship_type",
+    "would_refer": "would_refer",
+    "recency": "last_interaction",
+}
+
+
+def _build_signal_value(signal_type: str, signal_value: str) -> dict:
+    """Convert flat signal_value string to typed dict for JSONB storage."""
+    key = _SIGNAL_KEY_MAP.get(signal_type, "value")
+    return {key: signal_value}
+
+
+def _apply_signal_to_contact(
+    contact: "Contact", signal_type: str, signal_value: str
+) -> None:
+    """Write enrichment signal back to the contact record."""
+    if signal_type == "relationship_type":
+        contact.relationship_type = signal_value
+    elif signal_type == "would_refer":
+        contact.would_refer = signal_value
+    elif signal_type == "recency":
+        contact.last_interaction_date = date.fromisoformat(signal_value)
+
+
 @router.post("/enrichment-response")
 async def submit_enrichment_response(
     payload: EnrichmentResponseRequest,
@@ -316,9 +351,9 @@ async def submit_enrichment_response(
 
     This is the key data collection endpoint — every response enriches the
     trust graph and improves match quality. The signal is stored in
-    contact_freshness_signals and optionally applied back to the contact.
+    contact_freshness_signals and applied back to the contact record.
+    Awards 5 credits per enrichment response.
     """
-    contact_id = uuid.UUID(payload.contact_id)
     feed_item_id = uuid.UUID(payload.feed_item_id)
 
     # Verify feed item belongs to user
@@ -332,9 +367,16 @@ async def submit_enrichment_response(
     if not item:
         raise HTTPException(status_code=404, detail="Feed item not found")
 
-    # Verify contact belongs to user
-    from app.models.contact import Contact
+    # Extract contact_id from feed item metadata
+    metadata = item.metadata_ or {}
+    raw_contact_id = metadata.get("contact_id")
+    if not raw_contact_id:
+        raise HTTPException(
+            status_code=400, detail="Feed item has no associated contact"
+        )
+    contact_id = uuid.UUID(raw_contact_id)
 
+    # Verify contact belongs to user
     contact_result = await db.execute(
         select(Contact).where(
             Contact.id == contact_id,
@@ -347,31 +389,48 @@ async def submit_enrichment_response(
         raise HTTPException(status_code=404, detail="Contact not found")
 
     # Build privacy-safe cross-user hash
-    import hashlib
-
     name_company = (
         f"{(contact.full_name or '').lower()}|{(contact.current_company or '').lower()}"
     )
     name_company_hash = hashlib.sha256(name_company.encode()).hexdigest()
 
-    # Create freshness signal
-    signal = ContactFreshnessSignal(
-        user_id=current_user.id,
-        contact_id=contact_id,
-        signal_type=payload.signal_type,
-        signal_value=payload.signal_value,
-        name_company_hash=name_company_hash,
-        source="feed_prompt",
-    )
-    db.add(signal)
+    # Build signal_value dict for storage
+    signal_value_dict = _build_signal_value(payload.signal_type, payload.signal_value)
+    db_signal_type = _SIGNAL_TYPE_TO_DB[payload.signal_type]
 
-    # Apply signal to contact if it's a relationship type
-    if payload.signal_type == "relationship_type" and "type" in payload.signal_value:
-        contact.relationship_type = payload.signal_value["type"]
-        signal.applied_at = datetime.now(timezone.utc)
+    # Upsert freshness signal (one per user + contact + signal_type)
+    existing_signal_result = await db.execute(
+        select(ContactFreshnessSignal).where(
+            ContactFreshnessSignal.user_id == current_user.id,
+            ContactFreshnessSignal.contact_id == contact_id,
+            ContactFreshnessSignal.signal_type == db_signal_type,
+        )
+    )
+    existing_signal = existing_signal_result.scalar_one_or_none()
+
+    now = datetime.now(timezone.utc)
+
+    if existing_signal:
+        existing_signal.signal_value = signal_value_dict
+        existing_signal.name_company_hash = name_company_hash
+        existing_signal.source = "feed_prompt"
+        signal = existing_signal
+    else:
+        signal = ContactFreshnessSignal(
+            user_id=current_user.id,
+            contact_id=contact_id,
+            signal_type=db_signal_type,
+            signal_value=signal_value_dict,
+            name_company_hash=name_company_hash,
+            source="feed_prompt",
+        )
+        db.add(signal)
+
+    # Apply signal to contact record
+    _apply_signal_to_contact(contact, payload.signal_type, payload.signal_value)
+    signal.applied_at = now
 
     # Mark feed item as acted on
-    now = datetime.now(timezone.utc)
     if not item.seen_at:
         item.seen_at = now
     item.acted_on_at = now
@@ -384,6 +443,15 @@ async def submit_enrichment_response(
             source="in_app",
             metadata_={"signal_type": payload.signal_type},
         )
+    )
+
+    # Award 5 credits for enrichment response
+    await earn_credits(
+        current_user.id,
+        5,
+        "enrichment_response",
+        db,
+        reference_id=contact_id,
     )
 
     await track_action(
@@ -403,7 +471,21 @@ async def submit_enrichment_response(
         "data": {
             "status": "recorded",
             "signal_type": payload.signal_type,
-            "applied": signal.applied_at is not None,
+            "applied": True,
+            "credits_awarded": 5,
+            "contact": {
+                "id": str(contact.id),
+                "full_name": contact.full_name,
+                "current_company": contact.current_company,
+                "current_title": contact.current_title,
+                "relationship_type": contact.relationship_type,
+                "would_refer": contact.would_refer,
+                "last_interaction_date": (
+                    contact.last_interaction_date.isoformat()
+                    if contact.last_interaction_date
+                    else None
+                ),
+            },
         },
         "meta": {},
     }
