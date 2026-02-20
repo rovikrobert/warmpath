@@ -455,3 +455,28 @@ async def test_nlp_search_response_includes_match_score(
     for item in body["data"]:
         assert "nlp_match_score" in item
         assert isinstance(item["nlp_match_score"], (int, float))
+
+
+# ---------------------------------------------------------------------------
+# Usage metering
+# ---------------------------------------------------------------------------
+
+
+class TestNlpSearchMetering:
+    """NLP search is metered with free tier limits."""
+
+    def test_nlp_search_route_is_metered(self):
+        from app.middleware.usage_logger import match_metered_action
+
+        action = match_metered_action("POST", "/api/v1/contacts/nlp-search")
+        assert action == "nlp_search"
+
+    def test_nlp_search_standard_free_tier_limit_is_ten(self):
+        from app.middleware.usage_logger import _STANDARD_FREE_TIER_LIMITS
+
+        assert _STANDARD_FREE_TIER_LIMITS["nlp_search"] == 10
+
+    def test_nlp_search_beta_free_tier_limit_is_fifty(self):
+        from app.middleware.usage_logger import _BETA_FREE_TIER_LIMITS
+
+        assert _BETA_FREE_TIER_LIMITS["nlp_search"] == 50
