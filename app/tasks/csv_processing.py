@@ -256,7 +256,12 @@ def process_csv_upload(
 
     Creates its own async engine + session, then delegates to the core function.
     """
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.info("Worker received task %s for upload %s", self.request.id, csv_upload_id)
     asyncio.run(_celery_run(self, csv_upload_id, user_id, file_content_b64))
+    logger.info("Worker completed task for upload %s", csv_upload_id)
 
 
 async def _celery_run(task, csv_upload_id, user_id, file_content_b64):
