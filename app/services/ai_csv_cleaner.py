@@ -379,7 +379,7 @@ def _merge_cleaned_fields(original: dict, cleaned_fields: dict) -> dict:
     return merged
 
 
-MAX_CONCURRENT_BATCHES = 5
+MAX_CONCURRENT_BATCHES = 2
 
 
 async def _clean_batch(
