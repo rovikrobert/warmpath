@@ -488,6 +488,11 @@ async def submit_enrichment_response(
         },
     )
 
+    # Check if a milestone was crossed
+    from app.services.enrichment_progress import check_and_award_milestones
+
+    milestone_reached = await check_and_award_milestones(current_user.id, db)
+
     await db.commit()
 
     return {
@@ -496,6 +501,7 @@ async def submit_enrichment_response(
             "signal_type": payload.signal_type,
             "applied": True,
             "credits_awarded": 5,
+            "milestone_reached": milestone_reached,
             "contact": {
                 "id": str(contact.id),
                 "full_name": contact.full_name,
