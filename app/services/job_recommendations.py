@@ -320,17 +320,21 @@ async def get_recommendations(
             }
         )
 
-    # Re-score with network-first weighting:
-    # network_density * 0.4 + job_relevance * 0.3 + ats_quality * 0.2 + recency * 0.1
+    # Re-score: network strength first, then job relevance
+    # network_density * 0.6 + job_relevance * 0.25 + ats_quality * 0.15
     max_density = max((r["network_density"] for r in merged), default=1) or 1
     for rec in merged:
         nd = rec["network_density"] / max_density  # normalize 0-1
         jr = min(rec.get("score", 0) / 100, 1.0)  # normalize 0-1
         aq = 1.0 if rec["source"] == "ats_board" else 0.0
-        rec["score"] = round(nd * 0.4 + jr * 0.3 + aq * 0.2, 3)
+        rec["score"] = round(nd * 0.6 + jr * 0.25 + aq * 0.15, 3)
 
     merged.sort(key=lambda r: r["score"], reverse=True)
     merged = merged[:max_results]
+
+    # Mark companies where user has direct contacts as "referral ready"
+    for rec in merged:
+        rec["referral_ready"] = rec.get("own_contacts", 0) >= 1
 
     network_count = sum(1 for r in merged if r.get("network_density", 0) > 0)
 

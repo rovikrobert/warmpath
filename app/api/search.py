@@ -889,6 +889,21 @@ async def _process_company(
         or (c.current_company and company_lower in c.current_company.lower())
     ]
 
+    # Diagnostic: log matching results for debugging
+    logger.info(
+        "Company match: query=%r total_contacts=%d matched=%d "
+        "sample_companies=[%s] sample_company_fks=[%s]",
+        company_name,
+        len(all_contacts),
+        len(company_contacts),
+        ", ".join(
+            repr(c.current_company) for c in all_contacts[:10] if c.current_company
+        ),
+        ", ".join(
+            repr(c.company.name) if c.company else "None" for c in all_contacts[:10]
+        ),
+    )
+
     referral_paths: list[dict] = []
     if company_contacts:
         referral_paths = await _build_referral_paths(
