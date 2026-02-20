@@ -119,3 +119,19 @@ class PaginationMeta(BaseModel):
 class ContactListResponse(BaseModel):
     data: list[ContactResponse]
     meta: PaginationMeta
+
+
+# -- NLP Search --
+
+
+class NlpSearchRequest(BaseModel):
+    query: str = Field(..., max_length=500, description="Natural language search query")
+
+
+class NlpInterpretation(BaseModel):
+    titles: list[str] = []
+    companies: list[str] = []
+    seniority: list[str] = []
+    locations: list[str] = []
+    relationship_types: list[str] = []
+    raw_query: str = ""
