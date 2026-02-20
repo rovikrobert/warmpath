@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { feed as feedApi } from '../api/client';
 import KeevsAvatar from './KeevsAvatar';
 import FeedCard from './FeedCard';
+import EnrichmentProgress from './EnrichmentProgress';
 
 /**
  * Route-to-feed-type mapping.
@@ -83,8 +84,24 @@ export default function KeevsBar({ className = '' }) {
     }
   }, [expanded, item]);
 
-  // Don't render anything if no relevant item or on coach page
-  if (loading || !item || dismissed || feedType === null) return null;
+  // Show compact enrichment progress on contacts page even if no feed item
+  if (loading) return null;
+  if (feedType === null) return null;
+
+  if ((!item || dismissed) && location.pathname.startsWith('/contacts')) {
+    return (
+      <div className={`mb-4 ${className}`}>
+        <div className="flex items-center gap-3 rounded-lg border border-slate-700/50 bg-slate-900/80 px-4 py-2.5">
+          <KeevsAvatar size="sm" />
+          <div className="min-w-0 flex-1">
+            <EnrichmentProgress compact />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!item || dismissed) return null;
 
   return (
     <div className={`mb-4 ${className}`}>

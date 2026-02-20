@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { contacts as contactsApi, companies as companiesApi } from '../api/client';
 import MatchBadge from '../components/MatchBadge';
 import { getNlpMatchTier } from '../utils/scores';
+import EnrichmentProgress from '../components/EnrichmentProgress';
 
 const RELATIONSHIP_TYPES = [
   { value: '', label: 'All types' },
@@ -639,6 +640,8 @@ export default function ContactsPage() {
           </button>
         </div>
       </div>
+
+      <EnrichmentProgress />
 
       {exportError && (
         <p role="alert" className="mb-4 rounded-md bg-red-500/10 p-2 text-sm text-red-400">{exportError}</p>
