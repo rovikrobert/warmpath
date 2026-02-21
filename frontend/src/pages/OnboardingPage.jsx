@@ -402,6 +402,7 @@ export default function OnboardingPage() {
     setError('');
     try {
       await authApi.completeOnboarding();
+      trackEvent('signup_completed', { intent, skipped_work_history: true });
       await refreshUser();
       navigate('/coach');
     } catch (err) {
@@ -1000,6 +1001,11 @@ export default function OnboardingPage() {
                         }
                       }
                       await authApi.completeOnboarding();
+                      trackEvent('signup_completed', {
+                        intent,
+                        has_work_history: entries.length > 0,
+                        has_resume: !!resumeProfileData,
+                      });
                       await refreshUser();
                       navigate('/coach');
                     } catch (err) {
