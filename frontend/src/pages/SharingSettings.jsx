@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { marketplace as mpApi, contacts as contactsApi } from '../api/client';
+import { SOURCES } from '../utils/sources';
+import SourceTag from '../components/ui/SourceTag';
 import Spinner from '../components/ui/Spinner';
 
 const DEPARTMENT_OPTIONS = [
@@ -117,8 +119,8 @@ export default function SharingSettings() {
             <h2 className="text-base font-semibold text-slate-50">Share my network on the marketplace</h2>
             <p className="text-sm text-slate-400">
               {prefs?.opt_in_marketplace
-                ? 'Your contacts are visible (anonymized) to candidates. When a hire happens, the referral bonus ($2-10K) goes to you.'
-                : 'Enable sharing to capture referral bonuses ($2-10K per hire) and earn credits.'}
+                ? <>Your contacts are visible (anonymized) to candidates. When a hire happens, the referral bonus ({SOURCES.REFERRAL_BONUS_RANGE.claim}) goes to you. <SourceTag source={SOURCES.REFERRAL_BONUS_RANGE.source} label={SOURCES.REFERRAL_BONUS_RANGE.label} /></>
+                : <>Enable sharing to capture referral bonuses ({SOURCES.REFERRAL_BONUS_RANGE.claim} per hire) and earn credits. <SourceTag source={SOURCES.REFERRAL_BONUS_RANGE.source} label={SOURCES.REFERRAL_BONUS_RANGE.label} /></>}
             </p>
           </div>
           <button

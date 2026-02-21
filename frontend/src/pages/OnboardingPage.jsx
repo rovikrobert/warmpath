@@ -5,7 +5,9 @@ import { auth as authApi, contacts as contactsApi, preferences, marketplace, ref
 import TagInput from '../components/TagInput';
 import KeevsAvatar from '../components/KeevsAvatar';
 import { trackEvent } from '../utils/analytics';
+import { SOURCES } from '../utils/sources';
 import Button from '../components/ui/Button';
+import SourceTag from '../components/ui/SourceTag';
 import Spinner from '../components/ui/Spinner';
 
 function ResumePreviewModal({ data, onApply, onClose }) {
@@ -540,7 +542,7 @@ export default function OnboardingPage() {
               <div className="space-y-3">
                 {[
                   { value: 'find_referrals', title: 'I want to get referred to companies', desc: 'Search networks, find referral paths, and get introduced to people at your target companies.' },
-                  { value: 'sha[RESEND_KEY_REDACTED]', title: 'I want to share my network and earn', desc: 'Share your network anonymously. Your employer pays $2-10K per referral hire \u2014 we send you pre-qualified candidates so you can capture those bonuses.' },
+                  { value: 'sha[RESEND_KEY_REDACTED]', title: 'I want to share my network and earn', desc: `Share your network anonymously. Your employer pays ${SOURCES.REFERRAL_BONUS_RANGE.claim} per referral hire \u2014 we send you pre-qualified candidates so you can capture those bonuses.` },
                   { value: 'explore', title: "Both \u2014 I'm exploring", desc: 'Search for referrals AND share your network. Most members choose this.' },
                 ].map((opt) => (
                   <button
@@ -594,8 +596,11 @@ export default function OnboardingPage() {
                     </svg>
                   </div>
                   <div>
-                    <p className="font-medium text-slate-50">$2,000 - $10,000 per successful hire</p>
-                    <p className="mt-0.5 text-sm text-slate-400">Most employers pay referral bonuses when you help them hire. WarmPath sends you pre-qualified candidates so you can capture those bonuses.</p>
+                    <p className="font-medium text-slate-50">{SOURCES.REFERRAL_BONUS_RANGE.claim} per successful hire</p>
+                    <p className="mt-0.5 text-sm text-slate-400">
+                      Most employers pay referral bonuses when you help them hire. WarmPath sends you pre-qualified candidates so you can capture those bonuses.{' '}
+                      <SourceTag source={SOURCES.REFERRAL_BONUS_RANGE.source} label={SOURCES.REFERRAL_BONUS_RANGE.label} />
+                    </p>
                   </div>
                 </div>
 

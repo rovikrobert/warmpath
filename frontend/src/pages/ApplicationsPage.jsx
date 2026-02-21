@@ -4,7 +4,9 @@ import { applications as appsApi, contacts as contactsApi } from '../api/client'
 import FeedbackModal from '../components/FeedbackModal';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
+import SourceTag, { UserDataTag } from '../components/ui/SourceTag';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
+import { SOURCES } from '../utils/sources';
 
 const PIPELINE_STAGES = [
   { key: 'draft', label: 'Draft', color: 'bg-slate-700/50 text-slate-400' },
@@ -140,7 +142,8 @@ function ReferralAdvantage({ stats }) {
           <div>
             <p className="text-sm font-semibold text-amber-300">Try the referral path</p>
             <p className="mt-0.5 text-sm text-slate-400">
-              You have {stats.total} application{stats.total !== 1 ? 's' : ''} tracked — all cold. Referrals get up to 4x more interviews.
+              You have {stats.total} application{stats.total !== 1 ? 's' : ''} tracked — all cold. Referrals get {SOURCES.REFERRAL_INTERVIEW_MULTIPLIER.claim} more interviews.{' '}
+              <SourceTag source={SOURCES.REFERRAL_INTERVIEW_MULTIPLIER.source} />
             </p>
             <Link to="/search" className="mt-2 inline-block text-sm font-medium text-amber-400 hover:text-amber-300">
               Find referral paths &rarr;
@@ -173,7 +176,7 @@ function ReferralAdvantage({ stats }) {
           </div>
           {multiplier && parseFloat(multiplier) > 1 && (
             <p className="mt-2 text-sm text-emerald-400/80">
-              Your referrals convert <span className="font-bold">{multiplier}x</span> better.{' '}
+              Your referrals convert <span className="font-bold">{multiplier}x</span> better <UserDataTag />.{' '}
               <Link to="/search" className="underline hover:text-emerald-300">Find more referral paths</Link>
             </p>
           )}
@@ -358,7 +361,8 @@ export default function ApplicationsPage() {
                       You have {warmPaths.length} contact{warmPaths.length > 1 ? 's' : ''} at {newApp.company_name}.
                     </p>
                     <p className="mt-0.5 text-slate-400">
-                      Referrals get up to 4x more interviews than cold applications.
+                      Referrals get {SOURCES.REFERRAL_INTERVIEW_MULTIPLIER.claim} more interviews than cold applications.{' '}
+                      <SourceTag source={SOURCES.REFERRAL_INTERVIEW_MULTIPLIER.source} />
                     </p>
                     <Link
                       to={`/search?company=${encodeURIComponent(newApp.company_name)}`}
@@ -425,9 +429,10 @@ export default function ApplicationsPage() {
           title="Your application pipeline"
           description="Track every application from first message to offer. Applications from marketplace intros appear automatically."
           stats={[
-            { value: '4x', label: 'higher interview rate with referrals' },
-            { value: '10-40%', label: 'referral conversion rate' },
+            { value: SOURCES.REFERRAL_INTERVIEW_MULTIPLIER.claim, label: 'higher interview rate with referrals' },
+            { value: SOURCES.REFERRAL_CONVERSION.claim, label: SOURCES.REFERRAL_CONVERSION.label },
           ]}
+          statsSource={SOURCES.REFERRAL_CONVERSION.source}
           preview={
             <div className="flex items-center justify-center gap-2">
               {['Draft', 'Sent', 'Interview', 'Offer'].map((col) => (
