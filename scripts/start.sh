@@ -19,25 +19,25 @@ CONCURRENCY="${CELERY_CONCURRENCY:-2}"
 # Once `exec` runs, this trap is replaced by the target process's own handler.
 trap 'echo "[entrypoint] Caught signal during setup, exiting..."; exit 1' SIGTERM SIGINT
 
-# Run Alembic migrations only for web service (before uvicorn starts).
-# Other services skip migrations to avoid race conditions on parallel deploys.
 echo "[entrypoint] SERVICE_ROLE=$ROLE, PID=$$"
 
+# Run Alembic migrations only for web service (before uvicorn starts).
+# Other services skip migrations to avoid race conditions on parallel deploys.
 if [ "$ROLE" = "web" ]; then
     echo "[entrypoint] Running Alembic migrations..."
     alembic upgrade head
-    echo "[entrypoint] Alembic complete (exit=$?)"
+    echo "[entrypoint] Alembic migrations complete"
 fi
 
 case "$ROLE" in
     web)
-        echo "[entrypoint] About to exec uvicorn (role=$ROLE, port=${PORT:-8000})"
+        echo "[entrypoint] Starting uvicorn (port=${PORT:-8000})"
         exec uvicorn app.main:app \
             --host 0.0.0.0 \
             --port "${PORT:-8000}"
         ;;
     worker)
-        echo "[entrypoint] Starting celery worker (role=$ROLE, concurrency=$CONCURRENCY)"
+        echo "[entrypoint] Starting celery worker (concurrency=$CONCURRENCY)"
         exec celery -A app.celery_app:celery_app worker \
             --loglevel=info \
             --concurrency="$CONCURRENCY" \
@@ -47,12 +47,12 @@ case "$ROLE" in
             --without-gossip
         ;;
     beat)
-        echo "[entrypoint] Starting celery beat (role=$ROLE)"
+        echo "[entrypoint] Starting celery beat"
         exec celery -A app.celery_app:celery_app beat \
             --loglevel=info
         ;;
     scan)
-        echo "[entrypoint] Running agent scans (role=$ROLE)"
+        echo "[entrypoint] Running agent scans"
         exec python3 scripts/run_agent_scans.py
         ;;
     *)
