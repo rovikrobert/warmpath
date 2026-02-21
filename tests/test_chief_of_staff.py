@@ -436,18 +436,17 @@ class TestSynthesizer:
         from agents.chief_of_staff.synthesizer import synthesize_daily
 
         brief, _ = synthesize_daily(sample_reports, kpi_snapshot="Health: 85")
-        assert "# Founder Daily Brief" in brief
-        assert "Decisions Needed" in brief
-        assert "Key Updates" in brief
-        assert "Progress" in brief
+        assert "# Daily Brief" in brief
+        assert "Your call needed" in brief
+        assert "What each team is doing" in brief
         assert "Health: 85" in brief
 
     def test_synthesize_daily_empty(self):
         from agents.chief_of_staff.synthesizer import synthesize_daily
 
         brief, _ = synthesize_daily([])
-        assert "# Founder Daily Brief" in brief
-        assert "No decisions needed" in brief
+        assert "# Daily Brief" in brief
+        assert "Nothing needs your decision today" in brief
 
     def test_synthesize_daily_critical_findings(self):
         from agents.chief_of_staff.synthesizer import synthesize_daily
@@ -457,16 +456,16 @@ class TestSynthesizer:
         ]
         reports = [_make_report("security", findings)]
         brief, _ = synthesize_daily(reports)
-        assert "CRIT-1" in brief
-        assert "Decisions Needed" in brief
+        assert "Urgent fix needed" in brief
+        assert "Your call needed" in brief
 
     def test_synthesize_daily_all_clean(self):
         from agents.chief_of_staff.synthesizer import synthesize_daily
 
         reports = [_make_report("architect"), _make_report("doc_keeper")]
         brief, _ = synthesize_daily(reports)
-        assert "No decisions needed" in brief
-        assert "Progress" in brief
+        assert "Nothing needs your decision today" in brief
+        assert "What each team is doing" in brief
 
     def test_synthesize_daily_with_costs(self, sample_reports: list[AgentReport]):
         from agents.chief_of_staff.synthesizer import synthesize_daily
@@ -477,8 +476,8 @@ class TestSynthesizer:
             "total_duration_seconds": 12.3,
         }
         brief, _ = synthesize_daily(sample_reports, costs=costs)
-        assert "Cost Summary" in brief
-        assert "$0.0123" in brief
+        assert "Agent cost yesterday" in brief
+        assert "$0.01" in brief
 
     def test_synthesize_daily_with_alerts(self, sample_reports: list[AgentReport]):
         from agents.chief_of_staff.synthesizer import synthesize_daily
@@ -490,7 +489,7 @@ class TestSynthesizer:
         }
         alerts = ["Token budget exceeded!"]
         brief, _ = synthesize_daily(sample_reports, costs=costs, alerts=alerts)
-        assert "ALERT" in brief
+        assert "Cost alert" in brief
         assert "Token budget exceeded" in brief
 
     def test_synthesize_weekly(self, sample_reports: list[AgentReport]):
@@ -1094,8 +1093,8 @@ class TestCosAgent:
         for r in sample_reports:
             self._write_report(r)
         result = run_daily()
-        assert "# Founder Daily Brief" in result
-        assert "Decisions Needed" in result
+        assert "# Daily Brief" in result
+        assert "Your call needed" in result
 
     def test_run_daily_clean_reports(self):
         from agents.chief_of_staff.cos_agent import run_daily
@@ -1103,8 +1102,8 @@ class TestCosAgent:
         self._write_report(_make_report("architect"))
         self._write_report(_make_report("doc_keeper"))
         result = run_daily()
-        assert "# Founder Daily Brief" in result
-        assert "No decisions needed" in result
+        assert "# Daily Brief" in result
+        assert "Nothing needs your decision today" in result
 
     def test_run_weekly_no_reports(self):
         from agents.chief_of_staff.cos_agent import run_weekly
@@ -1881,7 +1880,7 @@ class TestCosWiringIntegration:
         )
         result = run_daily()
         # Brief should be generated (even if no budget issues)
-        assert "# Founder Daily Brief" in result
+        assert "# Daily Brief" in result
 
     def test_run_daily_processes_telegram_commands(self):
         from agents.chief_of_staff.cos_agent import run_daily
@@ -1889,7 +1888,7 @@ class TestCosWiringIntegration:
         self._write_report(_make_report("architect"))
         (self._tg_dir / "telegram-reply-001.txt").write_text("status")
         result = run_daily()
-        assert "# Founder Daily Brief" in result
+        assert "# Daily Brief" in result
         # Reply file should be processed
         assert (self._tg_dir / "telegram-reply-001.processed").exists()
 
@@ -1917,7 +1916,7 @@ class TestCosWiringIntegration:
         path.write_text(json.dumps(data))
 
         result = run_daily()
-        assert "# Founder Daily Brief" in result
+        assert "# Daily Brief" in result
         # Request should have been routed and tracked
         open_reqs = get_open_requests()
         assert len(open_reqs) >= 1
@@ -1935,7 +1934,7 @@ class TestCosWiringIntegration:
 
         self._write_report(_make_report("architect"))
         result = run_daily()
-        assert "# Founder Daily Brief" in result
+        assert "# Daily Brief" in result
         tg_files = list(self._tg_dir.glob("telegram-daily-*.txt"))
         assert len(tg_files) >= 1
 

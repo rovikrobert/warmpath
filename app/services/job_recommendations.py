@@ -287,6 +287,9 @@ async def get_recommendations(
                 len(to_fetch),
             )
             fresh_scanned = len(to_fetch)
+            # Timeout may interrupt mid-flush inside set_cached_jobs(),
+            # leaving the session dirty. Rollback to clear pending state.
+            await db.rollback()
 
         await db.flush()
 
