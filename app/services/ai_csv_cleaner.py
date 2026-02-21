@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 CLEANUP_MODEL = getattr(settings, "CLEANUP_MODEL", "claude-haiku-4-5-20251001")
 GEMINI_CLEANUP_MODEL = "gemini-2.0-flash"
-CLEANUP_BATCH_SIZE = 200
+CLEANUP_BATCH_SIZE = settings.CSV_CHUNK_SIZE
 
 # ---------------------------------------------------------------------------
 # System prompt for Claude cleanup
