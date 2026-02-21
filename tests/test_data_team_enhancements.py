@@ -118,9 +118,10 @@ class TestPipelineLiveDataQuality:
         insights: list[Insight] = []
         metrics: dict = {}
 
+        # 15 users (above pre-launch threshold) but other tables empty
         mock_qe = self._make_mock_executor(
             {
-                "users": 0,
+                "users": 15,
                 "contacts": 5,
                 "csv_uploads": 0,
                 "search_requests": 0,
@@ -136,11 +137,39 @@ class TestPipelineLiveDataQuality:
             _scan_live_data_quality(findings, insights, metrics)
 
         assert metrics["live_db_available"] is True
-        assert metrics["live_empty_tables"] == 6
+        assert metrics["live_empty_tables"] == 5
         assert any(f.id == "pipe-010" for f in findings)
-        # users empty → severity high
         empty_finding = next(f for f in findings if f.id == "pipe-010")
-        assert empty_finding.severity == "high"
+        assert empty_finding.severity == "medium"
+
+    def test_suppresses_empty_tables_prelaunch(self):
+        from data_team.pipeline.pipeline import _scan_live_data_quality
+
+        findings: list[Finding] = []
+        insights: list[Insight] = []
+        metrics: dict = {}
+
+        # < 10 users → pre-launch, suppress empty table findings
+        mock_qe = self._make_mock_executor(
+            {
+                "users": 0,
+                "contacts": 0,
+                "csv_uploads": 0,
+                "search_requests": 0,
+                "marketplace_listings": 0,
+                "intro_facilitations": 0,
+                "credit_transactions": 0,
+            }
+        )
+
+        with patch(
+            "data_team.shared.query_executor.get_executor", return_value=mock_qe
+        ):
+            _scan_live_data_quality(findings, insights, metrics)
+
+        assert metrics["live_empty_tables"] == 7
+        assert not any(f.id == "pipe-010" for f in findings)
+        assert metrics.get("live_empty_suppressed") == "pre-launch (<10 users)"
 
     def test_healthy_data_no_findings(self):
         from data_team.pipeline.pipeline import _scan_live_data_quality
