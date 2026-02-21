@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { applications as appsApi } from '../api/client';
+import { applications as appsApi, contacts as contactsApi } from '../api/client';
 import FeedbackModal from '../components/FeedbackModal';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
@@ -194,6 +194,8 @@ export default function ApplicationsPage() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [mobileFilter, setMobileFilter] = useState('all');
+  const [warmPaths, setWarmPaths] = useState(null);
+  const [warmLoading, setWarmLoading] = useState(false);
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768);
@@ -217,6 +219,28 @@ export default function ApplicationsPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (!newApp.company_name || newApp.company_name.trim().length < 2) {
+      setWarmPaths(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setWarmLoading(true);
+      try {
+        const res = await contactsApi.list({ search: newApp.company_name.trim(), per_page: 5 });
+        const matches = (res.data || []).filter(
+          (c) => (c.current_company || '').toLowerCase().includes(newApp.company_name.trim().toLowerCase())
+        );
+        setWarmPaths(matches.length > 0 ? matches : null);
+      } catch {
+        setWarmPaths(null);
+      } finally {
+        setWarmLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [newApp.company_name]);
 
   const handleStatusChange = async (id, status) => {
     setUpdating(id);
@@ -244,6 +268,7 @@ export default function ApplicationsPage() {
       });
       setNewApp({ company_name: '', role_title: '', channel: '', notes: '' });
       setShowCreate(false);
+      setWarmPaths(null);
       await load();
     } catch (err) {
       console.error(err);
@@ -324,6 +349,27 @@ export default function ApplicationsPage() {
               aria-required="true"
               className="rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
+            {warmPaths && warmPaths.length > 0 && (
+              <div className="col-span-full rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <div className="flex items-start gap-2">
+                  <span className="text-sm" aria-hidden="true">&#x1F4A1;</span>
+                  <div className="text-sm">
+                    <p className="font-medium text-amber-300">
+                      You have {warmPaths.length} contact{warmPaths.length > 1 ? 's' : ''} at {newApp.company_name}.
+                    </p>
+                    <p className="mt-0.5 text-slate-400">
+                      Referrals get up to 4x more interviews than cold applications.
+                    </p>
+                    <Link
+                      to={`/search?company=${encodeURIComponent(newApp.company_name)}`}
+                      className="mt-1 inline-block font-medium text-amber-400 hover:text-amber-300"
+                    >
+                      Find referral path &rarr;
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
             <input
               id="new-app-role"
               type="text"
