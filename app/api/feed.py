@@ -468,6 +468,11 @@ async def submit_enrichment_response(
         )
     )
 
+    # Flush pending objects (signal + interaction) before earn_credits,
+    # which runs a SELECT that triggers autoflush. Without this, the
+    # autoflush can fail on CHECK constraints mid-query.
+    await db.flush()
+
     # Award 5 credits for enrichment response
     await earn_credits(
         current_user.id,

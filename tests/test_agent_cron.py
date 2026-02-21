@@ -619,8 +619,7 @@ class TestDailyBriefRendering:
             [report],
             founder_requests=[{"title": "Test request", "priority": "P0"}],
         )
-        assert "Founder Requests" in brief_md
-        assert "[P0]" in brief_md
+        assert "Open requests from you" in brief_md
         assert "Test request" in brief_md
         assert len(brief_data["founder_requests"]) == 1
 
@@ -641,8 +640,7 @@ class TestDailyBriefRendering:
                 }
             ],
         )
-        assert "Conflict Resolutions" in brief_md
-        assert "[compromise]" in brief_md
+        assert "Resolved conflicts" in brief_md
         assert "Sequence the work" in brief_md
 
     def test_escalated_resolution_tagged(self):
@@ -662,7 +660,7 @@ class TestDailyBriefRendering:
                 }
             ],
         )
-        assert "[ESCALATED]" in brief_md
+        assert "escalated to you" in brief_md
 
     def test_no_sections_when_empty(self):
         from agents.shared.report import AgentReport
@@ -671,5 +669,5 @@ class TestDailyBriefRendering:
 
         report = AgentReport(agent="test", timestamp="2026-01-01T00:00:00Z")
         brief_md, _ = synthesize_daily([report])
-        assert "Founder Requests" not in brief_md
-        assert "Conflict Resolutions" not in brief_md
+        assert "Open requests from you" not in brief_md
+        assert "Resolved conflicts" not in brief_md

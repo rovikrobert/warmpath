@@ -4,6 +4,7 @@
 #   web    — uvicorn only
 #   worker — celery worker only
 #   beat   — celery beat only
+#   scan   — run agent team scans + CoS daily brief, then exit (for Railway Cron)
 #   all    — all three (default, single-container mode)
 
 set -euo pipefail
@@ -56,6 +57,12 @@ case "$ROLE" in
     beat)
         echo "[entrypoint] Starting beat only (role=$ROLE)"
         start_beat  # foreground
+        ;;
+    scan)
+        echo "[entrypoint] Running agent scans (role=$ROLE)"
+        python3 scripts/run_agent_scans.py
+        echo "[entrypoint] Scans complete, exiting."
+        exit 0
         ;;
     all)
         echo "[entrypoint] Starting all services (role=$ROLE, concurrency=$CONCURRENCY)"

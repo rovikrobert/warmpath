@@ -37,8 +37,8 @@ COPY finance_team/ ./finance_team/
 COPY gtm_team/ ./gtm_team/
 COPY ops_team/ ./ops_team/
 
-# Copy entrypoint script
-COPY scripts/start.sh ./scripts/start.sh
+# Copy entrypoint and scan scripts
+COPY scripts/start.sh scripts/run_agent_scans.py ./scripts/
 
 # Copy project docs (agents read CLAUDE.md for strategy context)
 COPY CLAUDE.md ARCHITECTURE.md COMPETITIVE_STRATEGY.md ./
