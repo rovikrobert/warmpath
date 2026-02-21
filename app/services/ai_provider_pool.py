@@ -53,26 +53,31 @@ PROVIDER_CONFIGS = {
         "model": "gemini-2.5-flash",
         "key_attr": "GOOGLE_API_KEY",
         "max_concurrent_attr": "GOOGLE_MAX_CONCURRENT",
+        "max_tokens": 65536,
     },
     "anthropic": {
         "model": "claude-haiku-4-5-20251001",
         "key_attr": "ANTHROPIC_API_KEY",
         "max_concurrent_attr": "ANTHROPIC_MAX_CONCURRENT",
+        "max_tokens": 16384,
     },
     "openai": {
         "model": "gpt-4o-mini",
         "key_attr": "OPENAI_API_KEY",
         "max_concurrent_attr": "OPENAI_MAX_CONCURRENT",
+        "max_tokens": 16384,
     },
     "groq": {
         "model": "llama-3.3-70b-versatile",
         "key_attr": "GROQ_API_KEY",
         "max_concurrent_attr": "GROQ_MAX_CONCURRENT",
+        "max_tokens": 16384,
     },
     "deepseek": {
         "model": "deepseek-chat",
         "key_attr": "DEEPSEEK_API_KEY",
         "max_concurrent_attr": "DEEPSEEK_MAX_CONCURRENT",
+        "max_tokens": 8192,
     },
 }
 
@@ -117,6 +122,7 @@ async def _call_gemini(
         config=genai.types.GenerateContentConfig(
             system_instruction=system_prompt,
             response_mime_type="application/json",
+            max_output_tokens=PROVIDER_CONFIGS["gemini"]["max_tokens"],
             temperature=0,
         ),
     )
@@ -129,7 +135,7 @@ async def _call_anthropic(
     """Call Claude API with markdown fence stripping."""
     message = await client.messages.create(
         model=PROVIDER_CONFIGS["anthropic"]["model"],
-        max_tokens=16384,
+        max_tokens=PROVIDER_CONFIGS["anthropic"]["max_tokens"],
         system=system_prompt,
         messages=[{"role": "user", "content": json.dumps(payload)}],
         temperature=0,
@@ -142,7 +148,7 @@ async def _call_anthropic(
 
 
 async def _call_openai_compat(
-    client: Any, system_prompt: str, payload: list[dict], model: str
+    client: Any, system_prompt: str, payload: list[dict], model: str, max_tokens: int
 ) -> list[dict]:
     """Call OpenAI-compatible API (OpenAI, Groq, DeepSeek) with JSON mode."""
     response = await client.chat.completions.create(
@@ -153,7 +159,7 @@ async def _call_openai_compat(
         ],
         response_format={"type": "json_object"},
         temperature=0,
-        max_tokens=16384,
+        max_tokens=max_tokens,
     )
     return _extract_contacts_array(json.loads(response.choices[0].message.content))
 
@@ -161,24 +167,27 @@ async def _call_openai_compat(
 async def _call_openai(
     client: Any, system_prompt: str, payload: list[dict]
 ) -> list[dict]:
+    cfg = PROVIDER_CONFIGS["openai"]
     return await _call_openai_compat(
-        client, system_prompt, payload, PROVIDER_CONFIGS["openai"]["model"]
+        client, system_prompt, payload, cfg["model"], cfg["max_tokens"]
     )
 
 
 async def _call_groq(
     client: Any, system_prompt: str, payload: list[dict]
 ) -> list[dict]:
+    cfg = PROVIDER_CONFIGS["groq"]
     return await _call_openai_compat(
-        client, system_prompt, payload, PROVIDER_CONFIGS["groq"]["model"]
+        client, system_prompt, payload, cfg["model"], cfg["max_tokens"]
     )
 
 
 async def _call_deepseek(
     client: Any, system_prompt: str, payload: list[dict]
 ) -> list[dict]:
+    cfg = PROVIDER_CONFIGS["deepseek"]
     return await _call_openai_compat(
-        client, system_prompt, payload, PROVIDER_CONFIGS["deepseek"]["model"]
+        client, system_prompt, payload, cfg["model"], cfg["max_tokens"]
     )
 
 
