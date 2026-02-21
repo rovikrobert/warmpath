@@ -368,6 +368,14 @@ async def _process_contact_row(
     if existing_id:
         return "duplicate"
 
+    # Parse connected_on — JSON serialization through Redis turns dates to strings
+    connected_on = row.get("connected_on")
+    if isinstance(connected_on, str):
+        try:
+            connected_on = datetime.strptime(connected_on, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            connected_on = None
+
     contact = Contact(
         user_id=user_uuid,
         csv_upload_id=upload_uuid,
@@ -378,7 +386,7 @@ async def _process_contact_row(
         current_title=row.get("current_title"),
         current_company=row.get("current_company"),
         linkedin_url=row.get("linkedin_url"),
-        connected_on=row.get("connected_on"),
+        connected_on=connected_on,
         fingerprint=fingerprint,
         relationship_type=rel_type,
         source=source,
