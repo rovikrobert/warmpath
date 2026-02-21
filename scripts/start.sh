@@ -1,38 +1,25 @@
 #!/usr/bin/env bash
-# Entrypoint: runs uvicorn, celery worker, celery beat — or a subset.
-# SERVICE_ROLE env var controls which processes start:
-#   web    — uvicorn only
+# Entrypoint for Railway multi-service deployment.
+# SERVICE_ROLE env var controls which process starts (one per service):
+#   web    — uvicorn only (default, binds $PORT)
 #   worker — celery worker only
 #   beat   — celery beat only
-#   scan   — run agent team scans + CoS daily brief, then exit (for Railway Cron)
-#   all    — all three (default, single-container mode)
+#   scan   — run agent team scans, then exit (Railway Cron)
 
 set -euo pipefail
 
-ROLE="${SERVICE_ROLE:-all}"
+ROLE="${SERVICE_ROLE:-web}"
 CONCURRENCY="${CELERY_CONCURRENCY:-2}"
-PIDS=()
-
-cleanup() {
-    echo "[entrypoint] Shutting down..."
-    for pid in "${PIDS[@]}"; do
-        kill "$pid" 2>/dev/null || true
-    done
-    wait
-    exit 0
-}
-
-trap cleanup SIGTERM SIGINT
 
 case "$ROLE" in
     web)
-        echo "[entrypoint] Starting web only (role=$ROLE)"
+        echo "[entrypoint] Starting uvicorn (role=$ROLE, port=${PORT:-8000})"
         exec uvicorn app.main:app \
             --host 0.0.0.0 \
             --port "${PORT:-8000}"
         ;;
     worker)
-        echo "[entrypoint] Starting worker only (role=$ROLE, concurrency=$CONCURRENCY)"
+        echo "[entrypoint] Starting celery worker (role=$ROLE, concurrency=$CONCURRENCY)"
         exec celery -A app.celery_app:celery_app worker \
             --loglevel=info \
             --concurrency="$CONCURRENCY" \
@@ -42,7 +29,7 @@ case "$ROLE" in
             --without-gossip
         ;;
     beat)
-        echo "[entrypoint] Starting beat only (role=$ROLE)"
+        echo "[entrypoint] Starting celery beat (role=$ROLE)"
         exec celery -A app.celery_app:celery_app beat \
             --loglevel=info
         ;;
@@ -50,31 +37,8 @@ case "$ROLE" in
         echo "[entrypoint] Running agent scans (role=$ROLE)"
         exec python3 scripts/run_agent_scans.py
         ;;
-    all)
-        echo "[entrypoint] Starting all services (role=$ROLE, concurrency=$CONCURRENCY)"
-
-        celery -A app.celery_app:celery_app worker \
-            --loglevel=info \
-            --concurrency="$CONCURRENCY" \
-            --pool=prefork \
-            --without-heartbeat \
-            --without-mingle \
-            --without-gossip &
-        PIDS+=($!)
-        echo "[entrypoint] Worker started (PID ${PIDS[0]})"
-
-        celery -A app.celery_app:celery_app beat \
-            --loglevel=info &
-        PIDS+=($!)
-        echo "[entrypoint] Beat started (PID ${PIDS[1]})"
-
-        echo "[entrypoint] Exec'ing uvicorn as PID 1..."
-        exec uvicorn app.main:app \
-            --host 0.0.0.0 \
-            --port "${PORT:-8000}"
-        ;;
     *)
-        echo "[entrypoint] Unknown SERVICE_ROLE: $ROLE (expected: web, worker, beat, all)"
+        echo "[entrypoint] Unknown SERVICE_ROLE: $ROLE (expected: web, worker, beat, scan)"
         exit 1
         ;;
 esac
