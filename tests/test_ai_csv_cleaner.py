@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, patch
 
 from app.services.ai_csv_cleaner import clean_contacts_mock
+from app.services.ai_provider_pool import _extract_contacts_array
 
 
 class TestCleanContactsMock:
@@ -348,3 +349,36 @@ class TestCsvProcessingIntegration:
             assert contact.first_name == "Alice"
             assert contact.last_name == "Smith"
             assert contact.current_company == "Google"
+
+
+class TestExtractContactsArray:
+    """Tests for _extract_contacts_array helper that normalises AI responses."""
+
+    def test_raw_array_passes_through(self):
+        """A plain JSON array is returned as-is."""
+        data = [{"first_name": "Alice", "last_name": "Smith"}]
+        assert _extract_contacts_array(data) == data
+
+    def test_wrapped_object_extracts_array(self):
+        """OpenAI JSON-mode wraps arrays in an object — extract the list."""
+        data = {"contacts": [{"first_name": "Bob", "last_name": "Jones"}]}
+        assert _extract_contacts_array(data) == [
+            {"first_name": "Bob", "last_name": "Jones"}
+        ]
+
+    def test_wrapped_with_different_key(self):
+        """Any key name wrapping an array is handled."""
+        data = {"result": [{"first_name": "Eve"}]}
+        assert _extract_contacts_array(data) == [{"first_name": "Eve"}]
+
+    def test_single_object_wrapped(self):
+        """A single contact dict (no array) becomes a one-element list."""
+        data = {"first_name": "Dan", "last_name": "Lee"}
+        result = _extract_contacts_array(data)
+        assert result == [{"first_name": "Dan", "last_name": "Lee"}]
+
+    def test_empty_list(self):
+        assert _extract_contacts_array([]) == []
+
+    def test_non_dict_non_list_returns_empty(self):
+        assert _extract_contacts_array("unexpected") == []
