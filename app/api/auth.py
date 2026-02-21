@@ -243,6 +243,15 @@ async def complete_onboarding(
 
     # Stamp completion
     current_user.onboarding_completed_at = datetime.now(timezone.utc)
+
+    from app.utils.tracking import track_action
+
+    await track_action(
+        db,
+        current_user.id,
+        "signup_completed",
+        metadata_={"intent": current_user.intent},
+    )
     await db.commit()
     await db.refresh(current_user)
 

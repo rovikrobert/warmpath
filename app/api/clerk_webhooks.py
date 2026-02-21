@@ -156,10 +156,18 @@ async def _handle_user_updated(
     email, email_verified = _extract_primary_email(data)
     full_name = _extract_full_name(data)
 
+    # Detect email verification state transition (unverified → verified)
+    newly_verified = email_verified and not user.email_verified
+
     if email:
         user.email = email
     user.full_name = full_name
     user.email_verified = email_verified
+
+    if newly_verified:
+        from app.utils.tracking import track_action
+
+        await track_action(db, user.id, "email_verified")
 
     await db.commit()
     logger.info("Updated user %s from Clerk webhook", clerk_user_id)
