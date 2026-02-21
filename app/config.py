@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 10
     ANTHROPIC_MAX_CONCURRENT: int = 5
     GOOGLE_API_KEY: str = ""
+    GOOGLE_PROJECT_ID: str = ""  # GCP project for Vertex AI
+    GOOGLE_LOCATION: str = "us-central1"  # Vertex AI region
+    GOOGLE_SERVICE_ACCOUNT_JSON: str = ""  # SA key JSON (enables Vertex AI)
     GOOGLE_MAX_CONCURRENT: int = 10
     OPENAI_API_KEY: str = ""
     OPENAI_MAX_CONCURRENT: int = 10
