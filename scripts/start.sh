@@ -24,65 +24,54 @@ cleanup() {
 
 trap cleanup SIGTERM SIGINT
 
-start_worker() {
-    celery -A app.celery_app:celery_app worker \
-        --loglevel=info \
-        --concurrency="$CONCURRENCY" \
-        --pool=prefork \
-        --without-heartbeat \
-        --without-mingle \
-        --without-gossip "$@"
-}
-
-start_beat() {
-    celery -A app.celery_app:celery_app beat \
-        --loglevel=info "$@"
-}
-
-start_web() {
-    uvicorn app.main:app \
-        --host 0.0.0.0 \
-        --port "${PORT:-8000}" "$@"
-}
-
 case "$ROLE" in
     web)
         echo "[entrypoint] Starting web only (role=$ROLE)"
-        start_web  # foreground
+        exec uvicorn app.main:app \
+            --host 0.0.0.0 \
+            --port "${PORT:-8000}"
         ;;
     worker)
         echo "[entrypoint] Starting worker only (role=$ROLE, concurrency=$CONCURRENCY)"
-        start_worker  # foreground
+        exec celery -A app.celery_app:celery_app worker \
+            --loglevel=info \
+            --concurrency="$CONCURRENCY" \
+            --pool=prefork \
+            --without-heartbeat \
+            --without-mingle \
+            --without-gossip
         ;;
     beat)
         echo "[entrypoint] Starting beat only (role=$ROLE)"
-        start_beat  # foreground
+        exec celery -A app.celery_app:celery_app beat \
+            --loglevel=info
         ;;
     scan)
         echo "[entrypoint] Running agent scans (role=$ROLE)"
-        python3 scripts/run_agent_scans.py
-        echo "[entrypoint] Scans complete, exiting."
-        exit 0
+        exec python3 scripts/run_agent_scans.py
         ;;
     all)
         echo "[entrypoint] Starting all services (role=$ROLE, concurrency=$CONCURRENCY)"
 
-        start_worker &
+        celery -A app.celery_app:celery_app worker \
+            --loglevel=info \
+            --concurrency="$CONCURRENCY" \
+            --pool=prefork \
+            --without-heartbeat \
+            --without-mingle \
+            --without-gossip &
         PIDS+=($!)
         echo "[entrypoint] Worker started (PID ${PIDS[0]})"
 
-        start_beat &
+        celery -A app.celery_app:celery_app beat \
+            --loglevel=info &
         PIDS+=($!)
         echo "[entrypoint] Beat started (PID ${PIDS[1]})"
 
-        start_web &
-        PIDS+=($!)
-        echo "[entrypoint] Web started (PID ${PIDS[2]})"
-
-        # Wait for any child to exit — then tear down all
-        wait -n
-        echo "[entrypoint] A process exited, shutting down all..."
-        cleanup
+        echo "[entrypoint] Exec'ing uvicorn as PID 1..."
+        exec uvicorn app.main:app \
+            --host 0.0.0.0 \
+            --port "${PORT:-8000}"
         ;;
     *)
         echo "[entrypoint] Unknown SERVICE_ROLE: $ROLE (expected: web, worker, beat, all)"
