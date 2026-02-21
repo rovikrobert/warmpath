@@ -51,7 +51,7 @@ def _extract_contacts_array(parsed: Any) -> list[dict]:
 
 PROVIDER_CONFIGS = {
     "gemini": {
-        "model": "gemini-2.0-flash",
+        "model": "gemini-2.5-flash",
         "key_attr": "GOOGLE_API_KEY",
         "max_concurrent_attr": "GOOGLE_MAX_CONCURRENT",
     },
@@ -148,6 +148,7 @@ async def _call_openai_compat(
         ],
         response_format={"type": "json_object"},
         temperature=0,
+        max_tokens=16384,
     )
     return _extract_contacts_array(json.loads(response.choices[0].message.content))
 
