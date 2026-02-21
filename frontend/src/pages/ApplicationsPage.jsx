@@ -38,7 +38,8 @@ function StatusBadge({ status }) {
 }
 
 function AppCard({ app, onStatusChange, updating }) {
-  const isMarketplace = app.channel === 'marketplace' || app.match_result_id;
+  const isMarketplace = app.source_type === 'marketplace';
+  const isReferral = app.source_type === 'own_network';
   const nextStatuses = getNextStatuses(app.status);
 
   return (
@@ -55,12 +56,17 @@ function AppCard({ app, onStatusChange, updating }) {
             Via Marketplace
           </span>
         )}
+        {isReferral && (
+          <span className="ml-2 shrink-0 rounded bg-blue-500/10 px-1.5 py-0.5 text-xs font-medium text-blue-400">
+            Via Referral
+          </span>
+        )}
       </div>
 
       {app.contact_name && (
         <p className="mt-1 text-xs text-slate-400">Contact: {app.contact_name}</p>
       )}
-      {app.channel && !isMarketplace && (
+      {app.channel && !isMarketplace && !isReferral && (
         <p className="mt-0.5 text-xs text-slate-400">via {app.channel}</p>
       )}
       {app.notes && (
@@ -190,7 +196,10 @@ export default function ApplicationsPage() {
   return (
     <div role="main">
       <div className="mb-6 flex items-center justify-between gap-3">
-        <h1 className="min-w-0 page-title">My Applications</h1>
+        <div className="min-w-0">
+          <h1 className="page-title">My Applications</h1>
+          <p className="mt-1 text-sm text-slate-400">Track your outreach and referral progress — apply on company sites, track outcomes here.</p>
+        </div>
         <Button
           onClick={() => setShowCreate(!showCreate)}
           aria-expanded={showCreate}
