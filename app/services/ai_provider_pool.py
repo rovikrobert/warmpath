@@ -50,7 +50,7 @@ def _extract_contacts_array(parsed: Any) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 PROVIDER_CONFIGS = {
-    "gemini": {
+    "google": {
         "model": "gemini-2.5-flash",
         "key_attr": "GOOGLE_API_KEY",
         "max_concurrent_attr": "GOOGLE_MAX_CONCURRENT",
@@ -88,11 +88,17 @@ class CleaningProvider:
 
 
 def _is_provider_enabled(name: str, cfg: Any = None) -> bool:
-    """Check if a provider has its API key configured."""
+    """Check if a provider has its API key (or Vertex AI credentials) configured."""
     cfg = cfg or settings
     key_attr = PROVIDER_CONFIGS[name]["key_attr"]
     key = getattr(cfg, key_attr, "")
-    return bool(key and key.strip())
+    if key and key.strip():
+        return True
+    # Vertex AI mode: service account JSON enables Google without an API key
+    if name == "google":
+        sa = getattr(cfg, "GOOGLE_SERVICE_ACCOUNT_JSON", "")
+        return bool(sa and sa.strip())
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +113,7 @@ async def _call_gemini(
     from google import genai
 
     response = await client.aio.models.generate_content(
-        model=PROVIDER_CONFIGS["gemini"]["model"],
+        model=PROVIDER_CONFIGS["google"]["model"],
         contents=json.dumps(payload),
         config=genai.types.GenerateContentConfig(
             system_instruction=system_prompt,
@@ -187,7 +193,7 @@ def _build_provider(name: str) -> CleaningProvider:
     cfg = PROVIDER_CONFIGS[name]
     max_conc = getattr(settings, cfg["max_concurrent_attr"])
 
-    if name == "gemini":
+    if name == "google":
         from app.utils.gemini_client import get_gemini_client
 
         return CleaningProvider(
