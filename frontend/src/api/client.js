@@ -229,6 +229,10 @@ export const applications = {
   create: (body) => api('/api/v1/applications', { method: 'POST', body }),
   update: (id, body) => api(`/api/v1/applications/${id}`, { method: 'PATCH', body }),
   stats: () => api('/api/v1/applications/stats'),
+  fromIntro: (introId) =>
+    api(`/api/v1/applications/from-intro/${introId}`, { method: 'POST' }),
+  fromFacilitation: (facilitationId) =>
+    api(`/api/v1/applications/from-facilitation/${facilitationId}`, { method: 'POST' }),
 };
 
 export const usage = {
