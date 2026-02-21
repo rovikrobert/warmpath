@@ -91,6 +91,7 @@ celery_app.conf.update(
 )
 celery_app.conf.include = [
     "app.tasks.csv_processing",
+    "app.tasks.csv_pipeline",
     "app.tasks.email_tasks",
     "app.tasks.feed_tasks",
     "app.tasks.infra_tasks",
