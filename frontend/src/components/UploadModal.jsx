@@ -3,7 +3,7 @@ import { contacts as contactsApi } from '../api/client';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import KeevsAvatar from './KeevsAvatar';
-import SourceTag from './ui/SourceTag';
+import KeevsTrivia from './KeevsTrivia';
 import { KEEVS_TRIVIA, shuffleArray } from '../utils/keevs-trivia';
 
 const LINKEDIN_EXPORT_URL = 'https://www.linkedin.com/mypreferences/d/download-my-data';
@@ -263,21 +263,12 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
               </div>
 
               {/* Keevs trivia */}
-              <div className="mt-3 flex min-h-[72px] items-start gap-3" aria-live="polite">
-                <KeevsAvatar size="sm" pulse={currentTrivia.isGreeting} className="mt-0.5 shrink-0" />
-                <div
-                  key={triviaIdx}
-                  className={`min-w-0 flex-1 transition-opacity duration-300 ${triviaFade ? 'opacity-100' : 'opacity-0'}`}
-                >
-                  <span className="text-xs font-medium text-amber-400">Keevs:</span>
-                  <p className="mt-0.5 text-sm leading-snug text-slate-300">{currentTrivia.text}</p>
-                  {currentTrivia.source && (
-                    <div className="mt-1">
-                      <SourceTag source={currentTrivia.source.source} label={currentTrivia.source.label} />
-                    </div>
-                  )}
-                </div>
-              </div>
+              <KeevsTrivia
+                triviaIdx={triviaIdx}
+                triviaFade={triviaFade}
+                triviaPool={triviaPool}
+                currentTrivia={currentTrivia}
+              />
             </div>
           )}
 
