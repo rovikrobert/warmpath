@@ -13,7 +13,7 @@ class TestProviderRegistry:
         with patch("app.services.ai_provider_pool.settings") as s:
             s.GOOGLE_API_KEY = "key"
             s.GOOGLE_SERVICE_ACCOUNT_JSON = ""
-            assert _is_provider_enabled("google", s) is True
+            assert _is_provider_enabled("gemini", s) is True
 
     def test_provider_disabled_when_key_empty(self):
         from app.services.ai_provider_pool import _is_provider_enabled
@@ -21,15 +21,15 @@ class TestProviderRegistry:
         with patch("app.services.ai_provider_pool.settings") as s:
             s.GOOGLE_API_KEY = ""
             s.GOOGLE_SERVICE_ACCOUNT_JSON = ""
-            assert _is_provider_enabled("google", s) is False
+            assert _is_provider_enabled("gemini", s) is False
 
-    def test_google_provider_enabled_via_vertex_ai_credentials(self):
+    def test_gemini_provider_enabled_via_vertex_ai_credentials(self):
         from app.services.ai_provider_pool import _is_provider_enabled
 
         with patch("app.services.ai_provider_pool.settings") as s:
             s.GOOGLE_API_KEY = ""
             s.GOOGLE_SERVICE_ACCOUNT_JSON = '{"type":"service_account"}'
-            assert _is_provider_enabled("google", s) is True
+            assert _is_provider_enabled("gemini", s) is True
 
     def test_get_enabled_providers_filters_correctly(self):
         from app.services.ai_provider_pool import (
@@ -63,7 +63,7 @@ class TestProviderRegistry:
             s.DEEPSEEK_MAX_CONCURRENT = 10
             enabled = get_enabled_providers(s)
             names = [p.name for p in enabled]
-            assert "google" in names
+            assert "gemini" in names
             assert "openai" in names
             assert "deepseek" in names
             assert "anthropic" not in names
