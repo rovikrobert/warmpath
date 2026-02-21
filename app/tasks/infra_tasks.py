@@ -26,7 +26,7 @@ def rate_limiter_watchdog() -> None:
 
     # Top up all configured cleaning providers
     if settings.GOOGLE_API_KEY or settings.GOOGLE_SERVICE_ACCOUNT_JSON:
-        top_up_tokens_sync("google", settings.GOOGLE_MAX_CONCURRENT)
+        top_up_tokens_sync("gemini", settings.GOOGLE_MAX_CONCURRENT)
     if settings.OPENAI_API_KEY:
         top_up_tokens_sync("openai", settings.OPENAI_MAX_CONCURRENT)
     if settings.GROQ_API_KEY:

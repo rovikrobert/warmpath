@@ -50,7 +50,7 @@ def _extract_contacts_array(parsed: Any) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 PROVIDER_CONFIGS = {
-    "google": {
+    "gemini": {
         "model": "gemini-2.5-flash",
         "key_attr": "GOOGLE_API_KEY",
         "max_concurrent_attr": "GOOGLE_MAX_CONCURRENT",
@@ -113,7 +113,7 @@ async def _call_gemini(
     from google import genai
 
     response = await client.aio.models.generate_content(
-        model=PROVIDER_CONFIGS["google"]["model"],
+        model=PROVIDER_CONFIGS["gemini"]["model"],
         contents=json.dumps(payload),
         config=genai.types.GenerateContentConfig(
             system_instruction=system_prompt,
