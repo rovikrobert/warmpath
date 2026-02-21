@@ -17,7 +17,7 @@ import httpx
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 
 from agents.chief_of_staff.telegram_bridge import split_telegram_message
-from agents.shared.whatsapp_formatter import WhatsAppFormatter
+from agents.shared.message_formatter import MessageFormatter
 
 logger = logging.getLogger(__name__)
 
@@ -207,7 +207,7 @@ async def telegram_webhook(
     expected_chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
     is_founder = str(chat_id) == expected_chat_id
 
-    parsed = WhatsAppFormatter.parse_reply(text)
+    parsed = MessageFormatter.parse_reply(text)
     command = parsed.get("command", "unknown")
 
     logger.info("Telegram command received: %s (from chat %s)", command, chat_id)
