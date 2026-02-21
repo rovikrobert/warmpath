@@ -18,7 +18,7 @@ def get_async_client() -> anthropic.AsyncAnthropic:
     if _async_client is None:
         _async_client = anthropic.AsyncAnthropic(
             api_key=settings.ANTHROPIC_API_KEY,
-            timeout=60.0,
+            timeout=120.0,
             max_retries=1,
         )
     return _async_client
@@ -30,7 +30,7 @@ def get_sync_client() -> anthropic.Anthropic:
     if _sync_client is None:
         _sync_client = anthropic.Anthropic(
             api_key=settings.ANTHROPIC_API_KEY,
-            timeout=60.0,
+            timeout=120.0,
             max_retries=1,
         )
     return _sync_client
