@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import SourceTag from './SourceTag';
 
 export default function EmptyState({
   icon,
@@ -7,6 +8,7 @@ export default function EmptyState({
   primaryAction,
   secondaryAction,
   stats,
+  statsSource,
   preview,
 }) {
   return (
@@ -30,17 +32,24 @@ export default function EmptyState({
       )}
 
       {stats && stats.length > 0 && (
-        <div className="mb-6 flex justify-center gap-8">
-          {stats.map((stat) => (
-            <div key={stat.label}>
-              <div className="text-lg font-semibold text-amber-400">
-                {stat.value}
+        <div className="mb-6">
+          <div className="flex justify-center gap-8">
+            {stats.map((stat) => (
+              <div key={stat.label}>
+                <div className="text-lg font-semibold text-amber-400">
+                  {stat.value}
+                </div>
+                <div className="text-xs uppercase tracking-wider text-slate-500">
+                  {stat.label}
+                </div>
               </div>
-              <div className="text-xs uppercase tracking-wider text-slate-500">
-                {stat.label}
-              </div>
+            ))}
+          </div>
+          {statsSource && (
+            <div className="mt-2 text-center">
+              <SourceTag source={statsSource} />
             </div>
-          ))}
+          )}
         </div>
       )}
 

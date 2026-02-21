@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { marketplace as mpApi, credits as creditsApi } from '../api/client';
 import { trackEvent } from '../utils/analytics';
+import { SOURCES } from '../utils/sources';
 import { MarketplaceBadge } from '../utils/marketplace';
 import EmptyState from '../components/ui/EmptyState';
+import SourceTag from '../components/ui/SourceTag';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
 
 function StatusBadge({ status }) {
@@ -157,10 +159,11 @@ export default function MarketplaceOverview() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
             <div>
-              <p className="text-sm font-semibold text-emerald-400">Your employer pays $2,000-$10,000 per referral hire</p>
+              <p className="text-sm font-semibold text-emerald-400">Your employer pays {SOURCES.REFERRAL_BONUS_RANGE.claim} per referral hire</p>
               <p className="mt-0.5 text-sm text-emerald-400/80">
                 When you approve an intro and your contact hires the candidate, the referral bonus goes directly to you.
-                WarmPath sends you pre-qualified candidates so you don't have to find them yourself.
+                WarmPath sends you pre-qualified candidates so you don't have to find them yourself.{' '}
+                <SourceTag source={SOURCES.REFERRAL_BONUS_RANGE.source} label={SOURCES.REFERRAL_BONUS_RANGE.label} />
               </p>
             </div>
           </div>
@@ -214,6 +217,7 @@ export default function MarketplaceOverview() {
             title="Requests will appear here"
             description="When job seekers find your contacts on the marketplace, you'll review their profile and decide whether to make an intro. You earn referral bonuses from your employer for successful hires."
             stats={[{ value: '$2-10K', label: 'avg referral bonus' }]}
+            statsSource={SOURCES.REFERRAL_BONUS_RANGE.source}
           />
         ) : (
           <div className="divide-y divide-slate-700/50">

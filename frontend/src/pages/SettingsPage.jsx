@@ -4,6 +4,8 @@ import { useUser as useClerkUser } from '@clerk/clerk-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../context/AuthContext';
 import { auth as authApi, privacy as privacyApi, marketplace as mpApi, contacts as contactsApi } from '../api/client';
+import { SOURCES } from '../utils/sources';
+import SourceTag from '../components/ui/SourceTag';
 import Spinner from '../components/ui/Spinner';
 
 // ---------------------------------------------------------------------------
@@ -605,8 +607,8 @@ function SharingTab() {
             <h2 className="text-base font-semibold text-slate-50">Share my network on the marketplace</h2>
             <p className="text-sm text-slate-400">
               {prefs?.opt_in_marketplace
-                ? 'Your contacts are visible (anonymized) to candidates. Referral bonus ($2-10K) goes to you.'
-                : 'Enable sharing to capture referral bonuses ($2-10K per hire) and earn credits.'}
+                ? <>Your contacts are visible (anonymized) to candidates. Referral bonus ({SOURCES.REFERRAL_BONUS_RANGE.claim}) goes to you. <SourceTag source={SOURCES.REFERRAL_BONUS_RANGE.source} label={SOURCES.REFERRAL_BONUS_RANGE.label} /></>
+                : <>Enable sharing to capture referral bonuses ({SOURCES.REFERRAL_BONUS_RANGE.claim} per hire) and earn credits. <SourceTag source={SOURCES.REFERRAL_BONUS_RANGE.source} label={SOURCES.REFERRAL_BONUS_RANGE.label} /></>}
             </p>
           </div>
           <button onClick={() => setPrefs({ ...prefs, opt_in_marketplace: !prefs.opt_in_marketplace })} role="switch" aria-checked={!!prefs?.opt_in_marketplace} aria-label="Share my network"

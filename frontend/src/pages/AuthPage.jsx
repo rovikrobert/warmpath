@@ -1,5 +1,7 @@
 import { SignIn, SignUp } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import SourceTag from '../components/ui/SourceTag';
+import { SOURCES } from '../utils/sources';
 
 function hashIndicatesSignup() {
   return window.location.hash.replace(/\/+$/, '') === '#sign-up';
@@ -25,7 +27,8 @@ export default function AuthPage() {
             Get referred to your dream job
           </p>
           <p className="mt-1 text-sm text-slate-400">
-            Employee referrals convert at 40% vs 1% for cold applications.
+            Employee referrals convert at {SOURCES.COLD_VS_REFERRAL.claim} for cold applications.{' '}
+            <SourceTag source={SOURCES.COLD_VS_REFERRAL.source} label={SOURCES.COLD_VS_REFERRAL.label} />
           </p>
         </div>
 
