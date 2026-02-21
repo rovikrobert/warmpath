@@ -11,7 +11,6 @@ from __futu[RESEND_KEY_REDACTED] import annotations
 import asyncio
 import json
 import logging
-import random
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -264,12 +263,16 @@ def get_enabled_providers(cfg: Any = None) -> list[CleaningProvider]:
 MAX_DISPATCH_ROUNDS = 3
 SLOT_ACQUIRE_TIMEOUT = 2  # seconds
 
+# Priority order: fastest/cheapest first, paid APIs as fallback
+PROVIDER_PRIORITY = ["groq", "gemini", "deepseek", "anthropic", "openai"]
+
 
 async def dispatch_batch(batch: list[dict]) -> list[dict]:
     """Route a cleaning batch to the first available provider.
 
-    Tries providers round-robin across 3 retry rounds with exponential backoff.
-    Falls back to mock cleaner if all providers are exhausted.
+    Tries providers in priority order (Groq → Gemini → others) across
+    3 retry rounds with exponential backoff. Falls back to mock cleaner
+    if all providers are exhausted.
     Returns post-processed (deterministic normalized) results.
     """
     enabled = get_enabled_providers()
@@ -277,10 +280,13 @@ async def dispatch_batch(batch: list[dict]) -> list[dict]:
         logger.warning("No AI providers configured, using mock cleaner")
         return clean_contacts_mock(batch)
 
+    # Sort by priority — unknown providers go last
+    priority_map = {name: i for i, name in enumerate(PROVIDER_PRIORITY)}
+    enabled.sort(key=lambda p: priority_map.get(p.name, 99))
+
     payload = _build_cleanup_payload(batch)
 
     for round_num in range(MAX_DISPATCH_ROUNDS):
-        random.shuffle(enabled)
         for provider in enabled:
             try:
                 used_redis = await acqui[RESEND_KEY_REDACTED](
