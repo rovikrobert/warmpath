@@ -34,6 +34,9 @@ class FeedbackRequest(BaseModel):
     comment: str | None = Field(None, max_length=1000)
 
 
+_SKIP_EMAIL_DOMAINS = {"test.com", "example.com", "localhost"}
+
+
 def _sync_feedback_to_notion(
     feature: str,
     rating: int,
@@ -42,6 +45,11 @@ def _sync_feedback_to_notion(
 ) -> None:
     """Sync feedback to Notion Beta Feedback database. Best-effort, never raises."""
     try:
+        # Skip test/synthetic emails (prevents pytest runs from polluting Notion)
+        domain = user_email.rsplit("@", 1)[-1].lower()
+        if domain in _SKIP_EMAIL_DOMAINS:
+            return
+
         from agents.shared.notion_client import NotionClient
 
         client = NotionClient()
