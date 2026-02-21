@@ -803,7 +803,7 @@ export default function ContactsPage() {
         <UploadModal
           onClose={() => setShowBulkModal(false)}
           onComplete={() => load()}
-          hasContacts={contacts.length > 0}
+          hasContacts={contactsList.length > 0}
         />
       )}
 
