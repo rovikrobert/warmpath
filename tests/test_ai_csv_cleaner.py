@@ -230,6 +230,9 @@ class TestCleanContactsRealMode:
 
         with (
             patch(
+                "app.services.ai_csv_cleaner.settings"
+            ) as mock_settings,
+            patch(
                 "app.services.ai_csv_cleaner._get_anthropic_client",
                 return_value=mock_client,
             ),
@@ -243,6 +246,10 @@ class TestCleanContactsRealMode:
                 new_callable=AsyncMock,
             ),
         ):
+            mock_settings.CLEANUP_PROVIDER = "anthropic"
+            mock_settings.ANTHROPIC_MAX_CONCURRENT = 5
+            mock_settings.QUEUE_DEPTH_THRESHOLD = 20
+            mock_settings.AI_MOCK_MODE = False
             from app.services.ai_csv_cleaner import clean_contacts_real
 
             result = await clean_contacts_real(contacts)

@@ -398,9 +398,15 @@ async def _celery_run(task, csv_upload_id, user_id, file_content_b64):
     """Async wrapper for the Celery task — uses shared DB engine."""
     import logging
 
-    from app.database import _get_session_factory
+    from app.database import _get_engine, _get_session_factory
 
     logger = logging.getLogger(__name__)
+
+    # asyncio.run() creates a new event loop each time, but the @lru_cache
+    # engine retains asyncpg connections bound to the previous loop.
+    # Dispose stale connections so asyncpg reconnects on the current loop.
+    await _get_engine().dispose()
+
     factory = _get_session_factory()
 
     async def publish(upload_id, **fields):
