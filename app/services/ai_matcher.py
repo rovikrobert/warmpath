@@ -1,6 +1,6 @@
 """AI-powered referral matching service.
 
-Uses the Anthropic Claude API to assess referral paths between a user's
+Uses Groq (Llama 3.3 70B) to assess referral paths between a user's
 contacts and target companies.  When AI_MOCK_MODE=true (default), returns
 deterministic scores based on company match, department alignment, and
 seniority heuristics — no API key required.
@@ -18,7 +18,6 @@ from app.utils.performance import timed
 from datetime import datetime, timezone
 from decimal import Decimal
 
-import anthropic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -32,12 +31,9 @@ from app.models.user import ConnectorProfile, User
 
 logger = logging.getLogger(__name__)
 
-BATCH_SIZE = (
-    25  # contacts per Claude API call (keep small to avoid response truncation)
-)
+BATCH_SIZE = 25  # contacts per API call (keep small to avoid response truncation)
 MAX_CONCURRENT_BATCHES = 10
-CLAUDE_MODEL = settings.CLAUDE_MODEL
-CLAUDE_SCORER_MODEL = settings.CLAUDE_SCORER_MODEL
+GROQ_SCORER_MODEL = "llama-3.3-70b-versatile"
 
 
 # ---------------------------------------------------------------------------
@@ -516,69 +512,63 @@ def _repair_truncated_json(raw: str) -> list[dict] | None:
     return None
 
 
-@timed("ai_call_claude")
-async def _call_claude_api(
+@timed("ai_call_groq")
+async def _call_groq_api(
     search: SearchRequest,
     contacts: list[Contact],
     profile: ConnectorProfile | None = None,
     user_name: str | None = None,
 ) -> tuple[list[ContactMatch], TokenUsage]:
-    """Call the real Claude API with the referral-focused prompt.
+    """Call the Groq API (Llama 3.3 70B) with the referral-focused prompt.
 
     Retries once on rate limit (429) with exponential backoff.
     Falls back to mock scoring on persistent API failures.
     """
-    from app.utils.anthropic_client import get_async_client
+    from openai import RateLimitError as OpenAIRateLimitError
 
-    client = get_async_client()
+    from app.utils.openai_compat_client import get_groq_client
+
+    client = get_groq_client()
     user_prompt = _build_user_prompt(search, contacts, profile, user_name)
 
     max_retries = 2
     for attempt in range(max_retries):
         try:
-            message = await client.messages.create(
-                model=CLAUDE_SCORER_MODEL,
+            response = await client.chat.completions.create(
+                model=GROQ_SCORER_MODEL,
                 max_tokens=8192,
-                system=_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_prompt}],
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0,
             )
             break
-        except anthropic.RateLimitError as exc:
-            hdrs = getattr(getattr(exc, "response", None), "headers", {})
+        except OpenAIRateLimitError as exc:
             logger.warning(
-                "Claude rate limit hit (attempt %d/%d): "
-                "requests=%s/%s, tokens=%s/%s, retry-after=%s",
+                "Groq rate limit hit (attempt %d/%d): %s",
                 attempt + 1,
                 max_retries,
-                hdrs.get("x-ratelimit-remaining-requests", "?"),
-                hdrs.get("x-ratelimit-limit-requests", "?"),
-                hdrs.get("x-ratelimit-remaining-tokens", "?"),
-                hdrs.get("x-ratelimit-limit-tokens", "?"),
-                hdrs.get("retry-after", "?"),
+                exc,
             )
             if attempt < max_retries - 1:
-                wait_str = hdrs.get("retry-after")
-                wait = (
-                    int(wait_str)
-                    if wait_str and wait_str.isdigit()
-                    else 2 ** (attempt + 1)
-                )
-                await asyncio.sleep(wait)
+                await asyncio.sleep(2 ** (attempt + 1))
             else:
                 logger.error(
-                    "Claude rate limit persists after retries, falling back to mock"
+                    "Groq rate limit persists after retries, falling back to mock"
                 )
                 return _mock_score_contacts(search, contacts), TokenUsage(0, 0)
-        except anthropic.APIError as exc:
-            logger.error("Claude API error: %s — falling back to mock scoring", exc)
+        except Exception as exc:
+            logger.error("Groq API error: %s — falling back to mock scoring", exc)
             return _mock_score_contacts(search, contacts), TokenUsage(0, 0)
 
     usage = TokenUsage(
-        input_tokens=message.usage.input_tokens,
-        output_tokens=message.usage.output_tokens,
+        input_tokens=response.usage.prompt_tokens if response.usage else 0,
+        output_tokens=response.usage.completion_tokens if response.usage else 0,
     )
 
-    raw = message.content[0].text.strip()
+    raw = response.choices[0].message.content.strip()
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1]
         raw = raw.rsplit("```", 1)[0].strip()
@@ -590,20 +580,30 @@ async def _call_claude_api(
         parsed = _repair_truncated_json(raw)
         if parsed is None:
             logger.error(
-                "Claude response not valid JSON even after repair (len=%d, tail=%r)",
+                "Groq response not valid JSON even after repair (len=%d, tail=%r)",
                 len(raw),
                 raw[-100:] if raw else "",
             )
-            return _mock_score_contacts(search, contacts), TokenUsage(
-                message.usage.input_tokens, message.usage.output_tokens
-            )
+            return _mock_score_contacts(search, contacts), usage
+
+    # Groq with json_object mode may wrap array in an object
+    if isinstance(parsed, dict):
+        for key in ("contacts", "results", "data"):
+            if key in parsed and isinstance(parsed[key], list):
+                parsed = parsed[key]
+                break
+        else:
+            # Single-key dict wrapping an array
+            vals = [v for v in parsed.values() if isinstance(v, list)]
+            parsed = vals[0] if vals else []
+
     valid_ids = {str(c.id) for c in contacts}
 
     results: list[ContactMatch] = []
     for item in parsed:
         cid = item.get("contact_id", "")
         if cid not in valid_ids:
-            logger.warning("Claude returned unknown contact_id: %s — skipping", cid)
+            logger.warning("Groq returned unknown contact_id: %s — skipping", cid)
             continue
 
         results.append(
@@ -813,7 +813,7 @@ async def score_contacts(
 ) -> list[ContactMatch]:
     """Score contacts against search criteria for referral potential.
 
-    Uses mock mode when AI_MOCK_MODE=true, real Claude API otherwise.
+    Uses mock mode when AI_MOCK_MODE=true, real Groq API otherwise.
     """
     if settings.AI_MOCK_MODE:
         return _mock_score_contacts(search, contacts, profile)
@@ -834,10 +834,10 @@ async def score_contacts(
         batch_num: int, batch: list[Contact]
     ) -> tuple[list[ContactMatch], int, int]:
         used_redis = await acquire_slot(
-            "anthropic", max_concurrent=settings.ANTHROPIC_MAX_CONCURRENT
+            "groq", max_concurrent=settings.GROQ_MAX_CONCURRENT
         )
         try:
-            batch_results, usage = await _call_claude_api(
+            batch_results, usage = await _call_groq_api(
                 search, batch, profile, user_name
             )
             logger.info(
@@ -850,21 +850,21 @@ async def score_contacts(
                 usage.output_tokens,
             )
             return batch_results, usage.input_tokens, usage.output_tokens
-        except anthropic.APIError as exc:
+        except (json.JSONDecodeError, KeyError, ValueError) as exc:
             logger.error(
-                "Claude API error on batch %d (%d contacts): %s — skipping",
+                "Failed to parse Groq response for batch %d: %s — skipping",
+                batch_num,
+                exc,
+            )
+        except Exception as exc:
+            logger.error(
+                "Groq API error on batch %d (%d contacts): %s — skipping",
                 batch_num,
                 len(batch),
                 exc,
             )
-        except (json.JSONDecodeError, KeyError, ValueError) as exc:
-            logger.error(
-                "Failed to parse Claude response for batch %d: %s — skipping",
-                batch_num,
-                exc,
-            )
         finally:
-            await release_slot("anthropic", used_redis)
+            await release_slot("groq", used_redis)
         return [], 0, 0
 
     results = await asyncio.gather(
@@ -887,7 +887,7 @@ async def score_contacts(
             resource_type="search_request",
             resource_id=search.id,
             metadata_={
-                "model": CLAUDE_SCORER_MODEL,
+                "model": GROQ_SCORER_MODEL,
                 "input_tokens": total_input_tokens,
                 "output_tokens": total_output_tokens,
                 "total_tokens": total_input_tokens + total_output_tokens,
@@ -1017,7 +1017,7 @@ async def run_search(
     )
 
     # Upsert match results (skip scores below 20)
-    model_version = "mock-v2-referral" if settings.AI_MOCK_MODE else CLAUDE_MODEL
+    model_version = "mock-v2-referral" if settings.AI_MOCK_MODE else GROQ_SCORER_MODEL
     match_results = await _upsert_match_results(
         search_id, user_id, matches, model_version, db
     )

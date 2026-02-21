@@ -6,8 +6,8 @@ seniority levels, locations, and relationship types.  Two modes:
 
 * **Mock mode** (``parse_query_mock``): regex / keyword extraction — fast,
   deterministic, no API key required.  Used when ``AI_MOCK_MODE=true``.
-* **Real mode** (``parse_query_real``): Claude API call that returns a
-  ``ParsedQuery``.  Falls back to mock on any error.
+* **Real mode** (``parse_query_real``): Groq API call (Llama 3.3 70B) that
+  returns a ``ParsedQuery``.  Falls back to mock on any error.
 
 Also provides ``score_contact()`` for weighted scoring of contacts against
 a parsed query.
@@ -583,23 +583,29 @@ alumni, industry_peer, friend, mentor, recruiter]
 Return ONLY the JSON object. No explanation, no markdown fences."""
 
 
+GROQ_NLP_MODEL = "llama-3.3-70b-versatile"
+
+
 def parse_query_real(query: str) -> ParsedQuery:
-    """Parse a query using the Claude API, falling back to mock on error."""
+    """Parse a query using the Groq API (Llama 3.3 70B), falling back to mock on error."""
     try:
         import json as _json
 
-        from app.config import settings as _settings
-        from app.utils.anthropic_client import get_sync_client
+        from app.utils.openai_compat_client import get_groq_sync_client
 
-        client = get_sync_client()
-        response = client.messages.create(
-            model=_settings.CLAUDE_MODEL,
+        client = get_groq_sync_client()
+        response = client.chat.completions.create(
+            model=GROQ_NLP_MODEL,
             max_tokens=512,
-            system=_PARSE_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": query}],
+            messages=[
+                {"role": "system", "content": _PARSE_SYSTEM_PROMPT},
+                {"role": "user", "content": query},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
         )
 
-        text = response.content[0].text.strip()
+        text = response.choices[0].message.content.strip()
         data = _json.loads(text)
 
         return ParsedQuery(
@@ -611,7 +617,7 @@ def parse_query_real(query: str) -> ParsedQuery:
             raw_query=query,
         )
     except Exception:
-        logger.warning("Claude parse failed for query %r, falling back to mock", query)
+        logger.warning("Groq parse failed for query %r, falling back to mock", query)
         return parse_query_mock(query)
 
 
@@ -631,6 +637,11 @@ def parse_query(query: str) -> ParsedQuery:
     if _settings.AI_MOCK_MODE:
         return parse_query_mock(query)
     return parse_query_real(query)
+
+
+# ---------------------------------------------------------------------------
+# Real Claude API parser — kept as alias for backward compatibility
+# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
