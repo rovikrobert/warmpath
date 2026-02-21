@@ -6,6 +6,7 @@ import TagInput from '../components/TagInput';
 import KeevsAvatar from '../components/KeevsAvatar';
 import { trackEvent } from '../utils/analytics';
 import { SOURCES } from '../utils/sources';
+import { KEEVS_TRIVIA, shuffleArray } from '../utils/keevs-trivia';
 import Button from '../components/ui/Button';
 import SourceTag from '../components/ui/SourceTag';
 import Spinner from '../components/ui/Spinner';
@@ -143,6 +144,11 @@ export default function OnboardingPage() {
   const [uploadProgressWidth, setUploadProgressWidth] = useState(0);
   const [uploadProgressMsg, setUploadProgressMsg] = useState('');
 
+  // Keevs trivia rotation during upload
+  const [triviaPool, setTriviaPool] = useState([]);
+  const [triviaIdx, setTriviaIdx] = useState(-1); // -1 = greeting
+  const [triviaFade, setTriviaFade] = useState(true);
+
   // Resume from last completed step on mount
   useEffect(() => {
     let cancelled = false;
@@ -203,6 +209,34 @@ export default function OnboardingPage() {
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [uploading]);
+
+  // Keevs trivia rotation — greeting first, then shuffled trivia at 8s intervals
+  useEffect(() => {
+    if (!uploading) {
+      setTriviaIdx(-1);
+      setTriviaFade(true);
+      return;
+    }
+    setTriviaPool(shuffleArray(KEEVS_TRIVIA));
+    setTriviaIdx(-1);
+    setTriviaFade(true);
+
+    const interval = setInterval(() => {
+      setTriviaFade(false);
+      setTimeout(() => {
+        setTriviaIdx((prev) => {
+          const next = prev + 1;
+          return next >= KEEVS_TRIVIA.length ? 0 : next;
+        });
+        setTriviaFade(true);
+      }, 300);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [uploading]);
+
+  const currentTrivia = triviaIdx === -1
+    ? { text: 'Hang tight — scoring your network takes a moment. Worth it.', source: null, isGreeting: true }
+    : { ...triviaPool[triviaIdx], isGreeting: false };
 
   // Step 10: Work history + resume import
   const [workHistory, setWorkHistory] = useState([]);
@@ -802,6 +836,23 @@ export default function OnboardingPage() {
                     />
                   </div>
                   <p className="text-xs text-slate-400">{uploadProgressMsg}</p>
+
+                  {/* Keevs trivia */}
+                  <div className="mt-3 flex min-h-[72px] items-start gap-3" aria-live="polite">
+                    <KeevsAvatar size="sm" pulse={currentTrivia.isGreeting} className="mt-0.5 shrink-0" />
+                    <div
+                      key={triviaIdx}
+                      className={`min-w-0 flex-1 transition-opacity duration-300 ${triviaFade ? 'opacity-100' : 'opacity-0'}`}
+                    >
+                      <span className="text-xs font-medium text-amber-400">Keevs:</span>
+                      <p className="mt-0.5 text-sm leading-snug text-slate-300">{currentTrivia.text}</p>
+                      {currentTrivia.source && (
+                        <div className="mt-1">
+                          <SourceTag source={currentTrivia.source.source} label={currentTrivia.source.label} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
