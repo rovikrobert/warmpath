@@ -71,6 +71,13 @@ class ApplicationResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SourceStats(BaseModel):
+    sent: int = 0
+    responded: int = 0
+    interviews: int = 0
+    interview_rate: float = 0.0
+
+
 class ApplicationStatsResponse(BaseModel):
     total: int
     by_status: dict[str, int]
@@ -78,3 +85,4 @@ class ApplicationStatsResponse(BaseModel):
     interview_rate: float
     avg_days_to_response: float | None
     best_channel: str | None
+    by_source: dict[str, SourceStats] = {}

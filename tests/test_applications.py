@@ -956,3 +956,46 @@ class TestSuggestTrack:
         prefilled = meta["prefilled_application"]
         assert prefilled["contact_id"] == contact_id
         assert prefilled["channel"] == "linkedin"
+
+
+# ---------------------------------------------------------------------------
+# by_source breakdown in stats
+# ---------------------------------------------------------------------------
+
+
+async def test_stats_includes_by_source_breakdown(client: AsyncClient):
+    """Stats endpoint returns interview rates broken down by source_type."""
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email="sourcestats@test.com", full_name="Source Stats"
+        )
+        # Create referral apps (2 sent, 1 interview)
+        for i, app_status in enumerate(["message_sent", "interview_scheduled"]):
+            app = Application(
+                user_id=user.id,
+                company_name=f"RefCo{i}",
+                status=app_status,
+                source_type="own_network",
+            )
+            db.add(app)
+        # Create manual apps (3 sent, 0 interviews)
+        for i in range(3):
+            app = Application(
+                user_id=user.id,
+                company_name=f"ColdCo{i}",
+                status="message_sent",
+                source_type="manual",
+            )
+            db.add(app)
+        await db.commit()
+
+    resp = await client.get("/api/v1/applications/stats", headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert "by_source" in data
+    own = data["by_source"]["own_network"]
+    assert own["sent"] == 2
+    assert own["interview_rate"] == 0.5
+    manual = data["by_source"]["manual"]
+    assert manual["sent"] == 3
+    assert manual["interview_rate"] == 0.0
