@@ -111,7 +111,10 @@ async def _check_contact_in_vault(
     Uses hash comparison only — never exposes the network holder's contact PII.
     """
     contact_result = await db.execute(
-        select(Contact).where(Contact.id == listing.contact_id)
+        select(Contact).where(
+            Contact.id == listing.contact_id,
+            Contact.user_id == listing.network_holder_id,
+        )
     )
     listed_contact = contact_result.scalar_one_or_none()
     if listed_contact is None:
