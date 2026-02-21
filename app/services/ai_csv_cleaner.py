@@ -741,7 +741,7 @@ async def _clean_batch_gemini(
     from app.utils.rate_limiter import acquire_slot, release_slot
 
     used_redis = await acquire_slot(
-        "gemini", max_concurrent=settings.GOOGLE_MAX_CONCURRENT
+        "google", max_concurrent=settings.GOOGLE_MAX_CONCURRENT
     )
     try:
         payload = _build_cleanup_payload(batch)
@@ -769,7 +769,7 @@ async def _clean_batch_gemini(
         logger.exception("Gemini batch clean failed (batch=%d)", len(batch))
         raise
     finally:
-        await release_slot("gemini", used_redis)
+        await release_slot("google", used_redis)
 
 
 @timed("csv_clean_real")

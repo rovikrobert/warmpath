@@ -9,14 +9,17 @@ Supports two modes:
 - **AI Studio**: Set GOOGLE_API_KEY. Simple API key auth.
 """
 
+from __future__ import annotations
+
 import contextlib
 import json
-import os
-import tempfile
+import logging
 
 from google import genai
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 _client: genai.Client | None = None
 
@@ -32,26 +35,31 @@ def get_gemini_client() -> genai.Client:
         return _client
 
     if settings.GOOGLE_SERVICE_ACCOUNT_JSON.strip():
-        # Vertex AI mode — write SA key to temp file for ADC
-        sa_json = settings.GOOGLE_SERVICE_ACCOUNT_JSON
-        fd, path = tempfile.mkstemp(suffix=".json", prefix="gcp_sa_")
-        with os.fdopen(fd, "w") as f:
-            f.write(sa_json)
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = path
+        from app.utils.gcp_credentials import load_gcp_credentials
+
+        credentials = load_gcp_credentials(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
 
         # Extract project from SA JSON if not explicitly set
         project = settings.GOOGLE_PROJECT_ID
         if not project:
             with contextlib.suppress(json.JSONDecodeError, AttributeError):
-                project = json.loads(sa_json).get("project_id", "")
+                project = json.loads(settings.GOOGLE_SERVICE_ACCOUNT_JSON.strip()).get(
+                    "project_id", ""
+                )
 
         _client = genai.Client(
             vertexai=True,
             project=project,
             location=settings.GOOGLE_LOCATION,
+            credentials=credentials,
+        )
+        logger.info(
+            "Gemini client initialized in Vertex AI mode (project=%s, location=%s)",
+            project,
+            settings.GOOGLE_LOCATION,
         )
     else:
-        # AI Studio mode — simple API key
         _client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        logger.info("Gemini client initialized in AI Studio mode")
 
     return _client

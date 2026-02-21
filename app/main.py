@@ -74,13 +74,20 @@ if not settings.AI_MOCK_MODE:
             "AI_MOCK_MODE is disabled but ANTHROPIC_API_KEY is not set. "
             "Either set AI_MOCK_MODE=true or provide a valid API key."
         )
-    if settings.CLEANUP_PROVIDER == "gemini" and not settings.GOOGLE_API_KEY.strip():
-        raise RuntimeError("CLEANUP_PROVIDER=gemini but GOOGLE_API_KEY is not set.")
+    _has_gemini = (
+        settings.GOOGLE_API_KEY.strip() or settings.GOOGLE_SERVICE_ACCOUNT_JSON.strip()
+    )
+    if settings.CLEANUP_PROVIDER == "gemini" and not _has_gemini:
+        raise RuntimeError(
+            "CLEANUP_PROVIDER=gemini but neither GOOGLE_API_KEY nor "
+            "GOOGLE_SERVICE_ACCOUNT_JSON is set."
+        )
     # V2 pipeline: warn if no cleaning providers are configured
     if settings.CSV_PIPELINE_V2:
         has_any_provider = any(
             [
-                settings.GOOGLE_API_KEY.strip(),
+                settings.GOOGLE_API_KEY.strip()
+                or settings.GOOGLE_SERVICE_ACCOUNT_JSON.strip(),
                 settings.OPENAI_API_KEY.strip(),
                 settings.GROQ_API_KEY.strip(),
                 settings.DEEPSEEK_API_KEY.strip(),
