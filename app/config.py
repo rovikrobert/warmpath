@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     DEEPSEEK_MAX_CONCURRENT: int = 10
     # Pipeline v2 settings
     CSV_PIPELINE_V2: bool = False  # Feature flag: True = streaming pipeline
-    CSV_CHUNK_SIZE: int = 200  # contacts per AI batch
+    CSV_CHUNK_SIZE: int = 500  # contacts per AI batch
     CSV_STREAM_TTL_SECONDS: int = 3600  # 1 hour TTL for Redis Streams
     CLEANUP_PROVIDER: str = "gemini"  # "anthropic" | "gemini"
     QUEUE_DEPTH_THRESHOLD: int = 20
