@@ -229,9 +229,7 @@ class TestCleanContactsRealMode:
         mock_client.messages.create = AsyncMock(return_value=mock_message)
 
         with (
-            patch(
-                "app.services.ai_csv_cleaner.settings"
-            ) as mock_settings,
+            patch("app.services.ai_csv_cleaner.settings") as mock_settings,
             patch(
                 "app.services.ai_csv_cleaner._get_anthropic_client",
                 return_value=mock_client,
