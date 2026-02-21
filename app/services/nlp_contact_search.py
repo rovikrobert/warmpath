@@ -663,15 +663,11 @@ async def search_user_contacts(
     # Resolve company names to IDs
     resolved_company_ids: list[uuid.UUID] = []
     if parsed.companies:
-        for company_name in parsed.companies:
-            result = await db.execute(
-                sa_select(Company.id).where(
-                    sa_func.lower(Company.name) == company_name.lower()
-                )
-            )
-            cid = result.scalar_one_or_none()
-            if cid is not None:
-                resolved_company_ids.append(cid)
+        lowered_names = [c.lower() for c in parsed.companies]
+        result = await db.execute(
+            sa_select(Company.id).where(sa_func.lower(Company.name).in_(lowered_names))
+        )
+        resolved_company_ids = [row[0] for row in result.all()]
 
     # Build base query
     base_query = (

@@ -209,6 +209,23 @@ async def batch_discover(
     """
     results: dict[str, dict] = {}
 
+    # Batch-load all existing boards in one query
+    unique_keys: list[str] = []
+    seen: set[str] = set()
+    for name in company_names:
+        key = name.strip().lower()
+        if key and key not in seen:
+            unique_keys.append(key)
+            seen.add(key)
+
+    existing_boards: dict[str, CompanyBoard] = {}
+    if unique_keys:
+        existing_result = await db.execute(
+            select(CompanyBoard).where(CompanyBoard.company_key.in_(unique_keys))
+        )
+        for board in existing_result.scalars().all():
+            existing_boards[board.company_key] = board
+
     for name in company_names:
         key = name.strip().lower()
         if not key:
@@ -218,8 +235,8 @@ async def batch_discover(
         if key in results:
             continue
 
-        # Check if already in DB
-        existing = await get_board_by_key(db, key)
+        # Check batch-loaded results
+        existing = existing_boards.get(key)
         if existing is not None:
             results[key] = {
                 "status": "exists",
@@ -229,7 +246,7 @@ async def batch_discover(
             continue
 
         # Probe ATS platforms
-        discovered = await discover_boards(name)
+        discovered = await discover_boards(key)
 
         if discovered is not None:
             source = list(discovered.keys())[0]

@@ -161,7 +161,15 @@ async def _propagate_direct(
     signal_value: dict,
     source_count: int,
 ) -> int:
-    """Propagate a consensus value to contacts with NULL fields."""
+    """Propagate a consensus value to contacts with NULL fields.
+
+    NOTE: This query is intentionally NOT scoped by user_id.  Freshness
+    propagation is a cross-vault operation by design — when multiple users
+    confirm that a contact changed companies, the update applies to ALL
+    users who have the same contact (matched via privacy-safe blind index,
+    not PII).  Only NULL fields are filled; existing data is never overwritten.
+    See ARCHITECTURE.md "Freshness Aggregation" for details.
+    """
     value_key, contact_field = _DIRECT_PROPAGATION[signal_type]
     consensus_val = signal_value.get(value_key)
     if not consensus_val:
@@ -247,15 +255,19 @@ async def _create_company_change_feed_items(
     total_contacts = len(contacts)
     stale_confidence = round(source_count / max(total_contacts, 1), 2)
 
-    for contact in target_contacts:
-        existing = await db.execute(
-            select(func.count(FeedItem.id)).where(
-                FeedItem.user_id == contact.user_id,
-                FeedItem.dedup_key == dedup,
-                FeedItem.dismissed_at.is_(None),
-            )
+    # Batch dedup check — find all user_ids that already have this feed item
+    target_user_ids = [c.user_id for c in target_contacts]
+    existing_result = await db.execute(
+        select(FeedItem.user_id).where(
+            FeedItem.user_id.in_(target_user_ids),
+            FeedItem.dedup_key == dedup,
+            FeedItem.dismissed_at.is_(None),
         )
-        if existing.scalar_one() > 0:
+    )
+    already_notified = {row[0] for row in existing_result.all()}
+
+    for contact in target_contacts:
+        if contact.user_id in already_notified:
             continue
 
         item = FeedItem(
