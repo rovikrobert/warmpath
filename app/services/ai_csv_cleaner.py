@@ -43,6 +43,17 @@ For each contact in the input JSON array, clean and normalize these fields:
 - current_company: Normalize to the well-known canonical form (e.g. "GOOGLE LLC" -> "Google", "Meta Platforms, Inc." -> "Meta", "microsoft corp" -> "Microsoft"). For lesser-known companies, just fix capitalization and remove redundant suffixes like "Inc", "LLC", "Ltd", "Corp".
 - current_title: Clean up abbreviations and fix capitalization. E.g. "sr. swe" -> "Senior Software Engineer", "PM" -> "Product Manager", "eng" -> "Engineer". Keep it professional and standardized.
 
+Examples:
+
+Input: [{"first_name": "JOHN", "last_name": "doe", "current_company": "GOOGLE LLC", "current_title": "sr. swe"}]
+Output: [{"first_name": "John", "last_name": "Doe", "current_company": "Google", "current_title": "Senior Software Engineer"}]
+
+Input: [{"first_name": "jane smith", "last_name": "", "current_company": "Meta Platforms, Inc.", "current_title": "pm"}]
+Output: [{"first_name": "Jane", "last_name": "Smith", "current_company": "Meta", "current_title": "Product Manager"}]
+
+Input: [{"first_name": "wei", "last_name": "CHEN", "current_company": "acme solutions pte ltd", "current_title": "sr devops eng"}]
+Output: [{"first_name": "Wei", "last_name": "Chen", "current_company": "Acme Solutions", "current_title": "Senior DevOps Engineer"}]
+
 Return a JSON array with one object per input contact. Each object must have exactly these keys:
 - "first_name"
 - "last_name"
@@ -609,6 +620,45 @@ def _merge_cleaned_fields(original: dict, cleaned_fields: dict) -> dict:
     # Infer company from email if still empty
     if not merged["current_company"]:
         merged["current_company"] = _infer_company_from_email(merged.get("email"))
+
+    # Regenerate fingerprint
+    merged["fingerprint"] = generate_fingerprint(
+        merged.get("full_name"),
+        merged.get("current_company"),
+        merged.get("linkedin_url"),
+    )
+
+    return merged
+
+
+def post_process_ai_output(original: dict, ai_cleaned: dict) -> dict:
+    """Apply deterministic normalization on top of AI-cleaned fields.
+
+    Ensures consistent output regardless of which AI provider was used.
+    Runs the canonical company lookup, title abbreviation expansion,
+    and name casing normalization after the AI pass.
+    """
+    merged = _merge_cleaned_fields(original, ai_cleaned)
+
+    # Deterministic company normalization (200+ canonical lookups)
+    if merged.get("current_company"):
+        normalized = _normalize_company(merged["current_company"])
+        if normalized:
+            merged["current_company"] = normalized
+
+    # Deterministic title cleanup (40+ abbreviation expansions)
+    if merged.get("current_title"):
+        merged["current_title"] = _clean_title(merged["current_title"])
+
+    # Name casing normalization
+    if merged.get("first_name"):
+        merged["first_name"] = _normalize_name_case(merged["first_name"])
+    if merged.get("last_name"):
+        merged["last_name"] = _normalize_name_case(merged["last_name"])
+
+    # Rebuild full_name after normalization
+    name_parts = [p for p in (merged.get("first_name"), merged.get("last_name")) if p]
+    merged["full_name"] = " ".join(name_parts) if name_parts else None
 
     # Regenerate fingerprint
     merged["fingerprint"] = generate_fingerprint(
