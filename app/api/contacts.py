@@ -207,8 +207,27 @@ async def get_upload_status(
             csv_upload.completed_at = now
             await db.commit()
 
+    # Calculate ETA for in-progress uploads
+    eta = None
+    if csv_upload.status in ("processing", "queued") and csv_upload.started_at:
+        from datetime import datetime, timezone
+
+        total = csv_upload.total_chunks or 0
+        cleaned = csv_upload.chunks_cleaned or 0
+        if total > 0 and cleaned > 0:
+            now_utc = datetime.now(timezone.utc)
+            started = csv_upload.started_at
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            elapsed = (now_utc - started).total_seconds()
+            avg_per_chunk = elapsed / cleaned
+            remaining_chunks = total - cleaned
+            eta = round(avg_per_chunk * remaining_chunks, 1)
+
+    resp = CsvUploadResponse.model_validate(csv_upload).model_dump(mode="json")
+    resp["estimated_seconds_remaining"] = eta
     return {
-        "data": CsvUploadResponse.model_validate(csv_upload).model_dump(mode="json"),
+        "data": resp,
         "meta": {},
     }
 

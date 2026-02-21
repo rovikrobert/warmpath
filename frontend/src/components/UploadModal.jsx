@@ -18,50 +18,7 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
   const [dragOver, setDragOver] = useState(false);
   const [progressWidth, setProgressWidth] = useState(0);
   const [progressMsg, setProgressMsg] = useState('');
-
-  const PROGRESS_STEPS = [
-    'Uploading file...',
-    'Parsing contacts...',
-    'Normalizing names...',
-    'Matching companies...',
-    'Scoring connections...',
-    'Calculating warm scores...',
-    'Analyzing network strength...',
-    'Finalizing import...',
-  ];
-
-
-  useEffect(() => {
-    if (!uploading) {
-      setProgressWidth(0);
-      return;
-    }
-    let frame;
-    let start = Date.now();
-    const tick = () => {
-      const elapsed = (Date.now() - start) / 1000;
-      let w;
-      if (elapsed < 2) w = elapsed * 10;
-      else if (elapsed < 30) w = 20 + (elapsed - 2) * 2;
-      else if (elapsed < 90) w = 76 + (elapsed - 30) * 0.3;
-      else w = 94 + Math.min(elapsed - 90, 60) * 0.01;
-      setProgressWidth(Math.min(w, 95));
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [uploading]);
-
-  useEffect(() => {
-    if (!uploading) return;
-    let idx = 0;
-    setProgressMsg(PROGRESS_STEPS[0]);
-    const interval = setInterval(() => {
-      idx = Math.min(idx + 1, PROGRESS_STEPS.length - 1);
-      setProgressMsg(PROGRESS_STEPS[idx]);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [uploading]);
+  const [etaSeconds, setEtaSeconds] = useState(null);
 
   // Keevs trivia rotation — greeting first, then shuffled trivia at 8s intervals
   const [triviaPool, setTriviaPool] = useState([]);
@@ -118,7 +75,37 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
       try {
         const poll = await contactsApi.getUploadStatus(uploadId);
         const s = poll.data;
-        if (s.status === 'completed') return s;
+
+        // Update real progress from backend chunk data
+        const total = s.total_chunks || 0;
+        const cleaned = s.chunks_cleaned || 0;
+        const imported = s.chunks_imported || 0;
+        if (total > 0) {
+          // Cleaning is ~80% of work, importing ~20%
+          const pct = Math.min(((cleaned * 0.8 + imported * 0.2) / total) * 100, 95);
+          setProgressWidth(pct);
+          if (imported > 0 && imported < total) {
+            setProgressMsg(`Importing contacts... (${imported}/${total} batches)`);
+          } else if (cleaned > 0) {
+            setProgressMsg(`AI cleaning... (${cleaned}/${total} batches)`);
+          } else {
+            setProgressMsg('Parsing contacts...');
+          }
+        } else if (s.progress_phase) {
+          setProgressMsg(s.progress_phase === 'parsing' ? 'Parsing contacts...' : 'Processing...');
+        }
+
+        // Update ETA
+        if (s.estimated_seconds_remaining != null) {
+          setEtaSeconds(Math.round(s.estimated_seconds_remaining));
+        }
+
+        if (s.status === 'completed') {
+          setProgressWidth(100);
+          setProgressMsg('Done!');
+          setEtaSeconds(null);
+          return s;
+        }
         if (s.status === 'failed') throw new Error(s.error_message || 'CSV processing failed');
       } catch (err) {
         if (err.message?.includes('failed')) throw err;
@@ -131,6 +118,9 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
     if (!file) return;
     setUploading(true);
     setError('');
+    setProgressWidth(5);
+    setProgressMsg('Uploading file...');
+    setEtaSeconds(null);
     try {
       const res = await contactsApi.upload(file);
       let data = res.data;
@@ -146,6 +136,7 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
       setError(err.message);
     } finally {
       setUploading(false);
+      setEtaSeconds(null);
     }
   };
 
@@ -262,7 +253,14 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
                   style={{ width: `${progressWidth}%` }}
                 />
               </div>
-              <p className="text-xs text-slate-500">{progressMsg}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-slate-500">{progressMsg}</p>
+                {etaSeconds != null && etaSeconds > 0 && (
+                  <p className="text-xs text-slate-500">
+                    ~{etaSeconds >= 60 ? `${Math.floor(etaSeconds / 60)}m ${etaSeconds % 60}s` : `${etaSeconds}s`} remaining
+                  </p>
+                )}
+              </div>
 
               {/* Keevs trivia */}
               <div className="mt-3 flex min-h-[72px] items-start gap-3" aria-live="polite">
