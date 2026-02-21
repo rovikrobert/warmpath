@@ -76,6 +76,21 @@ if not settings.AI_MOCK_MODE:
         )
     if settings.CLEANUP_PROVIDER == "gemini" and not settings.GOOGLE_API_KEY.strip():
         raise RuntimeError("CLEANUP_PROVIDER=gemini but GOOGLE_API_KEY is not set.")
+    # V2 pipeline: warn if no cleaning providers are configured
+    if settings.CSV_PIPELINE_V2:
+        has_any_provider = any(
+            [
+                settings.GOOGLE_API_KEY.strip(),
+                settings.OPENAI_API_KEY.strip(),
+                settings.GROQ_API_KEY.strip(),
+                settings.DEEPSEEK_API_KEY.strip(),
+            ]
+        )
+        if not has_any_provider:
+            logger.warning(
+                "CSV_PIPELINE_V2 enabled but no cleaning provider API keys set. "
+                "AI cleaning will fall back to mock for all batches."
+            )
 
 # ---------------------------------------------------------------------------
 # CORS
