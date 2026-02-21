@@ -473,8 +473,8 @@ async def generate_follow_up_nudges(
             title=title,
             body=body,
             icon="message-circle",
-            action_url=f"/marketplace/requests?highlight={intro.id}",
-            action_label="View intro",
+            action_url="/applications",
+            action_label="Track application",
             priority=85,
             dedup_key=dedup_key,
             metadata_={
