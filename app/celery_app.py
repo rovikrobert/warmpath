@@ -87,6 +87,10 @@ celery_app.conf.update(
             "task": "app.tasks.infra_tasks.rate_limiter_watchdog",
             "schedule": crontab(minute="*/5"),  # Every 5 minutes
         },
+        "redis-stream-janitor": {
+            "task": "app.tasks.infra_tasks.redis_stream_janitor",
+            "schedule": crontab(minute="*/30"),  # Every 30 minutes
+        },
     },
 )
 celery_app.conf.include = [
