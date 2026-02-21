@@ -186,22 +186,23 @@ async def complete_onboarding(
     # Validate all required steps
     missing = []
 
-    # Step 2: intent
+    # Step 1: intent
     if not current_user.intent:
-        missing.append("Intent not set (step 2)")
+        missing.append("Intent not set (step 1)")
 
-    # Step 1: job preferences with target_role
-    prefs = (
-        await db.execute(
-            select(UserJobPreferences).where(
-                UserJobPreferences.user_id == current_user.id
+    # Step 2: job preferences with target_role (not required for sha[RESEND_KEY_REDACTED])
+    if current_user.intent != "sha[RESEND_KEY_REDACTED]":
+        prefs = (
+            await db.execute(
+                select(UserJobPreferences).where(
+                    UserJobPreferences.user_id == current_user.id
+                )
             )
-        )
-    ).scalar_one_or_none()
-    if not prefs or not prefs.target_role:
-        missing.append("Job preferences with target role not set (step 1)")
+        ).scalar_one_or_none()
+        if not prefs or not prefs.target_role:
+            missing.append("Job preferences with target role not set (step 2)")
 
-    # Step 8: at least one contact OR a queued/processing CSV upload
+    # Step 9: at least one contact OR a queued/processing CSV upload
     # Check CsvUpload first — it exists immediately even when async processing
     # hasn't finished creating Contact rows yet.
     from app.models.contact import CsvUpload
@@ -224,16 +225,16 @@ async def complete_onboarding(
             or 0
         )
         if contact_count == 0:
-            missing.append("No contacts uploaded (step 8)")
+            missing.append("No contacts uploaded (step 9)")
 
-    # Step 9: connector profile with work history
+    # Step 10: connector profile with work history
     profile = (
         await db.execute(
             select(ConnectorProfile).where(ConnectorProfile.user_id == current_user.id)
         )
     ).scalar_one_or_none()
     if not profile or not profile.work_history:
-        missing.append("Work history not added (step 9)")
+        missing.append("Work history not added (step 10)")
 
     if missing:
         raise HTTPException(

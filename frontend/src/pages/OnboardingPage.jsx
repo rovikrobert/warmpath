@@ -54,8 +54,8 @@ const EMPTY_WORK = { company: '', title: '', start_date: '', end_date: '', is_cu
 
 const SENIORITY_OPTIONS = ['Staff / Principal', 'Manager', 'Director', 'VP', 'C-Suite'];
 
-// Steps vary by user type — NHs skip job prefs (step 1), get bonus pitch instead
-// Steps: 1=Job Prefs, 2=Intent, 3=Bonus Pitch (NH only), 4-7=Privacy, 8=Meet Keevs, 9=Upload CSV, 10=Work History
+// Steps: 1=Intent, 2=Job Prefs (skipped by NHs), 3=Bonus Pitch (NH/explore only),
+// 4-7=Privacy, 8=Meet Keevs, 9=Upload CSV, 10=Work History
 const TOTAL_STEPS = 10;
 
 // Privacy step data (steps 4-7)
@@ -116,7 +116,14 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
 
-  // Step 1: Job preferences
+  // Step 1: Intent
+  const [intent, setIntent] = useState('');
+
+  // Step 1: Referral code (captured early, redeemed on completion)
+  const [referralCode, setReferralCode] = useState('');
+  const [referralExpanded, setReferralExpanded] = useState(false);
+
+  // Step 2: Job preferences (skipped by sha[RESEND_KEY_REDACTED])
   const [prefs, setPrefs] = useState({
     target_role: '',
     target_seniority: '',
@@ -124,13 +131,6 @@ export default function OnboardingPage() {
     target_locations: [],
     open_to_remote: true,
   });
-
-  // Step 1: Referral code (captured early, redeemed on completion)
-  const [referralCode, setReferralCode] = useState('');
-  const [referralExpanded, setReferralExpanded] = useState(false);
-
-  // Step 2: Intent
-  const [intent, setIntent] = useState('');
 
   // Step 9: Upload
   const [file, setFile] = useState(null);
@@ -156,16 +156,18 @@ export default function OnboardingPage() {
 
         if (cancelled) return;
 
-        const hasPrefs = prefsRes.status === 'fulfilled' && prefsRes.value?.data?.target_role;
         const hasIntent = meRes.status === 'fulfilled' && meRes.value?.data?.intent;
+        const userIntent = hasIntent ? meRes.value.data.intent : null;
+        const hasPrefs = prefsRes.status === 'fulfilled' && prefsRes.value?.data?.target_role;
         const hasContacts = contactsRes.status === 'fulfilled' && (contactsRes.value?.data?.length > 0 || contactsRes.value?.meta?.total > 0);
 
         // Pre-fill intent from existing data
-        if (hasIntent) setIntent(meRes.value.data.intent);
+        if (hasIntent) setIntent(userIntent);
 
-        // Jump to first incomplete step
-        if (!hasPrefs) { setStep(1); return; }
-        if (!hasIntent) { setStep(2); return; }
+        // Jump to first incomplete step (intent is now step 1)
+        if (!hasIntent) { setStep(1); return; }
+        // sha[RESEND_KEY_REDACTED] skips job prefs; others need them
+        if (userIntent !== 'sha[RESEND_KEY_REDACTED]' && !hasPrefs) { setStep(2); return; }
         // Steps 3-7 are informational, 8 is Meet Keevs — skip to data steps
         if (!hasContacts) { setStep(9); return; }
         // Work history is the last step
@@ -251,7 +253,7 @@ export default function OnboardingPage() {
   const setPref = (key) => (e) => setPrefs({ ...prefs, [key]: typeof e === 'object' && e.target ? e.target.value : e });
   const setArrayPref = (key) => (val) => setPrefs({ ...prefs, [key]: val });
 
-  // Step 1 -> 2
+  // Step 2 -> 3 (bonus pitch for explore) or 4 (privacy for find_referrals)
   const handlePrefs = async () => {
     setSaving(true);
     setError('');
@@ -265,7 +267,8 @@ export default function OnboardingPage() {
           open_to_remote: prefs.open_to_remote,
         });
       }
-      setStep(2);
+      // find_referrals skips bonus pitch; explore sees it
+      setStep(intent === 'find_referrals' ? 4 : 3);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -273,7 +276,7 @@ export default function OnboardingPage() {
     }
   };
 
-  // Step 2 -> 3 (referral bonus pitch) or 4 (privacy)
+  // Step 1 -> 2 (job prefs for find_referrals/explore) or 3 (bonus pitch for sha[RESEND_KEY_REDACTED])
   const handleIntent = async () => {
     if (!intent) return;
     setSaving(true);
@@ -281,8 +284,9 @@ export default function OnboardingPage() {
     try {
       await authApi.updateIntent(intent, clerkUser?.fullName);
       await refreshUser();
-      // sha[RESEND_KEY_REDACTED] and explore see referral bonus pitch; find_referrals skips to privacy
-      setStep(intent === 'find_referrals' ? 4 : 3);
+      // sha[RESEND_KEY_REDACTED] skips job prefs, goes straight to bonus pitch
+      // find_referrals and explore need job prefs first
+      setStep(intent === 'sha[RESEND_KEY_REDACTED]' ? 3 : 2);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -432,7 +436,8 @@ export default function OnboardingPage() {
         {/* Progress — clickable segments to jump back */}
         <div className="mb-6 flex items-center gap-1" role="progressbar" aria-valuenow={step} aria-valuemin={1} aria-valuemax={TOTAL_STEPS} aria-label={`Onboarding step ${step} of ${TOTAL_STEPS}`}>
           {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => {
-            // Job seekers skip step 3 (NH bonus pitch) — hide that segment
+            // NHs skip step 2 (job prefs); job seekers skip step 3 (bonus pitch)
+            if (s === 2 && intent === 'sha[RESEND_KEY_REDACTED]') return null;
             if (s === 3 && intent === 'find_referrals') return null;
             return (
               <button
@@ -448,8 +453,81 @@ export default function OnboardingPage() {
         </div>
 
         <div className="rounded-xl bg-slate-900 border border-slate-700/50 p-6 shadow-sm">
-          {/* Step 1: Job Preferences */}
+          {/* Step 1: Intent (first — determines which steps follow) */}
           {step === 1 && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-50">What brings you to WarmPath?</h2>
+                <p className="mt-1 text-sm text-slate-400">You can change this anytime.</p>
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  { value: 'find_referrals', title: 'I want to get referred to companies', desc: 'Search networks, find referral paths, and get introduced to people at your target companies.' },
+                  { value: 'sha[RESEND_KEY_REDACTED]', title: 'I want to share my network and earn', desc: `Share your network anonymously. Your employer pays ${SOURCES.REFERRAL_BONUS_RANGE.claim} per referral hire \u2014 we send you pre-qualified candidates so you can capture those bonuses.` },
+                  { value: 'explore', title: "Both \u2014 I'm exploring", desc: 'Search for referrals AND share your network. Most members choose this.' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setIntent(opt.value)}
+                    className={`w-full rounded-lg border-2 p-4 text-left transition ${
+                      intent === opt.value
+                        ? 'border-amber-500 bg-amber-500/10'
+                        : 'border-slate-700/50 hover:border-slate-600'
+                    }`}
+                  >
+                    <p className="font-medium text-slate-50">{opt.title}</p>
+                    <p className="mt-1 text-sm text-slate-400">{opt.desc}</p>
+                  </button>
+                ))}
+              </div>
+
+              <div>
+                {!referralExpanded ? (
+                  <button
+                    type="button"
+                    onClick={() => setReferralExpanded(true)}
+                    className="text-sm text-slate-400 hover:text-amber-400 transition"
+                  >
+                    Have a referral code?
+                  </button>
+                ) : (
+                  <div className="space-y-1">
+                    <label htmlFor="onboard-referral-code" className="mb-1 block text-sm font-medium text-slate-300">Referral Code</label>
+                    <input
+                      id="onboard-referral-code"
+                      type="text"
+                      value={referralCode}
+                      onChange={(e) => setReferralCode(e.target.value.trim())}
+                      className={inputClass}
+                      placeholder="e.g. WARM-ABC123"
+                      maxLength={32}
+                      autoFocus
+                    />
+                    <p className="text-xs text-slate-500">Optional — enter a code from a friend to earn bonus credits.</p>
+                  </div>
+                )}
+              </div>
+
+              {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleIntent}
+                  disabled={!intent}
+                  loading={saving}
+                  className="flex-1"
+                  size="lg"
+                >
+                  Continue
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Job Preferences (skipped by sha[RESEND_KEY_REDACTED]) */}
+          {step === 2 && (
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-50">What are you looking for?</h2>
@@ -495,86 +573,13 @@ export default function OnboardingPage() {
                 Open to remote roles
               </label>
 
-              <div>
-                {!referralExpanded ? (
-                  <button
-                    type="button"
-                    onClick={() => setReferralExpanded(true)}
-                    className="text-sm text-slate-400 hover:text-amber-400 transition"
-                  >
-                    Have a referral code?
-                  </button>
-                ) : (
-                  <div className="space-y-1">
-                    <label htmlFor="onboard-referral-code" className="mb-1 block text-sm font-medium text-slate-300">Referral Code</label>
-                    <input
-                      id="onboard-referral-code"
-                      type="text"
-                      value={referralCode}
-                      onChange={(e) => setReferralCode(e.target.value.trim())}
-                      className={inputClass}
-                      placeholder="e.g. WARM-ABC123"
-                      maxLength={32}
-                      autoFocus
-                    />
-                    <p className="text-xs text-slate-500">Optional — enter a code from a friend to earn bonus credits.</p>
-                  </div>
-                )}
-              </div>
-
-              {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
-
-              <div className="flex gap-3">
-                <Button onClick={handlePrefs} loading={saving} className="flex-1" size="lg">
-                  Continue
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2: Intent */}
-          {step === 2 && (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-50">What brings you to WarmPath?</h2>
-                <p className="mt-1 text-sm text-slate-400">You can change this anytime.</p>
-              </div>
-
-              <div className="space-y-3">
-                {[
-                  { value: 'find_referrals', title: 'I want to get referred to companies', desc: 'Search networks, find referral paths, and get introduced to people at your target companies.' },
-                  { value: 'sha[RESEND_KEY_REDACTED]', title: 'I want to share my network and earn', desc: `Share your network anonymously. Your employer pays ${SOURCES.REFERRAL_BONUS_RANGE.claim} per referral hire \u2014 we send you pre-qualified candidates so you can capture those bonuses.` },
-                  { value: 'explore', title: "Both \u2014 I'm exploring", desc: 'Search for referrals AND share your network. Most members choose this.' },
-                ].map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setIntent(opt.value)}
-                    className={`w-full rounded-lg border-2 p-4 text-left transition ${
-                      intent === opt.value
-                        ? 'border-amber-500 bg-amber-500/10'
-                        : 'border-slate-700/50 hover:border-slate-600'
-                    }`}
-                  >
-                    <p className="font-medium text-slate-50">{opt.title}</p>
-                    <p className="mt-1 text-sm text-slate-400">{opt.desc}</p>
-                  </button>
-                ))}
-              </div>
-
               {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
 
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={() => { setError(''); setStep(1); }} className="flex-1" size="lg">
                   Back
                 </Button>
-                <Button
-                  onClick={handleIntent}
-                  disabled={!intent}
-                  loading={saving}
-                  className="flex-1"
-                  size="lg"
-                >
+                <Button onClick={handlePrefs} loading={saving} className="flex-1" size="lg">
                   Continue
                 </Button>
               </div>
@@ -631,7 +636,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => { setError(''); setStep(2); }} className="flex-1" size="lg">
+                <Button variant="secondary" onClick={() => { setError(''); setStep(intent === 'sha[RESEND_KEY_REDACTED]' ? 1 : 2); }} className="flex-1" size="lg">
                   Back
                 </Button>
                 <Button onClick={() => setStep(4)} className="flex-1" size="lg">
@@ -669,7 +674,7 @@ export default function OnboardingPage() {
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={() => {
                   setError('');
-                  // From step 4, job seekers go back to step 2 (skip bonus pitch)
+                  // From step 4: find_referrals goes back to 2 (prefs), others go back to 3 (bonus pitch)
                   setStep(step === 4 && intent === 'find_referrals' ? 2 : step - 1);
                 }} className="flex-1" size="lg">
                   Back

@@ -274,6 +274,41 @@ async def test_onboarding_complete_succeeds_with_all_steps(client: AsyncClient):
     assert body["data"]["onboarding_complete"] is True
 
 
+async def test_onboarding_complete_succeeds_for_sha[RESEND_KEY_REDACTED](
+    client: AsyncClient,
+):
+    """POST /onboarding-complete passes for sha[RESEND_KEY_REDACTED] users without job preferences."""
+    from app.models.contact import Contact
+    from app.models.user import ConnectorProfile
+
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email="nhnoprefs@test.com", full_name="NH No Prefs"
+        )
+        user.intent = "sha[RESEND_KEY_REDACTED]"
+        # No UserJobPreferences created — NHs don't need them
+        contact = Contact(
+            user_id=user.id,
+            full_name="Jane Doe",
+            first_name="Jane",
+            last_name="Doe",
+            current_company="Acme",
+            current_title="Engineer",
+        )
+        db.add(contact)
+        profile = ConnectorProfile(
+            user_id=user.id,
+            work_history=[{"company": "Acme", "title": "SWE"}],
+        )
+        db.add(profile)
+        await db.commit()
+    resp = await client.post("/api/v1/auth/onboarding-complete", headers=headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["data"]["onboarding_complete"] is True
+    assert body["data"]["intent"] == "sha[RESEND_KEY_REDACTED]"
+
+
 async def test_onboarding_complete_succeeds_with_csv_upload_but_no_contacts_yet(
     client: AsyncClient,
 ):
