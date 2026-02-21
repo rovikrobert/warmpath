@@ -774,12 +774,15 @@ async def _clean_batch_gemini(
 
 @timed("csv_clean_real")
 async def clean_contacts_real(contacts: list[dict]) -> list[dict]:
-    """Clean contacts using AI for fuzzy name/company resolution.
+    """Clean contacts using the multi-provider AI pool.
 
-    Batches contacts (CLEANUP_BATCH_SIZE per API call) with global rate
-    limiting across all workers. Falls back to mock cleaner on any error.
-    Provider selected by settings.CLEANUP_PROVIDER (anthropic | gemini).
+    Batches contacts and dispatches each batch to the first available
+    provider (Gemini, Claude, OpenAI, Groq, DeepSeek). Each batch
+    independently rotates through providers on failure. Falls back
+    to mock cleaner per-batch if all providers are exhausted.
     """
+    from app.services.ai_provider_pool import dispatch_batch
+
     if not contacts:
         return []
 
@@ -789,20 +792,11 @@ async def clean_contacts_real(contacts: list[dict]) -> list[dict]:
             for i in range(0, len(contacts), CLEANUP_BATCH_SIZE)
         ]
 
-        if settings.CLEANUP_PROVIDER == "gemini":
-            from app.utils.gemini_client import get_gemini_client
-
-            client = get_gemini_client()
-            results = await asyncio.gather(
-                *[_clean_batch_gemini(client, batch) for batch in batches],
-                return_exceptions=True,
-            )
-        else:
-            client = _get_anthropic_client()
-            results = await asyncio.gather(
-                *[_clean_batch(client, batch) for batch in batches],
-                return_exceptions=True,
-            )
+        # Dispatch all batches concurrently — each finds its own provider
+        results = await asyncio.gather(
+            *[dispatch_batch(batch) for batch in batches],
+            return_exceptions=True,
+        )
 
         all_cleaned: list[dict] = []
         for i, result in enumerate(results):
@@ -825,7 +819,7 @@ async def clean_contacts_real(contacts: list[dict]) -> list[dict]:
         return all_cleaned
 
     except Exception:
-        logger.exception("Claude API cleanup failed, falling back to mock cleaner")
+        logger.exception("AI cleanup failed, falling back to mock cleaner")
         return clean_contacts_mock(contacts)
 
 
