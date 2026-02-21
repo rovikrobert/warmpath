@@ -26,6 +26,25 @@ from app.utils.rate_limiter import acquire_slot, release_slot
 
 logger = logging.getLogger(__name__)
 
+
+def _extract_contacts_array(parsed: Any) -> list[dict]:
+    """Extract the contacts array from various AI response formats.
+
+    OpenAI JSON mode requires top-level objects, so providers may wrap
+    the array like {"contacts": [...]} or {"result": [...]}.
+    This normalises both raw arrays and wrapped objects.
+    """
+    if isinstance(parsed, list):
+        return parsed
+    if isinstance(parsed, dict):
+        for v in parsed.values():
+            if isinstance(v, list):
+                return v
+        # Single contact wrapped in object
+        return [parsed]
+    return []
+
+
 # ---------------------------------------------------------------------------
 # Provider definitions
 # ---------------------------------------------------------------------------
@@ -96,7 +115,7 @@ async def _call_gemini(
             temperature=0,
         ),
     )
-    return json.loads(response.text)
+    return _extract_contacts_array(json.loads(response.text))
 
 
 async def _call_anthropic(
@@ -114,7 +133,7 @@ async def _call_anthropic(
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1]
         raw = raw.rsplit("```", 1)[0].strip()
-    return json.loads(raw)
+    return _extract_contacts_array(json.loads(raw))
 
 
 async def _call_openai_compat(
@@ -130,7 +149,7 @@ async def _call_openai_compat(
         response_format={"type": "json_object"},
         temperature=0,
     )
-    return json.loads(response.choices[0].message.content)
+    return _extract_contacts_array(json.loads(response.choices[0].message.content))
 
 
 async def _call_openai(
