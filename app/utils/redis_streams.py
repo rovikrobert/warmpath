@@ -126,7 +126,7 @@ async def write_batch_to_stream(
     stream: str, batch: list[dict], chunk_index: int
 ) -> str | None:
     """Serialize a batch of contacts and write to stream."""
-    payload = json.dumps({"chunk_index": chunk_index, "contacts": batch})
+    payload = json.dumps({"chunk_index": chunk_index, "contacts": batch}, default=str)
     return await stream_add(stream, {"data": payload})
 
 
