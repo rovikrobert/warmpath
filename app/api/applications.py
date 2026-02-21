@@ -21,6 +21,7 @@ from app.schemas.application import (
     ApplicationResponse,
     ApplicationStatsResponse,
     ApplicationUpdate,
+    SourceStats,
 )
 from app.schemas.contact import PaginationMeta
 from app.utils.security import get_current_user
@@ -393,6 +394,31 @@ async def get_application_stats(
                 best_rate = rate
                 best_channel = ch
 
+    # Source type breakdown
+    source_col = func.coalesce(Application.source_type, "manual")
+    source_query = (
+        select(
+            source_col.label("source"),
+            func.sum(sent_expr).label("sent"),
+            func.sum(responded_expr).label("responded"),
+            func.sum(interview_expr).label("interviews"),
+        )
+        .where(*base)
+        .group_by(source_col)
+    )
+    source_rows = (await db.execute(source_query)).all()
+
+    by_source = {}
+    for src, s_sent, s_resp, s_int in source_rows:
+        s_sent = int(s_sent or 0)
+        s_int = int(s_int or 0)
+        by_source[src] = SourceStats(
+            sent=s_sent,
+            responded=int(s_resp or 0),
+            interviews=s_int,
+            interview_rate=round(s_int / s_sent, 3) if s_sent > 0 else 0.0,
+        )
+
     return {
         "data": ApplicationStatsResponse(
             total=total,
@@ -401,6 +427,7 @@ async def get_application_stats(
             interview_rate=round(interview_rate, 3),
             avg_days_to_response=avg_days,
             best_channel=best_channel,
+            by_source=by_source,
         ).model_dump(),
         "meta": {},
     }
