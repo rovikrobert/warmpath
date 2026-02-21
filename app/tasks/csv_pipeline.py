@@ -188,19 +188,20 @@ async def _clean_async(csv_upload_id: str, user_id: str) -> None:
     await ensu[RESEND_KEY_REDACTED](stream_in, CLEAN_CONSUMER_GROUP)
     await ensu[RESEND_KEY_REDACTED](stream_out, "importers")
 
+    # Phase 1: Collect all batch messages from stream
+    pending = []  # (msg_id, chunk_index, contacts)
     total_batches = None
-    batches_cleaned = 0
     max_empty_reads = 60  # 5 seconds block * 60 = 5 minutes max wait
-
     empty_reads = 0
+
     while True:
         messages = await stream_read_group(
-            stream_in, CLEAN_CONSUMER_GROUP, consumer_name, count=1, block=5000
+            stream_in, CLEAN_CONSUMER_GROUP, consumer_name, count=50, block=5000
         )
 
         if not messages:
             empty_reads += 1
-            if total_batches is not None and batches_cleaned >= total_batches:
+            if total_batches is not None and len(pending) >= total_batches:
                 break
             if empty_reads >= max_empty_reads:
                 logger.warning(
@@ -220,64 +221,70 @@ async def _clean_async(csv_upload_id: str, user_id: str) -> None:
                 await write_sentinel(stream_out, total_batches)
                 continue
 
-            chunk_index = data["chunk_index"]
-            contacts = data["contacts"]
+            pending.append((msg_id, data["chunk_index"], data["contacts"]))
 
-            try:
-                # Update chunk status to cleaning
-                async with factory() as session:
-                    result = await session.execute(
-                        select(CsvUploadChunk).where(
-                            CsvUploadChunk.upload_id == upload_uuid,
-                            CsvUploadChunk.chunk_index == chunk_index,
-                        )
+        if total_batches is not None and len(pending) >= total_batches:
+            break
+
+    # Phase 2: Dispatch all batches concurrently across providers
+    batches_cleaned = 0
+
+    async def _clean_one(msg_id, chunk_index, contacts):
+        nonlocal batches_cleaned
+
+        try:
+            async with factory() as session:
+                result = await session.execute(
+                    select(CsvUploadChunk).where(
+                        CsvUploadChunk.upload_id == upload_uuid,
+                        CsvUploadChunk.chunk_index == chunk_index,
                     )
-                    chunk = result.scalar_one_or_none()
-                    if chunk:
-                        chunk.status = "cleaning"
-                        await session.commit()
+                )
+                chunk = result.scalar_one_or_none()
+                if chunk:
+                    chunk.status = "cleaning"
+                    await session.commit()
 
-                # Dispatch to AI provider pool
-                cleaned = await dispatch_batch(contacts)
+            cleaned = await dispatch_batch(contacts)
+            await write_batch_to_stream(stream_out, cleaned, chunk_index)
 
-                # Write cleaned batch to output stream
-                await write_batch_to_stream(stream_out, cleaned, chunk_index)
-
-                # Update chunk status to cleaned
-                async with factory() as session:
-                    result = await session.execute(
-                        select(CsvUploadChunk).where(
-                            CsvUploadChunk.upload_id == upload_uuid,
-                            CsvUploadChunk.chunk_index == chunk_index,
-                        )
+            async with factory() as session:
+                result = await session.execute(
+                    select(CsvUploadChunk).where(
+                        CsvUploadChunk.upload_id == upload_uuid,
+                        CsvUploadChunk.chunk_index == chunk_index,
                     )
-                    chunk = result.scalar_one_or_none()
-                    if chunk:
-                        chunk.status = "cleaned"
-                        chunk.completed_at = datetime.now(timezone.utc)
-                        await session.commit()
-
-                batches_cleaned += 1
-                await _update_upload(
-                    factory, upload_uuid, chunks_cleaned=batches_cleaned
                 )
+                chunk = result.scalar_one_or_none()
+                if chunk:
+                    chunk.status = "cleaned"
+                    chunk.completed_at = datetime.now(timezone.utc)
+                    await session.commit()
 
-            except Exception:
-                logger.exception(
-                    "Clean failed for chunk %d of upload %s",
-                    chunk_index,
-                    csv_upload_id,
-                )
-                from app.services.ai_csv_cleaner import clean_contacts_mock
+        except Exception:
+            logger.exception(
+                "Clean failed for chunk %d of upload %s",
+                chunk_index,
+                csv_upload_id,
+            )
+            from app.services.ai_csv_cleaner import clean_contacts_mock
 
-                fallback = clean_contacts_mock(contacts)
-                await write_batch_to_stream(stream_out, fallback, chunk_index)
-                batches_cleaned += 1
-                await _update_upload(
-                    factory, upload_uuid, chunks_cleaned=batches_cleaned
-                )
+            fallback = clean_contacts_mock(contacts)
+            await write_batch_to_stream(stream_out, fallback, chunk_index)
 
-            await stream_ack(stream_in, CLEAN_CONSUMER_GROUP, msg_id)
+        batches_cleaned += 1
+        await _update_upload(factory, upload_uuid, chunks_cleaned=batches_cleaned)
+        await stream_ack(stream_in, CLEAN_CONSUMER_GROUP, msg_id)
+
+    logger.info(
+        "Dispatching %d batches concurrently for upload %s",
+        len(pending),
+        csv_upload_id,
+    )
+    await asyncio.gather(
+        *[_clean_one(mid, ci, cts) for mid, ci, cts in pending],
+        return_exceptions=True,
+    )
 
     logger.info(
         "Clean complete: %d batches for upload %s", batches_cleaned, csv_upload_id
