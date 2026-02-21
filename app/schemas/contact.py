@@ -38,6 +38,7 @@ class CsvUploadResponse(BaseModel):
     completed_at: datetime | None = None
     progress_phase: str | None = None
     error_message: str | None = None
+    estimated_seconds_remaining: float | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
