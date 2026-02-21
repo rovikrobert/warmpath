@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { marketplace as mpApi } from '../api/client';
+import { marketplace as mpApi, applications as appsApi } from '../api/client';
 import { MarketplaceBadge } from '../utils/marketplace';
 
 function StatusBadge({ status }) {
@@ -24,6 +24,8 @@ export default function MyRequests() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [trackedIds, setTrackedIds] = useState(new Set());
+  const [trackingId, setTrackingId] = useState(null);
 
   useEffect(() => {
     mpApi.myRequests()
@@ -32,6 +34,20 @@ export default function MyRequests() {
       .finally(() => setLoading(false));
   }, []);
 
+
+  const handleTrackApp = async (reqId) => {
+    setTrackingId(reqId);
+    try {
+      await appsApi.fromFacilitation(reqId);
+      setTrackedIds((prev) => new Set([...prev, reqId]));
+    } catch (err) {
+      // Already tracked or other error — still mark as tracked for UX
+      setTrackedIds((prev) => new Set([...prev, reqId]));
+      console.error(err);
+    } finally {
+      setTrackingId(null);
+    }
+  };
   const filtered = filter === 'all' ? requests : requests.filter((r) => r.status === filter);
   const counts = {
     all: requests.length,
@@ -154,6 +170,21 @@ export default function MyRequests() {
                         <li>When you hear from the contact, send a warm follow-up thanking them for their time.</li>
                         <li>Mention the specific role you're interested in and keep the conversation natural.</li>
                       </ol>
+                    <div className="mt-3 border-t border-emerald-500/20 pt-3">
+                      {trackedIds.has(req.id) ? (
+                        <p className="text-sm text-emerald-400/80">
+                          Application tracked — <Link to="/applications" className="underline hover:text-emerald-300">view pipeline</Link>
+                        </p>
+                      ) : (
+                        <button
+                          onClick={() => handleTrackApp(req.id)}
+                          disabled={trackingId === req.id}
+                          className="rounded-md bg-emerald-500/20 px-3 py-1.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50"
+                        >
+                          {trackingId === req.id ? 'Tracking...' : 'Track this application'}
+                        </button>
+                      )}
+                    </div>
                     </div>
                   </div>
                 )}
