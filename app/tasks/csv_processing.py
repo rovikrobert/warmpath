@@ -14,6 +14,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.celery_app import celery_app
+from app.config import settings
 from app.models.company import Company
 from app.models.contact import Contact, CsvUpload
 from app.models.privacy import SuppressionList
@@ -385,10 +386,20 @@ def process_csv_upload(
     """Celery task: process a CSV upload in the background.
 
     Uses shared DB engine from database.py, delegates to the core function.
+    Routes to V2 streaming pipeline when CSV_PIPELINE_V2=true.
     """
     import logging
 
     logger = logging.getLogger(__name__)
+
+    # V2 pipeline routing
+    if settings.CSV_PIPELINE_V2:
+        from app.tasks.csv_pipeline import csv_parse_task
+
+        logger.info("Routing upload %s to V2 pipeline", csv_upload_id)
+        csv_parse_task.delay(csv_upload_id, user_id, file_content_b64)
+        return
+
     logger.info("Worker received task %s for upload %s", self.request.id, csv_upload_id)
     asyncio.run(_celery_run(self, csv_upload_id, user_id, file_content_b64))
     logger.info("Worker completed task for upload %s", csv_upload_id)
