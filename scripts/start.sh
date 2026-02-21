@@ -11,6 +11,13 @@ set -euo pipefail
 ROLE="${SERVICE_ROLE:-web}"
 CONCURRENCY="${CELERY_CONCURRENCY:-2}"
 
+# Run Alembic migrations only for web service (before uvicorn starts).
+# Other services skip migrations to avoid race conditions on parallel deploys.
+if [ "$ROLE" = "web" ]; then
+    echo "[entrypoint] Running Alembic migrations..."
+    alembic upgrade head
+fi
+
 case "$ROLE" in
     web)
         echo "[entrypoint] Starting uvicorn (role=$ROLE, port=${PORT:-8000})"

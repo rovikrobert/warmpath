@@ -3,8 +3,5 @@ dockerfilePath = "Dockerfile"
 watchPatterns = ["app/**", "frontend/**", "alembic/**", "scripts/**", "requirements.txt", "Dockerfile", "railway.toml", ".dockerignore"]
 
 [deploy]
-# Alembic only runs for web service (avoids race conditions on parallel deploys).
-# Health check configured per-service in Dashboard (web only).
-preDeployCommand = "if [ \"$SERVICE_ROLE\" = \"web\" ] || [ -z \"$SERVICE_ROLE\" ]; then alembic upgrade head; fi"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
