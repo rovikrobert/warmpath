@@ -2237,7 +2237,7 @@ class TestTelegramBridge:
         assert result["telegram"] is True
         assert result["status"] == "sent"
 
-    def test_parse_reply_reuses_whatsapp_grammar(self):
+    def test_parse_reply_reuses_message_grammar(self):
         from agents.chief_of_staff.telegram_bridge import TelegramBridge
 
         bridge = TelegramBridge()

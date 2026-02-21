@@ -27,7 +27,7 @@ agents/*/state.json
 # CoS runtime artifacts
 agents/chief_of_staff/cos_state.json
 agents/chief_of_staff/notion_state.json
-agents/chief_of_staff/reports/whatsapp/*.txt
+agents/chief_of_staff/reports/messages/*.txt
 
 # Data team artifacts (auto-generated)
 data_team/reports/*.json
