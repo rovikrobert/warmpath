@@ -188,15 +188,23 @@ async def get_upload_status(
             detail="Upload not found",
         )
 
-    # Auto-fail stale uploads (worker crashed without setting error status)
-    if csv_upload.status == "processing" and csv_upload.started_at:
+    # Auto-fail stale uploads (worker crashed / killed by redeploy / never started)
+    if csv_upload.status in ("pending", "queued", "processing"):
         from datetime import datetime, timezone
 
-        age = (datetime.now(timezone.utc) - csv_upload.started_at).total_seconds()
-        if age > 900:  # 15 minutes (matches Celery soft_time_limit)
+        now = datetime.now(timezone.utc)
+        ref_time = csv_upload.started_at or csv_upload.created_at
+        # Ensure both are tz-aware (SQLite returns naive datetimes in tests)
+        if ref_time.tzinfo is None:
+            ref_time = ref_time.replace(tzinfo=timezone.utc)
+        age = (now - ref_time).total_seconds()
+        # 15 min for "processing" (matches Celery soft_time_limit),
+        # 10 min for "pending"/"queued" (worker never picked it up)
+        threshold = 900 if csv_upload.status == "processing" else 600
+        if age > threshold:
             csv_upload.status = "failed"
             csv_upload.error_message = "Processing timed out — please re-upload"
-            csv_upload.completed_at = datetime.now(timezone.utc)
+            csv_upload.completed_at = now
             await db.commit()
 
     return {

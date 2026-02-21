@@ -67,6 +67,12 @@ case "$ROLE" in
     all)
         echo "[entrypoint] Starting all services (role=$ROLE, concurrency=$CONCURRENCY)"
 
+        # Quick import check so startup errors are logged before backgrounding
+        python3 -c "from app.celery_app import celery_app; print('[entrypoint] Celery imports OK')" || {
+            echo "[entrypoint] FATAL: Celery imports failed — see error above"
+            exit 1
+        }
+
         start_worker &
         PIDS+=($!)
         echo "[entrypoint] Worker started (PID ${PIDS[0]})"
