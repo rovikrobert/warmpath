@@ -115,6 +115,74 @@ function getNextStatuses(current) {
   return transitions[current] || [];
 }
 
+function ReferralAdvantage({ stats }) {
+  const bySource = stats?.by_source;
+  if (!bySource || stats.total < 3) return null;
+
+  // Combine own_network + marketplace as "referral"
+  const refSent = (bySource.own_network?.sent || 0) + (bySource.marketplace?.sent || 0);
+  const refInterviews = (bySource.own_network?.interviews || 0) + (bySource.marketplace?.interviews || 0);
+  const coldSent = bySource.manual?.sent || 0;
+  const coldInterviews = bySource.manual?.interviews || 0;
+
+  // Need data on at least one side
+  if (refSent === 0 && coldSent === 0) return null;
+
+  const refRate = refSent > 0 ? refInterviews / refSent : 0;
+  const coldRate = coldSent > 0 ? coldInterviews / coldSent : 0;
+
+  // If user only has cold apps, show a softer CTA
+  if (refSent === 0) {
+    return (
+      <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 text-lg" aria-hidden="true">&#x1F310;</span>
+          <div>
+            <p className="text-sm font-semibold text-amber-300">Try the referral path</p>
+            <p className="mt-0.5 text-sm text-slate-400">
+              You have {stats.total} application{stats.total !== 1 ? 's' : ''} tracked — all cold. Referrals get up to 4x more interviews.
+            </p>
+            <Link to="/search" className="mt-2 inline-block text-sm font-medium text-amber-400 hover:text-amber-300">
+              Find referral paths &rarr;
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const multiplier = coldRate > 0 ? (refRate / coldRate).toFixed(1) : null;
+
+  return (
+    <div className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 text-lg" aria-hidden="true">&#x1F4CA;</span>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-emerald-300">Referral Advantage</p>
+          <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-slate-400">Via referral</p>
+              <p className="text-lg font-bold text-emerald-400">{Math.round(refRate * 100)}%</p>
+              <p className="text-xs text-slate-500">interview rate ({refInterviews} of {refSent})</p>
+            </div>
+            <div>
+              <p className="text-slate-400">Cold / manual</p>
+              <p className="text-lg font-bold text-slate-300">{Math.round(coldRate * 100)}%</p>
+              <p className="text-xs text-slate-500">interview rate ({coldInterviews} of {coldSent})</p>
+            </div>
+          </div>
+          {multiplier && parseFloat(multiplier) > 1 && (
+            <p className="mt-2 text-sm text-emerald-400/80">
+              Your referrals convert <span className="font-bold">{multiplier}x</span> better.{' '}
+              <Link to="/search" className="underline hover:text-emerald-300">Find more referral paths</Link>
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ApplicationsPage() {
   const [apps, setApps] = useState([]);
   const [stats, setStats] = useState(null);
@@ -237,6 +305,8 @@ export default function ApplicationsPage() {
           </div>
         </div>
       )}
+
+      <ReferralAdvantage stats={stats} />
 
       {/* Create form */}
       {showCreate && (
