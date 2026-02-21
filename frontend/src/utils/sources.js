@@ -23,4 +23,24 @@ export const SOURCES = {
     label: 'referral vs cold application conversion',
     source: 'LinkedIn Talent Solutions, Jobvite Recruiter Nation Report',
   },
+  REFERRAL_HIRE_SPEED: {
+    claim: '29 days vs 39-55 days',
+    label: 'referral vs non-referral time-to-hire',
+    source: 'Jobvite Recruiter Nation Report',
+  },
+  REFERRAL_RETENTION: {
+    claim: '46%',
+    label: 'referral hires stay 1+ years',
+    source: 'Jobvite Recruiter Nation Report',
+  },
+  HIDDEN_JOB_MARKET: {
+    claim: 'up to 80%',
+    label: 'jobs filled before public posting',
+    source: 'CNBC, Bureau of Labor Statistics analysis',
+  },
+  NETWORKING_HIRES: {
+    claim: '85%',
+    label: 'jobs filled through networking',
+    source: 'LinkedIn Workforce Report, HBS Working Knowledge',
+  },
 };

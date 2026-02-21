@@ -2,8 +2,56 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { contacts as contactsApi } from '../api/client';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
+import KeevsAvatar from './KeevsAvatar';
+import SourceTag from './ui/SourceTag';
+import { SOURCES } from '../utils/sources';
 
 const LINKEDIN_EXPORT_URL = 'https://www.linkedin.com/mypreferences/d/download-my-data';
+
+const KEEVS_TRIVIA = [
+  {
+    text: `Cold applications convert at 1-3%. Referrals convert at ${SOURCES.COLD_VS_REFERRAL.claim}. The same resume, a completely different outcome.`,
+    source: SOURCES.COLD_VS_REFERRAL,
+  },
+  {
+    text: `${SOURCES.HIDDEN_JOB_MARKET.claim} of jobs are filled before they're ever posted publicly. Your network is the only way into that market.`,
+    source: SOURCES.HIDDEN_JOB_MARKET,
+  },
+  {
+    text: `Referred candidates get ${SOURCES.REFERRAL_INTERVIEW_MULTIPLIER.claim} more interviews than cold applicants — not because they're better, but because someone vouched.`,
+    source: SOURCES.REFERRAL_INTERVIEW_MULTIPLIER,
+  },
+  {
+    text: `Referral hires close in ${SOURCES.REFERRAL_HIRE_SPEED.claim} for non-referral hires. Fewer rounds, faster offer.`,
+    source: SOURCES.REFERRAL_HIRE_SPEED,
+  },
+  {
+    text: `${SOURCES.NETWORKING_HIRES.claim} of jobs are filled through networking. Most people know this. Few people have a system for it — until now.`,
+    source: SOURCES.NETWORKING_HIRES,
+  },
+  {
+    text: `${SOURCES.REFERRAL_RETENTION.claim} of referral hires stay over a year. They land better-fit roles because someone who knew the culture vouched for them.`,
+    source: SOURCES.REFERRAL_RETENTION,
+  },
+  {
+    text: `Your contacts at target companies may earn ${SOURCES.REFERRAL_BONUS_RANGE.claim} for referring you. Helping you is literally good for them.`,
+    source: SOURCES.REFERRAL_BONUS_RANGE,
+  },
+  {
+    text: 'WarmPath scores every contact on recency, relationship strength, and referral likelihood — so you lead with your best path, not your closest friend.',
+    source: null,
+  },
+];
+
+/** Fisher-Yates shuffle (returns new array). */
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 export default function UploadModal({ onClose, onComplete, hasContacts }) {
   const [step, setStep] = useState(hasContacts ? 2 : 1);
@@ -26,6 +74,7 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
     'Analyzing network strength...',
     'Finalizing import...',
   ];
+
 
   useEffect(() => {
     if (!uploading) {
@@ -58,6 +107,38 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
     }, 5000);
     return () => clearInterval(interval);
   }, [uploading]);
+
+  // Keevs trivia rotation — greeting first, then shuffled trivia at 8s intervals
+  const [triviaPool, setTriviaPool] = useState([]);
+  const [triviaIdx, setTriviaIdx] = useState(-1); // -1 = greeting
+  const [triviaFade, setTriviaFade] = useState(true);
+
+  useEffect(() => {
+    if (!uploading) {
+      setTriviaIdx(-1);
+      setTriviaFade(true);
+      return;
+    }
+    setTriviaPool(shuffleArray(KEEVS_TRIVIA));
+    setTriviaIdx(-1);
+    setTriviaFade(true);
+
+    const interval = setInterval(() => {
+      setTriviaFade(false);
+      setTimeout(() => {
+        setTriviaIdx((prev) => {
+          const next = prev + 1;
+          return next >= KEEVS_TRIVIA.length ? 0 : next;
+        });
+        setTriviaFade(true);
+      }, 300);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [uploading]);
+
+  const currentTrivia = triviaIdx === -1
+    ? { text: 'Hang tight — scoring your network takes a moment. Worth it.', source: null, isGreeting: true }
+    : { ...triviaPool[triviaIdx], isGreeting: false };
 
   const handleFile = (f) => {
     if (f && f.name.endsWith('.csv')) {
@@ -227,6 +308,23 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
                 />
               </div>
               <p className="text-xs text-slate-500">{progressMsg}</p>
+
+              {/* Keevs trivia */}
+              <div className="mt-3 flex min-h-[72px] items-start gap-3" aria-live="polite">
+                <KeevsAvatar size="sm" pulse={currentTrivia.isGreeting} className="mt-0.5 shrink-0" />
+                <div
+                  key={triviaIdx}
+                  className={`min-w-0 flex-1 transition-opacity duration-300 ${triviaFade ? 'opacity-100' : 'opacity-0'}`}
+                >
+                  <span className="text-xs font-medium text-amber-400">Keevs:</span>
+                  <p className="mt-0.5 text-sm leading-snug text-slate-300">{currentTrivia.text}</p>
+                  {currentTrivia.source && (
+                    <div className="mt-1">
+                      <SourceTag source={currentTrivia.source.source} label={currentTrivia.source.label} />
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -269,6 +367,13 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
                   You earned 100 credits for your first upload. Your contacts are now scored and ready to search.
                 </p>
               )}
+              <div className="mx-auto mb-4 flex max-w-xs items-center gap-2 rounded-lg bg-slate-800/60 px-3 py-2">
+                <KeevsAvatar size="sm" className="shrink-0" />
+                <p className="text-left text-xs text-slate-400">
+                  <span className="font-medium text-amber-400">Keevs:</span>{' '}
+                  Your network is scored and ready. Let's find your fastest path in.
+                </p>
+              </div>
               <Button
                 onClick={() => { onComplete?.(); onClose(); }}
                 className="w-full"
