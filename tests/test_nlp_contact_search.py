@@ -219,7 +219,7 @@ def test_seniority_match_boosts_title_score():
 
 
 # ---------------------------------------------------------------------------
-# Real Claude API parser — parse_query_real() with mocked API
+# Real Groq API parser — parse_query_real() with mocked API
 # ---------------------------------------------------------------------------
 
 from unittest.mock import MagicMock, patch  # noqa: E402
@@ -227,19 +227,25 @@ from unittest.mock import MagicMock, patch  # noqa: E402
 from app.services.nlp_contact_search import parse_query_real  # noqa: E402
 
 
-def test_parse_query_real_returns_parsed_query():
+def test_parse_query_real_returns_parsed_query_via_groq():
+    mock_message = MagicMock()
+    mock_message.content = (
+        '{"titles": ["engineer"], "companies": ["Google"], '
+        '"seniority": ["senior"], "locations": ["Singapore"], '
+        '"relationship_types": []}'
+    )
+    mock_choice = MagicMock()
+    mock_choice.message = mock_message
     mock_response = MagicMock()
-    mock_response.content = [
-        MagicMock(
-            text='{"titles": ["engineer"], "companies": ["Google"], '
-            '"seniority": ["senior"], "locations": ["Singapore"], '
-            '"relationship_types": []}'
-        )
-    ]
-    mock_client = MagicMock()
-    mock_client.messages.create.return_value = mock_response
+    mock_response.choices = [mock_choice]
 
-    with patch("anthropic.Anthropic", return_value=mock_client):
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch(
+        "app.utils.openai_compat_client.get_groq_sync_client",
+        return_value=mock_client,
+    ):
         result = parse_query_real("senior engineers at Google in Singapore")
 
     assert "engineer" in result.titles
@@ -249,8 +255,11 @@ def test_parse_query_real_returns_parsed_query():
     assert result.raw_query == "senior engineers at Google in Singapore"
 
 
-def test_parse_query_real_falls_back_to_mock_on_error():
-    with patch("anthropic.Anthropic", side_effect=RuntimeError("API unavailable")):
+def test_parse_query_real_falls_back_to_mock_on_groq_error():
+    with patch(
+        "app.utils.openai_compat_client.get_groq_sync_client",
+        side_effect=RuntimeError("API unavailable"),
+    ):
         result = parse_query_real("engineers at Google")
 
     # Should fall back to mock parser, which still extracts "Google"

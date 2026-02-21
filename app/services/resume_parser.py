@@ -1,7 +1,7 @@
 """Resume PDF parser — extracts structured profile data using AI.
 
 When AI_MOCK_MODE=true (default), returns deterministic fake profile data
-without requiring pdfplumber or an Anthropic API key.
+without requiring pdfplumber or a Gemini API key.
 """
 
 import asyncio
@@ -82,14 +82,8 @@ def _mock_parse() -> dict:
     }
 
 
-async def _ai_parse(text: str) -> dict:
-    """Send extracted resume text to Claude for structured extraction."""
-    from app.utils.anthropic_client import get_async_client
-    from app.utils.rate_limiter import acqui[RESEND_KEY_REDACTED], release_slot
-
-    client = get_async_client()
-
-    prompt = f"""You are a resume parser. Extract structured profile information from the resume text below.
+_RESUME_SYSTEM_PROMPT = """\
+You are a resume parser. Extract structured profile information from the resume text.
 
 Return a JSON object with exactly these fields (use null for any field you cannot determine):
 
@@ -117,28 +111,35 @@ Return a JSON object with exactly these fields (use null for any field you canno
 IMPORTANT:
 - Return ONLY valid JSON. No markdown fences, no extra text.
 - Look for sections titled Experience, Employment, Work History, Education, Summary, Objective, Skills.
-- For date parsing: "Jan 2020" = "2020-01", "March 2019" = "2019-03", "2021" = "2021-01", "Present" = null end_date.
+- For date parsing: "Jan 2020" = "2020-01", "March 2019" = "2019-03", "2021" = "2021-01", "Present" = null end_date."""
 
-Resume text:
-{text[:8000]}"""
 
-    used_redis = await acqui[RESEND_KEY_REDACTED]("anthropic")
+async def _ai_parse(text: str) -> dict:
+    """Send extracted resume text to Gemini Flash for structured extraction."""
+    from google import genai
+
+    from app.utils.gemini_client import get_gemini_client
+    from app.utils.rate_limiter import acqui[RESEND_KEY_REDACTED], release_slot
+
+    client = get_gemini_client()
+
+    used_redis = await acqui[RESEND_KEY_REDACTED](
+        "google", max_concurrent=settings.GOOGLE_MAX_CONCURRENT
+    )
     try:
-        message = await client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=2048,
-            messages=[{"role": "user", "content": prompt}],
+        response = await client.aio.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=text[:8000],
+            config=genai.types.GenerateContentConfig(
+                system_instruction=_RESUME_SYSTEM_PROMPT,
+                response_mime_type="application/json",
+                temperature=0,
+            ),
         )
     finally:
-        await release_slot("anthropic", used_redis)
+        await release_slot("google", used_redis)
 
-    raw = message.content[0].text.strip()
-    # Strip markdown fences if present
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1]
-        if raw.endswith("```"):
-            raw = raw[:-3]
-    return json.loads(raw)
+    return json.loads(response.text)
 
 
 async def parse_resume(pdf_bytes: bytes) -> dict:

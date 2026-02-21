@@ -1,7 +1,6 @@
 """Tests for V2 CSV streaming pipeline routing."""
 
-import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, MagicMock
 
 
 class TestV2PipelineRouting:
