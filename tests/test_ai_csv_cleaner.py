@@ -196,8 +196,8 @@ class TestCleanContactsRealMode:
     """Tests for Claude API cleanup mode (mocked API calls)."""
 
     @pytest.mark.asyncio
-    async def test_real_mode_calls_claude_and_returns_cleaned_data(self):
-        """Real mode sends contacts to Claude API and returns cleaned results."""
+    async def test_real_mode_dispatches_to_provider_pool(self):
+        """Real mode dispatches batches to provider pool and returns cleaned data."""
         contacts = [
             {
                 "first_name": "alice",
@@ -212,42 +212,26 @@ class TestCleanContactsRealMode:
             }
         ]
 
-        mock_response_text = """[
+        # dispatch_batch returns cleaned contacts list
+        cleaned_batch = [
             {
                 "first_name": "Alice",
                 "last_name": "Smith",
+                "full_name": "Alice Smith",
+                "email": "alice@example.com",
                 "current_company": "Acme Corp",
-                "current_title": "Software Engineer"
+                "current_title": "Software Engineer",
+                "connected_on": None,
+                "linkedin_url": None,
+                "fingerprint": "new",
             }
-        ]"""
+        ]
 
-        mock_message = AsyncMock()
-        mock_message.content = [AsyncMock(text=mock_response_text)]
-        mock_message.usage = AsyncMock(input_tokens=100, output_tokens=50)
-
-        mock_client = AsyncMock()
-        mock_client.messages.create = AsyncMock(return_value=mock_message)
-
-        with (
-            patch("app.services.ai_csv_cleaner.settings") as mock_settings,
-            patch(
-                "app.services.ai_csv_cleaner._get_anthropic_client",
-                return_value=mock_client,
-            ),
-            patch(
-                "app.utils.rate_limiter.acqui[RESEND_KEY_REDACTED]",
-                new_callable=AsyncMock,
-                return_value=False,
-            ),
-            patch(
-                "app.utils.rate_limiter.release_slot",
-                new_callable=AsyncMock,
-            ),
+        with patch(
+            "app.services.ai_provider_pool.dispatch_batch",
+            new_callable=AsyncMock,
+            return_value=cleaned_batch,
         ):
-            mock_settings.CLEANUP_PROVIDER = "anthropic"
-            mock_settings.ANTHROPIC_MAX_CONCURRENT = 5
-            mock_settings.QUEUE_DEPTH_THRESHOLD = 20
-            mock_settings.AI_MOCK_MODE = False
             from app.services.ai_csv_cleaner import clean_contacts_real
 
             result = await clean_contacts_real(contacts)
@@ -258,8 +242,8 @@ class TestCleanContactsRealMode:
         assert result[0]["current_title"] == "Software Engineer"
 
     @pytest.mark.asyncio
-    async def test_real_mode_falls_back_to_mock_on_api_error(self):
-        """If Claude API fails, falls back to mock cleanup."""
+    async def test_real_mode_falls_back_to_mock_on_pool_failure(self):
+        """If all providers fail, falls back to mock cleanup per-batch."""
         contacts = [
             {
                 "first_name": "alice",
@@ -274,25 +258,10 @@ class TestCleanContactsRealMode:
             }
         ]
 
-        mock_client = AsyncMock()
-        mock_client.messages.create = AsyncMock(
-            side_effect=Exception("API unavailable")
-        )
-
-        with (
-            patch(
-                "app.services.ai_csv_cleaner._get_anthropic_client",
-                return_value=mock_client,
-            ),
-            patch(
-                "app.utils.rate_limiter.acqui[RESEND_KEY_REDACTED]",
-                new_callable=AsyncMock,
-                return_value=False,
-            ),
-            patch(
-                "app.utils.rate_limiter.release_slot",
-                new_callable=AsyncMock,
-            ),
+        with patch(
+            "app.services.ai_provider_pool.dispatch_batch",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("All providers exhausted"),
         ):
             from app.services.ai_csv_cleaner import clean_contacts_real
 
