@@ -95,7 +95,7 @@ def _is_provider_enabled(name: str, cfg: Any = None) -> bool:
     if key and key.strip():
         return True
     # Vertex AI mode: service account JSON enables Google without an API key
-    if name == "google":
+    if name == "gemini":
         sa = getattr(cfg, "GOOGLE_SERVICE_ACCOUNT_JSON", "")
         return bool(sa and sa.strip())
     return False
@@ -193,7 +193,7 @@ def _build_provider(name: str) -> CleaningProvider:
     cfg = PROVIDER_CONFIGS[name]
     max_conc = getattr(settings, cfg["max_concurrent_attr"])
 
-    if name == "google":
+    if name == "gemini":
         from app.utils.gemini_client import get_gemini_client
 
         return CleaningProvider(
