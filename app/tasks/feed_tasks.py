@@ -22,6 +22,18 @@ def _run_async(coro):
         loop.close()
 
 
+async def _dispose_stale_pool():
+    """Dispose stale asyncpg connections before each Celery task.
+
+    _run_async() creates a new event loop each time, but the @lru_cache
+    engine retains asyncpg connections bound to the previous loop.
+    Dispose so asyncpg reconnects on the current loop.
+    """
+    from app.database import _get_engine
+
+    await _get_engine().dispose()
+
+
 def _get_session_factory():
     """Create an async session factory for Celery tasks (own connection)."""
     from app.database import _get_session_factory
@@ -48,6 +60,7 @@ def generate_feed_all_users():
     async def _run():
         from app.services.feed_generator import generate_feed_for_all_active_users
 
+        await _dispose_stale_pool()
         async with _get_session_factory()() as db:
             try:
                 total = await generate_feed_for_all_active_users(db)
@@ -80,6 +93,7 @@ def recompute_feed_weights():
     async def _run():
         from app.services.feed_ranker import compute_type_weights, set_cached_weights
 
+        await _dispose_stale_pool()
         async with _get_session_factory()() as db:
             try:
                 weights = await compute_type_weights(db)
@@ -114,6 +128,7 @@ def cleanup_expired_feed_items():
     async def _run():
         from app.models.feed import FeedItem
 
+        await _dispose_stale_pool()
         async with _get_session_factory()() as db:
             try:
                 now = datetime.now(timezone.utc)
@@ -161,6 +176,7 @@ def aggregate_freshness():
     async def _run():
         from app.services.freshness_aggregator import aggregate_freshness_signals
 
+        await _dispose_stale_pool()
         async with _get_session_factory()() as db:
             try:
                 result = await aggregate_freshness_signals(db)
@@ -206,6 +222,7 @@ def send_smart_digest():
     async def _run():
         from app.models.enrichment import UsageLog
 
+        await _dispose_stale_pool()
         async with _get_session_factory()() as db:
             try:
                 since = datetime.now(timezone.utc) - timedelta(days=7)

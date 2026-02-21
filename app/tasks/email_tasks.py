@@ -23,8 +23,13 @@ def _run_async(coro):
 
 async def _run_email_task(task_name: str, func_name: str) -> int:
     """Shared runner: create async session, call service function, return count."""
-    from app.database import _get_session_factory
+    from app.database import _get_engine, _get_session_factory
     from app.services import email_engagement
+
+    # _run_async() creates a new event loop each time, but the @lru_cache
+    # engine retains asyncpg connections bound to the previous loop.
+    # Dispose stale connections so asyncpg reconnects on the current loop.
+    await _get_engine().dispose()
 
     async with _get_session_factory()() as db:
         try:
