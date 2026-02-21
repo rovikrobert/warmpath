@@ -1,26 +1,28 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 import { useAuth } from './context/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import Spinner from './components/ui/Spinner';
-import AuthPage from './pages/AuthPage';
-import CoachPage from './pages/CoachPage';
-import SearchResults from './pages/SearchResults';
-import OnboardingPage from './pages/OnboardingPage';
-import FindReferrals from './pages/FindReferrals';
-import ReferralResults from './pages/ReferralResults';
-import MarketplaceOverview from './pages/MarketplaceOverview';
-import MarketplaceBrowse from './pages/MarketplaceBrowse';
-import MyRequests from './pages/MyRequests';
-import CreditsPage from './pages/CreditsPage';
-import SharingSettings from './pages/SharingSettings';
-import ApplicationsPage from './pages/ApplicationsPage';
-import ContactsPage from './pages/ContactsPage';
-import PrivacyPage from './pages/PrivacyPage';
-import ReferralCodesPage from './pages/ReferralCodesPage';
-import SettingsPage from './pages/SettingsPage';
-import ScoreGlossary from './pages/ScoreGlossary';
+
+const AuthPage = lazy(() => import('./pages/AuthPage'));
+const CoachPage = lazy(() => import('./pages/CoachPage'));
+const SearchResults = lazy(() => import('./pages/SearchResults'));
+const OnboardingPage = lazy(() => import('./pages/OnboardingPage'));
+const FindReferrals = lazy(() => import('./pages/FindReferrals'));
+const ReferralResults = lazy(() => import('./pages/ReferralResults'));
+const MarketplaceOverview = lazy(() => import('./pages/MarketplaceOverview'));
+const MarketplaceBrowse = lazy(() => import('./pages/MarketplaceBrowse'));
+const MyRequests = lazy(() => import('./pages/MyRequests'));
+const CreditsPage = lazy(() => import('./pages/CreditsPage'));
+const SharingSettings = lazy(() => import('./pages/SharingSettings'));
+const ApplicationsPage = lazy(() => import('./pages/ApplicationsPage'));
+const ContactsPage = lazy(() => import('./pages/ContactsPage'));
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const ReferralCodesPage = lazy(() => import('./pages/ReferralCodesPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const ScoreGlossary = lazy(() => import('./pages/ScoreGlossary'));
 
 function ProtectedRoute({ children, allowIncomplete = false }) {
   const { user, loading } = useAuth();
@@ -75,35 +77,43 @@ export default function App() {
     );
   }
 
+  const fallback = (
+    <div className="flex h-screen items-center justify-center bg-slate-950">
+      <Spinner size="lg" />
+    </div>
+  );
+
   return (
-    <Routes>
-      <Route path="/" element={<RootRedirect />} />
-      <Route path="/privacy" element={<PrivacyPage />} />
-      <Route path="/onboarding" element={<ProtectedRoute allowIncomplete><ErrorBoundary><OnboardingPage /></ErrorBoundary></ProtectedRoute>} />
-      <Route element={<ProtectedRoute><ErrorBoundary><Layout /></ErrorBoundary></ProtectedRoute>}>
-        <Route path="/coach" element={<CoachPage />} />
-        <Route path="/contacts" element={<ContactsPage />} />
-        <Route path="/search/new" element={<FindReferrals />} />
-        <Route path="/search/:id" element={<SearchResults />} />
-        <Route path="/referrals" element={<FindReferrals />} />
-        <Route path="/referrals/:id" element={<ReferralResults />} />
-        <Route path="/applications" element={<ApplicationsPage />} />
-        <Route path="/marketplace" element={<MarketplaceOverview />} />
-        <Route path="/marketplace/browse" element={<MarketplaceBrowse />} />
-        <Route path="/marketplace/requests" element={<MyRequests />} />
-        <Route path="/credits" element={<CreditsPage />} />
-        <Route path="/invite" element={<ReferralCodesPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/help/scores" element={<ScoreGlossary />} />
-        {/* Legacy routes — redirect to unified settings */}
-        <Route path="/dashboard" element={<Navigate to="/coach" replace />} />
-        <Route path="/profile/edit" element={<Navigate to="/settings?tab=profile" replace />} />
-        <Route path="/settings/privacy" element={<Navigate to="/settings?tab=privacy" replace />} />
-        <Route path="/marketplace/settings" element={<Navigate to="/settings?tab=sharing" replace />} />
-        <Route path="/marketplace/dashboard" element={<Navigate to="/marketplace" replace />} />
-        <Route path="/my-requests" element={<Navigate to="/marketplace/requests" replace />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense fallback={fallback}>
+      <Routes>
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/onboarding" element={<ProtectedRoute allowIncomplete><ErrorBoundary><OnboardingPage /></ErrorBoundary></ProtectedRoute>} />
+        <Route element={<ProtectedRoute><ErrorBoundary><Layout /></ErrorBoundary></ProtectedRoute>}>
+          <Route path="/coach" element={<CoachPage />} />
+          <Route path="/contacts" element={<ContactsPage />} />
+          <Route path="/search/new" element={<FindReferrals />} />
+          <Route path="/search/:id" element={<SearchResults />} />
+          <Route path="/referrals" element={<FindReferrals />} />
+          <Route path="/referrals/:id" element={<ReferralResults />} />
+          <Route path="/applications" element={<ApplicationsPage />} />
+          <Route path="/marketplace" element={<MarketplaceOverview />} />
+          <Route path="/marketplace/browse" element={<MarketplaceBrowse />} />
+          <Route path="/marketplace/requests" element={<MyRequests />} />
+          <Route path="/credits" element={<CreditsPage />} />
+          <Route path="/invite" element={<ReferralCodesPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/help/scores" element={<ScoreGlossary />} />
+          {/* Legacy routes — redirect to unified settings */}
+          <Route path="/dashboard" element={<Navigate to="/coach" replace />} />
+          <Route path="/profile/edit" element={<Navigate to="/settings?tab=profile" replace />} />
+          <Route path="/settings/privacy" element={<Navigate to="/settings?tab=privacy" replace />} />
+          <Route path="/marketplace/settings" element={<Navigate to="/settings?tab=sharing" replace />} />
+          <Route path="/marketplace/dashboard" element={<Navigate to="/marketplace" replace />} />
+          <Route path="/my-requests" element={<Navigate to="/marketplace/requests" replace />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
