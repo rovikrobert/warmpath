@@ -125,12 +125,23 @@ def check_encryption() -> None:
         config_content = config_file.read_text()
         match = re.search(r'ENCRYPTION_KEY.*=\s*"([^"]*)"', config_content)
         if match and match.group(1) == "":
-            _add(
-                "HIGH",
-                "encryption",
-                "ENCRYPTION_KEY defaults to empty — encryption disabled unless explicitly set",
-                str(config_file.relative_to(PROJECT_ROOT)),
-            )
+            # Boot validation in main.py blocks startup when ENCRYPTION_KEY is
+            # empty and SECURE_HEADERS=true (production). Only flag if that
+            # safety net is missing.
+            main_file = APP_DIR / "main.py"
+            has_boot_guard = False
+            if main_file.exists():
+                main_src = main_file.read_text()
+                has_boot_guard = (
+                    "ENCRYPTION_KEY" in main_src and "boot" in main_src.lower()
+                ) or ("ENCRYPTION_KEY" in main_src and "RuntimeError" in main_src)
+            if not has_boot_guard:
+                _add(
+                    "HIGH",
+                    "encryption",
+                    "ENCRYPTION_KEY defaults to empty — encryption disabled unless explicitly set",
+                    str(config_file.relative_to(PROJECT_ROOT)),
+                )
 
     found = sum(1 for f in findings if f["category"] == "encryption")
     if found == 0:

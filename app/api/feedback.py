@@ -74,7 +74,7 @@ def _sync_feedback_to_notion(
                 "Settings": "Settings",
                 "Onboarding": "Onboarding",
                 "Signup": "Signup",
-                "Invite": "Other",
+                "Invite": "Invite & Earn",
             }
             page_feature = page_map.get(first_segment, "Other")
 
