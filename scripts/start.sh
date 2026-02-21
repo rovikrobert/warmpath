@@ -5,11 +5,19 @@
 #   worker — celery worker only
 #   beat   — celery beat only
 #   scan   — run agent team scans, then exit (Railway Cron)
+#
+# Each role uses `exec` to replace the shell — the target process
+# becomes PID 1 and receives SIGTERM/SIGINT directly from the runtime.
+# No background processes, no zombies.
 
 set -euo pipefail
 
 ROLE="${SERVICE_ROLE:-web}"
 CONCURRENCY="${CELERY_CONCURRENCY:-2}"
+
+# Handle SIGTERM/SIGINT during pre-exec setup (e.g. alembic migrations).
+# Once `exec` runs, this trap is replaced by the target process's own handler.
+trap 'echo "[entrypoint] Caught signal during setup, exiting..."; exit 1' SIGTERM SIGINT
 
 # Run Alembic migrations only for web service (before uvicorn starts).
 # Other services skip migrations to avoid race conditions on parallel deploys.
