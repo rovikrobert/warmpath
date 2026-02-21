@@ -32,6 +32,9 @@ class CsvUploadResponse(BaseModel):
     error_count: int | None
     contacts_created: int | None = None
     duplicates_skipped: int | None = None
+    total_chunks: int | None = None
+    chunks_cleaned: int | None = None
+    chunks_imported: int | None = None
     completed_at: datetime | None = None
     progress_phase: str | None = None
     error_message: str | None = None
