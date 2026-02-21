@@ -7,7 +7,7 @@ export const KEEVS_TRIVIA = [
     source: SOURCES.COLD_VS_REFERRAL,
   },
   {
-    text: `${SOURCES.HIDDEN_JOB_MARKET.claim} of jobs are filled before they're ever posted publicly. Your network is the only way into that market.`,
+    text: `Up to 80% of jobs are filled before they're ever posted publicly. Your network is the only way into that market.`,
     source: SOURCES.HIDDEN_JOB_MARKET,
   },
   {
