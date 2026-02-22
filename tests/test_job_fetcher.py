@@ -491,12 +491,21 @@ async def auth_headers(client: AsyncClient) -> dict:
 
 
 class TestJobsAPI:
-    async def test_scan_unknown_company(self, client: AsyncClient, auth_headers):
+    async def test_scan_unknown_company_returns_empty(
+        self, client: AsyncClient, auth_headers
+    ):
+        """Unknown companies return 200 with zero openings (JobSpy fallback runs)."""
         resp = await client.get(
             "/api/v1/jobs/scan/completely_unknown_xyz",
             headers=auth_headers,
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["meta"]["openings_count"] == 0
+        assert body["meta"]["discovery_status"] in (
+            "scraped",
+            "no_listings",
+        )
 
     async def test_scan_and_dedup(self, client: AsyncClient, auth_headers):
         """Scanning the same company twice should not create duplicate openings."""

@@ -111,6 +111,11 @@ export const contacts = {
   createManual: (body) => api('/api/v1/contacts/manual', { method: 'POST', body }),
   bulkImport: (contactsList) =>
     api('/api/v1/contacts/manual/bulk', { method: 'POST', body: { contacts: contactsList } }),
+  bulkUpdate: (body) =>
+    api('/api/v1/contacts/bulk-update', { method: 'PATCH', body }).then((r) => {
+      track('bulk_update_contacts', { count: r.data?.updated_count });
+      return r;
+    }),
   nlpSearch: (query) =>
     api('/api/v1/contacts/nlp-search', { method: 'POST', body: { query } }).then((r) => {
       track('nlp_search', { query_length: query.length });
@@ -145,6 +150,17 @@ export const companies = {
     if (query) qs.set('search', query);
     qs.set('per_page', String(limit));
     return api(`/api/v1/companies?${qs}`);
+  },
+  discover: (companyName) =>
+    api('/api/v1/companies/discover', {
+      method: 'POST',
+      body: { company_name: companyName },
+    }),
+  suggest: ({ q, limit = 8 } = {}) => {
+    const qs = new URLSearchParams();
+    if (q) qs.set('q', q);
+    qs.set('limit', String(limit));
+    return api(`/api/v1/companies/suggest?${qs}`);
   },
 };
 

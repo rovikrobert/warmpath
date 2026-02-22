@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { auth as authApi, contacts as contactsApi, preferences, marketplace, referrals as referralsApi } from '../api/client';
 import TagInput from '../components/TagInput';
 import KeevsAvatar from '../components/KeevsAvatar';
+import TrebAvatar from '../components/TrebAvatar';
 import KeevsTrivia from '../components/KeevsTrivia';
 import { trackEvent } from '../utils/analytics';
 import { SOURCES } from '../utils/sources';
@@ -751,47 +752,105 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 5: Meet Keevs */}
+          {/* Step 5: Meet your AI coach */}
           {step === 5 && (
             <div className="space-y-5">
-              <div className="text-center">
-                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">Your AI career coach</p>
-                <h2 className="text-lg font-semibold text-slate-50">Meet Keevs</h2>
-              </div>
-
-              <div className="flex flex-col items-center rounded-xl border border-amber-500/30 bg-amber-500/5 p-8">
-                <KeevsAvatar size="xl" pulse />
-                <p className="mt-4 text-center text-base font-medium text-slate-100">
-                  Hey! I'm Keevs.
-                </p>
-                <p className="mt-2 text-center text-sm leading-relaxed text-slate-400 max-w-sm">
-                  I'm your AI career coach built into WarmPath. I work in the background to find opportunities, warm introductions, and insights you'd miss on your own.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
-                  <span className="mt-0.5 text-lg" aria-hidden="true">🔔</span>
-                  <div>
-                    <p className="text-sm font-medium text-slate-200">Proactive alerts</p>
-                    <p className="text-xs text-slate-400">I'll surface job matches, follow-up reminders, and network insights before you even ask.</p>
+              {user?.intent === 'sha[RESEND_KEY_REDACTED]' ? (
+                <>
+                  <div className="text-center">
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">Your AI network partner</p>
+                    <h2 className="text-lg font-semibold text-slate-50">Meet Treb</h2>
                   </div>
-                </div>
-                <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
-                  <span className="mt-0.5 text-lg" aria-hidden="true">💬</span>
-                  <div>
-                    <p className="text-sm font-medium text-slate-200">Ask me anything</p>
-                    <p className="text-xs text-slate-400">Strategy questions, intro message drafts, company research — I'm here whenever you need me.</p>
+                  <div className="flex flex-col items-center rounded-xl border border-teal-500/30 bg-teal-500/5 p-8">
+                    <TrebAvatar size="xl" pulse />
+                    <p className="mt-4 text-center text-base font-medium text-slate-100">Hey! I'm Treb.</p>
+                    <p className="mt-2 text-center text-sm leading-relaxed text-slate-400 max-w-sm">
+                      I'm your AI network partner. I help you manage intro requests, track referral bonuses, and make the most of sharing your professional network.
+                    </p>
                   </div>
-                </div>
-                <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
-                  <span className="mt-0.5 text-lg" aria-hidden="true">📈</span>
-                  <div>
-                    <p className="text-sm font-medium text-slate-200">Gets smarter over time</p>
-                    <p className="text-xs text-slate-400">The more you use WarmPath, the better I understand your goals and network — and the better my recommendations get.</p>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
+                      <span className="mt-0.5 text-lg" aria-hidden="true">🤝</span>
+                      <div>
+                        <p className="text-sm font-medium text-slate-200">Manage intro requests</p>
+                        <p className="text-xs text-slate-400">Review and approve intro requests from job seekers who want to connect with people in your network.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
+                      <span className="mt-0.5 text-lg" aria-hidden="true">💰</span>
+                      <div>
+                        <p className="text-sm font-medium text-slate-200">Capture referral bonuses</p>
+                        <p className="text-xs text-slate-400">Your employer likely offers $2-10K per referral hire. I help you track and capture these bonuses.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
+                      <span className="mt-0.5 text-lg" aria-hidden="true">🔒</span>
+                      <div>
+                        <p className="text-sm font-medium text-slate-200">Privacy controls</p>
+                        <p className="text-xs text-slate-400">You always decide what's shared. Exclude contacts, filter categories, pause anytime.</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </>
+              ) : user?.intent === 'explore' ? (
+                <>
+                  <div className="text-center">
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">Your AI coaches</p>
+                    <h2 className="text-lg font-semibold text-slate-50">Meet Your Coaches</h2>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col items-center rounded-xl border border-amber-500/30 bg-amber-500/5 p-6">
+                      <KeevsAvatar size="lg" pulse />
+                      <p className="mt-3 text-center text-sm font-medium text-slate-100">Keevs</p>
+                      <p className="mt-1 text-center text-xs text-slate-400">Career Coach</p>
+                      <p className="mt-2 text-center text-xs leading-relaxed text-slate-500">Finds referral paths, drafts intros, tracks your job search.</p>
+                    </div>
+                    <div className="flex flex-col items-center rounded-xl border border-teal-500/30 bg-teal-500/5 p-6">
+                      <TrebAvatar size="lg" pulse />
+                      <p className="mt-3 text-center text-sm font-medium text-slate-100">Treb</p>
+                      <p className="mt-1 text-center text-xs text-slate-400">Network Partner</p>
+                      <p className="mt-2 text-center text-xs leading-relaxed text-slate-500">Manages intro requests, tracks referral bonuses, privacy controls.</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-center">
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">Your AI career coach</p>
+                    <h2 className="text-lg font-semibold text-slate-50">Meet Keevs</h2>
+                  </div>
+                  <div className="flex flex-col items-center rounded-xl border border-amber-500/30 bg-amber-500/5 p-8">
+                    <KeevsAvatar size="xl" pulse />
+                    <p className="mt-4 text-center text-base font-medium text-slate-100">Hey! I'm Keevs.</p>
+                    <p className="mt-2 text-center text-sm leading-relaxed text-slate-400 max-w-sm">
+                      I'm your AI career coach built into WarmPath. I work in the background to find opportunities, warm introductions, and insights you'd miss on your own.
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
+                      <span className="mt-0.5 text-lg" aria-hidden="true">🔔</span>
+                      <div>
+                        <p className="text-sm font-medium text-slate-200">Proactive alerts</p>
+                        <p className="text-xs text-slate-400">I'll surface job matches, follow-up reminders, and network insights before you even ask.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
+                      <span className="mt-0.5 text-lg" aria-hidden="true">💬</span>
+                      <div>
+                        <p className="text-sm font-medium text-slate-200">Ask me anything</p>
+                        <p className="text-xs text-slate-400">Strategy questions, intro message drafts, company research — I'm here whenever you need me.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
+                      <span className="mt-0.5 text-lg" aria-hidden="true">📈</span>
+                      <div>
+                        <p className="text-sm font-medium text-slate-200">Gets smarter over time</p>
+                        <p className="text-xs text-slate-400">The more you use WarmPath, the better I understand your goals and network — and the better my recommendations get.</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={() => { setError(''); setStep(4); }} className="flex-1" size="lg">

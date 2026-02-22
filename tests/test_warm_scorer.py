@@ -603,3 +603,77 @@ async def test_single_contact_includes_warm_score(client: AsyncClient):
 async def test_compute_scores_requires_auth(client: AsyncClient):
     resp = await client.post("/api/v1/contacts/compute-scores")
     assert resp.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — warm_sco[RESEND_KEY_REDACTED] schema validation
+# ---------------------------------------------------------------------------
+
+
+def test_contact_update_schema_accepts_warm_sco[RESEND_KEY_REDACTED]():
+    from app.schemas.contact import ContactUpdate
+
+    update = ContactUpdate(warm_sco[RESEND_KEY_REDACTED]=75.0)
+    assert update.warm_sco[RESEND_KEY_REDACTED] == 75.0
+
+
+def test_contact_update_schema_accepts_null_warm_sco[RESEND_KEY_REDACTED]():
+    from app.schemas.contact import ContactUpdate
+
+    update = ContactUpdate(warm_sco[RESEND_KEY_REDACTED]=None)
+    assert update.warm_sco[RESEND_KEY_REDACTED] is None
+
+
+def test_contact_update_schema_rejects_warm_sco[RESEND_KEY_REDACTED]():
+    from app.schemas.contact import ContactUpdate
+    from pydantic import ValidationError
+    import pytest
+
+    with pytest.raises(ValidationError):
+        ContactUpdate(warm_sco[RESEND_KEY_REDACTED]=150.0)
+
+
+def test_contact_update_schema_rejects_warm_sco[RESEND_KEY_REDACTED]():
+    from app.schemas.contact import ContactUpdate
+    from pydantic import ValidationError
+    import pytest
+
+    with pytest.raises(ValidationError):
+        ContactUpdate(warm_sco[RESEND_KEY_REDACTED]=-10.0)
+
+
+def test_compute_warm_sco[RESEND_KEY_REDACTED]():
+    """When contact has warm_sco[RESEND_KEY_REDACTED], compute_warm_score returns it directly."""
+    from unittest.mock import MagicMock
+    from app.services.warm_scorer import compute_warm_score
+
+    contact = MagicMock()
+    contact.warm_sco[RESEND_KEY_REDACTED] = 90.0
+    contact.connected_on = None
+    contact.relationship_type = None
+    contact.current_title = None
+    contact.would_refer = None
+    contact.how_you_know = None
+    contact.last_interaction_date = None
+
+    result = compute_warm_score(contact, None, None)
+    assert result.total_score == 90.0
+
+
+def test_compute_warm_sco[RESEND_KEY_REDACTED]():
+    """When contact has no override, compute_warm_score uses algorithmic score."""
+    from unittest.mock import MagicMock
+    from app.services.warm_scorer import compute_warm_score
+
+    contact = MagicMock()
+    contact.warm_sco[RESEND_KEY_REDACTED] = None
+    contact.connected_on = None
+    contact.relationship_type = None
+    contact.current_title = None
+    contact.would_refer = None
+    contact.how_you_know = None
+    contact.last_interaction_date = None
+
+    result = compute_warm_score(contact, None, None)
+    # Should compute algorithmically (will be low since all fields are None)
+    assert result.total_score != 90.0

@@ -394,6 +394,18 @@ def compute_warm_score(
     target_role: str | None = None,
 ) -> WarmScoreResult:
     """Compute the full warm score for a single contact."""
+    # If user has manually overridden the warm score, use it directly
+    override = getattr(contact, "warm_sco[RESEND_KEY_REDACTED]", None)
+    if override is not None:
+        return WarmScoreResult(
+            total_score=override,
+            recency_score=0.0,
+            relationship_score=0.0,
+            role_score=0.0,
+            tenu[RESEND_KEY_REDACTED]=0.0,
+            factors=["manual_override"],
+        )
+
     recency = compute_recency_score(contact.connected_on)
     relationship, relationship_factors = compute_relationship_score(
         contact, connector_profile

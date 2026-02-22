@@ -6,7 +6,8 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import FeedbackModal from '../components/FeedbackModal';
 import FeedCard from '../components/FeedCard';
 import KeevsAvatar from '../components/KeevsAvatar';
-import OnboardingChecklist from '../components/OnboardingChecklist';
+import TrebAvatar from '../components/TrebAvatar';
+import ReferralJourney from '../components/ReferralJourney';
 import CoachPageSkeleton from '../components/skeletons/CoachPageSkeleton';
 import { useToast } from '../components/ui/Toast';
 import useDocumentTitle from '../hooks/useDocumentTitle';
@@ -49,10 +50,16 @@ function renderWithLinks(text) {
   });
 }
 
-const QUICK_ACTIONS = [
+const KEEVS_QUICK_ACTIONS = [
   { label: 'Find referrals', prompt: 'Help me find referral paths at my target companies' },
   { label: 'Draft an intro', prompt: 'Help me draft a referral intro message' },
   { label: 'Review my network', prompt: 'Analyze my network and tell me my strongest connections' },
+];
+
+const TREB_QUICK_ACTIONS = [
+  { label: 'Share my network', prompt: 'How do I share my network on WarmPath?' },
+  { label: 'Check intro requests', prompt: 'Show me pending intro requests' },
+  { label: 'Referral bonuses', prompt: 'How much are referral bonuses worth?' },
 ];
 
 export default function CoachPage() {
@@ -68,6 +75,7 @@ export default function CoachPage() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedItems, setFeedItems] = useState([]);
   const [feedExpanded, setFeedExpanded] = useState(true);
+  const [persona, setPersona] = useState('keevs');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const quickActionsRef = useRef(null);
@@ -100,7 +108,9 @@ export default function CoachPage() {
         const res = await coachApi.briefing();
         if (cancelled) return;
         const data = res.data;
-        setMessages([{ role: 'keevs', content: data.briefing }]);
+        const p = data.persona || 'keevs';
+        setPersona(p);
+        setMessages([{ role: p, content: data.briefing }]);
         setContextSnapshot(data.context_snapshot);
         setSuggestedPrompts(data.suggested_prompts || []);
       } catch {
@@ -132,7 +142,7 @@ export default function CoachPage() {
 
     // Append an empty Keevs bubble that will fill progressively
     const keevsIdx = messages.length + 1; // index of the new keevs message
-    setMessages((prev) => [...prev, { role: 'keevs', content: '' }]);
+    setMessages((prev) => [...prev, { role: persona, content: '' }]);
 
     try {
       const history = [...messages, userMsg].map((m) => ({
@@ -163,7 +173,13 @@ export default function CoachPage() {
           const payload = line.slice(6);
           if (payload === '[DONE]') continue;
           try {
-            const { t } = JSON.parse(payload);
+            const parsed = JSON.parse(payload);
+            // Handle persona event from SSE
+            if (parsed.persona) {
+              setPersona(parsed.persona);
+              continue;
+            }
+            const { t } = parsed;
             if (t) {
               setMessages((prev) => {
                 const updated = [...prev];
@@ -207,8 +223,8 @@ export default function CoachPage() {
 
   return (
     <div className="flex h-[calc(100dvh-8rem)] lg:h-[calc(100vh-8rem)] flex-col" role="main">
-      {/* Onboarding checklist for new users */}
-      <OnboardingChecklist />
+      {/* Guided referral journey for new users */}
+      <ReferralJourney variant="full" />
 
       {/* Notifications */}
       {feedItems.length > 0 && (() => {
@@ -291,10 +307,10 @@ export default function CoachPage() {
       {/* Header */}
       <div className="flex-none border-b border-slate-700/50 px-4 py-3">
         <div className="flex items-center gap-2">
-          <KeevsAvatar size={32} />
+          {persona === 'treb' ? <TrebAvatar size={32} /> : <KeevsAvatar size={32} />}
           <div>
-            <h1 className="page-title">Keevs</h1>
-            <p className="text-xs text-slate-400">AI Career Coach</p>
+            <h1 className="page-title">{persona === 'treb' ? 'Treb' : 'Keevs'}</h1>
+            <p className="text-xs text-slate-400">{persona === 'treb' ? 'Network Partner' : 'AI Career Coach'}</p>
           </div>
         </div>
       </div>
@@ -320,7 +336,7 @@ export default function CoachPage() {
                 {prompt}
               </button>
             ))}
-            {QUICK_ACTIONS.map((action) => (
+            {(persona === 'treb' ? TREB_QUICK_ACTIONS : KEEVS_QUICK_ACTIONS).map((action) => (
               <button
                 key={action.label}
                 onClick={() => sendMessage(action.prompt)}
@@ -338,7 +354,7 @@ export default function CoachPage() {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" aria-live="polite" aria-label="Conversation messages">
         <ErrorBoundary>
         {messages.map((msg, i) => {
-          const isBriefing = i === 0 && msg.role === 'keevs';
+          const isBriefing = i === 0 && (msg.role === 'keevs' || msg.role === 'treb');
           return (
           <div
             key={i}
@@ -354,7 +370,7 @@ export default function CoachPage() {
                       : 'max-w-[95%] sm:max-w-[85%] px-4 py-3 bg-slate-800 text-slate-200'
                 }`}
               >
-                {msg.role === 'keevs'
+                {(msg.role === 'keevs' || msg.role === 'treb')
                   ? msg.content.split('\n').map((line, j) => (
                       <p key={j} className={j > 0 ? 'mt-2' : ''}>
                         {renderWithLinks(line)}
@@ -363,7 +379,7 @@ export default function CoachPage() {
                   : msg.content
                 }
               </div>
-              {msg.role === 'keevs' && msg.content && (
+              {(msg.role === 'keevs' || msg.role === 'treb') && msg.content && (
                 <button
                   onClick={() => navigator.clipboard.writeText(msg.content).then(() => toast.success('Copied to clipboard'))}
                   className="mt-1 text-xs text-slate-500 hover:text-slate-400 transition-colors"
@@ -386,7 +402,7 @@ export default function CoachPage() {
               <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '150ms' }} />
               <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
-            <span className="text-xs text-slate-500">Keevs is thinking...</span>
+            <span className="text-xs text-slate-500">{persona === 'treb' ? 'Treb' : 'Keevs'} is thinking...</span>
           </div>
         )}
 
@@ -401,8 +417,8 @@ export default function CoachPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask Keevs anything about your job search..."
-            aria-label="Message to Keevs"
+            placeholder={persona === "treb" ? "Ask Treb about sharing your network..." : "Ask Keevs anything about your job search..."}
+            aria-label={`Message to ${persona === "treb" ? "Treb" : "Keevs"}`}
             disabled={sending}
             rows={1}
             className="flex-1 resize-none rounded-xl border border-slate-700/50 bg-slate-800 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"

@@ -182,8 +182,8 @@ export default function MarketplaceOverview() {
 
       {/* Quick navigation */}
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <Link to="/marketplace/browse" className="rounded-lg border border-amber-500/30 px-3 py-1.5 text-amber-400 hover:bg-amber-500/10">
-          Browse Marketplace
+        <Link to="/referrals" className="rounded-lg border border-amber-500/30 px-3 py-1.5 text-amber-400 hover:bg-amber-500/10">
+          Find Referral Paths
         </Link>
         <Link to="/marketplace/requests" className="rounded-lg border border-slate-700/50 px-3 py-1.5 text-slate-400 hover:bg-slate-800">
           My Requests {pendingRequests.length > 0 && <span className="ml-1 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-400">{pendingRequests.length}</span>}

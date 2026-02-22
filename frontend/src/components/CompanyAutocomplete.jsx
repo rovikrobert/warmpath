@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { companies as companiesApi } from '../api/client';
 
+const SOURCE_BADGES = {
+  own_contacts: { label: 'Your network', style: 'text-amber-400 font-medium' },
+  registry: { label: 'Known board', style: 'text-emerald-400' },
+  discovered: { label: 'Discovered', style: 'text-sky-400' },
+};
+
 export default function CompanyAutocomplete({ value = [], onChange, placeholder }) {
   const [input, setInput] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [searchedEmpty, setSearchedEmpty] = useState(false);
   const debounceRef = useRef(null);
   const containerRef = useRef(null);
   const inputRef = useRef(null);
@@ -18,21 +26,36 @@ export default function CompanyAutocomplete({ value = [], onChange, placeholder 
       if (query.length < 2) {
         setSuggestions([]);
         setOpen(false);
+        setSearchedEmpty(false);
         return;
       }
       debounceRef.current = setTimeout(async () => {
         setLoading(true);
         try {
-          const res = await companiesApi.search({ query, limit: 8 });
+          const res = await companiesApi.suggest({ q: query, limit: 8 });
           const items = (res.data ?? []).filter(
             (c) => !value.includes(c.name),
           );
           setSuggestions(items);
           setOpen(items.length > 0);
+          setSearchedEmpty(items.length === 0);
           setActiveIndex(-1);
         } catch {
-          setSuggestions([]);
-          setOpen(false);
+          // Fallback to legacy search endpoint
+          try {
+            const res = await companiesApi.search({ query, limit: 8 });
+            const items = (res.data ?? []).filter(
+              (c) => !value.includes(c.name),
+            );
+            setSuggestions(items);
+            setOpen(items.length > 0);
+            setSearchedEmpty(items.length === 0);
+            setActiveIndex(-1);
+          } catch {
+            setSuggestions([]);
+            setOpen(false);
+            setSearchedEmpty(true);
+          }
         } finally {
           setLoading(false);
         }
@@ -61,6 +84,7 @@ export default function CompanyAutocomplete({ value = [], onChange, placeholder 
     setSuggestions([]);
     setOpen(false);
     setActiveIndex(-1);
+    setSearchedEmpty(false);
     inputRef.current?.focus();
   };
 
@@ -121,6 +145,18 @@ export default function CompanyAutocomplete({ value = [], onChange, placeholder 
         addCompany(input);
       }
     }, 200);
+  };
+
+  const handleVerifyCompany = async (name) => {
+    setVerifying(true);
+    try {
+      await companiesApi.discover(name);
+    } catch {
+      // Still add the company even if discovery fails
+    } finally {
+      setVerifying(false);
+    }
+    addCompany(name);
   };
 
   return (
@@ -185,7 +221,7 @@ export default function CompanyAutocomplete({ value = [], onChange, placeholder 
         )}
       </div>
       <p className="mt-1 text-xs text-slate-500">
-        Type to search companies in your network, or press Enter to add
+        Type to search companies in your network, or press Enter to add any company
       </p>
 
       {/* Dropdown */}
@@ -194,34 +230,61 @@ export default function CompanyAutocomplete({ value = [], onChange, placeholder 
           role="listbox"
           className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-700/50 bg-slate-900 shadow-xl"
         >
-          {suggestions.map((company, i) => (
-            <li
-              key={company.id}
-              id={`company-option-${i}`}
-              role="option"
-              aria-selected={i === activeIndex}
-              onMouseDown={() => addCompany(company.name)}
-              onMouseEnter={() => setActiveIndex(i)}
-              className={`flex cursor-pointer items-center justify-between px-3 py-2 ${
-                i === activeIndex ? 'bg-slate-800' : ''
-              }`}
-            >
-              <span className="text-sm font-medium text-slate-200">
-                {company.name}
-              </span>
-              <span
-                className={`text-xs ${
-                  company.contact_count > 0
-                    ? 'font-medium text-amber-400'
-                    : 'text-slate-500'
+          {suggestions.map((company, i) => {
+            const badge = SOURCE_BADGES[company.source];
+            return (
+              <li
+                key={company.name + i}
+                id={`company-option-${i}`}
+                role="option"
+                aria-selected={i === activeIndex}
+                onMouseDown={() => addCompany(company.name)}
+                onMouseEnter={() => setActiveIndex(i)}
+                className={`flex cursor-pointer items-center justify-between px-3 py-2 ${
+                  i === activeIndex ? 'bg-slate-800' : ''
                 }`}
               >
-                {company.contact_count}{' '}
-                {company.contact_count === 1 ? 'connection' : 'connections'}
-              </span>
-            </li>
-          ))}
+                <span className="text-sm font-medium text-slate-200">
+                  {company.name}
+                </span>
+                <span className="flex items-center gap-2">
+                  {badge && (
+                    <span className={`text-[10px] ${badge.style}`}>
+                      {badge.label}
+                    </span>
+                  )}
+                  <span
+                    className={`text-xs ${
+                      company.contact_count > 0
+                        ? 'font-medium text-amber-400'
+                        : 'text-slate-500'
+                    }`}
+                  >
+                    {company.contact_count}{' '}
+                    {company.contact_count === 1 ? 'connection' : 'connections'}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
         </ul>
+      )}
+
+      {/* "Not found" state — show when suggestions are empty after a search */}
+      {searchedEmpty && input.length >= 2 && !loading && (
+        <div className="absolute z-30 mt-1 w-full rounded-lg border border-slate-700/50 bg-slate-900 p-3 shadow-xl">
+          <p className="text-sm text-slate-400">
+            &ldquo;{input}&rdquo; isn&rsquo;t in our network yet.
+          </p>
+          <button
+            type="button"
+            onMouseDown={() => handleVerifyCompany(input)}
+            disabled={verifying}
+            className="mt-2 rounded-md bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
+          >
+            {verifying ? 'Verifying...' : 'Add & verify'}
+          </button>
+        </div>
       )}
     </div>
   );

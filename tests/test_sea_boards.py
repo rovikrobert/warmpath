@@ -364,15 +364,15 @@ class TestScanAPIFallback:
             assert resp.status_code == 200
             assert resp.json()["meta"]["openings_count"] == 1
 
-    async def test_scan_truly_unknown_still_404(
-        self, client: AsyncClient, auth_headers
-    ):
-        """A company in neither registry nor career pages returns 404."""
+    async def test_scan_unknown_returns_empty(self, client: AsyncClient, auth_headers):
+        """A company in neither registry nor career pages returns 200 with empty results."""
         resp = await client.get(
             "/api/v1/jobs/scan/totally_unknown_company_xyz_123",
             headers=auth_headers,
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["meta"]["openings_count"] == 0
 
     async def test_scan_known_ats_company_still_works(
         self, client: AsyncClient, auth_headers

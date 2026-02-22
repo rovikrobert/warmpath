@@ -39,6 +39,7 @@ from app.services.credits import check_and_spend
 from app.api.jobs import _upsert_openings
 from app.services.job_fetcher import JobFetcher
 from app.services.job_recommendations import get_recommendations
+from app.services.marketplace_indexer import classify_department
 from app.services.warm_scorer import compute_warm_score
 from app.utils.exceptions import RateLimitError
 from app.utils.security import get_current_user
@@ -756,9 +757,9 @@ async def _fetch_and_filter_openings(
 ) -> tuple[list[dict], int, int, str]:
     """Fetch job board openings, filter, and return (openings, fetched, matched, status)."""
     boards, was_discovered = await lookup_or_discover_boards(company_name, db)
-    if not boards:
-        return [], 0, 0, "no_board"
 
+    # Let fetch_jobs_for_company run the full fallback chain
+    # (ATS boards → career page → JobSpy → Adzuna) even without a known board.
     raw_jobs = await fetcher.fetch_jobs_for_company(company_name, boards)
     total_jobs_fetched = len(raw_jobs)
 
@@ -783,7 +784,10 @@ async def _fetch_and_filter_openings(
     )
     total_matched = len(filtered_jobs)
 
-    if was_discovered:
+    if not boards and raw_jobs:
+        # Jobs came from JobSpy/Adzuna fallback (no ATS board)
+        scan_status = "scraped" if filtered_jobs else "no_match"
+    elif was_discovered:
         scan_status = "discovered" if filtered_jobs else "no_match"
     else:
         scan_status = "matched" if filtered_jobs else "no_match"
@@ -821,12 +825,28 @@ async def _build_referral_paths(
     contact_map = {c.id: c for c in contacts}
     referral_paths: list[dict] = []
 
+    # Classify the target role's department for function matching
+    target_dept = classify_department(target_role)
+
     for match in matches:
         if match.relevance_score < 20:
             continue
         contact = contact_map.get(match.contact_id)
         if contact is None:
             continue
+
+        # Job function matching bonus
+        contact_dept = classify_department(contact.current_title)
+        if contact_dept == target_dept and target_dept != "other":
+            dept_bonus = 20
+        elif contact_dept == "hr" or (
+            contact.current_title and "recruiter" in contact.current_title.lower()
+        ):
+            dept_bonus = 10
+        else:
+            dept_bonus = 0
+
+        adjusted_relevance = min(100, match.relevance_score + dept_bonus)
 
         warm_result = compute_warm_score(contact, profile, target_role)
         referral_paths.append(
@@ -840,7 +860,7 @@ async def _build_referral_paths(
                     "referral_likelihood": match.referral_likelihood,
                 },
                 "match_type": match.match_type,
-                "relevance_score": match.relevance_score,
+                "relevance_score": adjusted_relevance,
                 "cultural_context": match.cultural_context,
                 "recommended_channel": match.recommended_channel,
                 "source": "own_network",

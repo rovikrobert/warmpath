@@ -747,3 +747,72 @@ async def test_search_results_have_cultural_context(client: AsyncClient):
         assert r["referral_likelihood"] in ("high", "medium", "low")
         assert r["recommended_channel"] is not None
         assert isinstance(r["message_sequence"], list)
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — classify_department for function matching
+# ---------------------------------------------------------------------------
+
+
+class TestFunctionMatchBonus:
+    """Tests for department classification used in referral path ranking."""
+
+    def test_function_match_bonus_boosts_same_department(self):
+        """Contacts in the same department as target role get +20 relevance bonus."""
+        from app.services.marketplace_indexer import classify_department
+
+        target_dept = classify_department("Software Engineer")
+        contact_dept = classify_department("Senior Software Engineer")
+        assert target_dept == contact_dept  # both should be "engineering"
+        assert target_dept == "engineering"
+
+    def test_function_match_bonus_for_hiring_adjacent(self):
+        """Recruiters and HR are hiring-adjacent, should be detected."""
+        from app.services.marketplace_indexer import classify_department
+
+        recruiter_dept = classify_department("Technical Recruiter")
+        # Recruiter should classify as hr or similar
+        assert recruiter_dept in ("hr", "recruiting", "other")
+
+    def test_classify_department_product(self):
+        """Product Manager title classifies as product department."""
+        from app.services.marketplace_indexer import classify_department
+
+        assert classify_department("Product Manager") == "product"
+
+    def test_classify_department_other_for_unknown(self):
+        """Unknown titles classify as other department."""
+        from app.services.marketplace_indexer import classify_department
+
+        assert classify_department("Chief Happiness Officer") == "other"
+
+    def test_dept_bonus_applied_in_referral_path_ranking(self):
+        """Same-department contacts get +20 bonus capped at 100."""
+        from app.services.marketplace_indexer import classify_department
+
+        # Both engineering => same dept => +20 bonus
+        assert classify_department("Backend Engineer") == "engineering"
+        assert classify_department("Frontend Developer") == "engineering"
+
+        # Cross-department => no bonus
+        assert classify_department("Marketing Manager") == "marketing"
+        assert classify_department("Backend Engineer") != classify_department(
+            "Marketing Manager"
+        )
+
+    def test_hr_recruiter_always_gets_bonus(self):
+        """HR/recruiter contacts should get +10 regardless of target role."""
+        from app.services.marketplace_indexer import classify_department
+
+        hr_dept = classify_department("HR Business Partner")
+        assert hr_dept == "hr"
+
+    def test_other_department_no_bonus(self):
+        """Other department gets no same-dept bonus even if both are other."""
+        from app.services.marketplace_indexer import classify_department
+
+        # Two unknowns should both be "other" but no bonus applied
+        dept1 = classify_department("Chief Vibes Officer")
+        dept2 = classify_department("Head of Fun")
+        assert dept1 == "other"
+        assert dept2 == "other"

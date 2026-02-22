@@ -151,14 +151,16 @@ class TestJobsErrors:
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_scan_unknown_company_not_found(self, client: AsyncClient):
-        """GET /api/v1/jobs/scan/{company} for unknown company returns 404."""
+    async def test_scan_unknown_company_returns_empty(self, client: AsyncClient):
+        """GET /api/v1/jobs/scan/{company} for unknown company returns 200 with empty results."""
         headers = await _auth_headers(client)
         resp = await client.get(
             "/api/v1/jobs/scan/zzz_nonexistent_company_xyz_999",
             headers=headers,
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["meta"]["openings_count"] == 0
 
 
 # ===========================================================================

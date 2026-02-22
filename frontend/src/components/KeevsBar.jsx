@@ -1,151 +1,141 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { feed as feedApi } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import KeevsAvatar from './KeevsAvatar';
-import FeedCard from './FeedCard';
-import EnrichmentProgress from './EnrichmentProgress';
+import TrebAvatar from './TrebAvatar';
 
 /**
- * Route-to-feed-type mapping.
- * Determines which feed item type is most relevant on each page.
+ * Map current route to the most relevant feed item type.
+ * null = suppress bar on this route.
  */
 const ROUTE_FEED_TYPE = {
+  '/coach': null,
   '/contacts': 'enrichment_prompt',
-  '/search': 'marketplace_signal',
-  '/matches': 'follow_up_nudge',
+  '/referrals': 'marketplace_signal',
   '/applications': 'outcome_check',
-  '/coach': null, // Coach page has its own feed section
   '/marketplace': 'marketplace_signal',
-  '/dashboard': 'network_insight',
+  '/settings': null,
+  '/credits': null,
 };
 
+const TREB_ROUTES = ['/marketplace', '/settings'];
+
 function getRelevantType(pathname) {
-  // Exact match first
-  if (ROUTE_FEED_TYPE[pathname] !== undefined) return ROUTE_FEED_TYPE[pathname];
-  // Prefix match
   for (const [route, type] of Object.entries(ROUTE_FEED_TYPE)) {
     if (pathname.startsWith(route)) return type;
   }
-  return 'job_alert'; // Default on unknown pages
+  return 'job_alert';
+}
+
+function getBarPersona(intent, pathname) {
+  if (intent === 'sha[RESEND_KEY_REDACTED]') {
+    return 'treb';
+  }
+  if (intent === 'find_referrals') {
+    return 'keevs';
+  }
+  // explore users: route determines persona
+  for (const route of TREB_ROUTES) {
+    if (pathname.startsWith(route)) return 'treb';
+  }
+  return 'keevs';
 }
 
 /**
- * KeevsBar — thin contextual nudge bar that appears at the top of main content.
- *
- * Shows one relevant feed item based on the current page. Collapsed by default
- * into a single line with the Keevs avatar. Clicking expands to show the full
- * feed card with action/dismiss. Auto-hides on coach page (which has its own feed).
- *
- * Props:
- *   className — extra wrapper classes
+ * KeevsBar — contextual nudge bar that shows the most relevant feed item
+ * for the current page. Suppressed on /coach, /settings, /credits.
  */
-export default function KeevsBar({ className = '' }) {
-  const location = useLocation();
+export default function KeevsBar() {
   const [item, setItem] = useState(null);
-  const [expanded, setExpanded] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [dismissed, setDismissed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const location = useLocation();
+  const { user } = useAuth();
 
-  const feedType = getRelevantType(location.pathname);
+  const relevantType = getRelevantType(location.pathname);
+
+  // Suppress on certain pages
+  if (relevantType === null) return null;
+
+  const persona = getBarPersona(user?.intent, location.pathname);
+  const Avatar = persona === 'treb' ? TrebAvatar : KeevsAvatar;
+  const personaName = persona === 'treb' ? 'Treb' : 'Keevs';
+  const accentClass = persona === 'treb' ? 'text-teal-400' : 'text-amber-400';
 
   useEffect(() => {
-    // Don't show on coach page (has its own feed) or during onboarding
-    if (feedType === null || location.pathname.startsWith('/onboarding')) {
-      setItem(null);
-      setLoading(false);
-      return;
-    }
-
     let cancelled = false;
-    setLoading(true);
+    async function load() {
+      try {
+        const resp = await feedApi.list({ limit: 5, unseen_only: true });
+        const items = resp?.data?.items || [];
+        const match = items.find((i) => i.item_type === relevantType) || items[0];
+        if (!cancelled && match) setItem(match);
+      } catch {
+        // silently fail
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [relevantType]);
+
+  useEffect(() => {
     setDismissed(false);
     setExpanded(false);
+  }, [location.pathname]);
 
-    feedApi.list({ item_type: feedType, limit: 1 })
-      .then((res) => {
-        if (!cancelled) {
-          setItem(res.data?.[0] || null);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setItem(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+  if (!item || dismissed) return null;
 
-    return () => { cancelled = true; };
-  }, [location.pathname, feedType]);
+  const handleDismiss = async () => {
+    try {
+      await feedApi.dismiss(item.id);
+      setDismissed(true);
+      window.dispatchEvent(new Event('feed-updated'));
+    } catch { /* keep visible */ }
+  };
 
-  // Mark as seen when expanded
-  useEffect(() => {
-    if (expanded && item && !item.seen_at) {
-      feedApi.markSeen(item.id).catch(() => {});
-    }
-  }, [expanded, item]);
-
-  // Show compact enrichment progress on contacts page even if no feed item
-  if (loading) return null;
-  if (feedType === null) return null;
-
-  if ((!item || dismissed) && location.pathname.startsWith('/contacts')) {
+  if (!expanded) {
     return (
-      <div className={`mb-4 ${className}`}>
-        <div className="flex items-center gap-3 rounded-lg border border-slate-700/50 bg-slate-900/80 px-4 py-2.5">
-          <KeevsAvatar size="sm" />
-          <div className="min-w-0 flex-1">
-            <EnrichmentProgress compact />
-          </div>
-        </div>
+      <div className="fixed bottom-4 right-4 z-40">
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="group flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-2 shadow-lg transition hover:border-slate-600"
+          aria-label={`${personaName} has a suggestion`}
+        >
+          <Avatar size="sm" pulse />
+          <span className={`text-xs font-medium ${accentClass}`}>{personaName} says...</span>
+        </button>
       </div>
     );
   }
 
-  if (!item || dismissed) return null;
-
   return (
-    <div className={`mb-4 ${className}`}>
-      {!expanded ? (
-        /* Collapsed — single line nudge */
+    <div className="fixed bottom-4 right-4 z-40 w-80 rounded-lg border border-slate-700 bg-slate-900 p-3 shadow-xl">
+      <div className="flex items-start gap-2">
+        <Avatar size="sm" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-slate-200 leading-snug">{item.title}</p>
+          {item.action_url && (
+            <Link
+              to={item.action_url}
+              className={`mt-1 inline-block text-xs font-medium ${accentClass} hover:opacity-80`}
+            >
+              {item.action_label || 'View'} →
+            </Link>
+          )}
+        </div>
         <button
           type="button"
-          onClick={() => setExpanded(true)}
-          className="flex w-full items-center gap-3 rounded-lg border border-slate-700/50 bg-slate-900/80 px-4 py-2.5 text-left transition hover:border-amber-500/30 hover:bg-slate-900"
+          onClick={handleDismiss}
+          className="shrink-0 text-slate-600 hover:text-slate-400"
+          aria-label="Dismiss"
         >
-          <KeevsAvatar size="sm" />
-          <p className="min-w-0 flex-1 truncate text-sm text-slate-300">
-            <span className="font-medium text-amber-400">Keevs:</span>{' '}
-            {item.title}
-          </p>
-          <svg className="h-4 w-4 shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
           </svg>
         </button>
-      ) : (
-        /* Expanded — full feed card with Keevs branding */
-        <div className="rounded-lg border border-amber-500/20 bg-slate-900/80 p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <KeevsAvatar size="sm" />
-              <span className="text-xs font-medium text-amber-400">Keevs says</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setExpanded(false)}
-              className="text-slate-500 hover:text-slate-300 transition"
-              aria-label="Collapse"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" />
-              </svg>
-            </button>
-          </div>
-          <FeedCard
-            item={item}
-            onDismiss={() => setDismissed(true)}
-          />
-        </div>
-      )}
+      </div>
     </div>
   );
 }
