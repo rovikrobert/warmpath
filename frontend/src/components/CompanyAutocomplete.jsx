@@ -49,10 +49,12 @@ export default function CompanyAutocomplete({ value = [], onChange, placeholder 
             );
             setSuggestions(items);
             setOpen(items.length > 0);
+            setSearchedEmpty(items.length === 0);
             setActiveIndex(-1);
           } catch {
             setSuggestions([]);
             setOpen(false);
+            setSearchedEmpty(true);
           }
         } finally {
           setLoading(false);
@@ -82,6 +84,7 @@ export default function CompanyAutocomplete({ value = [], onChange, placeholder 
     setSuggestions([]);
     setOpen(false);
     setActiveIndex(-1);
+    setSearchedEmpty(false);
     inputRef.current?.focus();
   };
 
@@ -142,6 +145,18 @@ export default function CompanyAutocomplete({ value = [], onChange, placeholder 
         addCompany(input);
       }
     }, 200);
+  };
+
+  const handleVerifyCompany = async (name) => {
+    setVerifying(true);
+    try {
+      await companiesApi.discover(name);
+    } catch {
+      // Still add the company even if discovery fails
+    } finally {
+      setVerifying(false);
+    }
+    addCompany(name);
   };
 
   return (
@@ -253,6 +268,23 @@ export default function CompanyAutocomplete({ value = [], onChange, placeholder 
             );
           })}
         </ul>
+      )}
+
+      {/* "Not found" state — show when suggestions are empty after a search */}
+      {searchedEmpty && input.length >= 2 && !loading && (
+        <div className="absolute z-30 mt-1 w-full rounded-lg border border-slate-700/50 bg-slate-900 p-3 shadow-xl">
+          <p className="text-sm text-slate-400">
+            &ldquo;{input}&rdquo; isn&rsquo;t in our network yet.
+          </p>
+          <button
+            type="button"
+            onMouseDown={() => handleVerifyCompany(input)}
+            disabled={verifying}
+            className="mt-2 rounded-md bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
+          >
+            {verifying ? 'Verifying...' : 'Add & verify'}
+          </button>
+        </div>
       )}
     </div>
   );
