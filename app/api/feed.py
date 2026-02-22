@@ -11,6 +11,7 @@ Endpoints:
   POST /feed/{id}/seen — mark item as seen
   POST /feed/{id}/act  — mark item as acted on (clicked through)
   POST /feed/{id}/dismiss — dismiss item
+  POST /feed/dismiss-all — dismiss all visible feed items
   POST /feed/enrichment-response — submit enrichment prompt answer
   POST /feed/generate  — manual trigger for feed generation (dev/admin)
 """
@@ -325,6 +326,46 @@ async def dismiss_item(
 
     await db.commit()
     return {"data": {"status": "dismissed"}, "meta": {}}
+
+
+# ---------------------------------------------------------------------------
+# POST /feed/dismiss-all — bulk dismiss all visible feed items
+# ---------------------------------------------------------------------------
+
+
+@router.post("/dismiss-all")
+async def dismiss_all(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Dismiss all non-dismissed feed items for the current user."""
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        update(FeedItem)
+        .where(
+            FeedItem.user_id == current_user.id,
+            FeedItem.dismissed_at.is_(None),
+        )
+        .values(dismissed_at=now)
+        .returning(FeedItem.id)
+    )
+    dismissed_ids = [row[0] for row in result.fetchall()]
+
+    if dismissed_ids:
+        db.add_all(
+            [
+                FeedItemInteraction(
+                    feed_item_id=fid,
+                    user_id=current_user.id,
+                    interaction_type="dismiss",
+                    source="in_app",
+                )
+                for fid in dismissed_ids
+            ]
+        )
+
+    await db.commit()
+    return {"data": {"dismissed": len(dismissed_ids)}, "meta": {}}
 
 
 # ---------------------------------------------------------------------------

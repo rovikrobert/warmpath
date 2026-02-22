@@ -314,6 +314,7 @@ export const feed = {
       return r;
     }),
   dismiss: (id) => api(`/api/v1/feed/${id}/dismiss`, { method: 'POST' }),
+  dismissAll: () => api('/api/v1/feed/dismiss-all', { method: 'POST' }),
   batchSeen: (itemIds) =>
     api('/api/v1/feed/batch-seen', { method: 'POST', body: { item_ids: itemIds } }),
   enrichmentResponse: (body) =>
