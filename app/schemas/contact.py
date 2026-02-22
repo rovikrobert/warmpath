@@ -118,6 +118,37 @@ class ManualContactBulkCreate(BaseModel):
         return v
 
 
+class BulkContactFilter(BaseModel):
+    search: str | None = Field(default=None, max_length=500)
+    relationship_type: str | None = Field(default=None, max_length=50)
+    source: str | None = Field(default=None, max_length=50)
+
+
+class BulkContactUpdate(BaseModel):
+    relationship_type: str = Field(..., max_length=50)
+    contact_ids: list[uuid.UUID] | None = None
+    filter: BulkContactFilter | None = None
+
+    @field_validator("relationship_type")
+    @classmethod
+    def validate_relationship_type(cls, v: str) -> str:
+        if v not in VALID_RELATIONSHIP_TYPES:
+            raise ValueError(
+                f"relationship_type must be one of: {', '.join(sorted(VALID_RELATIONSHIP_TYPES))}"
+            )
+        return v
+
+    def model_post_init(self, __context) -> None:
+        has_ids = self.contact_ids is not None and len(self.contact_ids) > 0
+        has_filter = self.filter is not None
+        if has_ids == has_filter:
+            raise ValueError(
+                "Provide either contact_ids or filter, not both (and not neither)"
+            )
+        if has_ids and len(self.contact_ids) > 5000:
+            raise ValueError("Bulk update limited to 5000 contacts per request")
+
+
 class PaginationMeta(BaseModel):
     page: int
     per_page: int
