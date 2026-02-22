@@ -116,11 +116,14 @@ async def _fetch_jobs(
     boards: dict[str, str],
     fetcher: JobFetcher,
     semaphore: asyncio.Semaphore,
+    location_hint: str | None = None,
 ) -> list[dict]:
     """Fetch jobs for one company with concurrency limit (no DB access)."""
     async with semaphore:
         try:
-            return await fetcher.fetch_jobs_for_company(company_key, boards)
+            return await fetcher.fetch_jobs_for_company(
+                company_key, boards, location_hint=location_hint
+            )
         except Exception:
             logger.exception("Failed to fetch jobs for %s", company_key)
             return []
@@ -266,6 +269,9 @@ async def get_recommendations(
     match_results = await asyncio.gather(*match_tasks)
     recommendations = [r for r in match_results if r is not None]
 
+    # Derive a single location hint for fallback fetchers (JobSpy / Adzuna)
+    location_hint = target_locations[0] if target_locations else None
+
     # Phase 3: Only fetch fresh data if we don't have enough results.
     # Use a tight timeout so we never block longer than _FETCH_TIMEOUT.
     fresh_scanned = 0
@@ -281,7 +287,11 @@ async def get_recommendations(
             tasks = []
             for key in to_fetch:
                 boards = BOARD_REGISTRY.get(key, {})
-                tasks.append(_fetch_jobs(key, boards, fetcher, semaphore))
+                tasks.append(
+                    _fetch_jobs(
+                        key, boards, fetcher, semaphore, location_hint=location_hint
+                    )
+                )
 
             results = await asyncio.gather(*tasks)
 
@@ -431,10 +441,17 @@ async def warm_job_cache_for_user(user_id: str) -> None:
             # Limit to avoid excessive fetching
             to_warm = to_warm[: settings.RECOMMENDATION_MAX_SCAN]
 
+            warm_location_hint = locations[0] if locations else None
             fetcher = JobFetcher()
             semaphore = asyncio.Semaphore(5)
             tasks = [
-                _fetch_jobs(key, BOARD_REGISTRY.get(key, {}), fetcher, semaphore)
+                _fetch_jobs(
+                    key,
+                    BOARD_REGISTRY.get(key, {}),
+                    fetcher,
+                    semaphore,
+                    location_hint=warm_location_hint,
+                )
                 for key in to_warm
             ]
 

@@ -75,7 +75,7 @@ MOCK_JOBS = [
 ]
 
 
-def _mock_fetch(name, boards):
+def _mock_fetch(name, boards, location_hint=None):
     """Return mock jobs for any company."""
     return MOCK_JOBS
 

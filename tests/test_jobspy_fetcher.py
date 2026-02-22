@@ -183,6 +183,22 @@ class TestScrapeSync:
         assert jobs == []
 
     @patch("app.services.jobspy_fetcher.settings")
+    def test_default_sites_include_indeed_and_linkedin(self, mock_settings):
+        mock_settings.JOBSPY_SEARCH_ALL_SITES = False
+        mock_settings.JOBSPY_ENABLED = True
+
+        import pandas as pd
+
+        with patch("jobspy.scrape_jobs", return_value=pd.DataFrame()) as mock_scrape:
+            _scrape_sync("Google")
+
+        call_kwargs = mock_scrape.call_args
+        sites = call_kwargs.kwargs.get("site_name") or call_kwargs[1].get("site_name")
+        assert len(sites) == 2
+        assert "indeed" in sites
+        assert "linkedin" in sites
+
+    @patch("app.services.jobspy_fetcher.settings")
     def test_uses_all_sites_when_flag_enabled(self, mock_settings):
         mock_settings.JOBSPY_SEARCH_ALL_SITES = True
         mock_settings.JOBSPY_ENABLED = True
@@ -197,6 +213,34 @@ class TestScrapeSync:
         assert len(sites) == 5
         assert "indeed" in sites
         assert "linkedin" in sites
+
+    @patch("app.services.jobspy_fetcher.settings")
+    def test_passes_location_hint_to_scrape_jobs(self, mock_settings):
+        mock_settings.JOBSPY_SEARCH_ALL_SITES = False
+        mock_settings.JOBSPY_ENABLED = True
+
+        import pandas as pd
+
+        with patch("jobspy.scrape_jobs", return_value=pd.DataFrame()) as mock_scrape:
+            _scrape_sync("Google", location_hint="Singapore")
+
+        call_kwargs = mock_scrape.call_args.kwargs
+        assert call_kwargs["country_indeed"] == "Singapore"
+        assert call_kwargs["location"] == "Singapore"
+
+    @patch("app.services.jobspy_fetcher.settings")
+    def test_location_hint_defaults_to_usa(self, mock_settings):
+        mock_settings.JOBSPY_SEARCH_ALL_SITES = False
+        mock_settings.JOBSPY_ENABLED = True
+
+        import pandas as pd
+
+        with patch("jobspy.scrape_jobs", return_value=pd.DataFrame()) as mock_scrape:
+            _scrape_sync("Stripe")
+
+        call_kwargs = mock_scrape.call_args.kwargs
+        assert call_kwargs["country_indeed"] == "USA"
+        assert "location" not in call_kwargs
 
 
 # ---------------------------------------------------------------------------
@@ -223,12 +267,55 @@ class TestSearchJobsViaJobspy:
             jobs = await search_jobs_via_jobspy("Stripe", max_results=10)
 
         assert jobs == expected
-        mock_scrape.assert_called_once_with("Stripe", 10)
+        mock_scrape.assert_called_once_with("Stripe", 10, None)
+
+    async def test_passes_location_hint_to_scrape(self):
+        expected = [{"title": "Engineer", "source": "indeed"}]
+        with (
+            patch("app.services.jobspy_fetcher.settings") as mock_settings,
+            patch(
+                "app.services.jobspy_fetcher._scrape_sync", return_value=expected
+            ) as mock_scrape,
+        ):
+            mock_settings.JOBSPY_ENABLED = True
+            jobs = await search_jobs_via_jobspy(
+                "Google", max_results=15, location_hint="Singapore"
+            )
+
+        assert jobs == expected
+        mock_scrape.assert_called_once_with("Google", 15, "Singapore")
 
 
 # ---------------------------------------------------------------------------
 # Source mapping
 # ---------------------------------------------------------------------------
+
+
+class TestResolveIndeedCountry:
+    def test_none_defaults_to_usa(self):
+        from app.services.jobspy_fetcher import _resolve_indeed_country
+
+        assert _resolve_indeed_country(None) == "USA"
+
+    def test_singapore(self):
+        from app.services.jobspy_fetcher import _resolve_indeed_country
+
+        assert _resolve_indeed_country("Singapore") == "Singapore"
+
+    def test_india(self):
+        from app.services.jobspy_fetcher import _resolve_indeed_country
+
+        assert _resolve_indeed_country("India") == "India"
+
+    def test_unknown_defaults_to_usa(self):
+        from app.services.jobspy_fetcher import _resolve_indeed_country
+
+        assert _resolve_indeed_country("Antarctica") == "USA"
+
+    def test_case_insensitive(self):
+        from app.services.jobspy_fetcher import _resolve_indeed_country
+
+        assert _resolve_indeed_country("SINGAPORE") == "Singapore"
 
 
 class TestSourceMapping:

@@ -26,7 +26,7 @@ HTTPX_TIMEOUT = 5.0
 # Values are the base careers URL to scrape.
 CAREER_PAGES: dict[str, str] = {
     # US / Global
-    "google": "https://www.google.com/about/careers/applications/jobs/results",
+    "google": "https://www.google.com/about/careers/applications/",
     "openai": "https://openai.com/careers/",
     "shopify": "https://www.shopify.com/careers/search",
     # Singapore / SEA

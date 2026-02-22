@@ -193,12 +193,17 @@ class JobFetcher:
         return results
 
     async def fetch_jobs_for_company(
-        self, company_name: str, board_ids: dict[str, str] | None = None
+        self,
+        company_name: str,
+        board_ids: dict[str, str] | None = None,
+        location_hint: str | None = None,
     ) -> list[dict]:
         """Fetch jobs for a company using the best available source.
 
         Fallback chain: Greenhouse/Lever boards → career page scraper → empty.
         board_ids is a dict like {"greenhouse": "stripe", "lever": "notion"}.
+        location_hint is an optional location string (e.g. "Singapore") passed
+        to JobSpy and Adzuna for region-aware searching.
         """
         from app.services.career_page_fetcher import (
             fetch_career_page,
@@ -235,7 +240,7 @@ class JobFetcher:
                 )
                 all_jobs = await fetch_career_page(career_url)
 
-        # 3. If still nothing, try JobSpy (Indeed + optionally other boards)
+        # 3. If still nothing, try JobSpy (Indeed + LinkedIn + optionally other boards)
         if not all_jobs:
             from app.services.jobspy_fetcher import search_jobs_via_jobspy
 
@@ -243,7 +248,9 @@ class JobFetcher:
                 "No ATS/career-page results for '%s', trying JobSpy",
                 company_name,
             )
-            all_jobs = await search_jobs_via_jobspy(company_name)
+            all_jobs = await search_jobs_via_jobspy(
+                company_name, location_hint=location_hint
+            )
 
         # 4. If still nothing and aggregator configured, try Adzuna
         if not all_jobs and settings.ADZUNA_APP_ID:
@@ -253,7 +260,9 @@ class JobFetcher:
                 "No ATS/career-page/JobSpy results for '%s', trying Adzuna aggregator",
                 company_name,
             )
-            all_jobs = await search_jobs_by_company(company_name)
+            all_jobs = await search_jobs_by_company(
+                company_name, location_hint=location_hint
+            )
 
         logger.info(
             "Fetched %d total jobs for company '%s'", len(all_jobs), company_name

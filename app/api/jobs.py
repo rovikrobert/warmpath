@@ -89,9 +89,20 @@ async def scan_company_jobs(
     """Fetch live jobs for a company from Greenhouse/Lever, with auto-discovery and career page fallback."""
     boards, was_discovered = await lookup_or_discover_boards(company_name, db)
 
+    # Derive location hint from user's job preferences
+    prefs_result = await db.execute(
+        select(UserJobPreferences).where(UserJobPreferences.user_id == current_user.id)
+    )
+    prefs = prefs_result.scalar_one_or_none()
+    location_hint = (
+        prefs.target_locations[0] if prefs and prefs.target_locations else None
+    )
+
     # Let fetch_jobs_for_company run the full fallback chain
     # (ATS boards → career page → JobSpy → Adzuna) even if no board is known.
-    jobs = await fetcher.fetch_jobs_for_company(company_name, boards)
+    jobs = await fetcher.fetch_jobs_for_company(
+        company_name, boards, location_hint=location_hint
+    )
 
     # Try to link to existing company record
     result = await db.execute(
@@ -189,6 +200,9 @@ async def scan_target_companies(
     prefs = prefs_result.scalar_one_or_none()
     target_role = prefs.target_role if prefs else None
     target_seniority = prefs.target_seniority if prefs else None
+    scan_location_hint = (
+        prefs.target_locations[0] if prefs and prefs.target_locations else None
+    )
 
     # Collect target companies from all user searches
     searches_result = await db.execute(
@@ -227,7 +241,9 @@ async def scan_target_companies(
     for company_name in target_companies:
         boards = lookup_boards(company_name)
         # Let fetch_jobs_for_company run the full fallback chain for every target
-        jobs = await fetcher.fetch_jobs_for_company(company_name, boards)
+        jobs = await fetcher.fetch_jobs_for_company(
+            company_name, boards, location_hint=scan_location_hint
+        )
         companies_scanned += 1
         total_openings += len(jobs)
 
