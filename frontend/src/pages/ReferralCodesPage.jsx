@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { referrals as referralsApi } from '../api/client';
 import EmptyState from '../components/ui/EmptyState';
 import Spinner from '../components/ui/Spinner';
+import { useAuth } from '../context/AuthContext';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
-function CopyButton({ text }) {
+function CopyButton({ text, label = 'Copy', className }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -21,16 +22,24 @@ function CopyButton({ text }) {
   return (
     <button
       onClick={handleCopy}
-      aria-label={copied ? 'Copied' : 'Copy code'}
-      className="rounded border border-slate-700/50 px-2 py-1 text-xs text-slate-400 hover:bg-slate-800"
+      aria-label={copied ? 'Copied' : label}
+      className={className || 'rounded border border-slate-700/50 px-2 py-1 text-xs text-slate-400 hover:bg-slate-800'}
     >
-      {copied ? 'Copied!' : 'Copy'}
+      {copied ? 'Copied!' : label}
     </button>
   );
 }
 
+function buildInviteLink(code, intent) {
+  const base = `${window.location.origin}/join?ref=${encodeURIComponent(code)}`;
+  if (intent === 'share_network') return `${base}&intent=network`;
+  if (intent === 'find_referrals') return `${base}&intent=seeker`;
+  return `${base}&intent=network`;
+}
+
 export default function ReferralCodesPage() {
   useDocumentTitle('Invite Friends');
+  const { user } = useAuth();
   const [codes, setCodes] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +101,11 @@ export default function ReferralCodesPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <code className="rounded-lg bg-slate-800 px-4 py-2 font-mono text-lg text-slate-100">{myCode.code}</code>
             <CopyButton text={myCode.code} />
+            <CopyButton
+              text={buildInviteLink(myCode.code, user?.intent)}
+              label="Copy invite link"
+              className="rounded bg-amber-500 px-3 py-1 text-xs font-medium text-white hover:bg-amber-400"
+            />
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400 sm:gap-4">
               <span>{myCode.uses_count ?? 0} uses</span>
               <span>{myCode.credits_per_conversion ?? 25} credits each</span>
