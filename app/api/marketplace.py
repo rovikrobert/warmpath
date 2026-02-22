@@ -12,6 +12,7 @@ Endpoints:
 """
 
 import logging
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -674,6 +675,8 @@ async def update_facilitation(
 
         if contact and contact.email:
             # Email relay path — send intro via email, defer credits to delivery
+
+            from app.config import settings
             from app.services.email_engagement import send_intro_relay_email
             from app.services.referral_service import create_referral_code
 
@@ -701,6 +704,12 @@ async def update_facilitation(
                 "\n\nI think you two should connect — happy to share more context."
             )
 
+            # Generate review token for public intro page (90-day TTL)
+            review_token = secrets.token_urlsafe(32)
+            facilitation.review_token = review_token
+            facilitation.review_token_expires_at = now + timedelta(days=90)
+            view_intro_url = f"{settings.FRONTEND_URL}/intro/{review_token}"
+
             message_id = await send_intro_relay_email(
                 to_email=contact.email,
                 nh_name=current_user.full_name or current_user.email,
@@ -712,6 +721,7 @@ async def update_facilitation(
                 nh_referral_code=nh_referral_code,
                 db=db,
                 facilitation_id=facilitation.id,
+                view_intro_url=view_intro_url,
             )
 
             facilitation.delivery_method = "email_relay"
