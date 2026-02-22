@@ -632,10 +632,10 @@ class TestApproveDecline:
         )
         return resp.json()["data"]["id"]
 
-    async def test_approve_awards_holder_credits(
+    async def test_approve_defers_credits_for_email_relay(
         self, client: AsyncClient, seeker_with_credits, holder_auth, marketplace_data
     ):
-        """Approving awards 50 credits to network holder."""
+        """Approving with contact email uses relay path; credits NOT awarded yet."""
         fac_id = await self._create_request(
             client, seeker_with_credits, marketplace_data
         )
@@ -650,11 +650,17 @@ class TestApproveDecline:
             headers=holder_auth["headers"],
         )
         assert resp.status_code == 200
-        assert resp.json()["data"]["status"] == "approved"
+        data = resp.json()["data"]
+        assert data["status"] == "approved"
+        assert data["delivery_method"] == "email_relay"
+        # delivery_status is "failed" in tests because RESEND_API_KEY is empty
+        assert data["delivery_status"] in ("sent", "failed")
+        assert data["credits_awarded_at"] is None
 
+        # Credits should NOT have been awarded
         async with TestSessionLocal() as db:
             after = await get_balance(holder_uid, db)
-        assert after - before == 50
+        assert after == before
 
     async def test_decline_refunds_seeker(
         self, client: AsyncClient, seeker_with_credits, holder_auth, marketplace_data
@@ -737,6 +743,277 @@ class TestApproveDecline:
         resp = await client.patch(
             f"/api/v1/marketplace/requests/{uuid_mod.uuid4()}",
             json={"action": "approve"},
+            headers=holder_auth["headers"],
+        )
+        assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Test LinkedIn Fallback (contact without email)
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture
+async def marketplace_no_email(holder_auth: dict):
+    """Create marketplace data where the contact has no email (LinkedIn fallback)."""
+    holder_uid = uuid_mod.UUID(holder_auth["user_id"])
+
+    async with TestSessionLocal() as db:
+        company = Company(name="Acme Corp", domain="acme.com")
+        db.add(company)
+        await db.flush()
+
+        contact = Contact(
+            user_id=holder_uid,
+            full_name="Diana NoEmail",
+            first_name="Diana",
+            last_name="NoEmail",
+            email=None,
+            linkedin_url="https://linkedin.com/in/diana-noemail",
+            current_title="Staff Engineer",
+            current_company="Acme Corp",
+            company_id=company.id,
+            connected_on=date.today() - timedelta(days=90),
+        )
+        db.add(contact)
+        await db.flush()
+
+        db.add(
+            WarmScore(
+                user_id=holder_uid,
+                contact_id=contact.id,
+                total_score=75,
+                recency_score=80,
+                tenure_score=70,
+                context_score=75,
+                role_score=70,
+                referral_likelihood="high",
+            )
+        )
+
+        db.add(NetworkSharingPreferences(user_id=holder_uid, opt_in_marketplace=True))
+        await db.flush()
+
+        listing = MarketplaceListing(
+            network_holder_id=holder_uid,
+            contact_id=contact.id,
+            company_id=company.id,
+            role_level="lead",
+            department_category="engineering",
+            warm_score_range="high",
+            connection_recency="recent",
+        )
+        db.add(listing)
+        await db.flush()
+
+        db.add(
+            ConnectorReputation(
+                user_id=holder_uid,
+                intros_facilitated=5,
+                response_rate=90,
+                avg_rating=5,
+            )
+        )
+        await db.commit()
+
+        return {
+            "company_id": company.id,
+            "contact_id": contact.id,
+            "listing_id": listing.id,
+        }
+
+
+class TestLinkedInFallback:
+    async def _create_request(self, client, seeker_with_credits, marketplace_no_email):
+        listing_id = str(marketplace_no_email["listing_id"])
+        resp = await client.post(
+            "/api/v1/marketplace/request-intro",
+            json={"marketplace_listing_id": listing_id},
+            headers=seeker_with_credits["headers"],
+        )
+        return resp.json()["data"]["id"]
+
+    async def test_approve_returns_linkedin_url_and_drafted_message(
+        self,
+        client: AsyncClient,
+        seeker_with_credits,
+        holder_auth,
+        marketplace_no_email,
+    ):
+        """When contact has no email, approve returns linkedin_url and drafted_message."""
+        fac_id = await self._create_request(
+            client, seeker_with_credits, marketplace_no_email
+        )
+
+        resp = await client.patch(
+            f"/api/v1/marketplace/requests/{fac_id}",
+            json={"action": "approve"},
+            headers=holder_auth["headers"],
+        )
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert data["status"] == "approved"
+        assert data["delivery_method"] is None
+        assert data["linkedin_url"] == "https://linkedin.com/in/diana-noemail"
+        assert "Diana" in data["drafted_message"]
+        assert data["credits_awarded_at"] is None
+
+    async def test_approve_no_email_no_credits_awarded(
+        self,
+        client: AsyncClient,
+        seeker_with_credits,
+        holder_auth,
+        marketplace_no_email,
+    ):
+        """LinkedIn fallback path does not award credits immediately."""
+        fac_id = await self._create_request(
+            client, seeker_with_credits, marketplace_no_email
+        )
+
+        holder_uid = uuid_mod.UUID(holder_auth["user_id"])
+        async with TestSessionLocal() as db:
+            before = await get_balance(holder_uid, db)
+
+        await client.patch(
+            f"/api/v1/marketplace/requests/{fac_id}",
+            json={"action": "approve"},
+            headers=holder_auth["headers"],
+        )
+
+        async with TestSessionLocal() as db:
+            after = await get_balance(holder_uid, db)
+        assert after == before
+
+
+# ---------------------------------------------------------------------------
+# Test Confirm Manual Send
+# ---------------------------------------------------------------------------
+
+
+class TestConfirmManualSend:
+    async def _create_and_approve(
+        self, client, seeker_with_credits, holder_auth, marketplace_no_email
+    ):
+        """Helper: create request and approve it (LinkedIn fallback path)."""
+        listing_id = str(marketplace_no_email["listing_id"])
+        req_resp = await client.post(
+            "/api/v1/marketplace/request-intro",
+            json={"marketplace_listing_id": listing_id},
+            headers=seeker_with_credits["headers"],
+        )
+        fac_id = req_resp.json()["data"]["id"]
+
+        await client.patch(
+            f"/api/v1/marketplace/requests/{fac_id}",
+            json={"action": "approve"},
+            headers=holder_auth["headers"],
+        )
+        return fac_id
+
+    async def test_confirm_sent_awards_credits_and_sets_delivery(
+        self,
+        client: AsyncClient,
+        seeker_with_credits,
+        holder_auth,
+        marketplace_no_email,
+    ):
+        """Confirming manual send awards 50 credits and sets delivery fields."""
+        fac_id = await self._create_and_approve(
+            client, seeker_with_credits, holder_auth, marketplace_no_email
+        )
+
+        holder_uid = uuid_mod.UUID(holder_auth["user_id"])
+        async with TestSessionLocal() as db:
+            before = await get_balance(holder_uid, db)
+
+        resp = await client.post(
+            f"/api/v1/marketplace/requests/{fac_id}/confirm-sent",
+            headers=holder_auth["headers"],
+        )
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert data["status"] == "confirmed"
+        assert data["credits_awarded"] == 50
+
+        async with TestSessionLocal() as db:
+            after = await get_balance(holder_uid, db)
+        assert after - before == 50
+
+    async def test_confirm_sent_404_for_wrong_user(
+        self,
+        client: AsyncClient,
+        seeker_with_credits,
+        holder_auth,
+        marketplace_no_email,
+    ):
+        """Other users cannot confirm-sent on someone else's facilitation."""
+        fac_id = await self._create_and_approve(
+            client, seeker_with_credits, holder_auth, marketplace_no_email
+        )
+
+        # Seeker tries to confirm — should get 404
+        resp = await client.post(
+            f"/api/v1/marketplace/requests/{fac_id}/confirm-sent",
+            headers=seeker_with_credits["headers"],
+        )
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"].lower()
+
+    async def test_confirm_sent_400_for_non_approved(
+        self,
+        client: AsyncClient,
+        seeker_with_credits,
+        holder_auth,
+        marketplace_no_email,
+    ):
+        """Cannot confirm-sent on a request that is still in 'requested' state."""
+        listing_id = str(marketplace_no_email["listing_id"])
+        req_resp = await client.post(
+            "/api/v1/marketplace/request-intro",
+            json={"marketplace_listing_id": listing_id},
+            headers=seeker_with_credits["headers"],
+        )
+        fac_id = req_resp.json()["data"]["id"]
+
+        # Try to confirm without approving first
+        resp = await client.post(
+            f"/api/v1/marketplace/requests/{fac_id}/confirm-sent",
+            headers=holder_auth["headers"],
+        )
+        assert resp.status_code == 400
+        assert "not in approved state" in resp.json()["detail"]
+
+    async def test_confirm_sent_400_for_already_awarded(
+        self,
+        client: AsyncClient,
+        seeker_with_credits,
+        holder_auth,
+        marketplace_no_email,
+    ):
+        """Cannot double-confirm — second call returns 400."""
+        fac_id = await self._create_and_approve(
+            client, seeker_with_credits, holder_auth, marketplace_no_email
+        )
+
+        # First confirm — should succeed
+        resp1 = await client.post(
+            f"/api/v1/marketplace/requests/{fac_id}/confirm-sent",
+            headers=holder_auth["headers"],
+        )
+        assert resp1.status_code == 200
+
+        # Second confirm — should fail
+        resp2 = await client.post(
+            f"/api/v1/marketplace/requests/{fac_id}/confirm-sent",
+            headers=holder_auth["headers"],
+        )
+        assert resp2.status_code == 400
+        assert "already awarded" in resp2.json()["detail"].lower()
+
+    async def test_confirm_sent_404_nonexistent(self, client: AsyncClient, holder_auth):
+        """Nonexistent facilitation returns 404."""
+        resp = await client.post(
+            f"/api/v1/marketplace/requests/{uuid_mod.uuid4()}/confirm-sent",
             headers=holder_auth["headers"],
         )
         assert resp.status_code == 404

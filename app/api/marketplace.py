@@ -559,14 +559,56 @@ async def update_facilitation(
         if body.notes:
             facilitation.network_holder_notes = body.notes
 
-        # Award 50 credits to network holder
-        await earn_credits(
-            current_user.id,
-            50,
-            "intro_facilitation",
-            db,
-            reference_id=facilitation.id,
-        )
+        # Look up the contact to check for email (relay vs LinkedIn fallback)
+        listing = await db.get(MarketplaceListing, facilitation.marketplace_listing_id)
+        contact = await db.get(Contact, listing.contact_id) if listing else None
+
+        if contact and contact.email:
+            # Email relay path — send intro via email, defer credits to delivery
+            from app.services.email_engagement import send_intro_relay_email
+            from app.services.referral_service import create_referral_code
+
+            nh_ref_code = await create_referral_code(current_user.id, db)
+            nh_referral_code = nh_ref_code.code if nh_ref_code else ""
+
+            js_snapshot = facilitation.job_seeker_profile_snapshot or {}
+            contact_first = contact.first_name or "there"
+            js_name = js_snapshot.get("full_name", "a professional")
+            js_role = js_snapshot.get("headline", "")
+            js_message = js_snapshot.get("message", "")
+
+            intro_body = (
+                f"Hey {contact_first},\n\nI'd like to introduce you to {js_name}"
+            )
+            if js_role:
+                intro_body += f", {js_role}"
+            intro_body += "."
+            if js_message:
+                intro_body += f"\n\n{js_message}"
+            intro_body += f"\n\nI think you two should connect — {js_name} is exploring opportunities and I thought of you."
+
+            message_id = await send_intro_relay_email(
+                to_email=contact.email,
+                nh_name=current_user.full_name or current_user.email,
+                nh_email=current_user.email,
+                job_seeker_name=js_name,
+                job_seeker_role=js_role,
+                target_company=contact.current_company or "",
+                intro_message=intro_body,
+                nh_referral_code=nh_referral_code,
+                db=db,
+                facilitation_id=facilitation.id,
+            )
+
+            facilitation.delivery_method = "email_relay"
+            facilitation.delivery_status = "sent" if message_id else "failed"
+            facilitation.relay_message_id = message_id
+            # Credits NOT awarded here — awarded on delivery webhook
+        else:
+            # LinkedIn fallback — no email relay available
+            # Credits deferred until NH confirms manual send via confirm-sent endpoint
+            pass
+
         await log_event(
             db,
             "marketplace_approved",
@@ -619,12 +661,74 @@ async def update_facilitation(
 
     await db.commit()
 
+    # Build response — for LinkedIn fallback, include linkedin_url and drafted_message
+    resp_data = IntroFacilitationResponse.model_validate(facilitation).model_dump(
+        mode="json"
+    )
+    if body.action == "approve" and not facilitation.delivery_method:
+        # LinkedIn fallback: include contact's LinkedIn URL and a drafted message
+        if contact and contact.linkedin_url:
+            resp_data["linkedin_url"] = contact.linkedin_url
+        js_snapshot = facilitation.job_seeker_profile_snapshot or {}
+        js_name = js_snapshot.get("full_name", "a professional")
+        js_role = js_snapshot.get("headline", "")
+        contact_first = (
+            contact.first_name if contact and contact.first_name else "there"
+        )
+        drafted = f"Hey {contact_first}, I'd like to introduce you to {js_name}"
+        if js_role:
+            drafted += f", {js_role}"
+        drafted += ". I think you two should connect."
+        resp_data["drafted_message"] = drafted
+
     return {
-        "data": IntroFacilitationResponse.model_validate(facilitation).model_dump(
-            mode="json"
-        ),
+        "data": resp_data,
         "meta": {},
     }
+
+
+# ---------------------------------------------------------------------------
+# POST /marketplace/requests/{facilitation_id}/confirm-sent
+# ---------------------------------------------------------------------------
+
+
+@router.post("/requests/{facilitation_id}/confirm-sent")
+async def confirm_manual_send(
+    facilitation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """NH confirms they manually sent the intro (LinkedIn/other channel)."""
+    facilitation = await db.get(IntroFacilitation, facilitation_id)
+    if not facilitation or facilitation.network_holder_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Facilitation not found",
+        )
+    if facilitation.status != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Facilitation not in approved state",
+        )
+    if facilitation.credits_awarded_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Credits already awarded",
+        )
+
+    now = datetime.now(timezone.utc)
+    facilitation.delivery_method = "linkedin_manual"
+    facilitation.delivery_status = "delivered"
+    facilitation.delivered_at = now
+
+    # Award credits for manual send (trust-based)
+    await earn_credits(
+        current_user.id, 50, "intro_facilitation", db, reference_id=facilitation.id
+    )
+    facilitation.credits_awarded_at = now
+    await db.commit()
+
+    return {"data": {"status": "confirmed", "credits_awarded": 50}}
 
 
 # ---------------------------------------------------------------------------

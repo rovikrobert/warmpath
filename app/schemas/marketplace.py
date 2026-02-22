@@ -135,6 +135,14 @@ class IntroFacilitationResponse(BaseModel):
     completed_at: datetime | None = None
     created_at: datetime
     listing_summary: MarketplaceSearchResult | None = None
+    delivery_method: str | None = None
+    delivery_status: str | None = None
+    delivered_at: datetime | None = None
+    credits_awarded_at: datetime | None = None
+
+    # LinkedIn fallback fields (not persisted — set in response only)
+    linkedin_url: str | None = None
+    drafted_message: str | None = None
 
     model_config = {"from_attributes": True}
 
