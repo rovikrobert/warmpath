@@ -1,5 +1,16 @@
 import { Component } from 'react';
 
+function isChunkLoadError(error) {
+  return (
+    error?.name === 'ChunkLoadError' ||
+    error?.message?.includes('Failed to fetch dynamically imported module') ||
+    error?.message?.includes('Importing a module script failed') ||
+    error?.message?.includes('error loading dynamically imported module')
+  );
+}
+
+const RELOAD_KEY = 'chunk_reload_attempted';
+
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -12,6 +23,19 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('ErrorBoundary caught:', error, errorInfo);
+
+    // Auto-reload on chunk load failures (stale deploy)
+    if (isChunkLoadError(error)) {
+      const lastReload = sessionStorage.getItem(RELOAD_KEY);
+      const now = Date.now();
+      // Only auto-reload if we haven't reloaded in the last 10 seconds
+      if (!lastReload || now - Number(lastReload) > 10000) {
+        sessionStorage.setItem(RELOAD_KEY, String(now));
+        window.location.reload();
+        return;
+      }
+    }
+
     // If PostHog is available, track the error
     try {
       const posthog = window.posthog;
