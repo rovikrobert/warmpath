@@ -87,6 +87,19 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
     }
   };
 
+  const handleWarmOverride = async (value) => {
+    const prev = detail.warm_sco[RESEND_KEY_REDACTED];
+    setDetail((d) => ({ ...d, warm_sco[RESEND_KEY_REDACTED]: value, warm_score: value ?? d.warm_score }));
+    onContactUpdate?.(contact.id, { warm_sco[RESEND_KEY_REDACTED]: value, warm_score: value ?? detail.warm_score }, true);
+    try {
+      await contactsApi.patch(contact.id, { warm_sco[RESEND_KEY_REDACTED]: value });
+    } catch {
+      setDetail((d) => ({ ...d, warm_sco[RESEND_KEY_REDACTED]: prev }));
+      onContactUpdate?.(contact.id, { warm_sco[RESEND_KEY_REDACTED]: prev }, false);
+      onError?.('Failed to update connection strength');
+    }
+  };
+
   const score = detail.warm_score ?? 0;
   const warmTier = getWarmTier(score);
   const likelihood = detail.referral_likelihood ? getLikelihood(detail.referral_likelihood) : null;
@@ -111,21 +124,21 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
           )}
         </div>
 
-        {/* Warm Score */}
+        {/* Connection Score */}
         <div className="space-y-2">
           <p className="label-uppercase">
-            Warm Score
+            Connection Score
             <ScoreExplainer
-              title="Warm Score"
-              body="How likely this person is to respond to your referral request. Based on recency, relationship strength, role relevance, and tenure."
+              title="Connection Score"
+              body="How likely this person is to respond to your referral request. Based on recency, relationship strength, role relevance, and time at company."
               tiers={WARM_TIERS}
-              learnMoreHref="/help/scores#warm-score"
+              learnMoreHref="/help/scores#connection-score"
             />
           </p>
           {loading ? (
             <div className="h-2 rounded-full bg-slate-800 animate-pulse" />
           ) : detail.warm_score == null ? (
-            <p className="text-xs text-slate-500">Warm Score will appear after we analyze your connection data.</p>
+            <p className="text-xs text-slate-500">Connection Score will appear after we analyze your connection data.</p>
           ) : (
             <>
               <ScoreBar score={score} />
@@ -162,7 +175,7 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
                     <div className="flex justify-between"><span className="text-slate-500">Role relevance (20%)</span><span className="text-slate-300">{detail.sco[RESEND_KEY_REDACTED].role_relevance}</span></div>
                   )}
                   {detail.sco[RESEND_KEY_REDACTED].tenure != null && (
-                    <div className="flex justify-between"><span className="text-slate-500">Tenure (15%)</span><span className="text-slate-300">{detail.sco[RESEND_KEY_REDACTED].tenure}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Time at company (15%)</span><span className="text-slate-300">{detail.sco[RESEND_KEY_REDACTED].tenure}</span></div>
                   )}
                 </div>
               )}
@@ -243,6 +256,41 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
               <option key={r.value} value={r.value}>{r.label}</option>
             ))}
           </select>
+        </div>
+
+        {/* Warm score override */}
+        <div className="border-t border-slate-700/50 pt-3">
+          <label className="mb-2 block text-xs text-slate-500">
+            How close are you?
+          </label>
+          <div className="grid grid-cols-3 gap-1.5">
+            {[
+              { label: 'Cold', value: 10, color: 'text-slate-400 border-slate-600' },
+              { label: 'Lukewarm', value: 30, color: 'text-blue-400 border-blue-500/30' },
+              { label: 'Warm', value: 55, color: 'text-amber-400 border-amber-500/30' },
+              { label: 'Strong', value: 75, color: 'text-emerald-400 border-emerald-500/30' },
+              { label: 'Very Strong', value: 90, color: 'text-emerald-300 border-emerald-400/30' },
+              { label: 'Auto', value: null, color: 'text-slate-500 border-slate-700' },
+            ].map((opt) => (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() => handleWarmOverride(opt.value)}
+                className={`rounded-md border px-2 py-1.5 text-xs font-medium transition ${
+                  detail.warm_sco[RESEND_KEY_REDACTED] === opt.value
+                    ? `${opt.color} bg-slate-800 ring-1 ring-current`
+                    : 'border-slate-700/50 text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {detail.warm_sco[RESEND_KEY_REDACTED] != null && (
+            <p className="mt-1 text-xs text-slate-500">
+              You've set this connection strength manually.
+            </p>
+          )}
         </div>
 
         <div className="flex gap-2">
