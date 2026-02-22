@@ -328,3 +328,11 @@ export const health = {
   check: () => api('/health'),
   usage: () => api('/api/v1/usage/me'),
 };
+
+export const introReview = {
+  get: (token) =>
+    fetch(`${BASE_URL}/api/v1/intro-review/${token}`).then((r) => {
+      if (!r.ok) throw new Error('Not found');
+      return r.json();
+    }),
+};
