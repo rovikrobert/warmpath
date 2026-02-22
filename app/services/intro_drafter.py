@@ -589,6 +589,18 @@ async def _call_claude_api(
 # ---------------------------------------------------------------------------
 
 
+def _append_nh_recruitment_ps(messages: list[DraftedMessage], contact: Contact) -> None:
+    """Append a P.S. to the last message encouraging NH recruitment."""
+    if messages:
+        last_msg = messages[-1]
+        company = contact.current_company or "your company"
+        ps = (
+            f"\n\nP.S. If you know others at {company} who might be open to "
+            f"helping people in their network get referred, I'd love an intro."
+        )
+        last_msg.message_body += ps
+
+
 @timed("intro_draft")
 async def draft_referral_request(
     contact: Contact,
@@ -596,6 +608,7 @@ async def draft_referral_request(
     match_result: MatchResult | None,
     job_opening: JobOpening | None = None,
     channel: str = "linkedin",
+    include_nh_recruitment: bool = False,
 ) -> list[DraftedMessage]:
     """Generate referral request messages for a contact.
 
@@ -605,11 +618,18 @@ async def draft_referral_request(
     - reconnect + explore + ask → 3 sequential messages
 
     Uses mock mode when AI_MOCK_MODE=true, real Claude API otherwise.
+
+    Args:
+        include_nh_recruitment: When True, appends a P.S. to the last message
+            encouraging the contact to refer others to the platform.
     """
     if settings.AI_MOCK_MODE:
-        return _mock_referral_drafts(
+        messages = _mock_referral_drafts(
             contact, user_profile, match_result, job_opening, channel
         )
+        if include_nh_recruitment:
+            _append_nh_recruitment_ps(messages, contact)
+        return messages
 
     import asyncio
 
@@ -625,6 +645,8 @@ async def draft_referral_request(
                 usage.input_tokens,
                 usage.output_tokens,
             )
+            if include_nh_recruitment:
+                _append_nh_recruitment_ps(drafts, contact)
             return drafts
         except anthropic.RateLimitError:
             if attempt < max_retries - 1:
@@ -635,22 +657,34 @@ async def draft_referral_request(
                 await asyncio.sleep(wait)
             else:
                 logger.error("Claude rate limit persists, falling back to mock drafts")
-                return _mock_referral_drafts(
+                messages = _mock_referral_drafts(
                     contact, user_profile, match_result, job_opening, channel
                 )
+                if include_nh_recruitment:
+                    _append_nh_recruitment_ps(messages, contact)
+                return messages
         except anthropic.APIError as exc:
             logger.error(
                 "Claude API error drafting referral for %s: %s", contact.full_name, exc
             )
-            return _mock_referral_drafts(
+            messages = _mock_referral_drafts(
                 contact, user_profile, match_result, job_opening, channel
             )
+            if include_nh_recruitment:
+                _append_nh_recruitment_ps(messages, contact)
+            return messages
         except (json.JSONDecodeError, KeyError, ValueError) as exc:
             logger.error("Failed to parse Claude referral response: %s", exc)
-            return _mock_referral_drafts(
+            messages = _mock_referral_drafts(
                 contact, user_profile, match_result, job_opening, channel
             )
+            if include_nh_recruitment:
+                _append_nh_recruitment_ps(messages, contact)
+            return messages
     # Unreachable, but satisfy type checker
-    return _mock_referral_drafts(
+    messages = _mock_referral_drafts(
         contact, user_profile, match_result, job_opening, channel
     )
+    if include_nh_recruitment:
+        _append_nh_recruitment_ps(messages, contact)
+    return messages

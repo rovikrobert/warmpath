@@ -6,6 +6,7 @@ from httpx import AsyncClient
 from app.services.intro_drafter import (
     LINKEDIN_CHAR_LIMIT,
     _mock_referral_drafts,
+    draft_referral_request,
 )
 from tests.conftest import TestSessionLocal, create_test_user_in_db
 
@@ -444,6 +445,72 @@ class TestCoachingNotes:
         # Each step should have different coaching
         coaching_set = {d.coaching_notes for d in drafts}
         assert len(coaching_set) == 3
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — Optional NH recruitment P.S.
+# ---------------------------------------------------------------------------
+
+
+class TestNhRecruitmentPs:
+    async def test_draft_includes_optional_nh_recruitment_ps(self):
+        """When include_nh_recruitment=True, last message includes P.S. about referring others."""
+        contact = _contact(current_company="Stripe")
+        messages = await draft_referral_request(
+            contact=contact,
+            user_profile=_profile(),
+            match_result=_match_result(),
+            include_nh_recruitment=True,
+        )
+        last_msg = messages[-1]
+        assert "P.S." in last_msg.message_body
+        assert "Stripe" in last_msg.message_body
+        assert "helping people in their network get referred" in last_msg.message_body
+
+    async def test_draft_excludes_ps_by_default(self):
+        """When include_nh_recruitment is not set, no P.S. is added."""
+        messages = await draft_referral_request(
+            contact=_contact(),
+            user_profile=_profile(),
+            match_result=_match_result(),
+        )
+        for msg in messages:
+            assert "P.S." not in msg.message_body
+
+    async def test_ps_appended_to_last_message_only(self):
+        """P.S. should only appear on the last message, not earlier ones."""
+        match = _match_result(
+            cultural_context={
+                "approach_style": "relationship-first",
+                "cultural_notes": "Build relationship first.",
+                "warm_up_suggested": True,
+                "message_sequence": ["reconnect", "explore", "ask"],
+            }
+        )
+        messages = await draft_referral_request(
+            contact=_contact(),
+            user_profile=_profile(),
+            match_result=match,
+            include_nh_recruitment=True,
+        )
+        assert len(messages) == 3
+        # Only the last message should have the P.S.
+        for msg in messages[:-1]:
+            assert "P.S." not in msg.message_body
+        assert "P.S." in messages[-1].message_body
+
+    async def test_ps_uses_fallback_company_when_missing(self):
+        """When contact has no current_company, P.S. uses 'your company'."""
+        contact = _contact(current_company=None)
+        messages = await draft_referral_request(
+            contact=contact,
+            user_profile=_profile(),
+            match_result=_match_result(),
+            include_nh_recruitment=True,
+        )
+        last_msg = messages[-1]
+        assert "P.S." in last_msg.message_body
+        assert "your company" in last_msg.message_body
 
 
 # ---------------------------------------------------------------------------
