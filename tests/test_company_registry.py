@@ -286,8 +286,8 @@ class TestRegistryServiceLookup:
 
         grab = await get_board_by_key(db_session, "grab")
         assert grab is not None
-        assert grab.board_source == "greenhouse"
-        assert grab.board_slug == "grab"
+        assert grab.board_source == "career_page"
+        assert grab.career_page_url == "https://grab.careers/jobs/"
         assert grab.region == "Singapore / SEA"
 
 

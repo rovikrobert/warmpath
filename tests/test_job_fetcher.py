@@ -317,10 +317,10 @@ class TestBoardRegistryPlatforms:
         assert boards is not None
         assert "ashby" in boards
 
-    def test_grab_uses_greenhouse(self):
+    def test_grab_uses_career_page(self):
         boards = lookup_boards("grab")
         assert boards is not None
-        assert "greenhouse" in boards
+        assert "career_page" in boards
 
     def test_google_uses_career_page(self):
         boards = lookup_boards("google")
@@ -668,10 +668,10 @@ class TestAggregatorFallback:
 
 
 class TestBoardRegistryExpansion:
-    def test_meta_uses_greenhouse(self):
+    def test_meta_uses_career_page(self):
         boards = lookup_boards("meta")
         assert boards is not None
-        assert "greenhouse" in boards
+        assert "career_page" in boards
 
     def test_gitlab_uses_greenhouse(self):
         boards = lookup_boards("gitlab")
@@ -693,10 +693,10 @@ class TestBoardRegistryExpansion:
         assert boards is not None
         assert "greenhouse" in boards
 
-    def test_swiggy_uses_greenhouse(self):
+    def test_swiggy_uses_career_page(self):
         boards = lookup_boards("swiggy")
         assert boards is not None
-        assert "greenhouse" in boards
+        assert "career_page" in boards
 
 
 # ---------------------------------------------------------------------------
