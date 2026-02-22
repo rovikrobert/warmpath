@@ -115,6 +115,12 @@ class IntroFacilitationRequest(BaseModel):
     marketplace_listing_id: uuid.UUID
     message_to_holder: str | None = Field(default=None, max_length=2000)
     profile_visibility: str = Field(default="summary", max_length=50)
+    # Request type and context fields
+    request_type: str = Field(default="specific_role", max_length=30)
+    job_title: str | None = Field(default=None, max_length=255)
+    job_url: str | None = Field(default=None, max_length=2000)
+    job_description: str | None = Field(default=None, max_length=5000)
+    exploration_context: str | None = Field(default=None, max_length=2000)
 
 
 class IntroFacilitationActionBody(BaseModel):
@@ -154,3 +160,8 @@ class IntroFacilitationHolderResponse(IntroFacilitationResponse):
     contact_title: str | None = None
     contact_email: str | None = None
     contact_company: str | None = None
+
+    # Relationship context for NH decision-making
+    relationship_type: str | None = None
+    would_refer: str | None = None
+    how_you_know: str | None = None
