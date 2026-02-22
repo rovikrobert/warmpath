@@ -4,6 +4,7 @@ import { feed as feedApi } from '../api/client';
 import KeevsAvatar from './KeevsAvatar';
 import FeedCard from './FeedCard';
 import EnrichmentProgress from './EnrichmentProgress';
+import ReferralJourney from './ReferralJourney';
 
 /**
  * Route-to-feed-type mapping.
@@ -11,12 +12,14 @@ import EnrichmentProgress from './EnrichmentProgress';
  */
 const ROUTE_FEED_TYPE = {
   '/contacts': 'enrichment_prompt',
+  '/referrals': 'job_alert',
   '/search': 'marketplace_signal',
   '/matches': 'follow_up_nudge',
   '/applications': 'outcome_check',
   '/coach': null, // Coach page has its own feed section
   '/marketplace': 'marketplace_signal',
   '/dashboard': 'network_insight',
+  '/invite': 'network_insight',
 };
 
 function getRelevantType(pathname) {
@@ -101,7 +104,14 @@ export default function KeevsBar({ className = '' }) {
     );
   }
 
-  if (!item || dismissed) return null;
+  // Cold-start fallback: show compact referral journey when no feed item
+  if (!item || dismissed) {
+    return (
+      <div className={`mb-4 ${className}`}>
+        <ReferralJourney variant="compact" />
+      </div>
+    );
+  }
 
   return (
     <div className={`mb-4 ${className}`}>

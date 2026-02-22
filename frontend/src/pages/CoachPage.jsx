@@ -6,7 +6,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import FeedbackModal from '../components/FeedbackModal';
 import FeedCard from '../components/FeedCard';
 import KeevsAvatar from '../components/KeevsAvatar';
-import OnboardingChecklist from '../components/OnboardingChecklist';
+import ReferralJourney from '../components/ReferralJourney';
 import CoachPageSkeleton from '../components/skeletons/CoachPageSkeleton';
 import { useToast } from '../components/ui/Toast';
 import useDocumentTitle from '../hooks/useDocumentTitle';
@@ -208,7 +208,7 @@ export default function CoachPage() {
   return (
     <div className="flex h-[calc(100dvh-8rem)] lg:h-[calc(100vh-8rem)] flex-col" role="main">
       {/* Onboarding checklist for new users */}
-      <OnboardingChecklist />
+      <ReferralJourney variant="full" />
 
       {/* Notifications */}
       {feedItems.length > 0 && (() => {
