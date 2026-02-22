@@ -155,6 +155,30 @@ class IntroFacilitation(Base):
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # Intro relay delivery tracking
+    delivery_method: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="email_relay | linkedin_manual | other_manual",
+    )
+    delivery_status: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="pending | sent | delivered | bounced | opened | failed",
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    relay_message_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, comment="Resend email ID for tracking"
+    )
+    credits_awarded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Prevents double credit award",
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
