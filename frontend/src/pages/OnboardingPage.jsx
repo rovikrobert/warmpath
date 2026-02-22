@@ -131,8 +131,13 @@ export default function OnboardingPage() {
   const [intent, setIntent] = useState('');
 
   // Step 1: Referral code (captured early, redeemed on completion)
-  const [referralCode, setReferralCode] = useState('');
-  const [referralExpanded, setReferralExpanded] = useState(false);
+  // Seed from localStorage (set by /join landing page) if present
+  const [referralCode, setReferralCode] = useState(
+    () => localStorage.getItem('referral_code') || ''
+  );
+  const [referralExpanded, setReferralExpanded] = useState(
+    () => !!localStorage.getItem('referral_code')
+  );
 
   // Step 2: Job preferences (skipped by sha[RESEND_KEY_REDACTED])
   const [prefs, setPrefs] = useState({
@@ -1070,8 +1075,10 @@ export default function OnboardingPage() {
                       if (referralCode) {
                         try {
                           await referralsApi.redeem({ code: referralCode });
+                          localStorage.removeItem('referral_code');
                         } catch {
                           // Invalid/expired/already-redeemed — silently continue
+                          localStorage.removeItem('referral_code');
                         }
                       }
                       await authApi.completeOnboarding();
