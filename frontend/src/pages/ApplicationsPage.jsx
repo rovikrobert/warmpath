@@ -7,6 +7,7 @@ import EmptyState from '../components/ui/EmptyState';
 import SourceTag, { UserDataTag } from '../components/ui/SourceTag';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
 import { SOURCES } from '../utils/sources';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const PIPELINE_STAGES = [
   { key: 'draft', label: 'Draft', color: 'bg-slate-700/50 text-slate-400' },
@@ -187,6 +188,7 @@ function ReferralAdvantage({ stats }) {
 }
 
 export default function ApplicationsPage() {
+  useDocumentTitle('Applications');
   const [apps, setApps] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);

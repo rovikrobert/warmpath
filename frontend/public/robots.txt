@@ -1,4 +1,17 @@
 User-agent: *
 Allow: /
+Disallow: /api/
+Disallow: /coach
+Disallow: /contacts
+Disallow: /search/
+Disallow: /referrals
+Disallow: /applications
+Disallow: /marketplace/browse
+Disallow: /marketplace/requests
+Disallow: /credits
+Disallow: /invite
+Disallow: /settings
+Disallow: /onboarding
+Disallow: /profile/
 
-Sitemap: https://web-production-b3a4a.up.railway.app/sitemap.xml
+Sitemap: https://warmpath.majiq.agency/sitemap.xml

@@ -4,6 +4,7 @@ import { search as searchApi, credits as creditsApi, preferences as prefsApi, co
 import CompanyAutocomplete from '../components/CompanyAutocomplete';
 import { trackEvent } from '../utils/analytics';
 import Button from '../components/ui/Button';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 function ShimmerCard() {
   return (
@@ -76,6 +77,7 @@ function RecommendationCard({ rec, onAdd, isAdded }) {
 }
 
 export default function FindReferrals() {
+  useDocumentTitle('Find Referrals');
   const navigate = useNavigate();
   const location = useLocation();
   const [companies, setCompanies] = useState(() => location.state?.prefillCompanies ?? []);

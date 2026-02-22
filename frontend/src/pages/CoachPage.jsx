@@ -9,6 +9,7 @@ import KeevsAvatar from '../components/KeevsAvatar';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import CoachPageSkeleton from '../components/skeletons/CoachPageSkeleton';
 import { useToast } from '../components/ui/Toast';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 /**
  * Render text with markdown-style links [text](/path) as React Router <Link>s.
@@ -55,6 +56,7 @@ const QUICK_ACTIONS = [
 ];
 
 export default function CoachPage() {
+  useDocumentTitle('Coach');
   const { user } = useAuth();
   const toast = useToast();
   const [messages, setMessages] = useState([]);

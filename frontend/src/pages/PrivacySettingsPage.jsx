@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { privacy as privacyApi, auth as authApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/ui/Spinner';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const REGULATION_OPTIONS = ['GDPR', 'CCPA', 'PDPA', 'Other'];
 const REQUEST_TYPES = [
@@ -13,6 +14,7 @@ const REQUEST_TYPES = [
 ];
 
 export default function PrivacySettingsPage() {
+  useDocumentTitle('Privacy Settings');
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 

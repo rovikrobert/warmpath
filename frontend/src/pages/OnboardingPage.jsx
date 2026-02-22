@@ -11,6 +11,7 @@ import { KEEVS_TRIVIA, shuffleArray } from '../utils/keevs-trivia';
 import Button from '../components/ui/Button';
 import SourceTag from '../components/ui/SourceTag';
 import Spinner from '../components/ui/Spinner';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 function ResumePreviewModal({ data, onApply, onClose }) {
   if (!data) return null;
@@ -109,6 +110,7 @@ const PRIVACY_STEPS = [
 ];
 
 export default function OnboardingPage() {
+  useDocumentTitle('Get Started');
   const { refreshUser, clerkUser } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);

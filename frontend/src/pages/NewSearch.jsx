@@ -6,8 +6,10 @@ import ScoreExplainer from '../components/ScoreExplainer';
 import { MATCH_TIERS } from '../utils/scores';
 import { trackEvent } from '../utils/analytics';
 import Button from '../components/ui/Button';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 export default function NewSearch() {
+  useDocumentTitle('New Search');
   const navigate = useNavigate();
   const [form, setForm] = useState({
     name: '',

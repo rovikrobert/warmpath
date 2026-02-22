@@ -4,6 +4,7 @@ import { marketplace as mpApi, contacts as contactsApi } from '../api/client';
 import { SOURCES } from '../utils/sources';
 import SourceTag from '../components/ui/SourceTag';
 import Spinner from '../components/ui/Spinner';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const DEPARTMENT_OPTIONS = [
   'Engineering', 'Product', 'Design', 'Marketing', 'Sales',
@@ -12,6 +13,7 @@ const DEPARTMENT_OPTIONS = [
 ];
 
 export default function SharingSettings() {
+  useDocumentTitle('Sharing Settings');
   const [prefs, setPrefs] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [excludedIds, setExcludedIds] = useState([]);

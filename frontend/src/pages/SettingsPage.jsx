@@ -7,6 +7,7 @@ import { auth as authApi, privacy as privacyApi, marketplace as mpApi, contacts 
 import { SOURCES } from '../utils/sources';
 import SourceTag from '../components/ui/SourceTag';
 import Spinner from '../components/ui/Spinner';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1105,6 +1106,7 @@ function AccountTab() {
 // ---------------------------------------------------------------------------
 
 export default function SettingsPage() {
+  useDocumentTitle('Settings');
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'profile';

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { credits as creditsApi, usage as usageApi } from '../api/client';
 import Spinner from '../components/ui/Spinner';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const REASON_LABELS = {
   welcome_bonus: 'Welcome bonus',
@@ -62,6 +63,7 @@ function UsageBar({ label, count, limit }) {
 }
 
 export default function CreditsPage() {
+  useDocumentTitle('Credits');
   const [balance, setBalance] = useState(null);
   const [history, setHistory] = useState([]);
   const [usageData, setUsageData] = useState(null);
