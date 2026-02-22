@@ -284,7 +284,7 @@ export default function PrivacyPage() {
           We do not sell, rent, or trade your personal data. We share information only with:
         </Paragraph>
         <BulletList items={[
-          'Service providers who process data on our behalf under contractual agreements: cloud hosting, Stripe (payments), Anthropic (AI), email delivery.',
+          'Service providers who process data on our behalf under contractual agreements: cloud hosting (Railway), Stripe (payments), AI providers (Anthropic, Google, Groq, OpenAI), Resend (email delivery).',
           'Marketplace participants \u2014 only when a connection owner explicitly approves an introduction request.',
           'Legal authorities when required by law to comply with legal obligations or protect rights and safety.',
         ]} />
@@ -439,16 +439,36 @@ export default function PrivacyPage() {
               Our algorithm computes referral likelihood scores based on connection recency,
               relationship strength, role relevance, and company tenure. Scores are indicative
               recommendations, not deterministic outcomes. Processing is performed locally on our
-              infrastructure.
+              infrastructure &mdash; no data is sent to external AI providers.
             </Paragraph>
           </div>
           <div>
-            <h4 className="mb-1 font-semibold text-slate-200">AI Message Drafting</h4>
+            <h4 className="mb-1 font-semibold text-slate-200">AI Coaching & Message Drafting</h4>
             <Paragraph>
-              We use the Anthropic Claude API to generate personalised referral request messages.
-              Anthropic processes this data solely to generate the output and does not retain it
-              beyond the API call. Generated messages are suggestions that you review, edit, and
-              choose whether to send.
+              We use Anthropic Claude to power our AI coach (Keevs) and to draft personalised referral
+              request messages. When you request an intro message, your contact&rsquo;s name and professional
+              details are sent to Anthropic to generate a personalised draft. Anthropic does not retain
+              data beyond the API call and does not train on API inputs. Generated messages are
+              suggestions that you review, edit, and choose whether to send.
+            </Paragraph>
+          </div>
+          <div>
+            <h4 className="mb-1 font-semibold text-slate-200">CSV Data Normalisation</h4>
+            <Paragraph>
+              When you upload a LinkedIn CSV, we use AI (Groq and OpenAI) to normalise company names
+              and job titles &mdash; for example, correcting &ldquo;GOOGLE LLC&rdquo; to
+              &ldquo;Google&rdquo; or expanding &ldquo;sr. swe&rdquo; to &ldquo;Senior Software
+              Engineer.&rdquo; Only company names and job titles are sent to these providers.
+              Your contacts&rsquo; names and email addresses are never sent to any external AI
+              provider &mdash; they are cleaned using deterministic rules on our own servers.
+            </Paragraph>
+          </div>
+          <div>
+            <h4 className="mb-1 font-semibold text-slate-200">Resume Parsing</h4>
+            <Paragraph>
+              If you upload a resume, we use Google Gemini to extract structured information (title,
+              company, skills). This is your own data, sent at your request. Google does not retain
+              API data beyond the processing call.
             </Paragraph>
           </div>
           <div>
@@ -459,6 +479,42 @@ export default function PrivacyPage() {
               individuals based on protected characteristics.
             </Paragraph>
           </div>
+        </div>
+
+        {/* AI Sub-Processors Table */}
+        <div className="overflow-x-auto">
+          <h4 className="mb-2 font-semibold text-slate-200">Our AI Providers</h4>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-700/50 bg-slate-800 text-left">
+                <th className="px-3 py-2 font-semibold text-slate-300">Provider</th>
+                <th className="px-3 py-2 font-semibold text-slate-300">What It Does</th>
+                <th className="px-3 py-2 font-semibold text-slate-300">Data Sent</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {[
+                ['Anthropic (Claude)', 'AI coaching, intro message drafting', 'Your profile, contact name + professional details (user-initiated only)'],
+                ['Google (Gemini)', 'Resume parsing', 'Your resume text (your own data)'],
+                ['Groq', 'Company & title normalisation', 'Company names and job titles only'],
+                ['OpenAI', 'Company & title normalisation (fallback)', 'Company names and job titles only'],
+              ].map(([provider, purpose, data], i) => (
+                <tr key={i} className="hover:bg-slate-800">
+                  <td className="px-3 py-2 font-medium text-slate-200">{provider}</td>
+                  <td className="px-3 py-2 text-slate-400">{purpose}</td>
+                  <td className="px-3 py-2 text-slate-400">{data}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 p-4">
+          <p className="text-sm font-medium text-sky-400">
+            Contact names and email addresses are never sent to any AI provider for bulk processing.
+            Names are cleaned deterministically on our own servers. None of our AI providers retain
+            or train on data submitted via their APIs.
+          </p>
         </div>
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
           <p className="text-sm font-medium text-emerald-400">
