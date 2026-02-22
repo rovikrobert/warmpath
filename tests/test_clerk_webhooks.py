@@ -204,3 +204,59 @@ async def test_webhook_duplicate_user_created_is_idempotent(client: AsyncClient)
         },
     )
     assert resp.status_code == 200
+
+
+async def test_webhook_user_created_relinks_existing_email_to_new_clerk_id(
+    client: AsyncClient,
+):
+    """user.created with a new clerk_id but existing email re-links instead of crashing."""
+    old_clerk_id = f"user_{uuid.uuid4().hex[:12]}"
+    new_clerk_id = f"user_{uuid.uuid4().hex[:12]}"
+    email = "relink@test.com"
+
+    # Pre-create user with old clerk_id
+    async with TestSessionLocal() as db:
+        user = User(
+            email=email,
+            full_name="Original Name",
+            clerk_user_id=old_clerk_id,
+        )
+        db.add(user)
+        await db.commit()
+        original_user_id = user.id
+
+    # Webhook arrives with new clerk_id but same email (e.g. re-signup via different OAuth)
+    payload = {
+        "type": "user.created",
+        "data": {
+            "id": new_clerk_id,
+            "email_addresses": [
+                {
+                    "email_address": email,
+                    "verification": {"status": "verified"},
+                }
+            ],
+            "first_name": "Updated",
+            "last_name": "Name",
+        },
+    }
+    resp = await client.post(
+        "/api/v1/webhooks/clerk",
+        content=json.dumps(payload),
+        headers={
+            "content-type": "application/json",
+            "x-webhook-test": "true",
+        },
+    )
+    assert resp.status_code == 200
+
+    # Verify: same user row, clerk_id updated, no duplicate
+    async with TestSessionLocal() as db:
+        result = await db.execute(select(User).where(User.email == email))
+        users = result.scalars().all()
+        assert len(users) == 1
+        user = users[0]
+        assert user.id == original_user_id
+        assert user.clerk_user_id == new_clerk_id
+        assert user.full_name == "Updated Name"
+        assert user.email_verified is True
