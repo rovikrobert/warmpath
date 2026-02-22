@@ -179,7 +179,9 @@ async def _clean_async(csv_upload_id: str, user_id: str) -> None:
     factory = _get_session_factory()
     upload_uuid = uuid.UUID(csv_upload_id)
 
-    from app.services.ai_provider_pool import dispatch_batch
+    from app.services.ai_provider_pool import dispatch_batch, warm_up_providers
+
+    warm_up_providers()
 
     stream_in = parsed_stream_key(csv_upload_id)
     stream_out = cleaned_stream_key(csv_upload_id)
