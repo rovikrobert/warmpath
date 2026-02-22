@@ -785,3 +785,213 @@ async def test_patch_nonexistent_message(client: AsyncClient):
 async def test_pending_requires_auth(client: AsyncClient):
     resp = await client.get("/api/v1/matches/intros/pending")
     assert resp.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — Relationship context in prompt
+# ---------------------------------------------------------------------------
+
+
+class TestRelationshipContextInPrompt:
+    """The intro drafter should use relationship context when available."""
+
+    def test_prompt_includes_relationship_type(self):
+        """When contact has relationship_type, it appears in the Claude prompt."""
+        from app.services.intro_drafter import _build_referral_prompt
+
+        contact = _contact(relationship_type="former_colleague")
+        prompt = _build_referral_prompt(
+            contact, _profile(), _match_result(), None, "email"
+        )
+        assert "Relationship: former_colleague" in prompt
+
+    def test_prompt_includes_how_you_know(self):
+        """When contact has how_you_know, it appears in the Claude prompt."""
+        from app.services.intro_drafter import _build_referral_prompt
+
+        contact = _contact(how_you_know="Worked together at Stripe on Payments team")
+        prompt = _build_referral_prompt(
+            contact, _profile(), _match_result(), None, "email"
+        )
+        assert "How sender knows them: Worked together at Stripe" in prompt
+
+    def test_prompt_includes_headline(self):
+        """Sender's headline appears in the prompt when available."""
+        from app.services.intro_drafter import _build_referral_prompt
+
+        profile = _profile(headline="Senior Backend Engineer | Distributed Systems")
+        prompt = _build_referral_prompt(
+            _contact(), profile, _match_result(), None, "email"
+        )
+        assert "Headline: Senior Backend Engineer | Distributed Systems" in prompt
+
+    def test_prompt_includes_work_history(self):
+        """Sender's work history appears in the prompt when available."""
+        from app.services.intro_drafter import _build_referral_prompt
+
+        profile = _profile(
+            work_history=[
+                {"company": "Stripe", "title": "Staff Engineer"},
+                {"company": "Google", "title": "Senior SWE"},
+            ]
+        )
+        prompt = _build_referral_prompt(
+            _contact(), profile, _match_result(), None, "email"
+        )
+        assert "Work history:" in prompt
+        assert "Stripe (Staff Engineer)" in prompt
+        assert "Google (Senior SWE)" in prompt
+
+    def test_prompt_includes_github_url(self):
+        """Sender's GitHub URL appears in the prompt when available."""
+        from app.services.intro_drafter import _build_referral_prompt
+
+        profile = _profile(github_url="https://github.com/sender")
+        prompt = _build_referral_prompt(
+            _contact(), profile, _match_result(), None, "email"
+        )
+        assert "GitHub: https://github.com/sender" in prompt
+
+    def test_prompt_includes_portfolio_url(self):
+        """Sender's portfolio URL appears in the prompt when available."""
+        from app.services.intro_drafter import _build_referral_prompt
+
+        profile = _profile(portfolio_url="https://portfolio.example.com")
+        prompt = _build_referral_prompt(
+            _contact(), profile, _match_result(), None, "email"
+        )
+        assert "Portfolio: https://portfolio.example.com" in prompt
+
+    def test_prompt_omits_missing_relationship_fields(self):
+        """When contact has no relationship fields, they are not in the prompt."""
+        from app.services.intro_drafter import _build_referral_prompt
+
+        contact = _contact()  # no relationship_type or how_you_know
+        prompt = _build_referral_prompt(
+            contact, _profile(), _match_result(), None, "email"
+        )
+        assert "Relationship:" not in prompt
+        assert "How sender knows them:" not in prompt
+
+    def test_prompt_omits_missing_profile_fields(self):
+        """When profile has no headline/work_history/urls, they are not in the prompt."""
+        from app.services.intro_drafter import _build_referral_prompt
+
+        profile = _profile()  # no headline, work_history, github_url, portfolio_url
+        prompt = _build_referral_prompt(
+            _contact(), profile, _match_result(), None, "email"
+        )
+        assert "Headline:" not in prompt
+        assert "Work history:" not in prompt
+        assert "GitHub:" not in prompt
+        assert "Portfolio:" not in prompt
+
+    def test_work_history_truncated_to_five_entries(self):
+        """Work history should include at most 5 entries."""
+        from app.services.intro_drafter import _build_referral_prompt
+
+        entries = [{"company": f"Company{i}", "title": f"Role{i}"} for i in range(8)]
+        profile = _profile(work_history=entries)
+        prompt = _build_referral_prompt(
+            _contact(), profile, _match_result(), None, "email"
+        )
+        assert "Company4 (Role4)" in prompt
+        assert "Company5" not in prompt
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — Relationship context in mock drafts
+# ---------------------------------------------------------------------------
+
+
+class TestRelationshipContextInMockDrafts:
+    """Mock drafts should reference relationship context when available."""
+
+    def test_former_colleague_reconnect_references_shared_history(self):
+        """When contact is a former_colleague, reconnect message references it."""
+        contact = _contact(
+            relationship_type="former_colleague",
+            how_you_know="Worked together at Stripe on Payments team",
+        )
+        match = _match_result(
+            cultural_context={
+                "approach_style": "formal-indirect",
+                "cultural_notes": "Professional approach.",
+                "warm_up_suggested": False,
+                "message_sequence": ["reconnect", "ask"],
+            }
+        )
+        drafts = _mock_referral_drafts(contact, _profile(), match, None, "email")
+        reconnect = drafts[0]
+        assert reconnect.step_label == "reconnect"
+        body_lower = reconnect.message_body.lower()
+        # Should reference their shared working history
+        assert "stripe" in body_lower or "colleague" in body_lower
+
+    def test_how_you_know_in_reconnect_email(self):
+        """When how_you_know is set, reconnect message references it."""
+        contact = _contact(
+            relationship_type="former_manager",
+            how_you_know="My manager at Google in 2022",
+        )
+        match = _match_result(
+            cultural_context={
+                "approach_style": "relationship-first",
+                "cultural_notes": "Build relationship first.",
+                "warm_up_suggested": True,
+                "message_sequence": ["reconnect", "explore", "ask"],
+            }
+        )
+        drafts = _mock_referral_drafts(contact, _profile(), match, None, "email")
+        reconnect = drafts[0]
+        body_lower = reconnect.message_body.lower()
+        assert "google" in body_lower or "manager" in body_lower
+
+    def test_headline_used_in_direct_ask_sender_description(self):
+        """When sender has a headline, it should be used instead of bare title."""
+        profile = _profile(
+            headline="Senior Backend Engineer | Distributed Systems",
+            current_title="Senior Backend Engineer",
+        )
+        drafts = _mock_referral_drafts(
+            _contact(), profile, _match_result(), None, "email"
+        )
+        all_bodies = " ".join(d.message_body for d in drafts)
+        # Should use the headline or title, not the generic "a professional"
+        assert "Senior Backend Engineer" in all_bodies
+
+    def test_no_relationship_uses_generic_reconnect(self):
+        """Without relationship context, reconnect uses generic language."""
+        contact = _contact()  # no relationship_type or how_you_know
+        match = _match_result(
+            cultural_context={
+                "approach_style": "formal-indirect",
+                "cultural_notes": "Professional approach.",
+                "warm_up_suggested": False,
+                "message_sequence": ["reconnect", "ask"],
+            }
+        )
+        drafts = _mock_referral_drafts(contact, _profile(), match, None, "email")
+        reconnect = drafts[0]
+        assert reconnect.step_label == "reconnect"
+        # Should still generate a valid reconnect message
+        assert len(reconnect.message_body) > 0
+        assert "Alice" in reconnect.message_body
+
+    def test_former_colleague_reconnect_linkedin_under_char_limit(self):
+        """Reconnect with relationship context stays under LinkedIn char limit."""
+        contact = _contact(
+            relationship_type="former_colleague",
+            how_you_know="Worked together at Stripe on Payments team 2020-2023",
+        )
+        match = _match_result(
+            cultural_context={
+                "approach_style": "formal-indirect",
+                "cultural_notes": "Professional approach.",
+                "warm_up_suggested": False,
+                "message_sequence": ["reconnect", "ask"],
+            }
+        )
+        drafts = _mock_referral_drafts(contact, _profile(), match, None, "linkedin")
+        for draft in drafts:
+            assert len(draft.message_body) <= LINKEDIN_CHAR_LIMIT

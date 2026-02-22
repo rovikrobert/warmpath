@@ -83,6 +83,79 @@ def _truncate_linkedin(body: str) -> str:
     return body
 
 
+def _build_reconnect_body(
+    contact_first: str,
+    contact_title: str,
+    contact_company: str,
+    rel_type: str | None,
+    how_know: str | None,
+    is_linkedin: bool,
+) -> str:
+    """Build a reconnect message body, personalized with relationship context."""
+    if how_know:
+        # Use the specific shared history from how_you_know
+        if is_linkedin:
+            return _truncate_linkedin(
+                f"Hi {contact_first}, it's been a while! I fondly remember "
+                f"our time — {how_know}. I see you're now {contact_title} at "
+                f"{contact_company}. Would love to reconnect."
+            )
+        return (
+            f"Hi {contact_first},\n\n"
+            f"It's been a while since we connected. I was thinking back to "
+            f"our shared history — {how_know}. I see you're now {contact_title} "
+            f"at {contact_company} — congratulations on the role.\n\n"
+            f"I'd love to catch up and hear how things are going for you.\n\n"
+            f"Best regards"
+        )
+
+    if rel_type == "former_colleague":
+        if is_linkedin:
+            return _truncate_linkedin(
+                f"Hi {contact_first}, it's been a while since we worked together! "
+                f"I see you're now {contact_title} at {contact_company}. "
+                f"Would love to reconnect and hear how things are going."
+            )
+        return (
+            f"Hi {contact_first},\n\n"
+            f"It's been a while since we were colleagues. I see you're now "
+            f"{contact_title} at {contact_company} — congratulations on the role.\n\n"
+            f"I'd love to catch up and hear how things are going for you.\n\n"
+            f"Best regards"
+        )
+
+    if rel_type == "former_manager":
+        if is_linkedin:
+            return _truncate_linkedin(
+                f"Hi {contact_first}, it's been a while! I learned so much "
+                f"working with you. I see you're now {contact_title} at "
+                f"{contact_company}. Would love to reconnect."
+            )
+        return (
+            f"Hi {contact_first},\n\n"
+            f"It's been a while since we worked together. I learned a great deal "
+            f"under your leadership and I see you're now {contact_title} at "
+            f"{contact_company} — congratulations.\n\n"
+            f"I'd love to catch up and hear how things are going for you.\n\n"
+            f"Best regards"
+        )
+
+    # Generic reconnect (no relationship context)
+    if is_linkedin:
+        return _truncate_linkedin(
+            f"Hi {contact_first}, it's been a while! I see you're doing great "
+            f"as {contact_title} at {contact_company}. I'd love to reconnect "
+            f"and hear how things are going."
+        )
+    return (
+        f"Hi {contact_first},\n\n"
+        f"It's been a while since we connected. I see you're now "
+        f"{contact_title} at {contact_company} — congratulations on the role.\n\n"
+        f"I'd love to catch up and hear how things are going for you.\n\n"
+        f"Best regards"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Mock drafts — deterministic, for dev/test
 # ---------------------------------------------------------------------------
@@ -108,6 +181,13 @@ def _mock_referral_drafts(
     is_linkedin = channel == "linkedin"
 
     sender_title = (profile.current_title if profile else None) or "a professional"
+    # Use headline as a richer sender description when available
+    sender_headline = getattr(profile, "headline", None) if profile else None
+    sender_desc = sender_headline or sender_title
+
+    # Relationship context for reconnect messages
+    rel_type = getattr(contact, "relationship_type", None)
+    how_know = getattr(contact, "how_you_know", None)
 
     drafts: list[DraftedMessage] = []
 
@@ -123,7 +203,7 @@ def _mock_referral_drafts(
         if is_linkedin:
             body = _truncate_linkedin(
                 f"Hi {contact_first}, I see you're {contact_title} at {contact_company}. "
-                f"I'm interested in {job} and think my background as {sender_title} "
+                f"I'm interested in {job} and think my background as {sender_desc} "
                 f"would be a great fit. Would you be open to referring me?"
             )
         else:
@@ -131,7 +211,7 @@ def _mock_referral_drafts(
                 f"Hi {contact_first},\n\n"
                 f"I noticed you're {contact_title} at {contact_company}. "
                 f"I'm actively looking at {job} and believe my experience as "
-                f"{sender_title} makes me a strong candidate.\n\n"
+                f"{sender_desc} makes me a strong candidate.\n\n"
                 f"Would you be open to putting in a referral? I'd be happy to "
                 f"share my resume and chat about the role.\n\n"
                 f"Best regards"
@@ -152,14 +232,14 @@ def _mock_referral_drafts(
         if is_linkedin:
             body = _truncate_linkedin(
                 f"Hi {contact_first}, I've been following {contact_company}'s work "
-                f"and I'm excited about {job}. As {sender_title}, I think I could "
+                f"and I'm excited about {job}. As {sender_desc}, I think I could "
                 f"add real value. Any chance you'd refer me?"
             )
         else:
             body = (
                 f"Hi {contact_first},\n\n"
                 f"I've been following what {contact_company} is building and I'm "
-                f"genuinely excited about {job}. With my background as {sender_title}, "
+                f"genuinely excited about {job}. With my background as {sender_desc}, "
                 f"I believe I could contribute meaningfully to the team.\n\n"
                 f"Would you feel comfortable referring me? Happy to send over my "
                 f"resume for context.\n\n"
@@ -222,28 +302,22 @@ def _mock_referral_drafts(
             "transition to your referral ask naturally."
         )
 
-        # Step 1: Reconnect
-        if is_linkedin:
-            body = _truncate_linkedin(
-                f"Hi {contact_first}, it's been a while! I see you're doing great "
-                f"as {contact_title} at {contact_company}. I'd love to reconnect "
-                f"and hear how things are going."
-            )
-        else:
-            body = (
-                f"Hi {contact_first},\n\n"
-                f"It's been a while since we connected. I see you're now "
-                f"{contact_title} at {contact_company} — congratulations on the role.\n\n"
-                f"I'd love to catch up and hear how things are going for you.\n\n"
-                f"Best regards"
-            )
+        # Step 1: Reconnect — personalize with relationship context when available
+        reconnect_body = _build_reconnect_body(
+            contact_first,
+            contact_title,
+            contact_company,
+            rel_type,
+            how_know,
+            is_linkedin,
+        )
         drafts.append(
             DraftedMessage(
                 variant_label="only",
                 subject_line=None
                 if is_linkedin
                 else f"Great to reconnect, {contact_first}",
-                message_body=body,
+                message_body=reconnect_body,
                 sequence_step=1,
                 step_label="reconnect",
                 send_after_days=0,
@@ -262,7 +336,7 @@ def _mock_referral_drafts(
             body = (
                 f"Hi {contact_first},\n\n"
                 f"Thanks for catching up! I wanted to mention — I'm actively "
-                f"interested in {job}. With my background as {sender_title}, "
+                f"interested in {job}. With my background as {sender_desc}, "
                 f"I think it could be a great fit.\n\n"
                 f"Would you be open to putting in a referral? I can send over "
                 f"my resume anytime.\n\n"
@@ -298,27 +372,20 @@ def _mock_referral_drafts(
             "Reference what they shared about the company to show you listened."
         )
 
-        # Step 1: Reconnect
-        if is_linkedin:
-            body = _truncate_linkedin(
-                f"Hi {contact_first}, it's been a while! I hope you're doing "
-                f"well at {contact_company}. Would love to reconnect and hear "
-                f"what you've been up to."
-            )
-        else:
-            body = (
-                f"Hi {contact_first},\n\n"
-                f"It's been a while and I hope you're doing well. I see "
-                f"you're at {contact_company} now as {contact_title} — that's "
-                f"great to hear.\n\n"
-                f"Would love to catch up sometime.\n\n"
-                f"Best"
-            )
+        # Step 1: Reconnect — personalize with relationship context when available
+        reconnect_body = _build_reconnect_body(
+            contact_first,
+            contact_title,
+            contact_company,
+            rel_type,
+            how_know,
+            is_linkedin,
+        )
         drafts.append(
             DraftedMessage(
                 variant_label="only",
                 subject_line=None if is_linkedin else f"Catching up, {contact_first}",
-                message_body=body,
+                message_body=reconnect_body,
                 sequence_step=1,
                 step_label="reconnect",
                 send_after_days=0,
@@ -367,7 +434,7 @@ def _mock_referral_drafts(
                 f"Hi {contact_first},\n\n"
                 f"Really appreciate you sharing about life at {contact_company}. "
                 f"It sounds like an amazing team. I've been looking at {job} and "
-                f"I think my experience as {sender_title} would be a strong fit.\n\n"
+                f"I think my experience as {sender_desc} would be a strong fit.\n\n"
                 f"Would you be comfortable putting in a referral for me? "
                 f"I can share my resume and any other details that would help.\n\n"
                 f"Thanks so much"
@@ -412,12 +479,24 @@ def _build_referral_prompt(
             sender_parts.append(f"Title: {profile.current_title}")
         if profile.current_company:
             sender_parts.append(f"Company: {profile.current_company}")
+        if getattr(profile, "headline", None):
+            sender_parts.append(f"Headline: {profile.headline}")
         if profile.industry:
             sender_parts.append(f"Industry: {profile.industry}")
         if profile.location:
             sender_parts.append(f"Location: {profile.location}")
         if profile.bio_summary:
             sender_parts.append(f"Bio: {profile.bio_summary}")
+        if getattr(profile, "work_history", None):
+            history_str = ", ".join(
+                f"{e.get('company', '?')} ({e.get('title', '')})"
+                for e in profile.work_history[:5]
+            )
+            sender_parts.append(f"Work history: {history_str}")
+        if getattr(profile, "github_url", None):
+            sender_parts.append(f"GitHub: {profile.github_url}")
+        if getattr(profile, "portfolio_url", None):
+            sender_parts.append(f"Portfolio: {profile.portfolio_url}")
         sender_info = "\n".join(sender_parts) if sender_parts else "No profile details"
     else:
         sender_info = "No profile available — write as a generic professional"
@@ -430,6 +509,10 @@ def _build_referral_prompt(
         contact_parts.append(f"Company: {contact.current_company}")
     if contact.location:
         contact_parts.append(f"Location: {contact.location}")
+    if getattr(contact, "relationship_type", None):
+        contact_parts.append(f"Relationship: {contact.relationship_type}")
+    if getattr(contact, "how_you_know", None):
+        contact_parts.append(f"How sender knows them: {contact.how_you_know}")
     contact_info = "\n".join(contact_parts)
 
     # --- Match context ---
