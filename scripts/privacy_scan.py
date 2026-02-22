@@ -340,7 +340,11 @@ def check_vault_isolation() -> None:
     _SUPPRESSED_VAULT_LOOKUPS: list[tuple[str, int]] = [
         ("matches.py", 271),  # post-consent contact reveal
         ("applications.py", 456),  # hash-based duplicate check
-        ("marketplace.py", 243),  # anonymized marketplace index query
+        ("marketplace.py", 117),  # anonymized marketplace index query
+        (
+            "freshness_aggregator.py",
+            179,
+        ),  # intentional cross-vault freshness propagation
     ]
 
     api_dir = APP_DIR / "api"
