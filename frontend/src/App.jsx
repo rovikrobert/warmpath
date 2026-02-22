@@ -84,36 +84,38 @@ export default function App() {
   );
 
   return (
-    <Suspense fallback={fallback}>
-      <Routes>
-        <Route path="/" element={<RootRedirect />} />
-        <Route path="/privacy" element={<PrivacyPage />} />
-        <Route path="/onboarding" element={<ProtectedRoute allowIncomplete><ErrorBoundary><OnboardingPage /></ErrorBoundary></ProtectedRoute>} />
-        <Route element={<ProtectedRoute><ErrorBoundary><Layout /></ErrorBoundary></ProtectedRoute>}>
-          <Route path="/coach" element={<CoachPage />} />
-          <Route path="/contacts" element={<ContactsPage />} />
-          <Route path="/search/new" element={<FindReferrals />} />
-          <Route path="/search/:id" element={<SearchResults />} />
-          <Route path="/referrals" element={<FindReferrals />} />
-          <Route path="/referrals/:id" element={<ReferralResults />} />
-          <Route path="/applications" element={<ApplicationsPage />} />
-          <Route path="/marketplace" element={<MarketplaceOverview />} />
-          <Route path="/marketplace/browse" element={<MarketplaceBrowse />} />
-          <Route path="/marketplace/requests" element={<MyRequests />} />
-          <Route path="/credits" element={<CreditsPage />} />
-          <Route path="/invite" element={<ReferralCodesPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/help/scores" element={<ScoreGlossary />} />
-          {/* Legacy routes — redirect to unified settings */}
-          <Route path="/dashboard" element={<Navigate to="/coach" replace />} />
-          <Route path="/profile/edit" element={<Navigate to="/settings?tab=profile" replace />} />
-          <Route path="/settings/privacy" element={<Navigate to="/settings?tab=privacy" replace />} />
-          <Route path="/marketplace/settings" element={<Navigate to="/settings?tab=sharing" replace />} />
-          <Route path="/marketplace/dashboard" element={<Navigate to="/marketplace" replace />} />
-          <Route path="/my-requests" element={<Navigate to="/marketplace/requests" replace />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={fallback}>
+        <Routes>
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/onboarding" element={<ProtectedRoute allowIncomplete><OnboardingPage /></ProtectedRoute>} />
+          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+            <Route path="/coach" element={<CoachPage />} />
+            <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/search/new" element={<FindReferrals />} />
+            <Route path="/search/:id" element={<SearchResults />} />
+            <Route path="/referrals" element={<FindReferrals />} />
+            <Route path="/referrals/:id" element={<ReferralResults />} />
+            <Route path="/applications" element={<ApplicationsPage />} />
+            <Route path="/marketplace" element={<MarketplaceOverview />} />
+            <Route path="/marketplace/browse" element={<MarketplaceBrowse />} />
+            <Route path="/marketplace/requests" element={<MyRequests />} />
+            <Route path="/credits" element={<CreditsPage />} />
+            <Route path="/invite" element={<ReferralCodesPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/help/scores" element={<ScoreGlossary />} />
+            {/* Legacy routes — redirect to unified settings */}
+            <Route path="/dashboard" element={<Navigate to="/coach" replace />} />
+            <Route path="/profile/edit" element={<Navigate to="/settings?tab=profile" replace />} />
+            <Route path="/settings/privacy" element={<Navigate to="/settings?tab=privacy" replace />} />
+            <Route path="/marketplace/settings" element={<Navigate to="/settings?tab=sharing" replace />} />
+            <Route path="/marketplace/dashboard" element={<Navigate to="/marketplace" replace />} />
+            <Route path="/my-requests" element={<Navigate to="/marketplace/requests" replace />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   );
 }
