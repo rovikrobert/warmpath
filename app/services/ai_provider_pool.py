@@ -54,7 +54,7 @@ PROVIDER_CONFIGS = {
         "model": "gemini-2.0-flash",
         "key_attr": "GOOGLE_API_KEY",
         "max_concurrent_attr": "GOOGLE_MAX_CONCURRENT",
-        "max_tokens": 65536,
+        "max_tokens": 8192,
     },
     "anthropic": {
         "model": "claude-haiku-4-5-20251001",
