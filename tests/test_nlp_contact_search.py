@@ -763,6 +763,32 @@ def test_company_first_query_multiword_title():
 
 
 # ---------------------------------------------------------------------------
+# Industry / sector extraction
+# ---------------------------------------------------------------------------
+
+
+def test_industry_tech_extracted_from_in_clause():
+    result = parse_query_mock("people in tech")
+    assert "tech" in result.industries
+
+
+def test_industry_finance_extracted():
+    result = parse_query_mock("friends in finance")
+    assert "finance" in result.industries
+    assert "friend" in result.relationship_types
+
+
+def test_industry_consulting_extracted():
+    result = parse_query_mock("consultants in consulting")
+    assert "consulting" in result.industries
+
+
+def test_industry_startup_extracted():
+    result = parse_query_mock("startup people")
+    assert "startup" in result.industries
+
+
+# ---------------------------------------------------------------------------
 # Name fallback — when no structured criteria detected, search by name
 # ---------------------------------------------------------------------------
 
