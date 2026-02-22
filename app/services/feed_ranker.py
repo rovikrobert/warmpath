@@ -28,6 +28,8 @@ ALL_ITEM_TYPES = [
     "platform_activity",
     "network_insight",
     "follow_up_nudge",
+    "intro_approval_nudge",
+    "manual_send_reminder",
 ]
 
 # Minimum total interactions before we trust learned weights
