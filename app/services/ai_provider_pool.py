@@ -265,6 +265,23 @@ def get_enabled_providers(cfg: Any = None) -> list[CleaningProvider]:
     ]
 
 
+def warm_up_providers() -> None:
+    """Eagerly initialize all enabled provider clients.
+
+    Call once before dispatching batches so that slow client init
+    (e.g. Gemini Vertex AI writing SA temp file) doesn't eat into
+    per-batch timeouts.
+    """
+    for provider in get_enabled_providers():
+        try:
+            provider.get_client()
+            logger.info("Warmed up provider: %s", provider.name)
+        except Exception:
+            logger.warning(
+                "Failed to warm up provider: %s", provider.name, exc_info=True
+            )
+
+
 # ---------------------------------------------------------------------------
 # Dispatch algorithm
 # ---------------------------------------------------------------------------
