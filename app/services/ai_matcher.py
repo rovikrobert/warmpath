@@ -1,6 +1,6 @@
 """AI-powered referral matching service.
 
-Uses Groq (Llama 3.3 70B) to assess referral paths between a user's
+Uses Groq (GPT-OSS 20B) to assess referral paths between a user's
 contacts and target companies.  When AI_MOCK_MODE=true (default), returns
 deterministic scores based on company match, department alignment, and
 seniority heuristics — no API key required.
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 25  # contacts per API call (keep small to avoid response truncation)
 MAX_CONCURRENT_BATCHES = 10
-GROQ_SCORER_MODEL = "llama-3.3-70b-versatile"
+GROQ_SCORER_MODEL = "openai/gpt-oss-20b"
 
 
 # ---------------------------------------------------------------------------
@@ -519,7 +519,7 @@ async def _call_groq_api(
     profile: ConnectorProfile | None = None,
     user_name: str | None = None,
 ) -> tuple[list[ContactMatch], TokenUsage]:
-    """Call the Groq API (Llama 3.3 70B) with the referral-focused prompt.
+    """Call the Groq API (GPT-OSS 20B) with the referral-focused prompt.
 
     Retries once on rate limit (429) with exponential backoff.
     Falls back to mock scoring on persistent API failures.

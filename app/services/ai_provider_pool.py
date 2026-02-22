@@ -1,9 +1,10 @@
 """Multi-provider AI cleaning pool.
 
 Dispatches CSV cleaning batches across all configured AI providers
-(Gemini, Claude, OpenAI, Groq, DeepSeek) for maximum throughput.
-Each provider has its own rate limiter. The dispatcher tries providers
-round-robin with retry and falls back to mock cleaning.
+(Gemini 2.0 Flash, Claude Haiku, GPT-4o-mini, Groq Llama 3.3, DeepSeek)
+for maximum throughput. Each provider has its own rate limiter. The
+dispatcher tries providers in priority order with fast-fail retry and
+falls back to mock cleaning.
 """
 
 from __future__ import annotations
@@ -50,7 +51,7 @@ def _extract_contacts_array(parsed: Any) -> list[dict]:
 
 PROVIDER_CONFIGS = {
     "gemini": {
-        "model": "gemini-2.5-flash",
+        "model": "gemini-2.0-flash",
         "key_attr": "GOOGLE_API_KEY",
         "max_concurrent_attr": "GOOGLE_MAX_CONCURRENT",
         "max_tokens": 65536,
@@ -68,10 +69,10 @@ PROVIDER_CONFIGS = {
         "max_tokens": 16384,
     },
     "groq": {
-        "model": "llama-3.3-70b-versatile",
+        "model": "openai/gpt-oss-20b",
         "key_attr": "GROQ_API_KEY",
         "max_concurrent_attr": "GROQ_MAX_CONCURRENT",
-        "max_tokens": 16384,
+        "max_tokens": 65536,
     },
     "deepseek": {
         "model": "deepseek-chat",

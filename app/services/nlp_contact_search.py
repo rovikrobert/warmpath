@@ -6,7 +6,7 @@ seniority levels, locations, and relationship types.  Two modes:
 
 * **Mock mode** (``parse_query_mock``): regex / keyword extraction — fast,
   deterministic, no API key required.  Used when ``AI_MOCK_MODE=true``.
-* **Real mode** (``parse_query_real``): Groq API call (Llama 3.3 70B) that
+* **Real mode** (``parse_query_real``): Groq API call (Llama 3.1 8B) that
   returns a ``ParsedQuery``.  Falls back to mock on any error.
 
 Also provides ``score_contact()`` for weighted scoring of contacts against
@@ -583,11 +583,11 @@ alumni, industry_peer, friend, mentor, recruiter]
 Return ONLY the JSON object. No explanation, no markdown fences."""
 
 
-GROQ_NLP_MODEL = "llama-3.3-70b-versatile"
+GROQ_NLP_MODEL = "llama-3.1-8b-instant"
 
 
 def parse_query_real(query: str) -> ParsedQuery:
-    """Parse a query using the Groq API (Llama 3.3 70B), falling back to mock on error."""
+    """Parse a query using the Groq API (Llama 3.1 8B), falling back to mock on error."""
     try:
         import json as _json
 
