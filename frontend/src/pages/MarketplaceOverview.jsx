@@ -262,70 +262,150 @@ export default function MarketplaceOverview() {
         ) : (
           <div className="divide-y divide-slate-700/50">
             {/* Pending first */}
-            {pendingRequests.map((req) => (
-              <div key={req.id} className={`px-5 py-4 transition-all duration-150 ${decliningId === req.id ? 'animate-fade-out-up' : ''}`}>
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <StatusBadge status={req.status} />
-                      <span className="text-xs text-slate-400">
-                        {new Date(req.requested_at).toLocaleDateString()}
-                      </span>
-                    </div>
+            {pendingRequests.map((req) => {
+              const snapshot = req.job_seeker_profile_snapshot || {};
+              const relType = req.relationship_type ? req.relationship_type.replace(/_/g, ' ') : null;
+              const wouldReferColor = req.would_refer === 'definitely' ? 'text-emerald-400' : req.would_refer === 'probably' ? 'text-amber-400' : 'text-slate-400';
+              const requestTypeBadge = snapshot.request_type === 'specific_role'
+                ? <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">Specific role</span>
+                : snapshot.request_type === 'general_networking'
+                  ? <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-400">Networking</span>
+                  : null;
 
-                    {/* Job seeker profile snapshot */}
-                    <div className="mt-2 rounded-lg bg-blue-500/10 p-3">
-                      <p className="text-xs font-medium uppercase tracking-wider text-blue-400">Candidate</p>
-                      <p className="mt-1 text-sm font-medium text-slate-50">
-                        {req.job_seeker_profile_snapshot?.full_name || 'Anonymous'}
-                      </p>
-                      {req.job_seeker_profile_snapshot?.email && (
-                        <p className="text-xs text-slate-400">{req.job_seeker_profile_snapshot.email}</p>
-                      )}
-                      {req.job_seeker_profile_snapshot?.message && (
-                        <p className="mt-2 text-sm italic text-slate-400">
-                          "{req.job_seeker_profile_snapshot.message}"
+              return (
+                <div key={req.id} className={`px-5 py-4 transition-all duration-150 ${decliningId === req.id ? 'animate-fade-out-up' : ''}`}>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={req.status} />
+                        {requestTypeBadge}
+                        <span className="text-xs text-slate-400">
+                          {new Date(req.requested_at).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      {/* Candidate panel (enriched snapshot) */}
+                      <div className="mt-2 rounded-lg bg-blue-500/10 p-3">
+                        <p className="text-xs font-medium uppercase tracking-wider text-blue-400">Candidate</p>
+                        <p className="mt-1 text-sm font-medium text-slate-50">
+                          {snapshot.full_name || 'Anonymous'}
                         </p>
-                      )}
+                        {snapshot.headline && (
+                          <p className="text-xs text-slate-300">{snapshot.headline}</p>
+                        )}
+                        {(snapshot.current_title || snapshot.current_company) && (
+                          <p className="text-xs text-slate-400">
+                            {snapshot.current_title}{snapshot.current_company ? ` at ${snapshot.current_company}` : ''}
+                          </p>
+                        )}
+                        {snapshot.email && (
+                          <p className="text-xs text-slate-400">{snapshot.email}</p>
+                        )}
+                        {snapshot.work_history?.length > 0 && (
+                          <div className="mt-1.5">
+                            <p className="text-xs text-slate-500">Previously at</p>
+                            <p className="text-xs text-slate-400">
+                              {snapshot.work_history.slice(0, 3).map((w) => w.company).join(', ')}
+                            </p>
+                          </div>
+                        )}
+                        {snapshot.target_role && (
+                          <p className="mt-1 text-xs text-slate-400">Target: {snapshot.target_role}</p>
+                        )}
+                        {/* Profile links */}
+                        {(snapshot.github_url || snapshot.portfolio_url) && (
+                          <div className="mt-1.5 flex items-center gap-3">
+                            {snapshot.github_url && (
+                              <a href={snapshot.github_url} target="_blank" rel="noopener noreferrer" className="text-xs text-amber-400 hover:text-amber-300">GitHub</a>
+                            )}
+                            {snapshot.portfolio_url && (
+                              <a href={snapshot.portfolio_url} target="_blank" rel="noopener noreferrer" className="text-xs text-amber-400 hover:text-amber-300">Portfolio</a>
+                            )}
+                          </div>
+                        )}
+                        {/* Candidate blurb */}
+                        {snapshot.candidate_blurb && (
+                          <div className="mt-2 rounded-md border border-slate-700/50 bg-slate-800/50 p-2">
+                            <div className="mb-1 flex items-center justify-between">
+                              <p className="text-xs font-medium text-slate-500">Quick summary</p>
+                              <button
+                                type="button"
+                                onClick={() => navigator.clipboard.writeText(snapshot.candidate_blurb)}
+                                className="text-xs text-amber-400 hover:text-amber-300"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                            <p className="text-xs text-slate-300">{snapshot.candidate_blurb}</p>
+                          </div>
+                        )}
+                        {snapshot.message && (
+                          <p className="mt-2 text-sm italic text-slate-400">
+                            &ldquo;{snapshot.message}&rdquo;
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Contact panel with relationship context */}
+                      <div className="mt-2 rounded-lg bg-slate-800/50 p-3">
+                        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Your Contact</p>
+                        <p className="mt-1 text-sm font-medium text-slate-50">
+                          {req.contact_name || 'Unknown'}
+                          {req.contact_title && <span className="font-normal text-slate-400">, {req.contact_title}</span>}
+                        </p>
+                        {req.contact_company && (
+                          <p className="text-xs text-slate-400">at {req.contact_company}</p>
+                        )}
+                        {req.contact_email && (
+                          <p className="text-xs text-slate-500">{req.contact_email}</p>
+                        )}
+                        {/* Relationship context */}
+                        {(relType || req.would_refer || req.how_you_know) && (
+                          <div className="mt-2 space-y-1 border-t border-slate-700/50 pt-2">
+                            {relType && (
+                              <p className="text-xs text-slate-400">
+                                <span className="text-slate-500">Relationship:</span>{' '}
+                                <span className="capitalize">{relType}</span>
+                              </p>
+                            )}
+                            {req.would_refer && (
+                              <p className="text-xs text-slate-400">
+                                <span className="text-slate-500">Would refer:</span>{' '}
+                                <span className={wouldReferColor}>{req.would_refer}</span>
+                              </p>
+                            )}
+                            {req.how_you_know && (
+                              <p className="text-xs italic text-slate-500">
+                                &ldquo;{req.how_you_know}&rdquo;
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Listing + your contact info */}
-                    <div className="mt-2 rounded-lg bg-slate-800/50 p-3">
-                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Your Contact</p>
-                      <p className="mt-1 text-sm font-medium text-slate-50">
-                        {req.contact_name || 'Unknown'}
-                        {req.contact_title && <span className="font-normal text-slate-400">, {req.contact_title}</span>}
-                      </p>
-                      {req.contact_company && (
-                        <p className="text-xs text-slate-400">at {req.contact_company}</p>
-                      )}
-                      {req.contact_email && (
-                        <p className="text-xs text-slate-500">{req.contact_email}</p>
-                      )}
+                    <div className="flex shrink-0 flex-col gap-2">
+                      <button
+                        onClick={() => handleAction(req.id, 'approve')}
+                        disabled={actionLoading === req.id}
+                        aria-label={`Approve intro request from ${snapshot.full_name || 'candidate'}`}
+                        className="rounded-md bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-400 disabled:opacity-50"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleAction(req.id, 'decline')}
+                        disabled={actionLoading === req.id}
+                        aria-label={`Decline intro request from ${snapshot.full_name || 'candidate'}`}
+                        className="rounded-md border border-red-500/30 px-4 py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                      >
+                        Decline
+                      </button>
                     </div>
-                  </div>
-
-                  <div className="flex shrink-0 flex-col gap-2">
-                    <button
-                      onClick={() => handleAction(req.id, 'approve')}
-                      disabled={actionLoading === req.id}
-                      aria-label={`Approve intro request from ${req.job_seeker_profile_snapshot?.full_name || 'candidate'}`}
-                      className="rounded-md bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-400 disabled:opacity-50"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => handleAction(req.id, 'decline')}
-                      disabled={actionLoading === req.id}
-                      aria-label={`Decline intro request from ${req.job_seeker_profile_snapshot?.full_name || 'candidate'}`}
-                      className="rounded-md border border-red-500/30 px-4 py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-                    >
-                      Decline
-                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Past requests */}
             {pastRequests.map((req) => (

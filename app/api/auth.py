@@ -132,12 +132,23 @@ async def get_me(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Return the authenticated user's profile with capabilities."""
-    from app.services.capabilities import compute_user_capabilities
+    from app.services.capabilities import (
+        compute_profile_completeness,
+        compute_user_capabilities,
+    )
 
     caps = await compute_user_capabilities(current_user.id, db)
     response = UserResponse.model_validate(current_user).model_dump(mode="json")
     response["onboarding_complete"] = current_user.onboarding_completed_at is not None
     response["capabilities"] = caps.model_dump()
+
+    # Profile completeness
+    profile_result = await db.execute(
+        select(ConnectorProfile).where(ConnectorProfile.user_id == current_user.id)
+    )
+    profile = profile_result.scalar_one_or_none()
+    response["profile_completeness"] = compute_profile_completeness(profile)
+
     return {"data": response, "meta": {}}
 
 

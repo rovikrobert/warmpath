@@ -32,7 +32,8 @@ from app.models.marketplace import (
     MarketplaceListing,
     NetworkSharingPreferences,
 )
-from app.models.user import User
+from app.models.job import UserJobPreferences
+from app.models.user import ConnectorProfile, User
 from app.schemas.marketplace import (
     IntroFacilitationActionBody,
     IntroFacilitationHolderResponse,
@@ -161,19 +162,82 @@ async def _check_contact_in_vault(
     return False
 
 
-def _build_seeker_profile_snapshot(user: User, visibility: str) -> dict:
-    """Build a profile snapshot based on visibility level."""
+def _summarize_work_history(work_history: list) -> list[str]:
+    """Summarize work history entries as 'Company — Title (Start–End)' strings."""
+    lines = []
+    for entry in work_history:
+        company = entry.get("company", "Unknown")
+        title = entry.get("title", "Unknown")
+        start = entry.get("start_date", "?")
+        end = entry.get("end_date") or "Present"
+        lines.append(f"{company} — {title} ({start}–{end})")
+    return lines
+
+
+def _build_seeker_profile_snapshot(
+    user: User,
+    visibility: str,
+    profile: "ConnectorProfile | None" = None,
+    prefs: "UserJobPreferences | None" = None,
+    request_type: str = "specific_role",
+    job_title: str | None = None,
+    job_url: str | None = None,
+    job_description: str | None = None,
+    exploration_context: str | None = None,
+    message: str | None = None,
+) -> dict:
+    """Build a profile snapshot based on visibility level, enriched with profile and prefs."""
+    # 1. Visibility-based name/email
+    snapshot: dict = {}
     if visibility == "full":
-        return {
-            "full_name": user.full_name,
-            "email": user.email,
-        }
+        snapshot["full_name"] = user.full_name
+        snapshot["email"] = user.email
     elif visibility == "summary":
-        return {
-            "full_name": user.full_name,
-        }
-    else:  # minimal
-        return {}
+        snapshot["full_name"] = user.full_name
+
+    # 2. Enrich with ConnectorProfile fields
+    if profile:
+        for field in (
+            "headline",
+            "current_title",
+            "current_company",
+            "bio_summary",
+            "github_url",
+            "portfolio_url",
+        ):
+            value = getattr(profile, field, None)
+            if value:
+                snapshot[field] = value
+
+        # Work history summarized as list of strings
+        if profile.work_history:
+            snapshot["work_history_summary"] = _summarize_work_history(
+                profile.work_history
+            )
+
+    # 3. Enrich with UserJobPreferences
+    if prefs:
+        if prefs.target_role:
+            snapshot["target_role"] = prefs.target_role
+        if prefs.target_seniority:
+            snapshot["target_seniority"] = prefs.target_seniority
+
+    # 4. Request type + conditional context fields
+    snapshot["request_type"] = request_type
+    if job_title:
+        snapshot["job_title"] = job_title
+    if job_url:
+        snapshot["job_url"] = job_url
+    if job_description:
+        snapshot["job_description"] = job_description
+    if exploration_context:
+        snapshot["exploration_context"] = exploration_context
+
+    # 5. Message
+    if message:
+        snapshot["message"] = message
+
+    return snapshot
 
 
 # ---------------------------------------------------------------------------
@@ -336,10 +400,50 @@ async def request_intro(
             detail="Insufficient credits. You need 20 credits to request an intro.",
         )
 
+    # Load seeker's profile and job preferences for snapshot enrichment
+    profile_result = await db.execute(
+        select(ConnectorProfile).where(ConnectorProfile.user_id == current_user.id)
+    )
+    profile = profile_result.scalar_one_or_none()
+
+    prefs_result = await db.execute(
+        select(UserJobPreferences).where(UserJobPreferences.user_id == current_user.id)
+    )
+    prefs = prefs_result.scalar_one_or_none()
+
     # Build profile snapshot
-    snapshot = _build_seeker_profile_snapshot(current_user, body.profile_visibility)
-    if body.message_to_holder:
-        snapshot["message"] = body.message_to_holder
+    snapshot = _build_seeker_profile_snapshot(
+        user=current_user,
+        visibility=body.profile_visibility,
+        profile=profile,
+        prefs=prefs,
+        request_type=body.request_type,
+        job_title=body.job_title,
+        job_url=body.job_url,
+        job_description=body.job_description,
+        exploration_context=body.exploration_context,
+        message=body.message_to_holder,
+    )
+
+    # Generate candidate blurb for NH forwarding
+    from app.services.candidate_blurb import generate_candidate_blurb
+
+    contact_result = await db.execute(
+        select(Contact).where(Contact.id == listing.contact_id)
+    )
+    contact_for_blurb = contact_result.scalar_one_or_none()
+
+    if contact_for_blurb:
+        blurb = await generate_candidate_blurb(
+            profile=profile,
+            contact=contact_for_blurb,
+            prefs=prefs,
+            request_type=body.request_type,
+            job_title=body.job_title,
+            job_description=body.job_description,
+            exploration_context=body.exploration_context,
+        )
+        snapshot["candidate_blurb"] = blurb
 
     # Create facilitation record
     facilitation = IntroFacilitation(
@@ -515,6 +619,11 @@ async def incoming_requests(
                 resp["contact_email"] = contact.email
                 resp["contact_company"] = contact.current_company
 
+                # Relationship context for NH decision-making
+                resp["relationship_type"] = contact.relationship_type
+                resp["would_refer"] = contact.would_refer
+                resp["how_you_know"] = contact.how_you_know
+
         data.append(resp)
 
     return {"data": data, "meta": {"total": len(data)}}
@@ -579,6 +688,7 @@ async def update_facilitation(
             js_name = js_snapshot.get("full_name", "a professional")
             js_role = js_snapshot.get("headline", "")
             js_message = js_snapshot.get("message", "")
+            js_blurb = js_snapshot.get("candidate_blurb", "")
 
             intro_body = (
                 f"Hey {contact_first},\n\nI'd like to introduce you to {js_name}"
@@ -586,9 +696,13 @@ async def update_facilitation(
             if js_role:
                 intro_body += f", {js_role}"
             intro_body += "."
+            if js_blurb:
+                intro_body += f"\n\n{js_blurb}"
             if js_message:
                 intro_body += f"\n\n{js_message}"
-            intro_body += f"\n\nI think you two should connect — {js_name} is exploring opportunities and I thought of you."
+            intro_body += (
+                "\n\nI think you two should connect — happy to share more context."
+            )
 
             # Generate review token for public intro page (90-day TTL)
             review_token = secrets.token_urlsafe(32)
@@ -688,7 +802,10 @@ async def update_facilitation(
         drafted = f"Hey {contact_first}, I'd like to introduce you to {js_name}"
         if js_role:
             drafted += f", {js_role}"
-        drafted += ". I think you two should connect."
+        drafted += "."
+        js_blurb = js_snapshot.get("candidate_blurb", "")
+        if js_blurb:
+            drafted += f" {js_blurb}"
         resp_data["drafted_message"] = drafted
 
     return {

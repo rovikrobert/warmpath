@@ -51,7 +51,9 @@ export default function EditProfile() {
   const { user, logout } = useAuth();
   const [form, setForm] = useState({
     headline: '', current_company: '', current_title: '',
-    industry: '', location: '', linkedin_url: '', bio_summary: '',
+    industry: '', location: '', linkedin_url: '',
+    github_url: '', portfolio_url: '', personal_site_url: '',
+    bio_summary: '',
   });
   const [workHistory, setWorkHistory] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -107,6 +109,9 @@ export default function EditProfile() {
       industry: data.industry || prev.industry,
       location: data.location || prev.location,
       linkedin_url: prev.linkedin_url,
+      github_url: prev.github_url,
+      portfolio_url: prev.portfolio_url,
+      personal_site_url: prev.personal_site_url,
       bio_summary: data.bio_summary || prev.bio_summary,
     }));
     if (data.work_history?.length) {
@@ -147,6 +152,9 @@ export default function EditProfile() {
         industry: p.industry || '',
         location: p.location || '',
         linkedin_url: p.linkedin_url || '',
+        github_url: p.github_url || '',
+        portfolio_url: p.portfolio_url || '',
+        personal_site_url: p.personal_site_url || '',
         bio_summary: p.bio_summary || '',
       });
       if (p.work_history?.length) {
@@ -314,6 +322,21 @@ export default function EditProfile() {
         <div>
           <label htmlFor="profile-linkedin-url" className="mb-1 block text-sm font-medium text-slate-300">LinkedIn URL</label>
           <input id="profile-linkedin-url" type="url" value={form.linkedin_url} onChange={set('linkedin_url')} className={inputClass} placeholder="https://linkedin.com/in/yourname" />
+        </div>
+
+        <div>
+          <label htmlFor="profile-github-url" className="mb-1 block text-sm font-medium text-slate-300">GitHub</label>
+          <input id="profile-github-url" type="url" value={form.github_url} onChange={set('github_url')} className={inputClass} placeholder="https://github.com/yourname" />
+        </div>
+
+        <div>
+          <label htmlFor="profile-portfolio-url" className="mb-1 block text-sm font-medium text-slate-300">Portfolio</label>
+          <input id="profile-portfolio-url" type="url" value={form.portfolio_url} onChange={set('portfolio_url')} className={inputClass} placeholder="https://yourportfolio.dev" />
+        </div>
+
+        <div>
+          <label htmlFor="profile-personal-site-url" className="mb-1 block text-sm font-medium text-slate-300">Personal site</label>
+          <input id="profile-personal-site-url" type="url" value={form.personal_site_url} onChange={set('personal_site_url')} className={inputClass} placeholder="https://yoursite.com" />
         </div>
 
         <div>

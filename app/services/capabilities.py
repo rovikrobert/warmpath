@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,30 @@ from app.models.marketplace import IntroFacilitation, MarketplaceListing
 from app.models.search_request import SearchRequest
 from app.models.user import User
 from app.schemas.user import UserCapabilities
+
+if TYPE_CHECKING:
+    from app.models.user import ConnectorProfile
+
+
+def compute_profile_completeness(profile: "ConnectorProfile | None") -> dict:
+    """Compute profile completeness from ConnectorProfile fields."""
+    fields = [
+        "headline",
+        "current_title",
+        "current_company",
+        "industry",
+        "location",
+        "bio_summary",
+        "work_history",
+        "github_url",
+        "portfolio_url",
+    ]
+    if not profile:
+        return {"score": 0, "missing": fields, "total_fields": len(fields)}
+    filled = [f for f in fields if getattr(profile, f, None)]
+    missing = [f for f in fields if not getattr(profile, f, None)]
+    score = round(len(filled) / len(fields) * 100)
+    return {"score": score, "missing": missing, "total_fields": len(fields)}
 
 
 async def compute_user_capabilities(
