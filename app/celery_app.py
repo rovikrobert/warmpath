@@ -91,6 +91,11 @@ celery_app.conf.update(
             "task": "app.tasks.infra_tasks.redis_stream_janitor",
             "schedule": crontab(minute="*/30"),  # Every 30 minutes
         },
+        # --- Job cache warming (recommendations data) ---
+        "job-cache-warm": {
+            "task": "app.tasks.job_scan_tasks.warm_job_cache_global",
+            "schedule": crontab(hour="1,5,9,13,17,21", minute=0),  # Every 4 hours
+        },
     },
 )
 celery_app.conf.include = [
@@ -99,4 +104,5 @@ celery_app.conf.include = [
     "app.tasks.email_tasks",
     "app.tasks.feed_tasks",
     "app.tasks.infra_tasks",
+    "app.tasks.job_scan_tasks",
 ]
