@@ -37,22 +37,48 @@ class TestSEABoardRegistry:
             "aspire",
             "funding-societies",
             "carro",
+            "bytedance",
+            "tiktok",
+            "wise",
+            "revolut",
+            "propertyguru",
+            "circles-life",
+            "traveloka",
+            "goto",
+            "binance",
+            "crypto-com",
+            "govtech",
+            "dbs",
+            "ocbc",
+            "uob",
+            "standard-chartered",
+            "shopback",
+            "nium",
+            "monks-hill",
         ]
         for company in sea_companies:
             assert company in BOARD_REGISTRY, f"{company} missing from registry"
 
     def test_india_companies_present(self):
-        india_companies = ["razorpay", "zerodha", "cred", "meesho", "phonepe"]
+        india_companies = [
+            "razorpay",
+            "zerodha",
+            "cred",
+            "meesho",
+            "phonepe",
+            "flipkart",
+            "swiggy",
+        ]
         for company in india_companies:
             assert company in BOARD_REGISTRY, f"{company} missing from registry"
 
     def test_anz_companies_present(self):
-        anz_companies = ["canva", "atlassian", "afterpay"]
+        anz_companies = ["canva", "atlassian", "afterpay", "xero"]
         for company in anz_companies:
             assert company in BOARD_REGISTRY, f"{company} missing from registry"
 
     def test_total_company_count(self):
-        assert len(BOARD_REGISTRY) >= 52
+        assert len(BOARD_REGISTRY) >= 74
 
     def test_regions_cover_all_companies(self):
         all_in_regions = set()
