@@ -635,3 +635,76 @@ async def test_daily_time_series_shows_recent_data(user_and_db):
     assert day_entry["views"] >= 1
     assert day_entry["acts"] >= 1
     assert day_entry["engagement_score"] > 0
+
+
+# ---------------------------------------------------------------------------
+# POST /feed/dismiss-all — bulk dismiss
+# ---------------------------------------------------------------------------
+
+
+async def test_dismiss_all_clears_feed(client: AsyncClient):
+    """POST /feed/dismiss-all dismisses all items and returns count."""
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email="dismissall@test.com", full_name="Dismiss All"
+        )
+        now = datetime.now(timezone.utc)
+        for i in range(3):
+            db.add(
+                FeedItem(
+                    user_id=user.id,
+                    item_type="job_alert",
+                    priority=50,
+                    title=f"Job {i}",
+                    body=f"Body {i}",
+                    dedup_key=f"dismiss-all-{i}",
+                    created_at=now,
+                )
+            )
+        await db.commit()
+
+    resp = await client.post("/api/v1/feed/dismiss-all", headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["data"]["dismissed"] == 3
+
+    # Feed should now be empty
+    resp2 = await client.get("/api/v1/feed", headers=headers)
+    assert resp2.status_code == 200
+    assert len(resp2.json()["data"]) == 0
+
+
+async def test_dismiss_all_skips_already_dismissed(client: AsyncClient):
+    """Already dismissed items are not double-counted."""
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email="dismissskip@test.com", full_name="Skip Test"
+        )
+        now = datetime.now(timezone.utc)
+        db.add(
+            FeedItem(
+                user_id=user.id,
+                item_type="job_alert",
+                priority=50,
+                title="Already gone",
+                body="Body",
+                dedup_key="already-dismissed",
+                dismissed_at=now,
+                created_at=now,
+            )
+        )
+        db.add(
+            FeedItem(
+                user_id=user.id,
+                item_type="job_alert",
+                priority=50,
+                title="Still visible",
+                body="Body",
+                dedup_key="still-visible",
+                created_at=now,
+            )
+        )
+        await db.commit()
+
+    resp = await client.post("/api/v1/feed/dismiss-all", headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["data"]["dismissed"] == 1
