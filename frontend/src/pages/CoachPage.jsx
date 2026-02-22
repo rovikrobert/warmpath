@@ -223,23 +223,37 @@ export default function CoachPage() {
       {/* Feed section */}
       {feedItems.length > 0 && (
         <div className="flex-none border-b border-slate-700/50">
-          <button
-            type="button"
-            onClick={() => setFeedExpanded(!feedExpanded)}
-            className="flex w-full items-center justify-between px-4 py-2.5 text-left"
-          >
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between px-4 py-2.5">
+            <button
+              type="button"
+              onClick={() => setFeedExpanded(!feedExpanded)}
+              className="flex items-center gap-2 text-left"
+            >
               <KeevsAvatar size="sm" />
               <span className="text-sm font-medium text-amber-400">
                 {feedItems.filter((f) => !f.seen_at).length > 0
                   ? `${feedItems.filter((f) => !f.seen_at).length} new insights`
                   : 'Recent insights'}
               </span>
-            </div>
-            <svg className={`h-4 w-4 text-slate-500 transition-transform ${feedExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-            </svg>
-          </button>
+              <svg className={`h-4 w-4 text-slate-500 transition-transform ${feedExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await feedApi.dismissAll();
+                  setFeedItems([]);
+                  window.dispatchEvent(new Event('feed-updated'));
+                } catch { /* silent */ }
+              }}
+              className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              aria-label="Clear all notifications"
+            >
+              Clear all
+            </button>
+          </div>
           {feedExpanded && (
             <div className="space-y-2 px-4 pb-3">
               {feedItems.map((item) => (
