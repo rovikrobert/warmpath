@@ -155,6 +155,20 @@ _ABBREVIATION_MAP: dict[str, str] = {
     "tpm": "technical program manager",
 }
 
+# Pattern: <Capitalized word> <title keyword> — e.g. "Grab engineers", "Google PMs"
+_COMPANY_FIRST_TITLE_TRIGGERS = sorted(
+    {kw for kw in _TITLE_KEYWORDS} | set(_ABBREVIATION_MAP.keys()),
+    key=len,
+    reverse=True,
+)
+
+_COMPANY_FIRST_RE = re.compile(
+    r"^([A-Z][A-Za-z0-9&.\-]+)\s+(?:"
+    + "|".join(re.escape(kw) + r"s?" for kw in _COMPANY_FIRST_TITLE_TRIGGERS)
+    + r")\b",
+    re.IGNORECASE,
+)
+
 # ---------------------------------------------------------------------------
 # Location keywords (covers major tech hubs)
 # ---------------------------------------------------------------------------
@@ -296,6 +310,20 @@ def _extract_companies(query_lower: str, original_query: str) -> tuple[list[str]
             existing_lower = {c.lower() for c in companies}
             if company.lower() not in existing_lower:
                 companies.append(company)
+
+    # Company-first pattern: "Grab engineers", "Google PMs"
+    if not companies:
+        m = _COMPANY_FIRST_RE.search(original_query)
+        if m:
+            company_name = m.group(1).strip()
+            # Exclude seniority/title words masquerading as companies
+            if (
+                company_name.lower() not in {kw for kw in _TITLE_KEYWORDS}
+                and company_name.lower() not in _ABBREVIATION_MAP
+                and company_name.lower()
+                not in {"senior", "junior", "staff", "principal", "lead"}
+            ):
+                companies.append(company_name)
 
     return companies, q_lower
 
