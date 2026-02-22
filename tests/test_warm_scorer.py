@@ -603,3 +603,77 @@ async def test_single_contact_includes_warm_score(client: AsyncClient):
 async def test_compute_scores_requires_auth(client: AsyncClient):
     resp = await client.post("/api/v1/contacts/compute-scores")
     assert resp.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — warm_score_override schema validation
+# ---------------------------------------------------------------------------
+
+
+def test_contact_update_schema_accepts_warm_score_override():
+    from app.schemas.contact import ContactUpdate
+
+    update = ContactUpdate(warm_score_override=75.0)
+    assert update.warm_score_override == 75.0
+
+
+def test_contact_update_schema_accepts_null_warm_score_override():
+    from app.schemas.contact import ContactUpdate
+
+    update = ContactUpdate(warm_score_override=None)
+    assert update.warm_score_override is None
+
+
+def test_contact_update_schema_rejects_warm_score_override_above_100():
+    from app.schemas.contact import ContactUpdate
+    from pydantic import ValidationError
+    import pytest
+
+    with pytest.raises(ValidationError):
+        ContactUpdate(warm_score_override=150.0)
+
+
+def test_contact_update_schema_rejects_warm_score_override_below_0():
+    from app.schemas.contact import ContactUpdate
+    from pydantic import ValidationError
+    import pytest
+
+    with pytest.raises(ValidationError):
+        ContactUpdate(warm_score_override=-10.0)
+
+
+def test_compute_warm_score_uses_override_when_set():
+    """When contact has warm_score_override, compute_warm_score returns it directly."""
+    from unittest.mock import MagicMock
+    from app.services.warm_scorer import compute_warm_score
+
+    contact = MagicMock()
+    contact.warm_score_override = 90.0
+    contact.connected_on = None
+    contact.relationship_type = None
+    contact.current_title = None
+    contact.would_refer = None
+    contact.how_you_know = None
+    contact.last_interaction_date = None
+
+    result = compute_warm_score(contact, None, None)
+    assert result.total_score == 90.0
+
+
+def test_compute_warm_score_ignores_override_when_none():
+    """When contact has no override, compute_warm_score uses algorithmic score."""
+    from unittest.mock import MagicMock
+    from app.services.warm_scorer import compute_warm_score
+
+    contact = MagicMock()
+    contact.warm_score_override = None
+    contact.connected_on = None
+    contact.relationship_type = None
+    contact.current_title = None
+    contact.would_refer = None
+    contact.how_you_know = None
+    contact.last_interaction_date = None
+
+    result = compute_warm_score(contact, None, None)
+    # Should compute algorithmically (will be low since all fields are None)
+    assert result.total_score != 90.0

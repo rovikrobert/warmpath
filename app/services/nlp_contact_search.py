@@ -41,6 +41,7 @@ class ParsedQuery:
     seniority: list[str] = field(default_factory=list)
     locations: list[str] = field(default_factory=list)
     relationship_types: list[str] = field(default_factory=list)
+    industries: list[str] = field(default_factory=list)
     raw_query: str = ""
 
 
@@ -131,10 +132,43 @@ _TITLE_KEYWORDS: list[str] = [
     "infrastructure",
     "platform",
     "architect",
+    "engineering manager",
+    "technical program manager",
+    "artificial intelligence",
+    "quality assurance",
 ]
 
 # Sort longest-first so "software engineer" matches before "engineer"
 _TITLE_KEYWORDS.sort(key=len, reverse=True)
+
+_ABBREVIATION_MAP: dict[str, str] = {
+    "pm": "product manager",
+    "swe": "software engineer",
+    "sde": "software engineer",
+    "ml": "machine learning",
+    "ai": "artificial intelligence",
+    "qa": "quality assurance",
+    "ux": "designer",
+    "ui": "designer",
+    "ds": "data scientist",
+    "de": "data engineer",
+    "em": "engineering manager",
+    "tpm": "technical program manager",
+}
+
+# Pattern: <Capitalized word> <title keyword> — e.g. "Grab engineers", "Google PMs"
+_COMPANY_FIRST_TITLE_TRIGGERS = sorted(
+    {kw for kw in _TITLE_KEYWORDS} | set(_ABBREVIATION_MAP.keys()),
+    key=len,
+    reverse=True,
+)
+
+_COMPANY_FIRST_RE = re.compile(
+    r"^([A-Z][A-Za-z0-9&.\-]+)\s+(?:"
+    + "|".join(re.escape(kw) + r"s?" for kw in _COMPANY_FIRST_TITLE_TRIGGERS)
+    + r")\b",
+    re.IGNORECASE,
+)
 
 # ---------------------------------------------------------------------------
 # Location keywords (covers major tech hubs)
@@ -253,6 +287,94 @@ _RELATIONSHIP_ENTRIES: list[tuple[str, str]] = sorted(
     _RELATIONSHIP_MAP.items(), key=lambda kv: len(kv[0]), reverse=True
 )
 
+# ---------------------------------------------------------------------------
+# Industry / sector keywords
+# ---------------------------------------------------------------------------
+
+_INDUSTRY_KEYWORDS: dict[str, dict] = {
+    "tech": {
+        "company_patterns": [
+            "google",
+            "meta",
+            "apple",
+            "amazon",
+            "microsoft",
+            "netflix",
+            "stripe",
+            "shopify",
+            "databricks",
+            "cloudflare",
+            "vercel",
+        ],
+        "title_patterns": ["engineer", "developer", "devops", "sre", "architect"],
+    },
+    "finance": {
+        "company_patterns": [
+            "goldman",
+            "jpmorgan",
+            "morgan stanley",
+            "citibank",
+            "dbs",
+            "ocbc",
+            "hsbc",
+            "barclays",
+            "ubs",
+        ],
+        "title_patterns": ["analyst", "trader", "banker", "portfolio", "quant"],
+    },
+    "consulting": {
+        "company_patterns": [
+            "mckinsey",
+            "bain",
+            "bcg",
+            "deloitte",
+            "accenture",
+            "kpmg",
+            "ey",
+            "pwc",
+        ],
+        "title_patterns": ["consultant", "advisory", "strategy"],
+    },
+    "healthcare": {
+        "company_patterns": ["pfizer", "johnson", "roche", "novartis", "merck"],
+        "title_patterns": ["nurse", "doctor", "physician", "clinical", "pharma"],
+    },
+    "startup": {
+        "company_patterns": [],
+        "title_patterns": ["founder", "co-founder", "ceo", "cto"],
+    },
+    "ecommerce": {
+        "company_patterns": ["shopify", "amazon", "lazada", "shopee", "tokopedia"],
+        "title_patterns": ["merchant", "marketplace", "ecommerce"],
+    },
+    "media": {
+        "company_patterns": ["netflix", "disney", "spotify", "tiktok", "bytedance"],
+        "title_patterns": ["content", "editor", "producer", "journalist"],
+    },
+    "education": {
+        "company_patterns": ["coursera", "udemy", "duolingo"],
+        "title_patterns": ["teacher", "professor", "instructor", "educator"],
+    },
+    "gaming": {
+        "company_patterns": ["riot", "blizzard", "ea", "ubisoft", "valve"],
+        "title_patterns": ["game", "gaming"],
+    },
+    "crypto": {
+        "company_patterns": ["coinbase", "binance", "kraken", "opensea"],
+        "title_patterns": ["blockchain", "web3", "defi", "crypto"],
+    },
+}
+
+_INDUSTRY_EXTRACTION_RE = re.compile(
+    r"\b(?:in|from|at)\s+("
+    + "|".join(re.escape(k) for k in _INDUSTRY_KEYWORDS)
+    + r")\b"
+    r"|\b("
+    + "|".join(re.escape(k) for k in _INDUSTRY_KEYWORDS)
+    + r")\s+(?:people|folks|contacts|connections|friends)\b",
+    re.IGNORECASE,
+)
+
 
 # ---------------------------------------------------------------------------
 # Private extraction helpers (keep parse_query_mock complexity manageable)
@@ -277,6 +399,20 @@ def _extract_companies(query_lower: str, original_query: str) -> tuple[list[str]
             existing_lower = {c.lower() for c in companies}
             if company.lower() not in existing_lower:
                 companies.append(company)
+
+    # Company-first pattern: "Grab engineers", "Google PMs"
+    if not companies:
+        m = _COMPANY_FIRST_RE.search(original_query)
+        if m:
+            company_name = m.group(1).strip()
+            # Exclude seniority/title words masquerading as companies
+            if (
+                company_name.lower() not in {kw for kw in _TITLE_KEYWORDS}
+                and company_name.lower() not in _ABBREVIATION_MAP
+                and company_name.lower()
+                not in {"senior", "junior", "staff", "principal", "lead"}
+            ):
+                companies.append(company_name)
 
     return companies, q_lower
 
@@ -312,10 +448,20 @@ def _extract_seniority(query_lower: str) -> tuple[list[str], list[str]]:
 def _extract_titles(query_lower: str) -> list[str]:
     """Extract title keywords from the query using word-boundary matching."""
     titles: list[str] = []
+
+    # First pass: expand abbreviations into full title keywords
+    for abbr, full in _ABBREVIATION_MAP.items():
+        if (
+            re.search(r"\b" + re.escape(abbr) + r"s?\b", query_lower)
+            and full not in titles
+        ):
+            titles.append(full)
+
+    # Second pass: match known title keywords
     for kw in _TITLE_KEYWORDS:
-        # Word boundary + optional plural "s" to match "engineers" → "engineer"
         if re.search(r"\b" + re.escape(kw) + r"s?\b", query_lower) and kw not in titles:
             titles.append(kw)
+
     return titles
 
 
@@ -339,6 +485,16 @@ def _extract_relationship_types(query_lower: str) -> list[str]:
         if phrase in query_lower and enum_val not in relationship_types:
             relationship_types.append(enum_val)
     return relationship_types
+
+
+def _extract_industries(query_lower: str) -> list[str]:
+    """Extract industry/sector keywords from the query."""
+    industries: list[str] = []
+    for m in _INDUSTRY_EXTRACTION_RE.finditer(query_lower):
+        industry = (m.group(1) or m.group(2)).lower()
+        if industry in _INDUSTRY_KEYWORDS and industry not in industries:
+            industries.append(industry)
+    return industries
 
 
 # ---------------------------------------------------------------------------
@@ -367,6 +523,7 @@ def parse_query_mock(query: str) -> ParsedQuery:
             result.titles.append(t)
     result.locations = _extract_locations(q_lower)
     result.relationship_types = _extract_relationship_types(q_lower)
+    result.industries = _extract_industries(q_lower)
 
     return result
 
@@ -515,6 +672,25 @@ def _score_relationship(parsed: ParsedQuery, relationship_type: str | None) -> f
     return 0.0
 
 
+def _score_industry(
+    parsed: ParsedQuery, company_name: str | None, title: str | None
+) -> float:
+    """Score contact against industry criteria."""
+    if not parsed.industries:
+        return 0.0
+    company_lower = (company_name or "").lower()
+    title_lower = (title or "").lower()
+    for industry in parsed.industries:
+        spec = _INDUSTRY_KEYWORDS.get(industry, {})
+        for pattern in spec.get("company_patterns", []):
+            if pattern in company_lower:
+                return 100.0
+        for pattern in spec.get("title_patterns", []):
+            if pattern in title_lower:
+                return 60.0
+    return 0.0
+
+
 def score_contact(
     parsed: ParsedQuery,
     company_name: str | None,
@@ -546,6 +722,8 @@ def score_contact(
         criteria.append((0.20, loc_score))
     if parsed.relationship_types:
         criteria.append((0.10, _score_relationship(parsed, relationship_type)))
+    if parsed.industries:
+        criteria.append((0.15, _score_industry(parsed, company_name, title)))
 
     if not criteria:
         return 0.0
@@ -723,40 +901,78 @@ async def search_user_contacts(
             )
         total_matched = total_scanned
     else:
-        # Score and filter
-        scored: list[tuple] = []
-        resolved_ids_set = set(resolved_company_ids)
-        for contact, score_val in all_rows:
-            company_matched = (
-                contact.company_id is not None
-                and contact.company_id in resolved_ids_set
-            )
-            nlp_score = score_contact(
-                parsed,
-                contact.current_company,
-                contact.current_title,
-                contact.location,
-                contact.relationship_type,
-                company_matched,
-            )
-            if nlp_score >= 20:
-                scored.append((contact, score_val, nlp_score))
+        # Check if we have any structured criteria
+        has_criteria = (
+            parsed.titles
+            or parsed.companies
+            or parsed.seniority
+            or parsed.locations
+            or parsed.relationship_types
+            or parsed.industries
+        )
 
-        scored.sort(key=lambda r: r[2], reverse=True)
-        total_matched = len(scored)
-        results = []
-        for contact, score_val, nlp_score in scored[:limit]:
-            results.append(
-                {
-                    "full_name": contact.full_name,
-                    "current_company": contact.current_company,
-                    "current_title": contact.current_title,
-                    "warm_score": float(score_val) if score_val is not None else None,
-                    "nlp_match_score": round(nlp_score, 2),
-                    "relationship_type": contact.relationship_type,
-                    "location": contact.location,
-                }
-            )
+        if has_criteria:
+            # Score and filter using NLP criteria
+            scored: list[tuple] = []
+            resolved_ids_set = set(resolved_company_ids)
+            for contact, score_val in all_rows:
+                company_matched = (
+                    contact.company_id is not None
+                    and contact.company_id in resolved_ids_set
+                )
+                nlp_score = score_contact(
+                    parsed,
+                    contact.current_company,
+                    contact.current_title,
+                    contact.location,
+                    contact.relationship_type,
+                    company_matched,
+                )
+                if nlp_score >= 20:
+                    scored.append((contact, score_val, nlp_score))
+
+            scored.sort(key=lambda r: r[2], reverse=True)
+            total_matched = len(scored)
+            results = []
+            for contact, score_val, nlp_score in scored[:limit]:
+                results.append(
+                    {
+                        "full_name": contact.full_name,
+                        "current_company": contact.current_company,
+                        "current_title": contact.current_title,
+                        "warm_score": float(score_val)
+                        if score_val is not None
+                        else None,
+                        "nlp_match_score": round(nlp_score, 2),
+                        "relationship_type": contact.relationship_type,
+                        "location": contact.location,
+                    }
+                )
+        else:
+            # Name fallback: no structured criteria detected, search by name
+            name_query = query_text.strip().lower()
+            name_matches = [
+                (contact, score_val)
+                for contact, score_val in all_rows
+                if contact.full_name and name_query in contact.full_name.lower()
+            ]
+            name_matches.sort(key=lambda r: (r[1] is not None, r[1] or 0), reverse=True)
+            total_matched = len(name_matches)
+            results = []
+            for contact, score_val in name_matches[:limit]:
+                results.append(
+                    {
+                        "full_name": contact.full_name,
+                        "current_company": contact.current_company,
+                        "current_title": contact.current_title,
+                        "warm_score": float(score_val)
+                        if score_val is not None
+                        else None,
+                        "nlp_match_score": None,
+                        "relationship_type": contact.relationship_type,
+                        "location": contact.location,
+                    }
+                )
 
     interpretation = {
         "titles": parsed.titles,
@@ -764,8 +980,21 @@ async def search_user_contacts(
         "seniority": parsed.seniority,
         "locations": parsed.locations,
         "relationship_types": parsed.relationship_types,
+        "industries": parsed.industries,
         "raw_query": parsed.raw_query,
     }
+
+    # Signal name-based fallback to the frontend
+    has_any_criteria = (
+        parsed.titles
+        or parsed.companies
+        or parsed.seniority
+        or parsed.locations
+        or parsed.relationship_types
+        or parsed.industries
+    )
+    if not has_any_criteria and query_text.strip():
+        interpretation["name_search"] = query_text.strip()
 
     return {
         "results": results,

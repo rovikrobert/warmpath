@@ -440,3 +440,50 @@ async def test_upsert_profile_with_url_fields(client: AsyncClient):
     assert data["portfolio_url"] == "https://janedoe.dev"
     assert data["personal_site_url"] == "https://janedoe.com"
     assert data["current_title"] == "Engineer"
+
+
+async def test_onboarding_complete_seeds_feed_items(client: AsyncClient):
+    """POST /onboarding-complete triggers feed generation for the new user."""
+    from app.models.contact import Contact
+    from app.models.feed import FeedItem
+    from app.models.job import UserJobPreferences
+    from app.models.user import ConnectorProfile
+
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email="feedseed@test.com", full_name="Feed Seed"
+        )
+        user.intent = "find_referrals"
+        prefs = UserJobPreferences(
+            user_id=user.id,
+            target_role="Engineer",
+            target_industries=[],
+            target_locations=[],
+        )
+        db.add(prefs)
+        contact = Contact(
+            user_id=user.id,
+            full_name="Jane Doe",
+            first_name="Jane",
+            last_name="Doe",
+            current_company="Acme",
+            current_title="Engineer",
+        )
+        db.add(contact)
+        profile = ConnectorProfile(
+            user_id=user.id,
+            work_history=[{"company": "Acme", "title": "SWE"}],
+        )
+        db.add(profile)
+        await db.commit()
+
+    resp = await client.post("/api/v1/auth/onboarding-complete", headers=headers)
+    assert resp.status_code == 200
+
+    # Verify feed items were created
+    async with TestSessionLocal() as db:
+        from sqlalchemy import select
+
+        result = await db.execute(select(FeedItem).where(FeedItem.user_id == user.id))
+        items = result.scalars().all()
+        assert len(items) >= 1, "Feed items should be seeded after onboarding"

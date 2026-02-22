@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +13,6 @@ from app.models.job import JobOpening, UserJobPreferences
 from app.models.search_request import SearchRequest
 from app.models.user import User
 from app.services.board_registry import lookup_boards, lookup_or_discover_boards
-from app.services.career_page_fetcher import lookup_career_page
 from app.services.job_fetcher import JobFetcher
 from app.utils.security import get_current_user
 
@@ -90,14 +89,8 @@ async def scan_company_jobs(
     """Fetch live jobs for a company from Greenhouse/Lever, with auto-discovery and career page fallback."""
     boards, was_discovered = await lookup_or_discover_boards(company_name, db)
 
-    # If no ATS board and no career page, return 404
-    if boards is None and lookup_career_page(company_name) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No board registry or career page for '{company_name}'. "
-            "Use a known company name or register a board first.",
-        )
-
+    # Let fetch_jobs_for_company run the full fallback chain
+    # (ATS boards → career page → JobSpy → Adzuna) even if no board is known.
     jobs = await fetcher.fetch_jobs_for_company(company_name, boards)
 
     # Try to link to existing company record
@@ -109,6 +102,16 @@ async def scan_company_jobs(
 
     openings = await _upsert_openings(db, jobs, company_id=company_id)
     await db.commit()
+
+    # Determine how jobs were found
+    if boards and was_discovered:
+        discovery_status = "discovered"
+    elif boards:
+        discovery_status = "known"
+    elif openings:
+        discovery_status = "scraped"
+    else:
+        discovery_status = "no_listings"
 
     return {
         "data": [
@@ -124,7 +127,11 @@ async def scan_company_jobs(
             }
             for o in openings
         ],
-        "meta": {"company": company_name, "openings_count": len(openings)},
+        "meta": {
+            "company": company_name,
+            "openings_count": len(openings),
+            "discovery_status": discovery_status,
+        },
     }
 
 
@@ -219,9 +226,7 @@ async def scan_target_companies(
 
     for company_name in target_companies:
         boards = lookup_boards(company_name)
-        if boards is None and lookup_career_page(company_name) is None:
-            continue
-
+        # Let fetch_jobs_for_company run the full fallback chain for every target
         jobs = await fetcher.fetch_jobs_for_company(company_name, boards)
         companies_scanned += 1
         total_openings += len(jobs)

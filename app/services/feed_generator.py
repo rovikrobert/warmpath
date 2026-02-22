@@ -284,7 +284,7 @@ async def generate_outcome_checks(
         .where(
             Application.user_id == user_id,
             Application.deleted_at.is_(None),
-            Application.status.in_(["draft", "message_sent"]),
+            Application.status.in_(["draft", "message_sent", "applied"]),
             Application.updated_at <= stale_window,
         )
         .order_by(Application.updated_at.asc())

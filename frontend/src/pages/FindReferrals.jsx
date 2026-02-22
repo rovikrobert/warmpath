@@ -93,6 +93,7 @@ export default function FindReferrals() {
   const [loadingRecs, setLoadingRecs] = useState(false);
   const [recsStale, setRecsStale] = useState(false);
   const [companyCounts, setCompanyCounts] = useState({});
+  const [discoveryStatus, setDiscoveryStatus] = useState({});
 
   useEffect(() => {
     creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
@@ -147,6 +148,35 @@ export default function FindReferrals() {
     });
   }, [companies, companyCounts]);
 
+  // Discover jobs at newly added companies
+  useEffect(() => {
+    const undiscovered = companies.filter((c) => !(c in discoveryStatus));
+    if (undiscovered.length === 0) return;
+
+    undiscovered.forEach((name) => {
+      setDiscoveryStatus((prev) => ({ ...prev, [name]: { status: 'discovering' } }));
+      companiesApi
+        .discover(name)
+        .then((res) => {
+          const d = res.data ?? {};
+          setDiscoveryStatus((prev) => ({
+            ...prev,
+            [name]: {
+              status: d.jobs_found > 0 ? 'found' : 'not_found',
+              jobsCount: d.jobs_found ?? 0,
+              careersUrl: d.careers_url,
+            },
+          }));
+        })
+        .catch(() => {
+          setDiscoveryStatus((prev) => ({
+            ...prev,
+            [name]: { status: 'not_found', jobsCount: 0 },
+          }));
+        });
+    });
+  }, [companies, discoveryStatus]);
+
   // Computed values for scope toggle UI
   const companiesLoaded = companies.length > 0 && companies.every((c) => c in companyCounts);
   const totalOwnConnections = companies.reduce((sum, c) => sum + (companyCounts[c] ?? 0), 0);
@@ -179,8 +209,6 @@ export default function FindReferrals() {
       </p>
 
       <div className="mb-6 flex items-center gap-3 text-sm">
-        <Link to="/marketplace/browse" className="text-amber-400 hover:text-amber-300">Browse Marketplace</Link>
-        <span className="text-slate-600">&middot;</span>
         <Link to="/applications" className="text-slate-400 hover:text-slate-300">Track applications</Link>
         <span className="text-slate-600">&middot;</span>
         <Link to="/help/scores" className="text-slate-400 hover:text-slate-300">How scores work</Link>
@@ -204,25 +232,53 @@ export default function FindReferrals() {
           />
         </div>
 
-        {/* Connection count preview */}
+        {/* Connection count + discovery status preview */}
         {companies.length > 0 && (
-          <div className="space-y-1">
+          <div className="space-y-1" aria-live="polite">
             {companies.map((name) => {
               const count = companyCounts[name];
+              const discovery = discoveryStatus[name];
               return (
-                <p key={name} className="text-xs text-slate-500">
-                  <span className="text-slate-400">{name}</span>
-                  {' — '}
-                  {count === undefined ? (
-                    <span className="italic">checking...</span>
-                  ) : count > 0 ? (
-                    <span className="font-medium text-amber-400">
-                      {count} {count === 1 ? 'connection' : 'connections'} in your network
-                    </span>
-                  ) : (
-                    'no connections yet'
+                <div key={name} className="text-xs text-slate-500">
+                  <p>
+                    <span className="text-slate-400">{name}</span>
+                    {' — '}
+                    {count === undefined ? (
+                      <span className="italic">checking...</span>
+                    ) : count > 0 ? (
+                      <span className="font-medium text-amber-400">
+                        {count} {count === 1 ? 'connection' : 'connections'} in your network
+                      </span>
+                    ) : (
+                      'no connections yet'
+                    )}
+                  </p>
+                  {discovery && (
+                    <p className="ml-0">
+                      {discovery.status === 'discovering' && (
+                        <span className="italic text-slate-500">Discovering jobs at {name}...</span>
+                      )}
+                      {discovery.status === 'found' && (
+                        <span className="text-emerald-400">{discovery.jobsCount} job{discovery.jobsCount !== 1 ? 's' : ''} found</span>
+                      )}
+                      {discovery.status === 'not_found' && (
+                        <span className="text-slate-500">
+                          No listings found.{' '}
+                          {discovery.careersUrl && (
+                            <a
+                              href={discovery.careersUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-amber-400 hover:text-amber-300"
+                            >
+                              Try their careers page ↗
+                            </a>
+                          )}
+                        </span>
+                      )}
+                    </p>
                   )}
-                </p>
+                </div>
               );
             })}
           </div>

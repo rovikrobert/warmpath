@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     ADZUNA_APP_ID: str = ""
     ADZUNA_APP_KEY: str = ""
     JOBSPY_ENABLED: bool = True
-    JOBSPY_SEARCH_ALL_SITES: bool = False
+    JOBSPY_SEARCH_ALL_SITES: bool = True
     POSTHOG_API_KEY: str = ""
     POSTHOG_PROJECT_ID: str = ""
     POSTHOG_HOST: str = "https://app.posthog.com"

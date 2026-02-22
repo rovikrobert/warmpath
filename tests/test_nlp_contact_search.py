@@ -74,6 +74,52 @@ def test_software_engineer_title_extracted():
 
 
 # ---------------------------------------------------------------------------
+# Abbreviation expansion
+# ---------------------------------------------------------------------------
+
+
+def test_pm_abbreviation_expands_to_product_manager():
+    result = parse_query_mock("PMs at Stripe")
+    assert "product manager" in result.titles
+
+
+def test_swe_abbreviation_expands_to_software_engineer():
+    result = parse_query_mock("SWEs at Google")
+    assert "software engineer" in result.titles
+
+
+def test_sde_abbreviation_expands_to_software_engineer():
+    result = parse_query_mock("SDEs at Amazon")
+    assert "software engineer" in result.titles
+
+
+def test_ml_abbreviation_expands_to_machine_learning():
+    result = parse_query_mock("ML engineers at Meta")
+    assert "machine learning" in result.titles
+    assert "engineer" in result.titles
+
+
+def test_ds_abbreviation_expands_to_data_scientist():
+    result = parse_query_mock("DS at Stripe")
+    assert "data scientist" in result.titles
+
+
+def test_de_abbreviation_expands_to_data_engineer():
+    result = parse_query_mock("DE at Databricks")
+    assert "data engineer" in result.titles
+
+
+def test_tpm_abbreviation_expands_to_technical_program_manager():
+    result = parse_query_mock("TPMs at Google")
+    assert "technical program manager" in result.titles
+
+
+def test_em_abbreviation_expands_to_engineering_manager():
+    result = parse_query_mock("EMs at Stripe")
+    assert "engineering manager" in result.titles
+
+
+# ---------------------------------------------------------------------------
 # Location extraction
 # ---------------------------------------------------------------------------
 
@@ -685,3 +731,83 @@ async def test_search_user_contacts_empty_query_returns_all(
 
     assert result["total_matched"] == 4
     assert len(result["results"]) == 4
+
+
+# ---------------------------------------------------------------------------
+# Company-first query patterns (e.g. "Grab engineers", "Google PMs")
+# ---------------------------------------------------------------------------
+
+
+def test_company_first_query_extracts_company():
+    """'Grab engineers' should extract Grab as a company."""
+    from app.services.nlp_contact_search import parse_query_mock
+
+    result = parse_query_mock("Grab engineers")
+    assert "Grab" in result.companies
+    assert "engineer" in result.titles
+
+
+def test_company_first_query_with_known_company():
+    from app.services.nlp_contact_search import parse_query_mock
+
+    result = parse_query_mock("Google PMs")
+    assert "Google" in result.companies
+
+
+def test_company_first_query_multiword_title():
+    from app.services.nlp_contact_search import parse_query_mock
+
+    result = parse_query_mock("Stripe product managers")
+    assert "Stripe" in result.companies
+    assert "product manager" in result.titles
+
+
+# ---------------------------------------------------------------------------
+# Industry / sector extraction
+# ---------------------------------------------------------------------------
+
+
+def test_industry_tech_extracted_from_in_clause():
+    result = parse_query_mock("people in tech")
+    assert "tech" in result.industries
+
+
+def test_industry_finance_extracted():
+    result = parse_query_mock("friends in finance")
+    assert "finance" in result.industries
+    assert "friend" in result.relationship_types
+
+
+def test_industry_consulting_extracted():
+    result = parse_query_mock("consultants in consulting")
+    assert "consulting" in result.industries
+
+
+def test_industry_startup_extracted():
+    result = parse_query_mock("startup people")
+    assert "startup" in result.industries
+
+
+# ---------------------------------------------------------------------------
+# Name fallback — when no structured criteria detected, search by name
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_nlp_search_falls_back_to_name_match(
+    nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list
+):
+    """When query matches no structured criteria, search by contact name."""
+    resp = await nlp_client.post(
+        NLP_SEARCH_URL,
+        json={"query": "Alice"},
+        headers=nlp_auth_headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "data" in body
+    results = body["data"]
+    assert len(results) >= 1
+    assert any("Alice" in r["full_name"] for r in results)
+    # Check interpretation signals name search
+    assert body["meta"]["interpretation"].get("name_search") == "Alice"

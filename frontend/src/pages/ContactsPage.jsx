@@ -222,6 +222,10 @@ export default function ContactsPage() {
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState(null);
   const [toast, setToast] = useState(null);
+  // Bulk update state
+  const [bulkRelType, setBulkRelType] = useState('');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
 
   // Enrichment prompt feed items
   const [enrichmentPrompts, setEnrichmentPrompts] = useState([]);
@@ -257,6 +261,7 @@ export default function ContactsPage() {
     try {
       const res = await contactsApi.nlpSearch(query);
       setNlpResults(res.data || []);
+      setNlpInterpretation(res.meta?.interpretation || null);
     } catch (err) {
       setNlpError(err.message || 'NLP search failed');
       setNlpResults(null);
@@ -372,7 +377,45 @@ export default function ContactsPage() {
     }
   };
 
+  const handleBulkUpdate = async () => {
+    if (!bulkRelType) return;
+    setBulkUpdating(true);
+    setBulkConfirm(false);
+    try {
+      let body = { relationship_type: bulkRelType };
+      if (nlpResults) {
+        // NLP mode: send explicit IDs
+        body.contact_ids = nlpResults.map((c) => c.id);
+      } else {
+        // Regular filter/search mode: send filter object
+        body.filter = {};
+        if (debouncedSearch) body.filter.search = debouncedSearch;
+        if (filter) body.filter.relationship_type = filter;
+      }
+      const res = await contactsApi.bulkUpdate(body);
+      const count = res.data?.updated_count || 0;
+      const label = RELATIONSHIP_TYPES.find((r) => r.value === bulkRelType)?.label || bulkRelType;
+      setToast(`Updated ${count} contact${count !== 1 ? 's' : ''} to ${label}`);
+      setTimeout(() => setToast(null), 3000);
+      setBulkRelType('');
+      // Refresh contact list
+      if (nlpResults) {
+        handleNlpSearch();
+      } else {
+        load();
+      }
+    } catch (err) {
+      setToast(err.message || 'Bulk update failed');
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
   const totalPages = meta.total_pages || Math.ceil((meta.total || contactsList.length) / 50);
+
+  const isFiltered = !!(debouncedSearch || filter || nlpResults);
+  const bulkTotal = nlpResults ? nlpResults.length : (meta.total || 0);
 
   const unclassifiedShowSet = useMemo(() => {
     const ids = new Set();
@@ -579,28 +622,128 @@ export default function ContactsPage() {
         )}
       </div>
 
+      {/* Bulk update bar */}
+      {isFiltered && bulkTotal > 0 && !loading && !nlpLoading && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-2.5">
+          <span className="text-sm text-slate-300">
+            {bulkTotal} contact{bulkTotal !== 1 ? 's' : ''} matched
+          </span>
+          <span className="text-slate-600">&middot;</span>
+          <label htmlFor="bulk-rel-type" className="text-sm text-slate-400">Bulk update:</label>
+          <select
+            id="bulk-rel-type"
+            value={bulkRelType}
+            onChange={(e) => setBulkRelType(e.target.value)}
+            className="rounded-md border border-slate-700/50 bg-slate-800 px-2 py-1 text-sm text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            <option value="">Relationship type...</option>
+            {RELATIONSHIP_TYPES.filter((r) => r.value).map((r) => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+          {!bulkConfirm ? (
+            <button
+              onClick={() => setBulkConfirm(true)}
+              disabled={!bulkRelType || bulkUpdating}
+              className="rounded-md bg-amber-500 px-3 py-1 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50"
+            >
+              Apply
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-amber-400">
+                Update {bulkTotal} contact{bulkTotal !== 1 ? 's' : ''} to {RELATIONSHIP_TYPES.find((r) => r.value === bulkRelType)?.label}?
+              </span>
+              <button
+                onClick={handleBulkUpdate}
+                disabled={bulkUpdating}
+                className="rounded-md bg-amber-500 px-3 py-1 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50"
+              >
+                {bulkUpdating ? 'Updating...' : 'Confirm'}
+              </button>
+              <button
+                onClick={() => setBulkConfirm(false)}
+                className="text-xs text-slate-500 hover:text-slate-400"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* NLP search result summary */}
       {nlpResults && (
-        <div className={`mb-4 flex items-center gap-3 transition-opacity duration-200 ${nlpFadingOut ? 'opacity-0' : 'opacity-100'}`}>
-          <span className="text-sm text-slate-400">
-            {(() => {
-              const best = nlpResults.filter((r) => (r.nlp_match_score ?? 0) >= 65).length;
-              const possible = nlpResults.filter((r) => (r.nlp_match_score ?? 0) >= 35 && (r.nlp_match_score ?? 0) < 65).length;
-              const parts = [];
-              if (best) parts.push(`${best} best ${best === 1 ? 'match' : 'matches'}`);
-              if (possible) parts.push(`${possible} possible`);
-              const rest = nlpResults.length - best - possible;
-              if (rest) parts.push(`${rest} partial`);
-              return parts.join(', ') || `${nlpResults.length} matches`;
-            })()}
-          </span>
-          <button
-            onClick={clearNlpSearch}
-            aria-label="Clear AI search and return to normal contact list"
-            className="text-xs text-slate-500 hover:text-slate-400"
-          >
-            Clear AI search &times;
-          </button>
+        <div className={`mb-4 space-y-2 transition-opacity duration-200 ${nlpFadingOut ? 'opacity-0' : 'opacity-100'}`}>
+          {/* Interpretation chips */}
+          {nlpInterpretation && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-slate-500">Searching for:</span>
+              {nlpInterpretation.titles?.map((t) => (
+                <span key={`t-${t}`} className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400">
+                  {t}
+                </span>
+              ))}
+              {nlpInterpretation.companies?.map((c) => (
+                <span key={`c-${c}`} className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
+                  at {c}
+                </span>
+              ))}
+              {nlpInterpretation.locations?.map((l) => (
+                <span key={`l-${l}`} className="inline-flex items-center rounded-full bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-400">
+                  in {l}
+                </span>
+              ))}
+              {nlpInterpretation.seniority?.map((s) => (
+                <span key={`s-${s}`} className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">
+                  {s.replace(/_/g, ' ')}
+                </span>
+              ))}
+              {nlpInterpretation.relationship_types?.map((r) => (
+                <span key={`r-${r}`} className="inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs font-medium text-cyan-400">
+                  {r.replace(/_/g, ' ')}
+                </span>
+              ))}
+              {nlpInterpretation.industries?.map((ind) => (
+                <span key={`i-${ind}`} className="inline-flex items-center rounded-full bg-rose-500/10 px-2 py-0.5 text-xs font-medium text-rose-400">
+                  {ind}
+                </span>
+              ))}
+              {nlpInterpretation?.name_search && (
+                <span className="inline-flex items-center rounded-full bg-slate-700/50 px-2 py-0.5 text-xs font-medium text-slate-300">
+                  name: {nlpInterpretation.name_search}
+                </span>
+              )}
+            </div>
+          )}
+          {nlpInterpretation && !nlpInterpretation.titles?.length && !nlpInterpretation.companies?.length && !nlpInterpretation.locations?.length && !nlpInterpretation.seniority?.length && !nlpInterpretation.relationship_types?.length && (
+            <p className="text-xs text-slate-500">
+              No criteria detected — try: &ldquo;engineers at [company name]&rdquo;
+            </p>
+          )}
+
+          {/* Existing result count + clear button */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-slate-400">
+              {(() => {
+                const best = nlpResults.filter((r) => (r.nlp_match_score ?? 0) >= 65).length;
+                const possible = nlpResults.filter((r) => (r.nlp_match_score ?? 0) >= 35 && (r.nlp_match_score ?? 0) < 65).length;
+                const parts = [];
+                if (best) parts.push(`${best} best ${best === 1 ? 'match' : 'matches'}`);
+                if (possible) parts.push(`${possible} possible`);
+                const rest = nlpResults.length - best - possible;
+                if (rest) parts.push(`${rest} partial`);
+                return parts.join(', ') || `${nlpResults.length} matches`;
+              })()}
+            </span>
+            <button
+              onClick={clearNlpSearch}
+              aria-label="Clear AI search and return to normal contact list"
+              className="text-xs text-slate-500 hover:text-slate-400"
+            >
+              Clear AI search &times;
+            </button>
+          </div>
         </div>
       )}
 
@@ -707,10 +850,10 @@ export default function ContactsPage() {
                                 <>
                                   <MatchBadge score={c.warm_score} type="warm" />
                                   <ScoreExplainer
-                                    title="Warm Score"
+                                    title="Connection Score"
                                     body="How strong your connection is. Higher means they're more likely to respond to your request."
                                     tiers={WARM_TIERS}
-                                    learnMoreHref="/help/scores#warm-score"
+                                    learnMoreHref="/help/scores#connection-score"
                                   />
                                 </>
                               )}
@@ -814,10 +957,10 @@ export default function ContactsPage() {
                     )}
                     {score >= 40 && (
                       <ScoreExplainer
-                        title="Warm Score"
+                        title="Connection Score"
                         body="How strong your connection is. Higher means they're more likely to respond to your request."
                         tiers={WARM_TIERS}
-                        learnMoreHref="/help/scores#warm-score"
+                        learnMoreHref="/help/scores#connection-score"
                       />
                     )}
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-slate-500" aria-hidden="true">
@@ -882,7 +1025,7 @@ export default function ContactsPage() {
       </SlideOver>
 
       {toast && (
-        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-red-500/90 px-4 py-2 text-sm font-medium text-white shadow-lg lg:bottom-8" role="alert" aria-live="polite">
+        <div className={`fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-lg lg:bottom-8 ${toast.startsWith('Updated') ? 'bg-emerald-500/90' : 'bg-red-500/90'}`} role="alert" aria-live="polite">
           {toast}
         </div>
       )}
