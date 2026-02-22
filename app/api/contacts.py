@@ -16,6 +16,7 @@ from app.models.contact import Contact, CsvUpload
 from app.models.match_result import WarmScore
 from app.models.user import User
 from app.schemas.contact import (
+    BulkContactUpdate,
     ContactResponse,
     ContactUpdate,
     CsvUploadResponse,
@@ -301,6 +302,87 @@ async def nlp_search(
             "total_scanned": search_result["total_scanned"],
             "total_matched": search_result["total_matched"],
         },
+    }
+
+
+@router.patch("/bulk-update")
+@timed("contacts_bulk_update")
+async def bulk_update_contacts(
+    body: BulkContactUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Bulk update relationship_type for contacts by IDs or filter."""
+    from app.utils.tracking import track_action
+
+    if body.contact_ids:
+        # Mode 1: explicit contact IDs
+        result = await db.execute(
+            select(Contact).where(
+                Contact.user_id == current_user.id,
+                Contact.id.in_(body.contact_ids),
+                Contact.deleted_at.is_(None),
+            )
+        )
+        contacts_to_update = result.scalars().all()
+    else:
+        # Mode 2: filter-based
+        f = body.filter
+        query = select(Contact).where(
+            Contact.user_id == current_user.id,
+            Contact.deleted_at.is_(None),
+        )
+        if f.relationship_type:
+            query = query.where(Contact.relationship_type == f.relationship_type)
+        if f.source:
+            query = query.where(Contact.source == f.source)
+
+        result = await db.execute(query)
+        contacts_to_update = list(result.scalars().all())
+
+        # Apply in-memory search filter (encrypted columns)
+        if f.search:
+            s = f.search.lower()
+            contacts_to_update = [
+                c
+                for c in contacts_to_update
+                if s in (c.full_name or "").lower()
+                or s in (c.current_company or "").lower()
+                or s in (c.current_title or "").lower()
+                or s in (c.email or "").lower()
+            ]
+
+    if not contacts_to_update:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No contacts match the provided filter",
+        )
+
+    # Apply update
+    for contact in contacts_to_update:
+        contact.relationship_type = body.relationship_type
+
+    updated_count = len(contacts_to_update)
+    await db.flush()
+
+    # Recompute warm scores (relationship_type is 30% of score weight)
+    await batch_compute_scores(current_user.id, db)
+
+    await track_action(
+        db,
+        current_user.id,
+        "bulk_update_contacts",
+        metadata_={
+            "field": "relationship_type",
+            "value": body.relationship_type,
+            "count": updated_count,
+        },
+    )
+    await db.commit()
+
+    return {
+        "data": {"updated_count": updated_count},
+        "meta": {},
     }
 
 
