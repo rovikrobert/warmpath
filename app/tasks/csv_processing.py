@@ -249,6 +249,8 @@ async def process_csv_upload_core(
                     existing.last_interaction_date = row["last_interaction_date"]
                 if row.get("location"):
                     existing.location = row["location"]
+                if row.get("phone"):
+                    existing.phone = row["phone"]
                 # Update blind indexes
                 if email_bi:
                     existing.email_blind_index = email_bi
@@ -275,6 +277,7 @@ async def process_csv_upload_core(
                     how_you_know=row.get("how_you_know"),
                     last_interaction_date=row.get("last_interaction_date"),
                     location=row.get("location") or None,
+                    phone=row.get("phone"),
                     email_blind_index=email_bi,
                     name_company_blind_index=name_co_bi,
                 )

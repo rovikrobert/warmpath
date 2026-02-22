@@ -38,6 +38,11 @@ COLUMN_ALIASES: dict[str, str] = {
     "url": "linkedin_url",
     "profile url": "linkedin_url",
     "linkedin url": "linkedin_url",
+    # phone
+    "phone": "phone",
+    "phone number": "phone",
+    "mobile": "phone",
+    "mobile phone": "phone",
 }
 
 # Simplified manual CSV format aliases
@@ -63,6 +68,9 @@ MANUAL_CSV_ALIASES: dict[str, str] = {
     "email address": "email",
     "location": "location",
     "phone": "phone",
+    "phone number": "phone",
+    "mobile": "phone",
+    "mobile phone": "phone",
 }
 
 _RECRUITER_PATTERN = re.compile(
@@ -109,6 +117,17 @@ def _clean(value: str | None) -> str | None:
     if not value or not value.strip():
         return None
     return sanitize_cell(value.strip())
+
+
+def _clean_phone(value: str | None) -> str | None:
+    """Clean a phone number value without formula sanitization.
+
+    Phone numbers legitimately start with '+' (international prefix),
+    so we skip the sanitize_cell step that would escape it.
+    """
+    if not value or not value.strip():
+        return None
+    return value.strip()
 
 
 def _parse_connected_on(value: str | None) -> date | None:
@@ -283,6 +302,7 @@ def parse_manual_csv(raw_bytes: bytes) -> list[dict]:
         how_you_know = _clean(mapped.get("how_you_know"))
         last_contact_date = _parse_connected_on(mapped.get("last_contact_date"))
         location = _clean(mapped.get("location"))
+        phone = _clean_phone(mapped.get("phone"))
         fingerprint = generate_fingerprint(full_name, company, None)
 
         contacts.append(
@@ -300,6 +320,7 @@ def parse_manual_csv(raw_bytes: bytes) -> list[dict]:
                 "relationship_type": relationship_type,
                 "how_you_know": how_you_know,
                 "location": location,
+                "phone": phone,
                 "source": "manual",
                 "raw_csv_row": dict(row),
             }
@@ -388,6 +409,7 @@ def parse_linkedin_csv(raw_bytes: bytes) -> list[dict]:
         email = _clean(mapped.get("email"))
         linkedin_url = _clean(mapped.get("linkedin_url"))
         connected_on = _parse_connected_on(mapped.get("connected_on"))
+        phone = _clean_phone(mapped.get("phone"))
         fingerprint = generate_fingerprint(full_name, company, linkedin_url)
 
         contacts.append(
@@ -401,6 +423,7 @@ def parse_linkedin_csv(raw_bytes: bytes) -> list[dict]:
                 "connected_on": connected_on,
                 "linkedin_url": linkedin_url,
                 "fingerprint": fingerprint,
+                "phone": phone,
                 "raw_csv_row": dict(row),
             }
         )
