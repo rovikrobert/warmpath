@@ -1,6 +1,5 @@
 """Tests for bulk contact relationship type update."""
 
-
 import pytest
 from httpx import AsyncClient
 
