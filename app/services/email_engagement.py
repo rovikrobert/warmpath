@@ -936,3 +936,93 @@ async def send_smart_digest_email(user_id: uuid.UUID, db: AsyncSession) -> bool:
     )
     await _record_send(db, user_id, "smart_digest", external_id=eid)
     return True
+
+
+# ---------------------------------------------------------------------------
+# Intro relay email (sent to contact on NH approval)
+# ---------------------------------------------------------------------------
+
+
+async def _already_sent_relay(db: AsyncSession, facilitation_id: uuid.UUID) -> bool:
+    """Check if an intro_relay email was already sent for this facilitation.
+
+    Unlike the per-user _already_sent(), relay dedup is global and keyed by
+    facilitation_id (stored in external_id) — one relay per facilitation, ever.
+    """
+    result = await db.execute(
+        select(EmailCampaignLog.id).where(
+            EmailCampaignLog.email_type == "intro_relay",
+            EmailCampaignLog.external_id == str(facilitation_id),
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def send_intro_relay_email(
+    to_email: str,
+    nh_name: str,
+    nh_email: str,
+    job_seeker_name: str,
+    job_seeker_role: str,
+    target_company: str,
+    intro_message: str,
+    nh_referral_code: str,
+    db: AsyncSession,
+    facilitation_id: uuid.UUID,
+) -> str | None:
+    """Send the intro relay email to a contact when the NH approves.
+
+    Appears as sent from the network holder (via WarmPath) with reply-to
+    pointing to the NH's real email so the contact can reply directly.
+
+    Returns the Resend message ID or None if skipped/failed.
+    """
+    # Dedup — one relay per facilitation
+    if await _already_sent_relay(db, facilitation_id):
+        logger.info(
+            "intro_relay: already sent for facilitation %s, skipping", facilitation_id
+        )
+        return None
+
+    from_addr = f"{nh_name} via WarmPath <intro@majiq.agency>"
+    subject = f"Introduction: {job_seeker_name} — {job_seeker_role} at {target_company}"
+
+    html = f"""\
+<div lang="en" dir="ltr" style="{_base_style()}">
+  {_preheader_html(f"{nh_name} is introducing {job_seeker_name} for a role at {target_company}")}
+  <div style="padding: 24px;">
+    {intro_message}
+  </div>
+  <div style="margin: 24px 0 0; padding: 16px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280;">
+    <p style="margin: 0 0 12px;">Reply STOP to opt out of future introductions</p>
+    <p style="margin: 0;">
+      {nh_name} sent this introduction via WarmPath.
+      Have connections that could help someone land their next role?
+      <a href="{APP_URL}/join?ref={nh_referral_code}" style="color: #f59e0b; text-decoration: none; font-weight: 600;">Share your network &rarr;</a>
+    </p>
+  </div>
+</div>"""
+
+    eid = _send_email(
+        to_email,
+        subject,
+        html,
+        reply_to=nh_email,
+        from_email=from_addr,
+    )
+
+    # Record send with facilitation_id as external_id for dedup
+    # Use a deterministic "system" UUID namespace for relay emails
+    # (contacts aren't users, but EmailCampaignLog requires user_id)
+    system_user_id = uuid.UUID("00000000-0000-0000-0000-000000000000")
+    await _record_send(
+        db, system_user_id, "intro_relay", external_id=str(facilitation_id)
+    )
+
+    logger.info(
+        "intro_relay: sent to %s for facilitation %s (resend_id=%s)",
+        to_email,
+        facilitation_id,
+        eid,
+    )
+    return eid

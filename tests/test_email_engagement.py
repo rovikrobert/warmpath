@@ -657,3 +657,165 @@ def test_celery_tasks_importable() -> None:
 
     assert callable(send_csv_reminder_d1)
     assert callable(send_weekly_digest)
+
+
+# ---------------------------------------------------------------------------
+# Intro relay email tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@patch("app.services.email_engagement._send_email")
+async def test_intro_relay_email_sends_with_correct_from_and_reply_to(
+    mock_send: object, db: AsyncSession
+) -> None:
+    """Intro relay email uses NH name in from and NH email as reply-to."""
+    from app.services.email_engagement import send_intro_relay_email
+
+    mock_send.return_value = "resend-msg-123"
+
+    facilitation_id = uuid.uuid4()
+    eid = await send_intro_relay_email(
+        to_email="contact@example.com",
+        nh_name="Alice Wong",
+        nh_email="alice@company.com",
+        job_seeker_name="Bob Smith",
+        job_seeker_role="Senior Engineer",
+        target_company="Stripe",
+        intro_message="<p>Hi, I'd like to introduce Bob...</p>",
+        nh_referral_code="ALICE123",
+        db=db,
+        facilitation_id=facilitation_id,
+    )
+
+    assert eid == "resend-msg-123"
+    mock_send.assert_called_once()
+
+    # Verify positional args: to, subject, html
+    call_args = mock_send.call_args
+    assert call_args[0][0] == "contact@example.com"
+    assert "Introduction: Bob Smith" in call_args[0][1]
+    assert "Senior Engineer at Stripe" in call_args[0][1]
+
+    # Verify keyword args: reply_to and from_email
+    assert call_args[1]["reply_to"] == "alice@company.com"
+    assert "Alice Wong via WarmPath" in call_args[1]["from_email"]
+    assert "intro@majiq.agency" in call_args[1]["from_email"]
+
+
+@pytest.mark.asyncio
+@patch("app.services.email_engagement._send_email")
+async def test_intro_relay_email_html_contains_stop_opt_out(
+    mock_send: object, db: AsyncSession
+) -> None:
+    """Relay email HTML must contain the STOP opt-out text."""
+    from app.services.email_engagement import send_intro_relay_email
+
+    mock_send.return_value = "msg-1"
+
+    await send_intro_relay_email(
+        to_email="contact@example.com",
+        nh_name="Alice Wong",
+        nh_email="alice@company.com",
+        job_seeker_name="Bob Smith",
+        job_seeker_role="Senior Engineer",
+        target_company="Stripe",
+        intro_message="<p>Hello there</p>",
+        nh_referral_code="ALICE123",
+        db=db,
+        facilitation_id=uuid.uuid4(),
+    )
+
+    html = mock_send.call_args[0][2]
+    assert "STOP" in html
+    assert "opt out" in html.lower()
+
+
+@pytest.mark.asyncio
+@patch("app.services.email_engagement._send_email")
+async def test_intro_relay_email_html_contains_share_network_cta(
+    mock_send: object, db: AsyncSession
+) -> None:
+    """Relay email footer should recruit new NHs with referral link."""
+    from app.services.email_engagement import send_intro_relay_email
+
+    mock_send.return_value = "msg-2"
+
+    await send_intro_relay_email(
+        to_email="contact@example.com",
+        nh_name="Alice Wong",
+        nh_email="alice@company.com",
+        job_seeker_name="Bob Smith",
+        job_seeker_role="Senior Engineer",
+        target_company="Stripe",
+        intro_message="<p>Hello there</p>",
+        nh_referral_code="ALICE123",
+        db=db,
+        facilitation_id=uuid.uuid4(),
+    )
+
+    html = mock_send.call_args[0][2]
+    assert "Share your network" in html
+    assert "/join?ref=ALICE123" in html
+
+
+@pytest.mark.asyncio
+@patch("app.services.email_engagement._send_email")
+async def test_intro_relay_email_html_contains_intro_message_body(
+    mock_send: object, db: AsyncSession
+) -> None:
+    """The AI-drafted intro message should appear in the email body."""
+    from app.services.email_engagement import send_intro_relay_email
+
+    mock_send.return_value = "msg-3"
+
+    intro_text = "<p>Hi, Bob is a great engineer with 7 years of experience.</p>"
+    await send_intro_relay_email(
+        to_email="contact@example.com",
+        nh_name="Alice Wong",
+        nh_email="alice@company.com",
+        job_seeker_name="Bob Smith",
+        job_seeker_role="Senior Engineer",
+        target_company="Stripe",
+        intro_message=intro_text,
+        nh_referral_code="ALICE123",
+        db=db,
+        facilitation_id=uuid.uuid4(),
+    )
+
+    html = mock_send.call_args[0][2]
+    assert intro_text in html
+
+
+@pytest.mark.asyncio
+@patch("app.services.email_engagement._send_email")
+async def test_intro_relay_email_dedup_prevents_duplicate_send(
+    mock_send: object, db: AsyncSession
+) -> None:
+    """Second send for the same facilitation_id should be skipped."""
+    from app.services.email_engagement import send_intro_relay_email
+
+    mock_send.return_value = "msg-first"
+    facilitation_id = uuid.uuid4()
+
+    kwargs = dict(
+        to_email="contact@example.com",
+        nh_name="Alice Wong",
+        nh_email="alice@company.com",
+        job_seeker_name="Bob Smith",
+        job_seeker_role="Senior Engineer",
+        target_company="Stripe",
+        intro_message="<p>Hello</p>",
+        nh_referral_code="ALICE123",
+        db=db,
+        facilitation_id=facilitation_id,
+    )
+
+    eid1 = await send_intro_relay_email(**kwargs)
+    assert eid1 == "msg-first"
+    assert mock_send.call_count == 1
+
+    # Second call — same facilitation_id
+    eid2 = await send_intro_relay_email(**kwargs)
+    assert eid2 is None
+    assert mock_send.call_count == 1  # not called again
