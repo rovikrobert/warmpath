@@ -265,6 +265,16 @@ async def complete_onboarding(
         metadata_={"intent": current_user.intent},
     )
     await db.commit()
+
+    # Seed feed items so KeevsBar has content from first session
+    try:
+        from app.services.feed_generator import generate_feed_for_user
+
+        await generate_feed_for_user(current_user.id, db)
+        await db.commit()
+    except Exception:
+        pass  # Feed seeding is best-effort — don't block onboarding
+
     await db.refresh(current_user)
 
     caps = await compute_user_capabilities(current_user.id, db)
