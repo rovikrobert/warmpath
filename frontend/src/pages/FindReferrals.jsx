@@ -21,7 +21,11 @@ function RecommendationCard({ rec, onAdd, isAdded }) {
   const jobLabel =
     rec.matching_count > 0
       ? `${rec.matching_count} job${rec.matching_count !== 1 ? 's' : ''} matching your criteria`
-      : null;
+      : 'No matching jobs found';
+  const jobBadgeStyle =
+    rec.matching_count > 0
+      ? 'bg-emerald-500/10 text-emerald-400'
+      : 'bg-slate-700/50 text-slate-500';
   return (
     <div className="surface-interactive p-4">
       <div className="flex items-start justify-between">
@@ -38,11 +42,9 @@ function RecommendationCard({ rec, onAdd, isAdded }) {
                 {rec.network_label}
               </span>
             ) : null}
-            {jobLabel ? (
-              <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
-                {jobLabel}
-              </span>
-            ) : null}
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${jobBadgeStyle}`}>
+              {jobLabel}
+            </span>
             {rec.referral_ready && (
               <span className="inline-flex rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-400">
                 Referral Ready

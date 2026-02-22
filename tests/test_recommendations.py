@@ -107,39 +107,20 @@ class TestBoardRegistryHelpers:
     def test_region_unknown(self):
         assert get_region("nonexistent") is None
 
-    def test_companies_for_locations_sea(self):
-        result = companies_for_locations(["Singapore"])
-        # SEA companies should appear first
-        sea_companies = {
-            "grab",
-            "sea-group",
-            "shopee",
-            "lazada",
-            "gojek",
-            "carousell",
-            "foodpanda",
-            "ninja-van",
-            "patsnap",
-            "endowus",
-            "syfe",
-            "aspire",
-            "funding-societies",
-            "carro",
-        }
-        first_batch = set(result[: len(sea_companies)])
-        assert sea_companies == first_batch
-
-    def test_companies_for_locations_all(self):
-        """No locations returns all companies."""
-        result = companies_for_locations(None)
-        assert len(result) > 50  # We have ~70 companies
+    def test_companies_for_locations_returns_all(self):
+        """All companies returned regardless of target location."""
+        all_companies = companies_for_locations(None)
+        sg_companies = companies_for_locations(["Singapore"])
+        us_companies = companies_for_locations(["San Francisco"])
+        assert set(all_companies) == set(sg_companies) == set(us_companies)
+        assert len(all_companies) > 50
 
     def test_companies_for_locations_empty_list(self):
         result = companies_for_locations([])
         assert len(result) > 50
 
     def test_companies_for_locations_unrecognized(self):
-        """Unrecognized location returns all companies."""
+        """Unrecognized location still returns all companies."""
         result = companies_for_locations(["Mars"])
         assert len(result) > 50
 
@@ -419,6 +400,7 @@ class TestDemandSignalCapture:
         from sqlalchemy import select
 
         from app.models.marketplace import RecommendationDemandSignal
+        from app.services.job_fetcher import JobFetcher
 
         async with TestSessionLocal() as db:
             user, headers = await create_test_user_in_db(db)
@@ -434,9 +416,17 @@ class TestDemandSignalCapture:
             },
         )
 
-        resp = await client.get(
-            "/api/v1/search/recommendations?limit=10", headers=headers
-        )
+        # Mock job fetcher to return empty — ensures sparse results regardless
+        # of real ATS API availability.
+        with patch.object(
+            JobFetcher,
+            "fetch_jobs_for_company",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            resp = await client.get(
+                "/api/v1/search/recommendations?limit=10", headers=headers
+            )
         assert resp.status_code == 200
 
         # Check demand signal was logged

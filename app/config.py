@@ -59,6 +59,8 @@ class Settings(BaseSettings):
     CSV_STREAM_TTL_SECONDS: int = 3600  # 1 hour TTL for Redis Streams
     CLEANUP_PROVIDER: str = "gemini"  # "anthropic" | "gemini"
     QUEUE_DEPTH_THRESHOLD: int = 20
+    ADZUNA_APP_ID: str = ""
+    ADZUNA_APP_KEY: str = ""
     POSTHOG_API_KEY: str = ""
     POSTHOG_PROJECT_ID: str = ""
     POSTHOG_HOST: str = "https://app.posthog.com"

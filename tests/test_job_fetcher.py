@@ -387,6 +387,46 @@ class TestRoleMatching:
         assert await fetcher.match_jobs_to_role([], "Engineer") == []
         assert await fetcher.match_jobs_to_role([{"title": "Eng"}], "") == []
 
+    async def test_multi_word_role_partial_match_via_shared_word(self):
+        """'General Manager' should match 'Product Manager' via shared 'manager'."""
+        fetcher = JobFetcher()
+        jobs = [
+            {"title": "Product Manager, Growth", "department": "Product"},
+            {"title": "Engineering Manager", "department": "Engineering"},
+            {"title": "Software Engineer", "department": "Engineering"},
+        ]
+        matched = await fetcher.match_jobs_to_role(jobs, "General Manager")
+        titles = [j["title"] for j in matched]
+        assert "Product Manager, Growth" in titles
+        assert "Engineering Manager" in titles
+        assert "Software Engineer" not in titles
+
+    async def test_multi_word_role_synonym_expansion(self):
+        """'General Manager' should match 'Director of Operations' via level synonyms."""
+        fetcher = JobFetcher()
+        jobs = [
+            {"title": "Director of Operations", "department": "Operations"},
+            {"title": "Head of Business", "department": "Strategy"},
+            {"title": "Data Scientist", "department": "Data"},
+        ]
+        matched = await fetcher.match_jobs_to_role(jobs, "General Manager")
+        titles = [j["title"] for j in matched]
+        assert "Director of Operations" in titles
+        assert "Head of Business" in titles
+        assert "Data Scientist" not in titles
+
+    async def test_engineer_synonym_expansion(self):
+        """'Software Engineer' should match 'Backend Developer' via synonyms."""
+        fetcher = JobFetcher()
+        jobs = [
+            {"title": "Backend Developer", "department": "Engineering"},
+            {"title": "Account Manager", "department": "Sales"},
+        ]
+        matched = await fetcher.match_jobs_to_role(jobs, "Software Engineer")
+        titles = [j["title"] for j in matched]
+        assert "Backend Developer" in titles
+        assert "Account Manager" not in titles
+
 
 # ---------------------------------------------------------------------------
 # Test Board Registry
@@ -549,3 +589,273 @@ class TestJobsAPI:
     async def test_scan_requires_auth(self, client: AsyncClient):
         resp = await client.get("/api/v1/jobs/scan/stripe")
         assert resp.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# Test Aggregator Fallback in fetch_jobs_for_company
+# ---------------------------------------------------------------------------
+
+
+class TestAggregatorFallback:
+    async def test_aggregator_called_when_ats_and_career_page_empty(self):
+        """Adzuna aggregator fires as 3rd fallback when ATS + career page return nothing."""
+        fetcher = JobFetcher()
+        adzuna_jobs = [
+            {
+                "title": "Software Engineer",
+                "department": "Engineering",
+                "location": "Singapore",
+                "url": "https://adzuna.sg/jobs/123",
+                "source": "adzuna",
+                "source_job_id": "123",
+                "posted_at": None,
+                "is_remote": False,
+                "raw_data": {},
+            }
+        ]
+        with (
+            patch("app.services.job_fetcher.settings") as mock_settings,
+            patch(
+                "app.services.job_aggregator.search_jobs_by_company",
+                new_callable=AsyncMock,
+                return_value=adzuna_jobs,
+            ) as mock_adzuna,
+        ):
+            mock_settings.AI_MOCK_MODE = True
+            mock_settings.ADZUNA_APP_ID = "test-id"
+            # No board_ids → ATS returns nothing; career page lookup returns nothing
+            jobs = await fetcher.fetch_jobs_for_company("unknown-company-xyz")
+
+        assert len(jobs) == 1
+        assert jobs[0]["source"] == "adzuna"
+        mock_adzuna.assert_called_once()
+
+    async def test_aggregator_skipped_when_ats_has_results(self):
+        """Adzuna should NOT be called if ATS boards return results."""
+        fetcher = JobFetcher()
+        with (
+            patch.object(
+                fetcher,
+                "fetch_greenhouse_jobs",
+                new_callable=AsyncMock,
+                return_value=[{"title": "Engineer", "source": "greenhouse"}],
+            ),
+            patch("app.services.job_fetcher.settings") as mock_settings,
+        ):
+            mock_settings.AI_MOCK_MODE = True
+            mock_settings.ADZUNA_APP_ID = "test-id"
+            jobs = await fetcher.fetch_jobs_for_company(
+                "stripe", {"greenhouse": "stripe"}
+            )
+
+        assert len(jobs) == 1
+        assert jobs[0]["source"] == "greenhouse"
+
+    async def test_aggregator_skipped_when_not_configured(self):
+        """No ADZUNA_APP_ID → aggregator fallback is skipped entirely."""
+        fetcher = JobFetcher()
+        with patch("app.services.job_fetcher.settings") as mock_settings:
+            mock_settings.AI_MOCK_MODE = True
+            mock_settings.ADZUNA_APP_ID = ""
+            jobs = await fetcher.fetch_jobs_for_company("unknown-company-xyz")
+
+        assert jobs == []
+
+
+# ---------------------------------------------------------------------------
+# Test Board Registry — new companies added in Phase 5
+# ---------------------------------------------------------------------------
+
+
+class TestBoardRegistryExpansion:
+    def test_meta_uses_career_page(self):
+        boards = lookup_boards("meta")
+        assert boards is not None
+        assert "career_page" in boards
+
+    def test_gitlab_uses_greenhouse(self):
+        boards = lookup_boards("gitlab")
+        assert boards is not None
+        assert "greenhouse" in boards
+
+    def test_linear_uses_ashby(self):
+        boards = lookup_boards("linear")
+        assert boards is not None
+        assert "ashby" in boards
+
+    def test_deel_uses_ashby(self):
+        boards = lookup_boards("deel")
+        assert boards is not None
+        assert "ashby" in boards
+
+    def test_vercel_uses_greenhouse(self):
+        boards = lookup_boards("vercel")
+        assert boards is not None
+        assert "greenhouse" in boards
+
+    def test_swiggy_uses_career_page(self):
+        boards = lookup_boards("swiggy")
+        assert boards is not None
+        assert "career_page" in boards
+
+
+# ---------------------------------------------------------------------------
+# Test Career Page — JSON-LD extraction
+# ---------------------------------------------------------------------------
+
+
+class TestJsonLdExtraction:
+    def test_extracts_jobposting_from_jsonld(self):
+        from app.services.career_page_fetcher import _extract_jsonld_jobs
+
+        html = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org/",
+            "@type": "JobPosting",
+            "title": "Senior Software Engineer",
+            "datePosted": "2026-01-15",
+            "jobLocation": {
+                "@type": "Place",
+                "address": {
+                    "@type": "PostalAddress",
+                    "addressLocality": "Singapore",
+                    "addressCountry": "SG"
+                }
+            },
+            "url": "https://example.com/jobs/123"
+        }
+        </script>
+        </head><body></body></html>
+        """
+        jobs = _extract_jsonld_jobs(html, "https://example.com/careers")
+        assert len(jobs) == 1
+        assert jobs[0]["title"] == "Senior Software Engineer"
+        assert jobs[0]["source"] == "career_page_jsonld"
+        assert "Singapore" in jobs[0]["location"]
+
+    def test_extracts_multiple_jobpostings_from_graph(self):
+        from app.services.career_page_fetcher import _extract_jsonld_jobs
+
+        html = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org/",
+            "@graph": [
+                {
+                    "@type": "JobPosting",
+                    "title": "Backend Engineer",
+                    "url": "https://example.com/jobs/1"
+                },
+                {
+                    "@type": "JobPosting",
+                    "title": "Frontend Engineer",
+                    "url": "https://example.com/jobs/2"
+                },
+                {
+                    "@type": "Organization",
+                    "name": "ExampleCorp"
+                }
+            ]
+        }
+        </script>
+        </head><body></body></html>
+        """
+        jobs = _extract_jsonld_jobs(html, "https://example.com/careers")
+        assert len(jobs) == 2
+        titles = {j["title"] for j in jobs}
+        assert "Backend Engineer" in titles
+        assert "Frontend Engineer" in titles
+
+    def test_returns_empty_for_non_jobposting_jsonld(self):
+        from app.services.career_page_fetcher import _extract_jsonld_jobs
+
+        html = """
+        <html><head>
+        <script type="application/ld+json">
+        {"@type": "Organization", "name": "ExampleCorp"}
+        </script>
+        </head><body></body></html>
+        """
+        jobs = _extract_jsonld_jobs(html, "https://example.com/careers")
+        assert jobs == []
+
+    def test_handles_malformed_jsonld_gracefully(self):
+        from app.services.career_page_fetcher import _extract_jsonld_jobs
+
+        html = """
+        <html><head>
+        <script type="application/ld+json">
+        {not valid json at all}
+        </script>
+        </head><body></body></html>
+        """
+        jobs = _extract_jsonld_jobs(html, "https://example.com/careers")
+        assert jobs == []
+
+    def test_detects_remote_from_jobloctype(self):
+        from app.services.career_page_fetcher import _extract_jsonld_jobs
+
+        html = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+            "@type": "JobPosting",
+            "title": "Remote Engineer",
+            "jobLocationType": "TELECOMMUTE",
+            "url": "https://example.com/jobs/remote"
+        }
+        </script>
+        </head><body></body></html>
+        """
+        jobs = _extract_jsonld_jobs(html, "https://example.com/careers")
+        # jobLocationType doesn't contain "remote", so is_remote depends on location
+        assert len(jobs) == 1
+
+
+# ---------------------------------------------------------------------------
+# Test Career Page — SPA API parsing
+# ---------------------------------------------------------------------------
+
+
+class TestSpaApiParsing:
+    def test_parse_bytedance_api_response(self):
+        from app.services.career_page_fetcher import _parse_bytedance_api
+
+        data = {
+            "data": {
+                "job_post_list": [
+                    {
+                        "id": "7001",
+                        "title": "Machine Learning Engineer",
+                        "city_info": [
+                            {"city_name": "Singapore"},
+                            {"city_name": "Beijing"},
+                        ],
+                        "job_category": {"name": "Engineering"},
+                    },
+                    {
+                        "id": "7002",
+                        "title": "Product Manager",
+                        "city_info": [{"city_name": "Remote"}],
+                        "job_category": {"name": "Product"},
+                    },
+                ]
+            }
+        }
+        jobs = _parse_bytedance_api(data, "https://jobs.bytedance.com/en/")
+        assert len(jobs) == 2
+        assert jobs[0]["title"] == "Machine Learning Engineer"
+        assert jobs[0]["department"] == "Engineering"
+        assert "Singapore" in jobs[0]["location"]
+        assert jobs[0]["source"] == "career_page_api"
+        assert jobs[1]["is_remote"] is True
+
+    def test_parse_bytedance_api_empty_response(self):
+        from app.services.career_page_fetcher import _parse_bytedance_api
+
+        data = {"data": {"job_post_list": []}}
+        jobs = _parse_bytedance_api(data, "https://jobs.bytedance.com/en/")
+        assert jobs == []
