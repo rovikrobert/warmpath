@@ -993,7 +993,11 @@ async def send_intro_relay_email(
   <div style="padding: 24px;">
     {intro_message}
   </div>
-  <div style="margin: 24px 0 0; padding: 16px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280;">
+  <div style="padding: 0 24px 24px; text-align: center;">
+    <a href="mailto:{nh_email}?subject=Re: {job_seeker_name}" style="display: inline-block; padding: 12px 28px; background-color: #f59e0b; color: #0f172a; text-decoration: none; font-weight: 600; border-radius: 6px; font-size: 15px;">Reply to {nh_name} &rarr;</a>
+    <p style="margin: 8px 0 0; font-size: 12px; color: #94a3b8;">or simply hit reply — it goes directly to {nh_name}</p>
+  </div>
+  <div style="margin: 0; padding: 16px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280;">
     <p style="margin: 0 0 12px;">Reply STOP to opt out of future introductions</p>
     <p style="margin: 0;">
       {nh_name} sent this introduction via WarmPath.
