@@ -127,8 +127,12 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
 
-  // Step 1: Intent
-  const [intent, setIntent] = useState('');
+  // Step 1: Intent — pre-select from /join landing page if available
+  const [intent, setIntent] = useState(() => {
+    const saved = localStorage.getItem('join_intent');
+    if (saved) localStorage.removeItem('join_intent');
+    return saved === 'seeker' ? 'find_referrals' : saved === 'network' ? 'share_network' : '';
+  });
 
   // Step 1: Referral code (captured early, redeemed on completion)
   // Seed from localStorage (set by /join landing page) if present
