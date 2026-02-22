@@ -7,6 +7,7 @@ import { MarketplaceBadge } from '../utils/marketplace';
 import EmptyState from '../components/ui/EmptyState';
 import SourceTag from '../components/ui/SourceTag';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
+import IntroRelayModal from '../components/IntroRelayModal';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 function StatusBadge({ status }) {
@@ -38,6 +39,7 @@ export default function MarketplaceOverview() {
   const [toggleLoading, setToggleLoading] = useState(null);
   const [decliningId, setDecliningId] = useState(null);
   const [statsAnimating, setStatsAnimating] = useState(false);
+  const [relayModal, setRelayModal] = useState(null); // { id, contactName, linkedinUrl, draftedMessage }
 
   const load = async () => {
     try {
@@ -84,7 +86,28 @@ export default function MarketplaceOverview() {
     }
 
     try {
-      await mpApi.updateRequest(id, { action });
+      const res = await mpApi.updateRequest(id, { action });
+      const data = res.data;
+
+      if (action === 'approve' && data) {
+        // Update the request in state with delivery info from response
+        setIncoming((prev) => prev.map((r) =>
+          r.id === id ? { ...r, status: 'approved', delivery_method: data.delivery_method, delivery_status: data.delivery_status } : r
+        ));
+
+        if (data.delivery_method === 'email_relay') {
+          // Email sent automatically — no further action needed
+        } else if (!data.delivery_method) {
+          // No email on file — open LinkedIn fallback modal
+          const req = prevIncoming.find((r) => r.id === id);
+          setRelayModal({
+            id,
+            contactName: req?.contact_name || data.contact_name || 'your contact',
+            linkedinUrl: data.linkedin_url || null,
+            draftedMessage: data.drafted_message || '',
+          });
+        }
+      }
     } catch (err) {
       console.error(err);
       // Revert on failure
@@ -92,6 +115,21 @@ export default function MarketplaceOverview() {
       setDecliningId(null);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleConfirmSent = async (facilitationId) => {
+    await mpApi.confirmSent(facilitationId);
+    // Update local state to reflect manual send confirmation
+    setIncoming((prev) => prev.map((r) =>
+      r.id === facilitationId ? { ...r, delivery_method: 'linkedin_manual', delivery_status: 'delivered' } : r
+    ));
+    // Refresh balance since 50 credits were awarded
+    try {
+      const balRes = await creditsApi.balance();
+      setBalance(balRes.data?.balance ?? balance);
+    } catch (_err) {
+      // Non-critical — balance will refresh on next load
     }
   };
 
@@ -306,31 +344,60 @@ export default function MarketplaceOverview() {
                   </span>
                 </div>
 
-                {/* Coaching text after approval */}
+                {/* Coaching text after approval — dynamic based on delivery status */}
                 {req.status === 'approved' && (req.id === approvedCoaching || !approvedCoaching) && (
                   <div className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4" aria-live="polite">
-                    <p className="mb-2 text-sm font-semibold text-emerald-400">
-                      Now introduce {req.job_seeker_profile_snapshot?.full_name || 'this candidate'} to {req.contact_name || 'your contact'}
-                    </p>
-                    <p className="text-sm text-emerald-400/80">
-                      Reach out to {req.contact_name || 'your contact'} via LinkedIn or email with a quick intro. Here's a suggested message:
-                    </p>
-                    <div className="mt-2 rounded-md bg-slate-800/50 p-3 text-sm text-slate-300">
-                      <p>Hey {req.contact_name?.split(' ')[0] || 'there'},</p>
-                      <p className="mt-2">
-                        I'd like to introduce you to {req.job_seeker_profile_snapshot?.full_name || 'someone'} who's
-                        interested in opportunities at {req.contact_company || 'your company'}.
-                        They came through WarmPath and I thought you two should connect.
-                      </p>
-                      <p className="mt-2">
-                        {req.job_seeker_profile_snapshot?.full_name || 'They'}, meet {req.contact_name || 'my contact'}
-                        {req.contact_title ? ` — ${req.contact_title}` : ''} at {req.contact_company || 'the company'}.
-                      </p>
-                      <p className="mt-2">I'll let you two take it from here!</p>
-                    </div>
-                    <p className="mt-2 text-xs text-emerald-400/70">
-                      You earned 50 credits for facilitating this intro.
-                    </p>
+                    {req.delivery_method === 'email_relay' && req.delivery_status === 'delivered' ? (
+                      <>
+                        <p className="text-sm font-semibold text-emerald-400">
+                          Email delivered! 50 credits earned.
+                        </p>
+                        <p className="mt-1 text-xs text-emerald-400/70">
+                          The intro to {req.contact_name || 'your contact'} for {req.job_seeker_profile_snapshot?.full_name || 'this candidate'} was delivered successfully.
+                        </p>
+                      </>
+                    ) : req.delivery_method === 'email_relay' ? (
+                      <>
+                        <p className="text-sm font-semibold text-emerald-400">
+                          Introduction sent to {req.contact_name || 'your contact'} via email!
+                        </p>
+                        <p className="mt-1 text-xs text-emerald-400/70">
+                          You'll earn 50 credits when delivery is confirmed.
+                        </p>
+                      </>
+                    ) : req.delivery_method === 'linkedin_manual' ? (
+                      <>
+                        <p className="text-sm font-semibold text-emerald-400">
+                          You confirmed sending the intro. 50 credits earned!
+                        </p>
+                        <p className="mt-1 text-xs text-emerald-400/70">
+                          Thank you for connecting {req.job_seeker_profile_snapshot?.full_name || 'the candidate'} with {req.contact_name || 'your contact'}.
+                        </p>
+                      </>
+                    ) : (
+                      /* No delivery method yet — approved but needs manual send */
+                      <>
+                        <p className="mb-2 text-sm font-semibold text-emerald-400">
+                          Now introduce {req.job_seeker_profile_snapshot?.full_name || 'this candidate'} to {req.contact_name || 'your contact'}
+                        </p>
+                        <p className="text-sm text-emerald-400/80">
+                          We don't have an email for {req.contact_name || 'your contact'}, so you'll need to send the intro yourself.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setRelayModal({
+                            id: req.id,
+                            contactName: req.contact_name || 'your contact',
+                            linkedinUrl: req.linkedin_url || null,
+                            draftedMessage: req.drafted_message || `Hey ${req.contact_name?.split(' ')[0] || 'there'}, I'd like to introduce you to ${req.job_seeker_profile_snapshot?.full_name || 'someone'} who's interested in opportunities at ${req.contact_company || 'your company'}. They came through WarmPath and I thought you two should connect.`,
+                          })}
+                          className="mt-2 rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-400"
+                          aria-label="Send the introduction manually"
+                        >
+                          Send the Introduction
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -451,6 +518,15 @@ export default function MarketplaceOverview() {
           </Link>
         </div>
       )}
+      {/* LinkedIn fallback modal */}
+      <IntroRelayModal
+        isOpen={!!relayModal}
+        onClose={() => setRelayModal(null)}
+        contactName={relayModal?.contactName}
+        linkedinUrl={relayModal?.linkedinUrl}
+        draftedMessage={relayModal?.draftedMessage}
+        onConfirmSent={() => handleConfirmSent(relayModal?.id)}
+      />
     </div>
   );
 }
