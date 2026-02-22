@@ -11,26 +11,38 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-def _send_email(to: str, subject: str, html: str) -> str | None:
+def _send_email(
+    to: str,
+    subject: str,
+    html: str,
+    *,
+    reply_to: str | None = None,
+    from_email: str | None = None,
+) -> str | None:
     """Send an email via Resend SDK or log to console.
 
     Returns the Resend message ID (for webhook matching) or None in console mode.
     Catches Resend API errors gracefully — logs the error and returns None
     so that the calling endpoint does not crash.
+
+    Optional keyword args:
+        reply_to: Sets the Reply-To header (e.g. network holder's email).
+        from_email: Overrides the default FROM_EMAIL (e.g. "Name via WarmPath <intro@majiq.agency>").
     """
     if settings.RESEND_API_KEY:
         import resend
 
         resend.api_key = settings.RESEND_API_KEY
+        payload: dict = {
+            "from": from_email or settings.FROM_EMAIL,
+            "to": [to],
+            "subject": subject,
+            "html": html,
+        }
+        if reply_to:
+            payload["reply_to"] = reply_to
         try:
-            result = resend.Emails.send(
-                {
-                    "from": settings.FROM_EMAIL,
-                    "to": [to],
-                    "subject": subject,
-                    "html": html,
-                }
-            )
+            result = resend.Emails.send(payload)
         except Exception:
             logger.exception("Resend API error sending to %s: %s", to, subject)
             return None
