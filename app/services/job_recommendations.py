@@ -168,6 +168,29 @@ async def _match_and_build(
     }
 
 
+async def _get_user_target_companies(user_id: uuid.UUID, db: AsyncSession) -> set[str]:
+    """Collect target companies from the user's SearchRequests."""
+    import json
+
+    from app.models.search_request import SearchRequest
+
+    result = await db.execute(
+        select(SearchRequest.target_companies).where(
+            SearchRequest.user_id == user_id,
+            SearchRequest.deleted_at.is_(None),
+            SearchRequest.target_companies.isnot(None),
+        )
+    )
+    targets: set[str] = set()
+    for (companies,) in result.all():
+        if not companies:
+            continue
+        if isinstance(companies, str):
+            companies = json.loads(companies)
+        targets.update(c.strip().lower() for c in companies)
+    return targets
+
+
 @timed("job_recommendations")
 async def get_recommendations(
     user_id: uuid.UUID,
@@ -207,6 +230,11 @@ async def get_recommendations(
     # from globally-hiring companies as a fallback.
     candidates = companies_for_locations(target_locations)
 
+    # Append user's target companies so the full fallback chain runs for them
+    user_targets = await _get_user_target_companies(user_id, db)
+    candidate_set = set(candidates)
+    candidates.extend(t for t in user_targets if t not in candidate_set)
+
     # --- Network layer (primary): referral paths from WarmPath's own data ---
     from app.services.network_recommendations import get_network_recommendations
 
@@ -221,10 +249,7 @@ async def get_recommendations(
     network_by_company: dict[str, dict] = {r["company_name"]: r for r in network_recs}
 
     # Apply exclusions
-    exclude_set = set()
-    if exclude_companies:
-        for name in exclude_companies:
-            exclude_set.add(name.strip().lower())
+    exclude_set = {n.strip().lower() for n in (exclude_companies or [])}
     candidates = [c for c in candidates if c not in exclude_set]
 
     # Phase 1: Batch-check cache for all candidates (one query)

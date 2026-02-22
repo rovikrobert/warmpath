@@ -456,9 +456,21 @@ CAREERS_URLS: dict[str, str] = {
 
 
 def lookup_careers_url(company_name: str) -> str | None:
-    """Return the careers page URL for a company, if known."""
+    """Return the careers page URL for a company, if known.
+
+    Strips common domain suffixes (.ai, .io, etc.) so 'cantina.ai' finds 'cantina'.
+    """
+    import re
+
     key = company_name.strip().lower()
-    return CAREERS_URLS.get(key)
+    url = CAREERS_URLS.get(key)
+    if url:
+        return url
+    # Strip domain suffix and retry
+    stripped = re.sub(r"\.(ai|io|com|co|dev|app|tech|xyz|org|net)$", "", key)
+    if stripped != key:
+        return CAREERS_URLS.get(stripped)
+    return None
 
 
 def is_known_tech_company(company_key: str) -> bool:
@@ -493,13 +505,21 @@ def companies_for_locations(target_locations: list[str] | None) -> list[str]:
 def lookup_boards(company_name: str) -> dict[str, str] | None:
     """Look up board identifiers for a company name (case-insensitive, fuzzy).
 
+    Strips common domain suffixes (.ai, .io, etc.) before matching.
     Returns the board dict if found, or None if no match above threshold.
     """
+    import re
+
     key = company_name.strip().lower()
 
     # Exact match
     if key in BOARD_REGISTRY:
         return BOARD_REGISTRY[key]
+
+    # Strip domain suffix and retry exact match
+    stripped = re.sub(r"\.(ai|io|com|co|dev|app|tech|xyz|org|net)$", "", key)
+    if stripped != key and stripped in BOARD_REGISTRY:
+        return BOARD_REGISTRY[stripped]
 
     # Fuzzy match — require >= 0.8 similarity
     best_match: str | None = None
@@ -532,7 +552,9 @@ _COMMON_SUFFIXES = re.compile(
     r"\b(inc|ltd|pte|co|corp|group|hq|limited|llc|technologies|tech|labs|ai)\b",
     re.IGNORECASE,
 )
-_NON_ALNUM = re.compile(r"[^a-z0-9\s-]")
+_NON_ALNUM = re.compile(
+    r"[^a-z0-9\s-]+"
+)  # Replace (not remove) to preserve word boundaries
 _MULTI_DASH = re.compile(r"-{2,}")
 
 _PROBE_TIMEOUT = 5.0
@@ -545,9 +567,12 @@ def _slug_candidates(company_name: str) -> list[str]:
         "Ninja Van" → ["ninja-van", "ninjavan"]
         "ByteDance, Inc." → ["bytedance"]
         "Sea Group" → ["sea-group", "seagroup", "sea"]
+        "Cantina.ai" → ["cantina"]
     """
     name = company_name.strip().lower()
-    name = _NON_ALNUM.sub("", name)
+    # Replace non-alnum with space (not empty) to preserve word boundaries
+    # so "cantina.ai" → "cantina ai" (not "cantinai")
+    name = _NON_ALNUM.sub(" ", name)
     name = _COMMON_SUFFIXES.sub("", name).strip()
     name = _MULTI_DASH.sub("-", name).strip("-")
 

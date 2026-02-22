@@ -125,9 +125,20 @@ def _extract_title_from_url(url: str) -> str:
 
 
 def lookup_career_page(company_name: str) -> str | None:
-    """Look up a known career page URL for a company."""
+    """Look up a known career page URL for a company.
+
+    Strips common domain suffixes (.ai, .io, etc.) so 'cantina.ai' finds 'cantina'.
+    """
+    import re
+
     key = company_name.strip().lower()
-    return CAREER_PAGES.get(key)
+    url = CAREER_PAGES.get(key)
+    if url:
+        return url
+    stripped = re.sub(r"\.(ai|io|com|co|dev|app|tech|xyz|org|net)$", "", key)
+    if stripped != key:
+        return CAREER_PAGES.get(stripped)
+    return None
 
 
 async def fetch_career_page(url: str) -> list[dict]:

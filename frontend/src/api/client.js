@@ -146,6 +146,17 @@ export const companies = {
     qs.set('per_page', String(limit));
     return api(`/api/v1/companies?${qs}`);
   },
+  discover: (companyName) =>
+    api('/api/v1/companies/discover', {
+      method: 'POST',
+      body: { company_name: companyName },
+    }),
+  suggest: ({ q, limit = 8 } = {}) => {
+    const qs = new URLSearchParams();
+    if (q) qs.set('q', q);
+    qs.set('limit', String(limit));
+    return api(`/api/v1/companies/suggest?${qs}`);
+  },
 };
 
 export const search = {

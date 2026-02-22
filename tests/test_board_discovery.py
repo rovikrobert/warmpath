@@ -422,21 +422,18 @@ class TestScanWithDiscovery:
             assert resp.status_code == 200
             assert resp.json()["meta"]["openings_count"] == 1
 
-    async def test_scan_falls_back_to_404_when_nothing_found(
+    async def test_scan_returns_empty_when_nothing_found(
         self, client: AsyncClient, auth_headers
     ):
-        """When discovery and career page both fail, return 404."""
-        with (
-            patch(
-                "app.api.jobs.lookup_or_discover_boards",
-                return_value=(None, False),
-            ),
-            patch(
-                "app.api.jobs.lookup_career_page",
-                return_value=None,
-            ),
+        """When no source finds jobs, return 200 with zero openings."""
+        with patch(
+            "app.api.jobs.lookup_or_discover_boards",
+            return_value=(None, False),
         ):
             resp = await client.get(
                 "/api/v1/jobs/scan/totally_unknown_xyz", headers=auth_headers
             )
-            assert resp.status_code == 404
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["meta"]["openings_count"] == 0
+            assert body["meta"]["discovery_status"] in ("scraped", "no_listings")
