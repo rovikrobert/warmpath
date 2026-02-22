@@ -5,6 +5,8 @@ import RequestIntroModal from '../components/RequestIntroModal';
 import FeedbackModal from '../components/FeedbackModal';
 import MatchBadge from '../components/MatchBadge';
 import { MarketplaceBadge } from '../utils/marketplace';
+import ScoreExplainer from '../components/ScoreExplainer';
+import { WARM_TIERS } from '../utils/scores';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -29,17 +31,33 @@ const REL_LABELS = {
 
 function IntroModal({ intro, onClose }) {
   if (!intro) return null;
+  const messages = intro.messages || [];
+  const totalSteps = messages.length;
   return (
     <Modal open={!!intro} onClose={onClose} title="Intro Drafts" maxWidth="max-w-xl">
       <div className="space-y-4">
-        {intro.messages?.map((msg) => (
+        {messages.map((msg, idx) => (
           <div key={msg.id} className="rounded-lg border border-slate-700/50 p-4">
             <div className="mb-2 flex items-center justify-between">
-              <Badge color="amber">
-                {msg.variant_label}
-              </Badge>
-              <span className="text-xs text-slate-500">{msg.ai_model_version}</span>
+              <div className="flex items-center gap-2">
+                {totalSteps > 1 && (
+                  <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[10px] font-medium text-slate-300">
+                    Step {idx + 1}/{totalSteps}
+                  </span>
+                )}
+                <Badge color="amber">
+                  {msg.step_label || msg.variant_label}
+                </Badge>
+              </div>
+              {msg.send_after_days > 0 && (
+                <span className="text-xs text-slate-500">Send after {msg.send_after_days} days</span>
+              )}
             </div>
+            {msg.coaching_notes && (
+              <p className="mb-2 rounded bg-slate-800/50 px-3 py-1.5 text-xs text-slate-400 italic">
+                {msg.coaching_notes}
+              </p>
+            )}
             {msg.subject_line && (
               <p className="mb-1 text-xs text-slate-400">
                 Subject: <span className="font-medium text-slate-300">{msg.subject_line}</span>
@@ -195,6 +213,12 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
                         {path.contact.name}
                       </p>
                       <MatchBadge score={path.contact.warm_score} type="warm" />
+                      <ScoreExplainer
+                        title="Warm Score"
+                        body="Your connection strength with this person. Higher means they're more likely to help."
+                        tiers={WARM_TIERS}
+                        learnMoreHref="/help/scores#warm-score"
+                      />
                     </div>
                     <p className="truncate text-xs text-slate-400" title={`${path.contact.title} at ${path.contact.company}`}>
                       {path.contact.title} · {path.contact.company}
@@ -234,6 +258,11 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
                     {path.listing.department_category && <span>{path.listing.department_category}</span>}
                     {path.listing.department_category && <span>&middot;</span>}
                     <MarketplaceBadge value={path.listing.warm_score_range} type="strength" />
+                    <ScoreExplainer
+                      title="Connection Strength"
+                      body="The network holder's relationship strength with this contact. Stronger connections lead to better intro outcomes."
+                      learnMoreHref="/help/scores#warm-score"
+                    />
                     {path.listing.connection_recency && <><span>&middot;</span><span>{path.listing.connection_recency}</span></>}
                   </div>
                   {path.network_holder_reputation && (

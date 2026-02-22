@@ -72,7 +72,7 @@ export default function NewSearch() {
 
       <form onSubmit={handleSubmit} className="space-y-5 rounded-xl bg-slate-900 border border-slate-700/50 p-6 shadow-sm">
         <p className="text-sm text-slate-400">
-          Define who you're looking for. WarmPath will search your network and score each contact by relevance and warmth.
+          Define who you're looking for. Results are ranked by Match Strength, which combines how relevant a person's role is with how strong your connection is.
         </p>
 
         <div>
@@ -136,6 +136,7 @@ export default function NewSearch() {
               title="Match Quality"
               body="Only show contacts that meet this minimum combined score (relevance + warmth). Lower values show more results."
               tiers={MATCH_TIERS}
+              learnMoreHref="/help/scores#match-strength"
             />
           </label>
           <div className="flex items-center gap-3">

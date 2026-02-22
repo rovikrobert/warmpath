@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { marketplace as mpApi, applications as appsApi } from '../api/client';
 import { MarketplaceBadge } from '../utils/marketplace';
+import ScoreExplainer from '../components/ScoreExplainer';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 function StatusBadge({ status }) {
@@ -149,6 +150,11 @@ export default function MyRequests() {
                           {req.listing_summary.department_category && <span>{req.listing_summary.department_category}</span>}
                           {req.listing_summary.department_category && <span>&middot;</span>}
                           <MarketplaceBadge value={req.listing_summary.warm_score_range} type="strength" />
+                          <ScoreExplainer
+                            title="Connection Strength"
+                            body="The network holder's relationship strength with this contact. Stronger connections lead to better intro outcomes."
+                            learnMoreHref="/help/scores#warm-score"
+                          />
                         </div>
                       </div>
                     )}

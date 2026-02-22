@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     QUEUE_DEPTH_THRESHOLD: int = 20
     ADZUNA_APP_ID: str = ""
     ADZUNA_APP_KEY: str = ""
+    JOBSPY_ENABLED: bool = True
+    JOBSPY_SEARCH_ALL_SITES: bool = False
     POSTHOG_API_KEY: str = ""
     POSTHOG_PROJECT_ID: str = ""
     POSTHOG_HOST: str = "https://app.posthog.com"

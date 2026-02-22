@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { contacts as contactsApi, companies as companiesApi, feed as feedApi } from '../api/client';
 import MatchBadge from '../components/MatchBadge';
-import { getNlpMatchTier } from '../utils/scores';
+import { getNlpMatchTier, WARM_TIERS } from '../utils/scores';
+import ScoreExplainer from '../components/ScoreExplainer';
 import EnrichmentProgress from '../components/EnrichmentProgress';
 import { EnrichmentActions } from '../components/FeedCard';
 import KeevsAvatar from '../components/KeevsAvatar';
@@ -703,7 +704,15 @@ export default function ContactsPage() {
                                 {nlpTier.label}
                               </span>
                               {c.warm_score != null && (
-                                <MatchBadge score={c.warm_score} type="warm" />
+                                <>
+                                  <MatchBadge score={c.warm_score} type="warm" />
+                                  <ScoreExplainer
+                                    title="Warm Score"
+                                    body="How strong your connection is. Higher means they're more likely to respond to your request."
+                                    tiers={WARM_TIERS}
+                                    learnMoreHref="/help/scores#warm-score"
+                                  />
+                                </>
                               )}
                               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-slate-500" aria-hidden="true">
                                 <path fillRule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
@@ -802,6 +811,14 @@ export default function ContactsPage() {
                     )}
                     {score >= 40 && score < 70 && (
                       <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">Warm</span>
+                    )}
+                    {score >= 40 && (
+                      <ScoreExplainer
+                        title="Warm Score"
+                        body="How strong your connection is. Higher means they're more likely to respond to your request."
+                        tiers={WARM_TIERS}
+                        learnMoreHref="/help/scores#warm-score"
+                      />
                     )}
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-slate-500" aria-hidden="true">
                       <path fillRule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />

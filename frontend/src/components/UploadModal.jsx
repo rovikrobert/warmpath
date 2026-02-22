@@ -80,19 +80,39 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
         const total = s.total_chunks || 0;
         const cleaned = s.chunks_cleaned || 0;
         const imported = s.chunks_imported || 0;
+        const rowCount = s.row_count || 0;
+        const created = s.contacts_created || 0;
+        const phase = s.progress_phase;
+        const contactLabel = rowCount > 0 ? ` — ${rowCount.toLocaleString()} contacts` : '';
+
         if (total > 0) {
-          // Cleaning is ~80% of work, importing ~20%
-          const pct = Math.min(((cleaned * 0.8 + imported * 0.2) / total) * 100, 95);
-          setProgressWidth(pct);
-          if (imported > 0 && imported < total) {
-            setProgressMsg(`Importing contacts... (${imported}/${total} batches)`);
-          } else if (cleaned > 0) {
-            setProgressMsg(`AI cleaning... (${cleaned}/${total} batches)`);
+          // Cleaning ~60%, importing ~35%, scoring ~5%
+          let pct;
+          if (phase === 'scoring') {
+            pct = 95;
+          } else if (imported > 0) {
+            pct = Math.min(60 + (imported / total) * 35, 94);
           } else {
-            setProgressMsg('Parsing contacts...');
+            pct = Math.min((cleaned / total) * 60, 59);
           }
-        } else if (s.progress_phase) {
-          setProgressMsg(s.progress_phase === 'parsing' ? 'Parsing contacts...' : 'Processing...');
+          setProgressWidth(pct);
+
+          if (phase === 'scoring') {
+            setProgressMsg(`Scoring contacts... (${created.toLocaleString()} imported)`);
+          } else if (imported > 0) {
+            setProgressMsg(`Importing contacts${contactLabel} (${imported}/${total} batches)`);
+          } else if (cleaned > 0) {
+            setProgressMsg(`AI cleaning${contactLabel} (${cleaned}/${total} batches)`);
+          } else {
+            setProgressMsg(`Parsing contacts...`);
+          }
+        } else if (phase) {
+          if (phase === 'parsing') {
+            setProgressMsg('Parsing contacts...');
+            setProgressWidth(8);
+          } else {
+            setProgressMsg(`Processing${contactLabel}...`);
+          }
         }
 
         // Update ETA

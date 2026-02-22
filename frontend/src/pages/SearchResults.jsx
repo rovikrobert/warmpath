@@ -122,6 +122,7 @@ export default function SearchResults() {
                 title="Match Strength"
                 body="Combines role relevance (50%) and relationship warmth (50%)."
                 tiers={MATCH_TIERS}
+                learnMoreHref="/help/scores#match-strength"
               />
             </p>
             <p className="text-lg font-bold text-slate-50">
@@ -144,7 +145,7 @@ export default function SearchResults() {
         <div>
           <label htmlFor="filter-min-relevance" className="mb-1 block text-xs text-slate-400">
             Min Match Strength
-            <ScoreExplainer title="Match Strength" body="Filters out contacts below this combined score (relevance + warmth)." />
+            <ScoreExplainer title="Match Strength" body="Filters out contacts below this combined score (relevance + warmth)." learnMoreHref="/help/scores#match-strength" />
           </label>
           <input
             id="filter-min-relevance"
@@ -218,7 +219,7 @@ export default function SearchResults() {
                 <th className="hidden px-4 py-3 font-medium text-slate-400 md:table-cell">Company</th>
                 <th className="px-3 py-3 font-medium text-slate-400 text-center">
                   Match Strength
-                  <ScoreExplainer title="Match Strength" body="Combines role relevance (50%) and relationship warmth (50%)." tiers={MATCH_TIERS} />
+                  <ScoreExplainer title="Match Strength" body="Combines role relevance (50%) and relationship warmth (50%)." tiers={MATCH_TIERS} learnMoreHref="/help/scores#match-strength" />
                 </th>
                 <th className="hidden px-3 py-3 font-medium text-slate-400 text-center sm:table-cell">Type</th>
                 <th className="px-4 py-3 font-medium text-slate-400"></th>

@@ -4,6 +4,7 @@ import { marketplace as mpApi, credits as creditsApi } from '../api/client';
 import { trackEvent } from '../utils/analytics';
 import { SOURCES } from '../utils/sources';
 import { MarketplaceBadge } from '../utils/marketplace';
+import ScoreExplainer from '../components/ScoreExplainer';
 import EmptyState from '../components/ui/EmptyState';
 import SourceTag from '../components/ui/SourceTag';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
@@ -567,6 +568,11 @@ export default function MarketplaceOverview() {
                           <MarketplaceBadge value={l.department_category} type="department" />
                           <span className="text-slate-600">&middot;</span>
                           <MarketplaceBadge value={l.warm_score_range} type="strength" />
+                          <ScoreExplainer
+                            title="Connection Strength"
+                            body="How job seekers see your connection strength with this contact. Based on the contact's Warm Score."
+                            learnMoreHref="/help/scores#warm-score"
+                          />
                         </div>
                       </>
                     )}
