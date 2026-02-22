@@ -59,9 +59,19 @@ def _get_session_factory():
 
 
 async def _dispose_engine():
-    from app.database import _get_engine
+    """Dispose old engine and clear caches so fresh objects are created in
+    the current asyncio.run() event loop.  Without this, a cached
+    sessionmaker/engine from a previous Celery task (different loop) causes:
+    ``RuntimeError: Future attached to a different loop``
+    """
+    import contextlib
 
-    await _get_engine().dispose()
+    from app.database import _get_engine, _get_session_factory
+
+    with contextlib.suppress(Exception):
+        await _get_engine().dispose()
+    _get_engine.cache_clear()
+    _get_session_factory.cache_clear()
 
 
 async def _update_upload(factory, upload_id: uuid.UUID, **fields) -> None:
