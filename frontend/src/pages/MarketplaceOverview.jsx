@@ -201,7 +201,7 @@ export default function MarketplaceOverview() {
             <div>
               <p className="text-sm font-semibold text-emerald-400">Your employer pays {SOURCES.REFERRAL_BONUS_RANGE.claim} per referral hire</p>
               <p className="mt-0.5 text-sm text-emerald-400/80">
-                When you approve an intro and your contact hires the candidate, the referral bonus goes directly to you.
+                When you approve an intro and your contact hires the candidate, the referral bonus goes to you.
                 WarmPath sends you pre-qualified candidates so you don't have to find them yourself.{' '}
                 <SourceTag source={SOURCES.REFERRAL_BONUS_RANGE.source} label={SOURCES.REFERRAL_BONUS_RANGE.label} />
               </p>
