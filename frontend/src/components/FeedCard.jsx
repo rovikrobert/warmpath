@@ -63,18 +63,18 @@ export function EnrichmentActions({ item, onRespond }) {
 
   const options = signalType === 'relationship_type'
     ? [
-        { label: 'Colleague', value: { type: 'colleague' } },
-        { label: 'Manager', value: { type: 'former_manager' } },
-        { label: 'Report', value: { type: 'former_report' } },
-        { label: 'Friend', value: { type: 'friend' } },
-        { label: 'Acquaintance', value: { type: 'acquaintance' } },
+        { label: 'Colleague', value: 'colleague' },
+        { label: 'Manager', value: 'manager' },
+        { label: 'Report', value: 'report' },
+        { label: 'Friend', value: 'friend' },
+        { label: 'Acquaintance', value: 'acquaintance' },
       ]
     : signalType === 'would_refer'
     ? [
-        { label: 'Definitely', value: { likelihood: 'definitely' } },
-        { label: 'Probably', value: { likelihood: 'probably' } },
-        { label: 'Maybe', value: { likelihood: 'maybe' } },
-        { label: 'No', value: { likelihood: 'no' } },
+        { label: 'Definitely', value: 'definitely' },
+        { label: 'Probably', value: 'probably' },
+        { label: 'Maybe', value: 'maybe' },
+        { label: 'No', value: 'no' },
       ]
     : [];
 
@@ -121,6 +121,7 @@ export default function FeedCard({ item, onDismiss, onAct, compact = false }) {
       await feedApi.dismiss(item.id);
       setDismissed(true);
       onDismiss?.(item.id);
+      window.dispatchEvent(new Event('feed-updated'));
     } catch {
       // Silently fail — item remains visible
     }

@@ -67,7 +67,7 @@ export default function CoachPage() {
   const [sending, setSending] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedItems, setFeedItems] = useState([]);
-  const [feedExpanded, setFeedExpanded] = useState(false);
+  const [feedExpanded, setFeedExpanded] = useState(true);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const quickActionsRef = useRef(null);
@@ -77,7 +77,7 @@ export default function CoachPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sending]);
 
-  // Load feed items on mount
+  // Load feed items on mount, auto-mark as seen
   useEffect(() => {
     let cancelled = false;
     feedApi.list({ limit: 5 })
@@ -89,6 +89,13 @@ export default function CoachPage() {
           .filter((f) => f.item_type !== 'enrichment_prompt')
           .slice(0, 3);
         setFeedItems(items);
+        // Auto-mark unseen items as seen and refresh badge
+        const unseenIds = items.filter((f) => !f.seen_at).map((f) => f.id);
+        if (unseenIds.length > 0) {
+          feedApi.batchMarkSeen(unseenIds)
+            .then(() => window.dispatchEvent(new Event('feed-updated')))
+            .catch(() => {});
+        }
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -239,7 +246,10 @@ export default function CoachPage() {
                 <FeedCard
                   key={item.id}
                   item={item}
-                  onDismiss={(id) => setFeedItems((prev) => prev.filter((f) => f.id !== id))}
+                  onDismiss={(id) => {
+                    setFeedItems((prev) => prev.filter((f) => f.id !== id));
+                    window.dispatchEvent(new Event('feed-updated'));
+                  }}
                 />
               ))}
             </div>
