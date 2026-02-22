@@ -1,20 +1,20 @@
-import { useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import SourceTag from '../components/ui/SourceTag';
-import { SOURCES } from '../utils/sources';
-import useDocumentTitle from '../hooks/useDocumentTitle';
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import SourceTag from "../components/ui/SourceTag";
+import { SOURCES } from "../utils/sources";
+import useDocumentTitle from "../hooks/useDocumentTitle";
 
 const CONTENT = {
   network: {
-    title: 'Share Your Network',
-    hero: 'Your network is more valuable than you think',
+    title: "Share Your Network",
+    hero: "Your network is more valuable than you think",
     heroSub:
       "Help people land their next role through referrals \u2014 and earn your employer's referral bonus while you're at it.",
     heroSource: null,
     cards: [
       {
-        title: 'Referral bonuses you\u2019re missing',
-        color: 'emerald',
+        title: "Referral bonuses you\u2019re missing",
+        color: "emerald",
         icon: (
           <svg
             className="h-5 w-5 text-emerald-400"
@@ -33,13 +33,13 @@ const CONTENT = {
         ),
         body: (
           <>
-            Your employer probably offers{' '}
+            Your employer probably offers{" "}
             <span className="font-medium text-emerald-400">
               {SOURCES.REFERRAL_BONUS_RANGE.claim}
-            </span>{' '}
+            </span>{" "}
             per successful referral hire. Most go unclaimed because finding
             qualified candidates is hard. We route pre-qualified candidates to
-            you so you can collect what you're already owed.{' '}
+            you so you can collect what you're already owed.{" "}
             <SourceTag
               source={SOURCES.REFERRAL_BONUS_RANGE.source}
               label={SOURCES.REFERRAL_BONUS_RANGE.label}
@@ -48,8 +48,8 @@ const CONTENT = {
         ),
       },
       {
-        title: 'You stay in control',
-        color: 'blue',
+        title: "You stay in control",
+        color: "blue",
         icon: (
           <svg
             className="h-5 w-5 text-blue-400"
@@ -76,8 +76,8 @@ const CONTENT = {
         ),
       },
       {
-        title: 'Zero cost, real impact',
-        color: 'amber',
+        title: "Zero cost, real impact",
+        color: "amber",
         icon: (
           <svg
             className="h-5 w-5 text-amber-400"
@@ -98,11 +98,11 @@ const CONTENT = {
           <>
             Completely free. Upload your connections, review intro requests on
             your schedule, and help someone skip the cold application grind.
-            Referred candidates are hired{' '}
+            Referred candidates are hired{" "}
             <span className="font-medium text-amber-400">
               {SOURCES.REFERRAL_HIRE_SPEED.claim}
-            </span>{' '}
-            faster than non-referred applicants.{' '}
+            </span>{" "}
+            faster than non-referred applicants.{" "}
             <SourceTag
               source={SOURCES.REFERRAL_HIRE_SPEED.source}
               label={SOURCES.REFERRAL_HIRE_SPEED.label}
@@ -113,36 +113,36 @@ const CONTENT = {
     ],
     steps: [
       {
-        step: '1',
-        title: 'Upload your connections',
-        desc: 'Export your LinkedIn CSV and upload it. Takes 2 minutes.',
+        step: "1",
+        title: "Upload your connections",
+        desc: "Export your LinkedIn CSV and upload it. Takes 2 minutes.",
       },
       {
-        step: '2',
-        title: 'Review intro requests',
-        desc: 'Job seekers find anonymous matches. You see who they are before deciding.',
+        step: "2",
+        title: "Review intro requests",
+        desc: "Job seekers find anonymous matches. You see who they are before deciding.",
       },
       {
-        step: '3',
-        title: 'Collect referral bonuses',
-        desc: 'When your contact hires the candidate, the referral bonus goes to you.',
+        step: "3",
+        title: "Collect referral bonuses",
+        desc: "When your contact hires the candidate, the referral bonus goes to you.",
       },
     ],
     ctaLabel: "Get started \u2014 it's free",
     ctaSub:
-      'No credit card required. Upload your connections and start earning referral bonuses.',
-    cardsAriaLabel: 'Why share your network',
+      "No credit card required. Upload your connections and start earning referral bonuses.",
+    cardsAriaLabel: "Why share your network",
   },
   seeker: {
-    title: 'Get Referred, Not Ignored',
-    hero: 'Stop applying cold. Get referred.',
+    title: "Get Referred, Not Ignored",
+    hero: "Stop applying cold. Get referred.",
     heroSub:
-      'Employee referrals convert at 10-40% vs 1-3% for cold applications. WarmPath connects you to people who can refer you.',
+      "Employee referrals convert at 10-40% vs 1-3% for cold applications. WarmPath connects you to people who can refer you.",
     heroSource: SOURCES.COLD_VS_REFERRAL,
     cards: [
       {
-        title: 'Access networks you don\u2019t have',
-        color: 'emerald',
+        title: "Access networks you don\u2019t have",
+        color: "emerald",
         icon: (
           <svg
             className="h-5 w-5 text-emerald-400"
@@ -167,8 +167,8 @@ const CONTENT = {
         ),
       },
       {
-        title: 'AI-powered matching',
-        color: 'blue',
+        title: "AI-powered matching",
+        color: "blue",
         icon: (
           <svg
             className="h-5 w-5 text-blue-400"
@@ -193,8 +193,8 @@ const CONTENT = {
         ),
       },
       {
-        title: 'Privacy-first',
-        color: 'amber',
+        title: "Privacy-first",
+        color: "amber",
         icon: (
           <svg
             className="h-5 w-5 text-amber-400"
@@ -221,52 +221,54 @@ const CONTENT = {
     ],
     steps: [
       {
-        step: '1',
-        title: 'Search',
-        desc: 'Find anonymized connections at your target companies.',
+        step: "1",
+        title: "Search",
+        desc: "Find anonymized connections at your target companies.",
       },
       {
-        step: '2',
-        title: 'Request intro',
-        desc: 'Ask the connection holder to introduce you. They review your profile first.',
+        step: "2",
+        title: "Request intro",
+        desc: "Ask the connection holder to introduce you. They review your profile first.",
       },
       {
-        step: '3',
-        title: 'Get referred',
-        desc: 'Once approved, you get a warm intro and a real shot at the role.',
+        step: "3",
+        title: "Get referred",
+        desc: "Once approved, you get a warm intro and a real shot at the role.",
       },
     ],
     ctaLabel: "Start getting referred \u2014 it's free",
     ctaSub:
-      'Free to search your own network. Marketplace access from $20-30/month.',
-    cardsAriaLabel: 'Why use WarmPath',
+      "Free to search your own network. Marketplace access from $20-30/month.",
+    cardsAriaLabel: "Why use WarmPath",
   },
 };
 
 const ICON_BG = {
-  emerald: 'bg-emerald-500/10',
-  blue: 'bg-blue-500/10',
-  amber: 'bg-amber-500/10',
+  emerald: "bg-emerald-500/10",
+  blue: "bg-blue-500/10",
+  amber: "bg-amber-500/10",
 };
 
 export default function Join() {
   const [searchParams] = useSearchParams();
-  const intent = searchParams.get('intent') === 'seeker' ? 'seeker' : 'network';
+  const intent = searchParams.get("intent") === "seeker" ? "seeker" : "network";
   const content = CONTENT[intent];
+
+  const [showExplainer, setShowExplainer] = useState(false);
 
   useDocumentTitle(content.title);
 
   // Store referral code from URL for post-signup attribution
   useEffect(() => {
-    const ref = searchParams.get('ref');
+    const ref = searchParams.get("ref");
     if (ref) {
-      localStorage.setItem('referral_code', ref);
+      localStorage.setItem("referral_code", ref);
     }
   }, [searchParams]);
 
   // Store intent in localStorage for onboarding pre-selection
   useEffect(() => {
-    localStorage.setItem('join_intent', intent);
+    localStorage.setItem("join_intent", intent);
   }, [intent]);
 
   return (
@@ -315,7 +317,10 @@ export default function Join() {
         </section>
 
         {/* Value prop cards */}
-        <section className="mb-12 space-y-4" aria-label={content.cardsAriaLabel}>
+        <section
+          className="mb-12 space-y-4"
+          aria-label={content.cardsAriaLabel}
+        >
           {content.cards.map((card) => (
             <div
               key={card.title}
@@ -450,6 +455,50 @@ export default function Join() {
               Read our full privacy policy
             </Link>
           </div>
+        </section>
+
+        {/* What is WarmPath? explainer */}
+        <section
+          className="mb-12 rounded-xl border border-slate-700/50 bg-slate-900"
+          aria-label="What is WarmPath"
+        >
+          <button
+            onClick={() => setShowExplainer(!showExplainer)}
+            aria-expanded={showExplainer}
+            className="flex w-full items-center justify-between p-6 text-left"
+          >
+            <h2 className="text-base font-semibold text-slate-50">
+              What is WarmPath?
+            </h2>
+            <svg
+              className={`h-5 w-5 text-slate-400 transition-transform ${showExplainer ? "rotate-180" : ""}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth="2"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="m19.5 8.25-7.5 7.5-7.5-7.5"
+              />
+            </svg>
+          </button>
+          {showExplainer && (
+            <div className="px-6 pb-6">
+              <p className="text-sm leading-relaxed text-slate-300">
+                WarmPath is a referral marketplace that connects job seekers
+                with employees at their target companies. Instead of applying
+                cold, job seekers search an anonymized marketplace of
+                professional networks and request warm introductions. If you
+                received an intro email &mdash; someone in your network used
+                WarmPath to connect you with a qualified candidate. You can
+                reply directly to them, or join WarmPath to help more people get
+                referred.
+              </p>
+            </div>
+          )}
         </section>
 
         {/* CTA */}
