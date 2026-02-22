@@ -23,12 +23,3 @@ class TestOpenAICompatClients:
             client = _build_groq_client()
             assert client.api_key == "test-groq-key"
             assert "groq.com" in str(client.base_url)
-
-    def test_get_deepseek_client_uses_deepseek_base_url(self):
-        with patch("app.utils.openai_compat_client.settings") as mock_settings:
-            mock_settings.DEEPSEEK_API_KEY = "test-ds-key"
-            from app.utils.openai_compat_client import _build_deepseek_client
-
-            client = _build_deepseek_client()
-            assert client.api_key == "test-ds-key"
-            assert "deepseek.com" in str(client.base_url)

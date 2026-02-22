@@ -31,9 +31,6 @@ def rate_limiter_watchdog() -> None:
         top_up_tokens_sync("openai", settings.OPENAI_MAX_CONCURRENT)
     if settings.GROQ_API_KEY:
         top_up_tokens_sync("groq", settings.GROQ_MAX_CONCURRENT)
-    if settings.DEEPSEEK_API_KEY:
-        top_up_tokens_sync("deepseek", settings.DEEPSEEK_MAX_CONCURRENT)
-
     logger.debug("Rate limiter watchdog completed")
 
 
