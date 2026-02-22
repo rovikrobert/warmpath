@@ -79,6 +79,58 @@ class TestComputeCapabilities:
             assert caps.has_subscription is True
 
 
+class TestProfileCompleteness:
+    """Unit tests for compute_profile_completeness."""
+
+    def test_no_profile_returns_zero(self):
+        from app.services.capabilities import compute_profile_completeness
+
+        score = compute_profile_completeness(None)
+        assert score["score"] == 0
+        assert len(score["missing"]) > 0
+        assert score["total_fields"] == 9
+
+    def test_full_profile_returns_100(self):
+        from unittest.mock import MagicMock
+
+        from app.services.capabilities import compute_profile_completeness
+
+        profile = MagicMock()
+        profile.headline = "Engineer"
+        profile.current_title = "Senior Engineer"
+        profile.current_company = "Acme"
+        profile.industry = "Tech"
+        profile.location = "SF"
+        profile.bio_summary = "I build things"
+        profile.work_history = [{"company": "Foo"}]
+        profile.github_url = "https://github.com/test"
+        profile.portfolio_url = "https://test.dev"
+        score = compute_profile_completeness(profile)
+        assert score["score"] == 100
+        assert score["missing"] == []
+
+    def test_partial_profile_scores_proportionally(self):
+        from unittest.mock import MagicMock
+
+        from app.services.capabilities import compute_profile_completeness
+
+        profile = MagicMock()
+        profile.headline = None
+        profile.current_title = "Engineer"
+        profile.current_company = "Acme"
+        profile.industry = None
+        profile.location = None
+        profile.bio_summary = None
+        profile.work_history = None
+        profile.github_url = None
+        profile.portfolio_url = None
+        score = compute_profile_completeness(profile)
+        assert 0 < score["score"] < 100
+        assert "headline" in score["missing"]
+        assert "bio_summary" in score["missing"]
+        assert score["score"] == round(2 / 9 * 100)
+
+
 class TestMeEndpointCapabilities:
     """GET /auth/me should include capabilities."""
 

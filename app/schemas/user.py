@@ -49,6 +49,9 @@ class ConnectorProfileUpsert(BaseModel):
     industry: str | None = None
     location: str | None = None
     linkedin_url: str | None = None
+    github_url: str | None = Field(default=None, max_length=500)
+    portfolio_url: str | None = Field(default=None, max_length=500)
+    personal_site_url: str | None = Field(default=None, max_length=500)
     bio_summary: str | None = None
     work_history: list[WorkHistoryEntry] | None = None
 
@@ -62,6 +65,9 @@ class ConnectorProfileResponse(BaseModel):
     industry: str | None
     location: str | None
     linkedin_url: str | None
+    github_url: str | None = None
+    portfolio_url: str | None = None
+    personal_site_url: str | None = None
     bio_summary: str | None
     work_history: list | None = None
     created_at: datetime
