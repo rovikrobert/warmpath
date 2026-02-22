@@ -235,6 +235,16 @@ class JobFetcher:
                 )
                 all_jobs = await fetch_career_page(career_url)
 
+        # 3. If still nothing and aggregator configured, try Adzuna
+        if not all_jobs and settings.ADZUNA_APP_ID:
+            from app.services.job_aggregator import search_jobs_by_company
+
+            logger.info(
+                "No ATS/career-page results for '%s', trying Adzuna aggregator",
+                company_name,
+            )
+            all_jobs = await search_jobs_by_company(company_name)
+
         logger.info(
             "Fetched %d total jobs for company '%s'", len(all_jobs), company_name
         )
@@ -259,44 +269,70 @@ class JobFetcher:
 
         return await self._ai_match_jobs(jobs, target_role, target_seniority)
 
+    # Level-synonym groups: roles at similar organizational levels.
+    # When a target role contains one of these words, titles containing
+    # any word in the same group get partial credit.
+    _LEVEL_SYNONYMS: dict[str, set[str]] = {
+        "manager": {"manager", "director", "head", "lead", "vp"},
+        "director": {"director", "manager", "head", "vp", "lead"},
+        "head": {"head", "director", "manager", "vp", "lead"},
+        "vp": {"vp", "director", "head", "manager"},
+        "lead": {"lead", "manager", "head", "director"},
+        "engineer": {"engineer", "developer", "programmer", "swe"},
+        "developer": {"developer", "engineer", "programmer"},
+        "designer": {"designer", "ux", "ui"},
+        "analyst": {"analyst", "associate", "coordinator"},
+    }
+
     def _mock_match_jobs(
         self,
         jobs: list[dict],
         target_role: str,
         target_seniority: str | None = None,
     ) -> list[dict]:
-        """Mock role matching using keyword overlap."""
+        """Mock role matching using keyword overlap + level-synonym expansion."""
         role_words = set(target_role.lower().split())
         seniority_words = (
             set(target_seniority.lower().split()) if target_seniority else set()
         )
 
+        # Build expanded set: for each role word, add its level synonyms
+        expanded_words: set[str] = set()
+        for w in role_words:
+            synonyms = self._LEVEL_SYNONYMS.get(w)
+            if synonyms:
+                expanded_words |= synonyms
+
         scored: list[dict] = []
         for job in jobs:
             title = job.get("title", "").lower()
-            title_words = set(title.split())
+            # Strip punctuation so "Manager," matches "manager"
+            title_words = set(re.sub(r"[^\w\s-]", " ", title).split())
 
-            # Score based on word overlap
-            role_overlap = len(role_words & title_words)
+            # Score each role word: 1.0 for exact match, 0.7 for synonym
+            coverage = 0.0
+            for w in role_words:
+                if w in title_words:
+                    coverage += 1.0
+                elif self._LEVEL_SYNONYMS.get(w, set()) & title_words:
+                    coverage += 0.7
+
+            # Substring fallback (e.g. "engineer" in "reengineering")
+            if coverage == 0 and any(w in title for w in role_words):
+                coverage = 0.5
+
+            if coverage == 0:
+                continue
+
             seniority_overlap = (
                 len(seniority_words & title_words) if seniority_words else 0
             )
 
-            if role_overlap == 0 and any(w in title for w in role_words):
-                # Check for substring match (e.g. "engineer" in "software engineer")
-                role_overlap = 0.5
-
-            if role_overlap == 0:
-                continue
-
             score = min(
                 100,
-                int(
-                    (role_overlap / max(len(role_words), 1)) * 70
-                    + seniority_overlap * 30
-                ),
+                int((coverage / max(len(role_words), 1)) * 80 + seniority_overlap * 20),
             )
-            if score >= 50:
+            if score >= 25:
                 scored.append({**job, "role_relevance": score})
 
         scored.sort(key=lambda x: x["role_relevance"], reverse=True)
@@ -323,6 +359,14 @@ class JobFetcher:
 
         seniority_text = f" at '{target_seniority}' level" if target_seniority else ""
         prompt = f"""Given a user looking for '{target_role}' roles{seniority_text}, score these job titles for relevance 0-100.
+
+Scoring guide:
+- 80-100: Same role or very close variant (e.g. "General Manager" ↔ "General Manager, APAC")
+- 60-79: Same job family or function (e.g. "General Manager" ↔ "Director of Operations", "Head of Business")
+- 50-59: Related level but different function (e.g. "General Manager" ↔ "Product Manager")
+- Below 50: Different role or level entirely (e.g. "General Manager" ↔ "Software Engineer")
+
+Prioritize job family closeness over shared keywords. "Director of Operations" is closer to "General Manager" than "Product Manager" despite sharing fewer words.
 
 JOB TITLES:
 {json.dumps(titles, indent=2)}

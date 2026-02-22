@@ -117,7 +117,15 @@ export default function Layout() {
     const interval = setInterval(() => {
       feedApi.count().then((r) => setFeedUnseen(r.data?.unseen ?? 0)).catch(() => {});
     }, 120_000);
-    return () => clearInterval(interval);
+    // Also refresh immediately when feed items are seen/dismissed
+    const refreshOnUpdate = () => {
+      feedApi.count().then((r) => setFeedUnseen(r.data?.unseen ?? 0)).catch(() => {});
+    };
+    window.addEventListener('feed-updated', refreshOnUpdate);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('feed-updated', refreshOnUpdate);
+    };
   }, []);
 
   // Refetch balance on route change (debounced: 10s minimum between fetches)
