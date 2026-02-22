@@ -31,6 +31,7 @@ class CoachingSession(Base):
     coaching_stage: Mapped[str] = mapped_column(
         String(50), nullable=False, default="onboarding"
     )
+    persona: Mapped[str] = mapped_column(String(20), nullable=False, default="keevs")
     topics_covered: Mapped[dict | None] = mapped_column(JSONB, default=dict)
     message_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     started_at: Mapped[datetime] = mapped_column(
