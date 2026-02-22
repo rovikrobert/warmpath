@@ -57,10 +57,10 @@ const EMPTY_WORK = { company: '', title: '', start_date: '', end_date: '', is_cu
 const SENIORITY_OPTIONS = ['Staff / Principal', 'Manager', 'Director', 'VP', 'C-Suite'];
 
 // Steps: 1=Intent, 2=Job Prefs (skipped by NHs), 3=Bonus Pitch (NH/explore only),
-// 4-7=Privacy, 8=Meet Keevs, 9=Upload CSV, 10=Work History
-const TOTAL_STEPS = 10;
+// 4=Privacy (consolidated), 5=Meet Keevs, 6=Upload CSV, 7=Work History
+const TOTAL_STEPS = 7;
 
-// Privacy step data (steps 4-7)
+// Privacy step data (rendered as compact rows in consolidated step 4)
 const PRIVACY_STEPS = [
   {
     step: 4,
@@ -134,7 +134,7 @@ export default function OnboardingPage() {
     open_to_remote: true,
   });
 
-  // Step 9: Upload
+  // Step 6: Upload
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
@@ -175,10 +175,10 @@ export default function OnboardingPage() {
         if (!hasIntent) { setStep(1); return; }
         // sha[RESEND_KEY_REDACTED] skips job prefs; others need them
         if (userIntent !== 'sha[RESEND_KEY_REDACTED]' && !hasPrefs) { setStep(2); return; }
-        // Steps 3-7 are informational, 8 is Meet Keevs — skip to data steps
-        if (!hasContacts) { setStep(9); return; }
+        // Steps 3-5 are informational — skip to data steps
+        if (!hasContacts) { setStep(6); return; }
         // Work history is the last step
-        setStep(10);
+        setStep(7);
       } catch {
         // Default to step 1 on error
       }
@@ -239,7 +239,7 @@ export default function OnboardingPage() {
     ? { text: 'Hang tight — scoring your network takes a moment. Worth it.', source: null, isGreeting: true }
     : { ...triviaPool[triviaIdx], isGreeting: false };
 
-  // Step 10: Work history + resume import
+  // Step 7: Work history + resume import
   const [workHistory, setWorkHistory] = useState([]);
   const [resumePreview, setResumePreview] = useState(null);
   const [resumeProfileData, setResumeProfileData] = useState(null);
@@ -454,9 +454,6 @@ export default function OnboardingPage() {
   const isHolder = intent === 'sha[RESEND_KEY_REDACTED]' || intent === 'explore';
 
   const inputClass = 'w-full rounded-lg border border-slate-700/50 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500';
-
-  // Check if current step is a privacy step
-  const privacyStep = PRIVACY_STEPS.find((ps) => ps.step === step);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12" role="main">
@@ -681,48 +678,63 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Steps 4-7: Privacy Explainer */}
-          {privacyStep && (
+          {/* Step 4: Privacy (consolidated) */}
+          {step === 4 && (
             <div className="space-y-5">
               <div className="text-center">
                 <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">How we protect your data</p>
-                <h2 className="text-lg font-semibold text-slate-50">{privacyStep.title}</h2>
+                <h2 className="text-lg font-semibold text-slate-50">Your Data Journey</h2>
               </div>
 
-              <div className={`flex flex-col items-center rounded-xl border ${privacyStep.borderColor} ${privacyStep.bgColor} p-8`}>
-                {privacyStep.icon}
-                <p className="mt-4 text-center text-sm leading-relaxed text-slate-300">
-                  {privacyStep.text}
-                </p>
+              {/* Data flow summary */}
+              <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-3 text-xs font-medium text-slate-300">
+                <span>CSV Upload</span>
+                <span className="text-slate-500" aria-hidden="true">&rarr;</span>
+                <span className="text-amber-400">Your Private Vault</span>
+                <span className="text-slate-500" aria-hidden="true">&rarr;</span>
+                <span className="text-emerald-400">Anonymized Marketplace</span>
+                <span className="text-slate-500" aria-hidden="true">&rarr;</span>
+                <span className="text-purple-400">You Review</span>
+                <span className="text-slate-500" aria-hidden="true">&rarr;</span>
+                <span className="text-blue-400">You Approve</span>
               </div>
 
-              {/* Show privacy policy link on last privacy step */}
-              {step === 7 && (
-                <p className="text-center text-sm text-slate-400">
-                  Learn more in our{' '}
-                  <Link to="/privacy" className="font-medium text-amber-400 hover:text-amber-300 hover:underline">
-                    Privacy Policy
-                  </Link>
-                </p>
-              )}
+              {/* Privacy points — compact rows */}
+              <div className="space-y-3">
+                {PRIVACY_STEPS.map((ps) => (
+                  <div key={ps.title} className={`flex items-start gap-3 rounded-xl border ${ps.borderColor} ${ps.bgColor} p-4`}>
+                    <div className="shrink-0 [&>svg]:h-6 [&>svg]:w-6">{ps.icon}</div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-100">{ps.title}</p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-slate-400">{ps.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-center text-sm text-slate-400">
+                Learn more in our{' '}
+                <Link to="/privacy" className="font-medium text-amber-400 hover:text-amber-300 hover:underline">
+                  Privacy Policy
+                </Link>
+              </p>
 
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={() => {
                   setError('');
-                  // From step 4: find_referrals goes back to 2 (prefs), others go back to 3 (bonus pitch)
-                  setStep(step === 4 && intent === 'find_referrals' ? 2 : step - 1);
+                  setStep(intent === 'find_referrals' ? 2 : 3);
                 }} className="flex-1" size="lg">
                   Back
                 </Button>
-                <Button onClick={() => setStep(step + 1)} className="flex-1" size="lg">
+                <Button onClick={() => setStep(5)} className="flex-1" size="lg">
                   Next
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Step 8: Meet Keevs */}
-          {step === 8 && (
+          {/* Step 5: Meet Keevs */}
+          {step === 5 && (
             <div className="space-y-5">
               <div className="text-center">
                 <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">Your AI career coach</p>
@@ -764,18 +776,18 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => { setError(''); setStep(7); }} className="flex-1" size="lg">
+                <Button variant="secondary" onClick={() => { setError(''); setStep(4); }} className="flex-1" size="lg">
                   Back
                 </Button>
-                <Button onClick={() => setStep(9)} className="flex-1" size="lg">
+                <Button onClick={() => setStep(6)} className="flex-1" size="lg">
                   Let's Go
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Step 9: Upload CSV */}
-          {step === 9 && !uploadResult && (
+          {/* Step 6: Upload CSV */}
+          {step === 6 && !uploadResult && (
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-50">Upload your LinkedIn connections</h2>
@@ -849,7 +861,7 @@ export default function OnboardingPage() {
               )}
 
               <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => { setError(''); setStep(8); }} size="lg" className="px-4">
+                <Button variant="secondary" onClick={() => { setError(''); setStep(5); }} size="lg" className="px-4">
                   Back
                 </Button>
                 <Button onClick={handleUpload} disabled={!file} loading={uploading} className="flex-1" size="lg">
@@ -859,8 +871,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 9 done — prompt for work history */}
-          {step === 9 && uploadResult && (
+          {/* Step 6 done — prompt for work history */}
+          {step === 6 && uploadResult && (
             <div className="space-y-4 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
                 <span className="text-xl text-emerald-400">&#10003;</span>
@@ -882,18 +894,18 @@ export default function OnboardingPage() {
                 </p>
               )}
               <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => { setError(''); setStep(8); }} size="lg" className="px-4">
+                <Button variant="secondary" onClick={() => { setError(''); setStep(5); }} size="lg" className="px-4">
                   Back
                 </Button>
-                <Button onClick={() => setStep(10)} className="flex-1" size="lg">
+                <Button onClick={() => setStep(7)} className="flex-1" size="lg">
                   Add Work History
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Step 10: Work History */}
-          {step === 10 && (
+          {/* Step 7: Work History */}
+          {step === 7 && (
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-50">Your work history</h2>
@@ -1017,7 +1029,7 @@ export default function OnboardingPage() {
               {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
 
               <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => { setError(''); setStep(9); }} size="lg" className="px-4">
+                <Button variant="secondary" onClick={() => { setError(''); setStep(6); }} size="lg" className="px-4">
                   Back
                 </Button>
                 <Button
