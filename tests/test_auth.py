@@ -33,6 +33,24 @@ async def test_me_returns_profile_and_capabilities(client: AsyncClient):
     assert "clerk_user_id" not in body["data"]
 
 
+async def test_me_includes_profile_completeness(client: AsyncClient):
+    """GET /me returns profile_completeness with score and missing fields."""
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="completeness@test.com", full_name="Completeness User"
+        )
+    resp = await client.get("/api/v1/auth/me", headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert "profile_completeness" in data
+    assert "score" in data["profile_completeness"]
+    assert "missing" in data["profile_completeness"]
+    assert "total_fields" in data["profile_completeness"]
+    # New user with no profile should have score 0
+    assert data["profile_completeness"]["score"] == 0
+    assert data["profile_completeness"]["total_fields"] == 9
+
+
 async def test_me_without_token_returns_401(client: AsyncClient):
     """GET /me without Authorization header returns 401/403."""
     resp = await client.get("/api/v1/auth/me")
@@ -398,3 +416,27 @@ async def test_me_returns_onboarding_complete_false_for_new_user(client: AsyncCl
     resp = await client.get("/api/v1/auth/me", headers=headers)
     assert resp.status_code == 200
     assert resp.json()["data"]["onboarding_complete"] is False
+
+
+async def test_upsert_profile_with_url_fields(client: AsyncClient):
+    """Profile URL fields (github, portfolio, personal site) are accepted and persisted."""
+    async with TestSessionLocal() as db:
+        _, headers = await create_test_user_in_db(
+            db, email="urls@test.com", full_name="URL User"
+        )
+    resp = await client.post(
+        "/api/v1/auth/profile",
+        json={
+            "current_title": "Engineer",
+            "github_url": "https://github.com/janedoe",
+            "portfolio_url": "https://janedoe.dev",
+            "personal_site_url": "https://janedoe.com",
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["github_url"] == "https://github.com/janedoe"
+    assert data["portfolio_url"] == "https://janedoe.dev"
+    assert data["personal_site_url"] == "https://janedoe.com"
+    assert data["current_title"] == "Engineer"
