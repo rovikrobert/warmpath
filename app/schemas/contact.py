@@ -71,6 +71,7 @@ class ContactUpdate(BaseModel):
     relationship_type: str | None = Field(default=None, max_length=50)
     how_you_know: str | None = Field(default=None, max_length=1000)
     notes: str | None = Field(default=None, max_length=2000)
+    warm_score_override: float | None = Field(default=None, ge=0, le=100)
 
     @field_validator("relationship_type")
     @classmethod

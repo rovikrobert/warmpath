@@ -127,6 +127,11 @@ class Contact(Base):
         String(20)
     )  # definitely/probably/maybe/no
 
+    # Manual warm score override (nullable — when set, replaces algorithmic score)
+    warm_score_override: Mapped[float | None] = mapped_column(
+        nullable=True, default=None
+    )
+
     # Raw and enriched data
     raw_csv_row: Mapped[dict | None] = mapped_column(JSONB)
     enriched_data: Mapped[dict | None] = mapped_column(JSONB)

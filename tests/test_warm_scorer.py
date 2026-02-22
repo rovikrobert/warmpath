@@ -603,3 +603,40 @@ async def test_single_contact_includes_warm_score(client: AsyncClient):
 async def test_compute_scores_requires_auth(client: AsyncClient):
     resp = await client.post("/api/v1/contacts/compute-scores")
     assert resp.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — warm_score_override schema validation
+# ---------------------------------------------------------------------------
+
+
+def test_contact_update_schema_accepts_warm_score_override():
+    from app.schemas.contact import ContactUpdate
+
+    update = ContactUpdate(warm_score_override=75.0)
+    assert update.warm_score_override == 75.0
+
+
+def test_contact_update_schema_accepts_null_warm_score_override():
+    from app.schemas.contact import ContactUpdate
+
+    update = ContactUpdate(warm_score_override=None)
+    assert update.warm_score_override is None
+
+
+def test_contact_update_schema_rejects_warm_score_override_above_100():
+    from app.schemas.contact import ContactUpdate
+    from pydantic import ValidationError
+    import pytest
+
+    with pytest.raises(ValidationError):
+        ContactUpdate(warm_score_override=150.0)
+
+
+def test_contact_update_schema_rejects_warm_score_override_below_0():
+    from app.schemas.contact import ContactUpdate
+    from pydantic import ValidationError
+    import pytest
+
+    with pytest.raises(ValidationError):
+        ContactUpdate(warm_score_override=-10.0)
