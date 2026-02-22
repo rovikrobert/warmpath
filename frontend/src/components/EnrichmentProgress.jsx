@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import { contacts as contactsApi } from '../api/client';
 
-const MILESTONES = [10, 25, 50, 75, 100];
+// Milestone thresholds → credits awarded (matches backend MILESTONES)
+const MILESTONES = [
+  { pct: 10, credits: 10 },
+  { pct: 25, credits: 25 },
+  { pct: 50, credits: 50 },
+  { pct: 75, credits: 75 },
+  { pct: 100, credits: 100 },
+];
 
 export default function EnrichmentProgress({ compact = false }) {
   const [data, setData] = useState(null);
@@ -65,34 +72,38 @@ export default function EnrichmentProgress({ compact = false }) {
         </div>
         {/* Milestone markers */}
         <div className="absolute inset-0 flex">
-          {MILESTONES.filter((m) => m < 100).map((m) => (
+          {MILESTONES.filter((m) => m.pct < 100).map((m) => (
             <div
-              key={m}
+              key={m.pct}
               className="absolute top-0 h-2.5"
-              style={{ left: `${m}%` }}
+              style={{ left: `${m.pct}%` }}
             >
-              <div className={`h-full w-0.5 ${claimedValues.has(m) ? 'bg-amber-300' : 'bg-slate-600'}`} />
+              <div className={`h-full w-0.5 ${claimedValues.has(m.pct) ? 'bg-amber-300' : 'bg-slate-600'}`} />
             </div>
           ))}
         </div>
       </div>
 
-      {/* Milestone badges */}
-      <div className="mb-2 flex gap-1.5">
-        {MILESTONES.map((m) => (
-          <span
-            key={m}
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-              claimedValues.has(m)
-                ? 'bg-amber-500/20 text-amber-400'
-                : percentage >= m
-                  ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'bg-slate-700/50 text-slate-500'
-            }`}
-          >
-            {m}%{claimedValues.has(m) ? ' \u2713' : ''}
-          </span>
-        ))}
+      {/* Milestone reward badges */}
+      <div className="mb-2">
+        <p className="mb-1 text-xs text-slate-500">Milestone rewards</p>
+        <div className="flex gap-1.5">
+          {MILESTONES.map((m) => (
+            <span
+              key={m.pct}
+              title={claimedValues.has(m.pct) ? `${m.credits} credits claimed` : `Earn ${m.credits} credits at ${m.pct}%`}
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                claimedValues.has(m.pct)
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : percentage >= m.pct
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : 'bg-slate-700/50 text-slate-500'
+              }`}
+            >
+              {m.pct}%{claimedValues.has(m.pct) ? ' \u2713' : ` \u2192 ${m.credits}cr`}
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Motivational text */}
