@@ -24,6 +24,7 @@ const ReferralCodesPage = lazy(() => import('./pages/ReferralCodesPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const ScoreGlossary = lazy(() => import('./pages/ScoreGlossary'));
 const Join = lazy(() => import('./pages/Join'));
+const IntroReview = lazy(() => import('./pages/IntroReview'));
 
 function ProtectedRoute({ children, allowIncomplete = false }) {
   const { user, loading } = useAuth();
@@ -91,6 +92,7 @@ export default function App() {
           <Route path="/" element={<RootRedirect />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/join" element={<Join />} />
+          <Route path="/intro/:token" element={<IntroReview />} />
           <Route path="/onboarding" element={<ProtectedRoute allowIncomplete><OnboardingPage /></ProtectedRoute>} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/coach" element={<CoachPage />} />

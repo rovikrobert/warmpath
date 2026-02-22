@@ -179,6 +179,14 @@ class IntroFacilitation(Base):
         comment="Prevents double credit award",
     )
 
+    # Public intro review token (90-day TTL, revocable)
+    review_token: Mapped[str | None] = mapped_column(
+        String(64), unique=True, nullable=True, index=True
+    )
+    review_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

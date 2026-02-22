@@ -1,9 +1,11 @@
+import html as html_mod
 import logging
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 
@@ -24,6 +26,7 @@ from app.api import (
     feedback,
     friends,
     health,
+    intro_review,
     jobs,
     marketplace,
     matches,
@@ -219,6 +222,91 @@ app.include_router(
 )
 app.include_router(benchmarks.router, prefix="/api/v1/benchmarks", tags=["benchmarks"])
 app.include_router(telegram.router, prefix="/api/v1/telegram", tags=["telegram"])
+app.include_router(intro_review.router, prefix="/api/v1", tags=["intro-review"])
+
+# ---------------------------------------------------------------------------
+# Social bot OG tag middleware (used by SPA catch-all)
+# ---------------------------------------------------------------------------
+_SOCIAL_BOT_FRAGMENTS = (
+    "facebookexternalhit",
+    "twitterbot",
+    "linkedinbot",
+    "slackbot",
+    "discordbot",
+    "whatsapp",
+)
+
+
+def _is_social_bot(request: Request) -> bool:
+    """Return True if the request User-Agent belongs to a social link previewer."""
+    ua = (request.headers.get("user-agent") or "").lower()
+    return any(fragment in ua for fragment in _SOCIAL_BOT_FRAGMENTS)
+
+
+def _get_og_config(path: str, params: dict[str, str]) -> dict[str, str] | None:
+    """Return OG title/desc for a path, or None if path has no OG config."""
+    if path == "join":
+        if params.get("intent") == "seeker":
+            return {
+                "title": "Stop Applying Cold. Get Referred. \u2014 WarmPath",
+                "description": (
+                    "Employee referrals convert at 10-40% vs 1-3%. "
+                    "Search anonymized networks at your target companies "
+                    "and get warm introductions."
+                ),
+            }
+        return {
+            "title": "Share Your Network \u2014 WarmPath",
+            "description": (
+                "Help people get referred to jobs through your connections. "
+                "Earn your employer\u2019s referral bonus ($2-10K per hire). "
+                "Free, privacy-first, you stay in control."
+            ),
+        }
+    if path.startswith("intro"):
+        return {
+            "title": "Introduction via WarmPath",
+            "description": (
+                "Someone in your network wants to connect you "
+                "with a qualified professional."
+            ),
+        }
+    return None
+
+
+def _serve_og_html(path: str, params: dict[str, str]) -> HTMLResponse:
+    """Return minimal HTML with OG meta tags for social bot crawlers."""
+    config = _get_og_config(path, params)
+    # Caller must verify config is not None before calling
+    title = html_mod.escape(config["title"])  # type: ignore[index]
+    description = html_mod.escape(config["description"])  # type: ignore[index]
+    image_url = html_mod.escape(f"{settings.FRONTEND_URL}/og-image.png")
+    page_url = f"{settings.FRONTEND_URL}/{path}"
+    if params:
+        qs = urlencode(params)
+        page_url = f"{page_url}?{qs}"
+    page_url = html_mod.escape(page_url)
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>{title}</title>
+<meta property="og:type" content="website" />
+<meta property="og:title" content="{title}" />
+<meta property="og:description" content="{description}" />
+<meta property="og:image" content="{image_url}" />
+<meta property="og:url" content="{page_url}" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{title}" />
+<meta name="twitter:description" content="{description}" />
+<meta name="twitter:image" content="{image_url}" />
+<meta http-equiv="refresh" content="0;url={page_url}" />
+</head>
+<body></body>
+</html>"""
+    return HTMLResponse(content=html)
+
 
 # ---------------------------------------------------------------------------
 # Frontend static files (SPA)
@@ -233,8 +321,19 @@ if _frontend_dist.is_dir():
     _frontend_dist_resolved = _frontend_dist.resolve()
 
     @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str) -> FileResponse:
-        """Serve index.html for all non-API routes (SPA catch-all)."""
+    async def serve_spa(request: Request, full_path: str) -> Response:
+        """Serve index.html for all non-API routes (SPA catch-all).
+
+        Social bot crawlers receive minimal HTML with OG meta tags so that
+        link previews on Facebook, Twitter, LinkedIn, Slack, Discord, and
+        WhatsApp display the correct title, description, and image.
+        """
+        # Social bot OG tag shortcut
+        if _is_social_bot(request) and _get_og_config(
+            full_path, dict(request.query_params)
+        ):
+            return _serve_og_html(full_path, dict(request.query_params))
+
         file_path = (_frontend_dist / full_path).resolve()
         # Path containment: block traversal outside frontend/dist
         if not file_path.is_relative_to(_frontend_dist_resolved):
