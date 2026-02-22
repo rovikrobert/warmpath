@@ -132,14 +132,15 @@ export default function FindReferrals() {
 
     missing.forEach((name) => {
       companiesApi
-        .search({ query: name, limit: 1 })
+        .search({ query: name, limit: 5 })
         .then((res) => {
-          const match = (res.data ?? []).find(
-            (c) => c.name.toLowerCase() === name.toLowerCase(),
-          );
+          const results = res.data ?? [];
+          // Sum contact counts across all name variants (e.g. "Meta" matches
+          // "Meta", "Meta Platforms", "Meta Platforms Inc" in the Company table)
+          const count = results.reduce((sum, c) => sum + (c.contact_count ?? 0), 0);
           setCompanyCounts((prev) => ({
             ...prev,
-            [name]: match?.contact_count ?? 0,
+            [name]: count,
           }));
         })
         .catch(() => {

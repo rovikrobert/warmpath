@@ -160,22 +160,25 @@ async def get_feed_count(
     """Get unseen and total feed item counts for notification badge."""
     now = datetime.now(timezone.utc)
 
+    # Exclude enrichment_prompt items — they're shown inline on the
+    # Contacts page, not in the Coach page notification feed.
+    badge_filter = [
+        FeedItem.user_id == current_user.id,
+        FeedItem.dismissed_at.is_(None),
+        FeedItem.item_type != "enrichment_prompt",
+        (FeedItem.expires_at.is_(None)) | (FeedItem.expires_at > now),
+    ]
+
     unseen_result = await db.execute(
         select(func.count(FeedItem.id)).where(
-            FeedItem.user_id == current_user.id,
+            *badge_filter,
             FeedItem.seen_at.is_(None),
-            FeedItem.dismissed_at.is_(None),
-            (FeedItem.expires_at.is_(None)) | (FeedItem.expires_at > now),
         )
     )
     unseen = unseen_result.scalar_one()
 
     total_result = await db.execute(
-        select(func.count(FeedItem.id)).where(
-            FeedItem.user_id == current_user.id,
-            FeedItem.dismissed_at.is_(None),
-            (FeedItem.expires_at.is_(None)) | (FeedItem.expires_at > now),
-        )
+        select(func.count(FeedItem.id)).where(*badge_filter)
     )
     total = total_result.scalar_one()
 
