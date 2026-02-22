@@ -419,6 +419,7 @@ class TestDemandSignalCapture:
         from sqlalchemy import select
 
         from app.models.marketplace import RecommendationDemandSignal
+        from app.services.job_fetcher import JobFetcher
 
         async with TestSessionLocal() as db:
             user, headers = await create_test_user_in_db(db)
@@ -434,9 +435,14 @@ class TestDemandSignalCapture:
             },
         )
 
-        resp = await client.get(
-            "/api/v1/search/recommendations?limit=10", headers=headers
-        )
+        # Mock job fetcher to return empty — ensures sparse results regardless
+        # of real ATS API availability.
+        with patch.object(
+            JobFetcher, "fetch_jobs_for_company", new_callable=AsyncMock, return_value=[]
+        ):
+            resp = await client.get(
+                "/api/v1/search/recommendations?limit=10", headers=headers
+            )
         assert resp.status_code == 200
 
         # Check demand signal was logged
