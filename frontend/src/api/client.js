@@ -200,6 +200,8 @@ export const marketplace = {
   updateSharingPrefs: (body) =>
     api('/api/v1/marketplace/sharing-preferences', { method: 'PUT', body }),
   myListings: () => api('/api/v1/marketplace/my-listings'),
+  confirmSent: (facilitationId) =>
+    api(`/api/v1/marketplace/requests/${facilitationId}/confirm-sent`, { method: 'POST' }),
 };
 
 export const credits = {
