@@ -13,7 +13,6 @@ const OnboardingPage = lazy(() => import('./pages/OnboardingPage'));
 const FindReferrals = lazy(() => import('./pages/FindReferrals'));
 const ReferralResults = lazy(() => import('./pages/ReferralResults'));
 const MarketplaceOverview = lazy(() => import('./pages/MarketplaceOverview'));
-const MarketplaceBrowse = lazy(() => import('./pages/MarketplaceBrowse'));
 const MyRequests = lazy(() => import('./pages/MyRequests'));
 const CreditsPage = lazy(() => import('./pages/CreditsPage'));
 const SharingSettings = lazy(() => import('./pages/SharingSettings'));
@@ -104,7 +103,7 @@ export default function App() {
             <Route path="/referrals/:id" element={<ReferralResults />} />
             <Route path="/applications" element={<ApplicationsPage />} />
             <Route path="/marketplace" element={<MarketplaceOverview />} />
-            <Route path="/marketplace/browse" element={<MarketplaceBrowse />} />
+            <Route path="/marketplace/browse" element={<Navigate to="/referrals" replace />} />
             <Route path="/marketplace/requests" element={<MyRequests />} />
             <Route path="/credits" element={<CreditsPage />} />
             <Route path="/invite" element={<ReferralCodesPage />} />
