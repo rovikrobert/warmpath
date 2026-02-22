@@ -251,3 +251,242 @@ async def test_record_send_handles_none_external_id() -> None:
         )
         log = result.scalar_one()
         assert log.external_id is None
+
+
+# ---------------------------------------------------------------------------
+# Intro facilitation delivery webhook tests
+# ---------------------------------------------------------------------------
+
+
+async def _create_intro_facilitation_with_relay_id() -> tuple[str, str]:
+    """Create full chain: users + company + contact + listing + facilitation.
+
+    Returns (relay_message_id, network_holder_id as str).
+    """
+    from app.models.company import Company
+    from app.models.contact import Contact
+    from app.models.marketplace import IntroFacilitation, MarketplaceListing
+
+    relay_id = f"resend_relay_{uuid_mod.uuid4().hex[:12]}"
+    async with TestSessionLocal() as db:
+        nh = User(
+            id=uuid_mod.uuid4(),
+            email=f"nh_{uuid_mod.uuid4().hex[:6]}@test.com",
+            full_name="Network Holder",
+        )
+        js = User(
+            id=uuid_mod.uuid4(),
+            email=f"js_{uuid_mod.uuid4().hex[:6]}@test.com",
+            full_name="Job Seeker",
+        )
+        db.add_all([nh, js])
+        await db.flush()
+
+        company = Company(id=uuid_mod.uuid4(), name="TestCo", domain="testco.com")
+        db.add(company)
+        await db.flush()
+
+        contact = Contact(
+            user_id=nh.id,
+            company_id=company.id,
+            first_name="Contact",
+            last_name="Person",
+            full_name="Contact Person",
+        )
+        db.add(contact)
+        await db.flush()
+
+        listing = MarketplaceListing(
+            network_holder_id=nh.id,
+            contact_id=contact.id,
+            company_id=company.id,
+            role_level="senior",
+            department_category="engineering",
+            warm_score_range="60-80",
+            connection_recency="recent",
+        )
+        db.add(listing)
+        await db.flush()
+
+        facilitation = IntroFacilitation(
+            job_seeker_id=js.id,
+            network_holder_id=nh.id,
+            marketplace_listing_id=listing.id,
+            status="approved",
+            relay_message_id=relay_id,
+            delivery_status="sent",
+            delivery_method="email_relay",
+        )
+        db.add(facilitation)
+        await db.commit()
+
+        nh_id_str = str(nh.id)
+    return relay_id, nh_id_str
+
+
+@pytest.mark.asyncio
+async def test_resend_webhook_delivery_awards_credits(client: AsyncClient) -> None:
+    """email.delivered sets delivery_status, delivered_at, awards 50 credits to NH."""
+    relay_id, nh_id = await _create_intro_facilitation_with_relay_id()
+
+    payload = {"type": "email.delivered", "data": {"email_id": relay_id}}
+    resp = await client.post(
+        "/api/v1/webhooks/resend",
+        content=json.dumps(payload),
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["matched"] is True
+
+    async with TestSessionLocal() as db:
+        from sqlalchemy import select
+
+        from app.models.credits import CreditTransaction
+        from app.models.marketplace import IntroFacilitation
+
+        result = await db.execute(
+            select(IntroFacilitation).where(
+                IntroFacilitation.relay_message_id == relay_id
+            )
+        )
+        fac = result.scalar_one()
+        assert fac.delivery_status == "delivered"
+        assert fac.delivered_at is not None
+        assert fac.credits_awarded_at is not None
+
+        # NH should have 50 credits
+        import uuid as _uuid
+
+        credit_result = await db.execute(
+            select(CreditTransaction).where(
+                CreditTransaction.user_id == _uuid.UUID(nh_id),
+                CreditTransaction.reason == "intro_facilitation",
+            )
+        )
+        txn = credit_result.scalar_one()
+        assert txn.amount == 50
+
+
+@pytest.mark.asyncio
+async def test_resend_webhook_bounce_awards_partial_credits(
+    client: AsyncClient,
+) -> None:
+    """email.bounced sets delivery_status=bounced, awards 25 partial credits to NH."""
+    relay_id, nh_id = await _create_intro_facilitation_with_relay_id()
+
+    payload = {"type": "email.bounced", "data": {"email_id": relay_id}}
+    resp = await client.post(
+        "/api/v1/webhooks/resend",
+        content=json.dumps(payload),
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["matched"] is True
+
+    async with TestSessionLocal() as db:
+        from sqlalchemy import select
+
+        from app.models.credits import CreditTransaction
+        from app.models.marketplace import IntroFacilitation
+
+        result = await db.execute(
+            select(IntroFacilitation).where(
+                IntroFacilitation.relay_message_id == relay_id
+            )
+        )
+        fac = result.scalar_one()
+        assert fac.delivery_status == "bounced"
+        assert fac.delivered_at is not None
+        assert fac.credits_awarded_at is not None
+
+        import uuid as _uuid
+
+        credit_result = await db.execute(
+            select(CreditTransaction).where(
+                CreditTransaction.user_id == _uuid.UUID(nh_id),
+                CreditTransaction.reason == "intro_facilitation_bounced",
+            )
+        )
+        txn = credit_result.scalar_one()
+        assert txn.amount == 25
+
+
+@pytest.mark.asyncio
+async def test_resend_webhook_opened_updates_status_no_credits(
+    client: AsyncClient,
+) -> None:
+    """email.opened sets delivery_status=opened but awards no credits."""
+    relay_id, nh_id = await _create_intro_facilitation_with_relay_id()
+
+    payload = {"type": "email.opened", "data": {"email_id": relay_id}}
+    resp = await client.post(
+        "/api/v1/webhooks/resend",
+        content=json.dumps(payload),
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["matched"] is True
+
+    async with TestSessionLocal() as db:
+        from sqlalchemy import func, select
+
+        from app.models.credits import CreditTransaction
+        from app.models.marketplace import IntroFacilitation
+
+        result = await db.execute(
+            select(IntroFacilitation).where(
+                IntroFacilitation.relay_message_id == relay_id
+            )
+        )
+        fac = result.scalar_one()
+        assert fac.delivery_status == "opened"
+        assert fac.credits_awarded_at is None
+
+        # No credits should have been awarded
+        import uuid as _uuid
+
+        count_result = await db.execute(
+            select(func.count()).where(
+                CreditTransaction.user_id == _uuid.UUID(nh_id),
+            )
+        )
+        assert count_result.scalar() == 0
+
+
+@pytest.mark.asyncio
+async def test_resend_webhook_no_double_credit_on_duplicate_delivery(
+    client: AsyncClient,
+) -> None:
+    """Sending email.delivered twice awards credits only once (idempotent)."""
+    relay_id, nh_id = await _create_intro_facilitation_with_relay_id()
+
+    payload = {"type": "email.delivered", "data": {"email_id": relay_id}}
+    headers = {"Content-Type": "application/json"}
+
+    # First delivery event
+    resp1 = await client.post(
+        "/api/v1/webhooks/resend", content=json.dumps(payload), headers=headers
+    )
+    assert resp1.status_code == 200
+
+    # Second delivery event (duplicate)
+    resp2 = await client.post(
+        "/api/v1/webhooks/resend", content=json.dumps(payload), headers=headers
+    )
+    assert resp2.status_code == 200
+
+    async with TestSessionLocal() as db:
+        from sqlalchemy import func, select
+
+        from app.models.credits import CreditTransaction
+
+        import uuid as _uuid
+
+        count_result = await db.execute(
+            select(func.count()).where(
+                CreditTransaction.user_id == _uuid.UUID(nh_id),
+                CreditTransaction.reason == "intro_facilitation",
+            )
+        )
+        # Only one credit transaction despite two webhook calls
+        assert count_result.scalar() == 1
