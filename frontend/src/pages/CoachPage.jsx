@@ -354,7 +354,7 @@ export default function CoachPage() {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" aria-live="polite" aria-label="Conversation messages">
         <ErrorBoundary>
         {messages.map((msg, i) => {
-          const isBriefing = i === 0 && msg.role === 'keevs' || msg.role === 'treb';
+          const isBriefing = i === 0 && (msg.role === 'keevs' || msg.role === 'treb');
           return (
           <div
             key={i}
@@ -370,7 +370,7 @@ export default function CoachPage() {
                       : 'max-w-[95%] sm:max-w-[85%] px-4 py-3 bg-slate-800 text-slate-200'
                 }`}
               >
-                {msg.role === 'keevs' || msg.role === 'treb'
+                {(msg.role === 'keevs' || msg.role === 'treb')
                   ? msg.content.split('\n').map((line, j) => (
                       <p key={j} className={j > 0 ? 'mt-2' : ''}>
                         {renderWithLinks(line)}
@@ -379,7 +379,7 @@ export default function CoachPage() {
                   : msg.content
                 }
               </div>
-              {msg.role === 'keevs' || msg.role === 'treb' && msg.content && (
+              {(msg.role === 'keevs' || msg.role === 'treb') && msg.content && (
                 <button
                   onClick={() => navigator.clipboard.writeText(msg.content).then(() => toast.success('Copied to clipboard'))}
                   className="mt-1 text-xs text-slate-500 hover:text-slate-400 transition-colors"
