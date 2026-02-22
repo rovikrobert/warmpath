@@ -171,7 +171,7 @@ export default function MarketplaceOverview() {
       )}
 
       {/* Reputation + Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <div className="surface-raised p-4">
           <p className="stat-label">Active Listings</p>
           <p className="stat-number">{listings.length}</p>
@@ -270,7 +270,7 @@ export default function MarketplaceOverview() {
                       onClick={() => handleAction(req.id, 'approve')}
                       disabled={actionLoading === req.id}
                       aria-label={`Approve intro request from ${req.job_seeker_profile_snapshot?.full_name || 'candidate'}`}
-                      className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-400 disabled:opacity-50"
+                      className="rounded-md bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-400 disabled:opacity-50"
                     >
                       Approve
                     </button>
@@ -278,7 +278,7 @@ export default function MarketplaceOverview() {
                       onClick={() => handleAction(req.id, 'decline')}
                       disabled={actionLoading === req.id}
                       aria-label={`Decline intro request from ${req.job_seeker_profile_snapshot?.full_name || 'candidate'}`}
-                      className="rounded-md border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                      className="rounded-md border border-red-500/30 px-4 py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
                     >
                       Decline
                     </button>
@@ -378,7 +378,7 @@ export default function MarketplaceOverview() {
                     type="button"
                     onClick={() => toggleContactVisibility(contactId)}
                     disabled={toggleLoading === contactId}
-                    className="absolute top-3 right-3 text-slate-500 hover:text-slate-300 disabled:opacity-50"
+                    className="absolute top-3 right-3 p-2 text-slate-500 hover:text-slate-300 disabled:opacity-50"
                     aria-label={isHidden ? 'Show contact on marketplace' : 'Hide contact from marketplace'}
                   >
                     {isHidden ? (

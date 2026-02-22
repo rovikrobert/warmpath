@@ -73,7 +73,7 @@ function CompanyCard({ rec, onSearch }) {
 
       <button
         onClick={() => onSearch(rec.display_name)}
-        className="mt-3 rounded-md bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/20 transition-colors"
+        className="mt-3 rounded-md bg-amber-500/10 px-3 py-2.5 text-sm font-medium text-amber-400 hover:bg-amber-500/20 transition-colors"
         aria-label={`Search referral paths at ${rec.display_name}`}
       >
         Search

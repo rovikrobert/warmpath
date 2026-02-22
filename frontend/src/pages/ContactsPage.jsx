@@ -421,20 +421,53 @@ export default function ContactsPage() {
           >
             Add Contact
           </button>
-          <button
-            onClick={() => setShowBulkModal(true)}
-            className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/10"
-          >
-            Import Multiple
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={exporting}
-            aria-label="Export contacts as CSV"
-            className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 disabled:opacity-50"
-          >
-            {exporting ? 'Exporting...' : 'Export CSV'}
-          </button>
+          {/* Secondary actions collapse behind overflow menu on mobile */}
+          <div className="hidden sm:flex gap-2">
+            <button
+              onClick={() => setShowBulkModal(true)}
+              className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/10"
+            >
+              Import Multiple
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              aria-label="Export contacts as CSV"
+              className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+            >
+              {exporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+          </div>
+          {/* Mobile overflow menu */}
+          <div className="relative sm:hidden">
+            <button
+              onClick={(e) => {
+                const menu = e.currentTarget.nextElementSibling;
+                menu.classList.toggle('hidden');
+              }}
+              className="rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
+              aria-label="More actions"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+              </svg>
+            </button>
+            <div className="hidden absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-slate-700/50 bg-slate-800 py-1 shadow-lg">
+              <button
+                onClick={() => { setShowBulkModal(true); }}
+                className="w-full px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-700"
+              >
+                Import Multiple
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="w-full px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+              >
+                {exporting ? 'Exporting...' : 'Export CSV'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -819,7 +852,7 @@ export default function ContactsPage() {
       </SlideOver>
 
       {toast && (
-        <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-red-500/90 px-4 py-2 text-sm font-medium text-white shadow-lg" role="alert" aria-live="polite">
+        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-red-500/90 px-4 py-2 text-sm font-medium text-white shadow-lg lg:bottom-8" role="alert" aria-live="polite">
           {toast}
         </div>
       )}

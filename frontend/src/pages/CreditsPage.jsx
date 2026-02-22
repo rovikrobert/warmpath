@@ -252,7 +252,7 @@ export default function CreditsPage() {
                 <div className="flex items-center gap-3">
                   <TypeBadge type={tx.type} />
                   <div>
-                    <p className="text-sm text-slate-50">
+                    <p className="text-sm text-slate-50 truncate max-w-[200px] sm:max-w-none">
                       {REASON_LABELS[tx.reason] || tx.reason}
                     </p>
                     <p className="text-xs text-slate-400">

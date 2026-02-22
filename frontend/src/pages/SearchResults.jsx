@@ -138,7 +138,7 @@ export default function SearchResults() {
       )}
 
       {/* Filters */}
-      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-slate-900 p-3 border border-slate-700/50" role="search" aria-label="Filter search results">
+      <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 items-end gap-3 rounded-lg bg-slate-900 p-3 border border-slate-700/50" role="search" aria-label="Filter search results">
         <div>
           <label htmlFor="filter-min-relevance" className="mb-1 block text-xs text-slate-400">
             Min Match Strength
@@ -153,7 +153,7 @@ export default function SearchResults() {
             aria-valuenow={filters.min_relevance}
             aria-valuemin={0}
             aria-valuemax={100}
-            className="w-28 accent-amber-500"
+            className="w-full sm:w-28 accent-amber-500"
           />
           <span className="ml-1 text-xs text-slate-400" aria-hidden="true">{filters.min_relevance}</span>
         </div>
@@ -179,7 +179,7 @@ export default function SearchResults() {
             value={filters.company}
             onChange={(e) => setFilter('company', e.target.value)}
             placeholder="Filter..."
-            className="w-32 rounded-md border-slate-700/50 bg-slate-800 px-2 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:border-amber-500"
+            className="w-full sm:w-32 rounded-md border-slate-700/50 bg-slate-800 px-2 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:border-amber-500"
           />
         </div>
       </div>

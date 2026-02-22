@@ -218,14 +218,14 @@ function ProfileTab() {
       <div className="mb-6 surface-raised p-6">
         <h2 className="text-sm font-semibold text-slate-50">Import Profile</h2>
         <p className="mt-1 text-xs text-slate-400">Pre-fill your profile from a resume or LinkedIn.</p>
-        <div className="mt-3 flex gap-3">
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row">
           <div>
             <input ref={resumeRef} type="file" accept=".pdf" onChange={handleResumeUpload} className="hidden" aria-label="Upload resume PDF" />
-            <button type="button" onClick={() => resumeRef.current?.click()} disabled={importLoading === 'resume'} className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/10 disabled:opacity-50">
+            <button type="button" onClick={() => resumeRef.current?.click()} disabled={importLoading === 'resume'} className="w-full sm:w-auto rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/10 disabled:opacity-50">
               {importLoading === 'resume' ? 'Parsing...' : 'Import from Resume (PDF)'}
             </button>
           </div>
-          <button type="button" onClick={handleLinkedInImport} disabled={importLoading === 'linkedin'} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
+          <button type="button" onClick={handleLinkedInImport} disabled={importLoading === 'linkedin'} className="w-full sm:w-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
             {importLoading === 'linkedin' ? 'Redirecting...' : 'Import from LinkedIn'}
           </button>
         </div>
@@ -293,7 +293,7 @@ function ProfileTab() {
           <div className="space-y-3">
             {workHistory.map((entry, i) => (
               <div key={i} className="rounded-lg bg-slate-800/50 border border-slate-700/50 p-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label htmlFor={`work-company-${i}`} className="mb-1 block text-xs font-medium text-slate-300">Company</label>
                     <input id={`work-company-${i}`} type="text" value={entry.company} onChange={(e) => updateWorkEntry(i, 'company', e.target.value)} className={inputClass} placeholder="Company name" />
@@ -303,7 +303,7 @@ function ProfileTab() {
                     <input id={`work-title-${i}`} type="text" value={entry.title} onChange={(e) => updateWorkEntry(i, 'title', e.target.value)} className={inputClass} placeholder="e.g. Software Engineer" />
                   </div>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-3">
+                <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label htmlFor={`work-start-${i}`} className="mb-1 block text-xs font-medium text-slate-300">Start date</label>
                     <input id={`work-start-${i}`} type="month" value={entry.start_date} onChange={(e) => updateWorkEntry(i, 'start_date', e.target.value)} className={inputClass} />
@@ -1133,7 +1133,7 @@ export default function SettingsPage() {
       <div className="flex flex-col gap-6 sm:flex-row sm:gap-8">
         {/* Side tab nav */}
         <nav className="w-full sm:w-44 sm:shrink-0" aria-label="Settings tabs">
-          <ul className="flex gap-1 overflow-x-auto sm:flex-col sm:space-y-1 sm:gap-0" role="tablist">
+          <ul className="relative flex gap-1 overflow-x-auto scrollbar-none sm:flex-col sm:space-y-1 sm:gap-0" role="tablist">
             {visibleTabs.map((tab) => (
               <li key={tab.key}>
                 <button
