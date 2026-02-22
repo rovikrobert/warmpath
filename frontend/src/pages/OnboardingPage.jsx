@@ -63,7 +63,6 @@ const TOTAL_STEPS = 7;
 // Privacy step data (rendered as compact rows in consolidated step 4)
 const PRIVACY_STEPS = [
   {
-    step: 4,
     title: 'Your Data Stays Private',
     text: 'Everything you upload lives in your Private Vault \u2014 encrypted and visible only to you. Your full contact data is never shared with other users.',
     icon: (
@@ -75,7 +74,6 @@ const PRIVACY_STEPS = [
     borderColor: 'border-amber-500/30',
   },
   {
-    step: 5,
     title: 'Contacts Are Protected',
     text: 'If you share contacts on the marketplace, only anonymised info is shown (company + role level). Names and emails are never revealed without your explicit approval.',
     icon: (
@@ -87,7 +85,6 @@ const PRIVACY_STEPS = [
     borderColor: 'border-emerald-500/30',
   },
   {
-    step: 6,
     title: "Your Employer Can't See You",
     text: 'Your job search activity is completely invisible. No employer \u2014 including yours \u2014 can discover you\'re looking for new opportunities.',
     icon: (
@@ -99,7 +96,6 @@ const PRIVACY_STEPS = [
     borderColor: 'border-purple-500/30',
   },
   {
-    step: 7,
     title: 'Anyone Can Opt Out',
     text: 'Any person can request removal from WarmPath at any time, even if they don\'t have an account. We maintain a permanent suppression list.',
     icon: (
@@ -837,6 +833,11 @@ export default function OnboardingPage() {
                   </div>
                 </label>
               )}
+
+              <p className="text-xs text-slate-500">
+                You can exclude specific contacts from the marketplace anytime in{' '}
+                <span className="font-medium text-slate-400">Settings &gt; Sharing</span>.
+              </p>
 
               {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
 
