@@ -94,7 +94,7 @@ async def _handle_user_created(
     clerk_user_id: str, data: dict, db: AsyncSession
 ) -> None:
     """Create a user row from Clerk user.created event."""
-    # Idempotency: skip if user already exists
+    # Idempotency: skip if user already exists by clerk_user_id
     result = await db.execute(select(User).where(User.clerk_user_id == clerk_user_id))
     if result.scalar_one_or_none() is not None:
         logger.info("User %s already exists, skipping", clerk_user_id)
@@ -102,6 +102,23 @@ async def _handle_user_created(
 
     email, email_verified = _extract_primary_email(data)
     full_name = _extract_full_name(data)
+
+    # Guard against duplicate email: if a user with this email already exists
+    # (e.g. re-signup via different OAuth provider), re-link the Clerk identity
+    # instead of creating a duplicate row.
+    existing_by_email = await db.execute(select(User).where(User.email == email))
+    existing_user = existing_by_email.scalar_one_or_none()
+    if existing_user is not None:
+        existing_user.clerk_user_id = clerk_user_id
+        existing_user.full_name = full_name
+        existing_user.email_verified = email_verified
+        await db.commit()
+        logger.info(
+            "Re-linked existing user (email=%s) to new clerk_id %s",
+            email,
+            clerk_user_id,
+        )
+        return
 
     user = User(
         email=email,
