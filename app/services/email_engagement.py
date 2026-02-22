@@ -969,6 +969,7 @@ async def send_intro_relay_email(
     nh_referral_code: str,
     db: AsyncSession,
     facilitation_id: uuid.UUID,
+    view_intro_url: str | None = None,
 ) -> str | None:
     """Send the intro relay email to a contact when the NH approves.
 
@@ -987,6 +988,11 @@ async def send_intro_relay_email(
     from_addr = f"{nh_name} via WarmPath <intro@majiq.agency>"
     subject = f"Introduction: {job_seeker_name} — {job_seeker_role} at {target_company}"
 
+    # Sanitize URL for safe HTML interpolation (defense-in-depth)
+    from html import escape as _esc
+
+    safe_view_url = _esc(view_intro_url) if view_intro_url else None
+
     html = f"""\
 <div lang="en" dir="ltr" style="{_base_style()}">
   {_preheader_html(f"{nh_name} is introducing {job_seeker_name} for a role at {target_company}")}
@@ -997,13 +1003,17 @@ async def send_intro_relay_email(
     <a href="mailto:{nh_email}?subject=Re: {job_seeker_name}" style="display: inline-block; padding: 12px 28px; background-color: #f59e0b; color: #0f172a; text-decoration: none; font-weight: 600; border-radius: 6px; font-size: 15px;">Reply to {nh_name} &rarr;</a>
     <p style="margin: 8px 0 0; font-size: 12px; color: #94a3b8;">or simply hit reply — it goes directly to {nh_name}</p>
   </div>
+  <p style="padding: 0 24px; font-size: 13px; color: #94a3b8; text-align: center;">
+    WarmPath helps people get referred to jobs through real connections — no cold applications.
+  </p>
+  {f'<div style="padding: 0 24px 16px; text-align: center;"><a href="{safe_view_url}" style="color: #f59e0b; text-decoration: none; font-weight: 600; font-size: 14px;">View introduction details &rarr;</a></div>' if safe_view_url else ""}
   <div style="margin: 0; padding: 16px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280;">
-    <p style="margin: 0 0 12px;">Reply STOP to opt out of future introductions</p>
-    <p style="margin: 0;">
-      {nh_name} sent this introduction via WarmPath.
+    <p style="margin: 0 0 8px;">{nh_name} used WarmPath to send this introduction on behalf of {job_seeker_name}.</p>
+    <p style="margin: 0 0 8px;">
       Have connections that could help someone land their next role?
       <a href="{APP_URL}/join?ref={nh_referral_code}" style="color: #f59e0b; text-decoration: none; font-weight: 600;">Share your network &rarr;</a>
     </p>
+    <p style="margin: 0; font-size: 12px; color: #94a3b8;">Reply STOP to opt out of future introductions</p>
   </div>
 </div>"""
 
