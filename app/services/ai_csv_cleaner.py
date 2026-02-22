@@ -38,25 +38,21 @@ CLEANUP_BATCH_SIZE = settings.CSV_CHUNK_SIZE
 _CLEANUP_SYSTEM_PROMPT = """You are a data-cleaning assistant for LinkedIn contact records.
 
 For each contact in the input JSON array, clean and normalize these fields:
-- first_name: Fix capitalization (title case). If it contains a full name and last_name is empty, split it.
-- last_name: Fix capitalization (title case).
 - current_company: Normalize to the well-known canonical form (e.g. "GOOGLE LLC" -> "Google", "Meta Platforms, Inc." -> "Meta", "microsoft corp" -> "Microsoft"). For lesser-known companies, just fix capitalization and remove redundant suffixes like "Inc", "LLC", "Ltd", "Corp".
 - current_title: Clean up abbreviations and fix capitalization. E.g. "sr. swe" -> "Senior Software Engineer", "PM" -> "Product Manager", "eng" -> "Engineer". Keep it professional and standardized.
 
 Examples:
 
-Input: [{"first_name": "JOHN", "last_name": "doe", "current_company": "GOOGLE LLC", "current_title": "sr. swe"}]
-Output: [{"first_name": "John", "last_name": "Doe", "current_company": "Google", "current_title": "Senior Software Engineer"}]
+Input: [{"current_company": "GOOGLE LLC", "current_title": "sr. swe"}]
+Output: [{"current_company": "Google", "current_title": "Senior Software Engineer"}]
 
-Input: [{"first_name": "jane smith", "last_name": "", "current_company": "Meta Platforms, Inc.", "current_title": "pm"}]
-Output: [{"first_name": "Jane", "last_name": "Smith", "current_company": "Meta", "current_title": "Product Manager"}]
+Input: [{"current_company": "Meta Platforms, Inc.", "current_title": "pm"}]
+Output: [{"current_company": "Meta", "current_title": "Product Manager"}]
 
-Input: [{"first_name": "wei", "last_name": "CHEN", "current_company": "acme solutions pte ltd", "current_title": "sr devops eng"}]
-Output: [{"first_name": "Wei", "last_name": "Chen", "current_company": "Acme Solutions", "current_title": "Senior DevOps Engineer"}]
+Input: [{"current_company": "acme solutions pte ltd", "current_title": "sr devops eng"}]
+Output: [{"current_company": "Acme Solutions", "current_title": "Senior DevOps Engineer"}]
 
 Return a JSON array with one object per input contact. Each object must have exactly these keys:
-- "first_name"
-- "last_name"
 - "current_company"
 - "current_title"
 
@@ -573,11 +569,13 @@ def clean_contacts_mock(contacts: list[dict]) -> list[dict]:
 
 
 def _build_cleanup_payload(contacts: list[dict]) -> list[dict]:
-    """Extract minimal fields to send to Claude for cleanup."""
+    """Extract minimal fields to send to AI for cleanup.
+
+    Privacy: Only company and title are sent. Names are PII of non-consenting
+    third parties and are cleaned deterministically instead.
+    """
     return [
         {
-            "first_name": c.get("first_name") or "",
-            "last_name": c.get("last_name") or "",
             "current_company": c.get("current_company") or "",
             "current_title": c.get("current_title") or "",
         }
@@ -586,16 +584,24 @@ def _build_cleanup_payload(contacts: list[dict]) -> list[dict]:
 
 
 def _merge_cleaned_fields(original: dict, cleaned_fields: dict) -> dict:
-    """Merge Claude's cleaned fields back into the original contact dict.
+    """Merge AI-cleaned fields back into the original contact dict.
 
-    Preserves all fields not returned by Claude (email, connected_on,
-    linkedin_url, etc.). Rebuilds full_name and regenerates fingerprint.
+    Names are cleaned deterministically (never sent to AI). Only company
+    and title come from the AI response. Preserves all other fields
+    (email, connected_on, linkedin_url, etc.).
     """
     merged = dict(original)
 
-    # Apply Claude's cleaned fields
-    first_name = (cleaned_fields.get("first_name") or "").strip() or None
-    last_name = (cleaned_fields.get("last_name") or "").strip() or None
+    # Names: deterministic cleaning from original (never sent to AI)
+    first_name = _normalize_name_case(_strip(merged.get("first_name")))
+    last_name = _normalize_name_case(_strip(merged.get("last_name")))
+
+    # Split combined name in first_name when last_name is empty
+    if first_name and not last_name and " " in first_name:
+        parts = first_name.split(None, 1)
+        first_name = _normalize_name_case(parts[0])
+        last_name = _normalize_name_case(parts[1]) if len(parts) > 1 else None
+
     merged["first_name"] = first_name
     merged["last_name"] = last_name
 
@@ -603,7 +609,7 @@ def _merge_cleaned_fields(original: dict, cleaned_fields: dict) -> dict:
     name_parts = [p for p in (first_name, last_name) if p]
     merged["full_name"] = " ".join(name_parts) if name_parts else None
 
-    # Apply cleaned company and title
+    # Apply AI-cleaned company and title
     company = (cleaned_fields.get("current_company") or "").strip() or None
     merged["current_company"] = company
     merged["current_title"] = (

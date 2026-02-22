@@ -640,8 +640,8 @@ async def draft_referral_request(
                 contact, user_profile, match_result, job_opening, channel
             )
             logger.info(
-                "Referral drafts for %s (tokens: %d in / %d out)",
-                contact.full_name,
+                "Referral drafts for contact %s (tokens: %d in / %d out)",
+                contact.id,
                 usage.input_tokens,
                 usage.output_tokens,
             )
@@ -665,7 +665,7 @@ async def draft_referral_request(
                 return messages
         except anthropic.APIError as exc:
             logger.error(
-                "Claude API error drafting referral for %s: %s", contact.full_name, exc
+                "Claude API error drafting referral for contact %s: %s", contact.id, exc
             )
             messages = _mock_referral_drafts(
                 contact, user_profile, match_result, job_opening, channel
