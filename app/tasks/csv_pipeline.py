@@ -392,6 +392,7 @@ async def _process_contact_row(
         fingerprint=fingerprint,
         relationship_type=rel_type,
         source=source,
+        phone=row.get("phone"),
         email_blind_index=email_bi,
         name_company_blind_index=name_co_bi,
     )

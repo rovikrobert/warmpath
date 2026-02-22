@@ -131,6 +131,40 @@ class TestParseLinkedinCsv:
         assert contacts[0]["raw_csv_row"]["First Name"] == "Alice"
 
 
+class TestManualCsvPhone:
+    def test_manual_csv_includes_phone(self):
+        csv_content = (
+            "First Name,Last Name,Email,Company,Position,Phone\n"
+            "Jane,Doe,jane@acme.com,Acme,Engineer,+6591234567"
+        )
+        result = parse_linkedin_csv(csv_content.encode("utf-8"))
+        assert len(result) == 1
+        assert result[0]["phone"] == "+6591234567"
+
+    def test_manual_csv_phone_missing_is_none(self):
+        csv_content = (
+            "First Name,Last Name,Email,Company,Position,Phone\n"
+            "Jane,Doe,jane@acme.com,Acme,Engineer,"
+        )
+        result = parse_linkedin_csv(csv_content.encode("utf-8"))
+        assert len(result) == 1
+        assert result[0]["phone"] is None
+
+    def test_manual_csv_no_phone_column(self):
+        csv_content = (
+            "First Name,Last Name,Email,Company,Position\n"
+            "Jane,Doe,jane@acme.com,Acme,Engineer"
+        )
+        result = parse_linkedin_csv(csv_content.encode("utf-8"))
+        assert len(result) == 1
+        assert result[0].get("phone") is None
+
+    def test_linkedin_csv_phone_is_none(self):
+        """LinkedIn CSVs don't have phone columns — phone should default to None."""
+        contacts = parse_linkedin_csv(SAMPLE_CSV.encode("utf-8"))
+        assert contacts[0].get("phone") is None
+
+
 class TestGenerateFingerprint:
     def test_same_inputs_same_hash(self):
         fp1 = generate_fingerprint(
