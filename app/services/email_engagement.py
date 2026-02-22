@@ -497,7 +497,7 @@ async def send_intro_pending_reminder(db: AsyncSession) -> int:
   <p style="margin: 0 0 16px;">Hi {first},</p>
   <p style="margin: 0 0 16px;"><strong>You have {pending_count} intro request(s) waiting.</strong> Each one is a potential referral bonus of $2-10K.</p>
   <div style="margin: 16px 0;">
-    <a href="{APP_URL}/marketplace/requests" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Review &amp; Earn Credits</a>
+    <a href="{APP_URL}/marketplace" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Review &amp; Earn Credits</a>
   </div>
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("share_network")}</p>
   {_footer_html()}
@@ -546,7 +546,7 @@ async def send_intro_request_notification(
   {seeker_info}
   <p style="margin: 0 0 16px;">If this leads to a hire, you could earn <strong>$2-10K</strong> in referral bonuses from your employer.</p>
   <div style="margin: 16px 0;">
-    <a href="{APP_URL}/marketplace/requests" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Review Request</a>
+    <a href="{APP_URL}/marketplace" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Review Request</a>
   </div>
   <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("share_network")}</p>
   {_footer_html()}
