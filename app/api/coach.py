@@ -191,11 +191,6 @@ async def coach_chat_stream(
     # Sanitize conversation history
     history = _sanitize_conversation_history(body.conversation_history)
 
-    # Run contact search BEFORE entering SSE generator (db session still alive)
-    contact_results = await _run_contact_search_if_needed(
-        current_user.id, body.message, db
-    )
-
     # Log usage eagerly (captured even if client disconnects mid-stream)
     db.add(
         UsageLog(
@@ -232,6 +227,10 @@ async def coach_chat_stream(
 
         stream_gen = generate_nh_chat_response_stream(body.message, history, context)
     else:
+        # Run contact search only for Keevs (not relevant for Treb)
+        contact_results = await _run_contact_search_if_needed(
+            current_user.id, body.message, db
+        )
         context = await _assemble_context(current_user.id, db)
         session = await _get_or_create_session(current_user.id, db, context)
         topic = _detect_topic(body.message)
