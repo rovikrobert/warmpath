@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useUser as useClerkUser } from '@clerk/clerk-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../context/AuthContext';
-import { auth as authApi, privacy as privacyApi, marketplace as mpApi, contacts as contactsApi } from '../api/client';
+import { auth as authApi, privacy as privacyApi, marketplace as mpApi, contacts as contactsApi, preferences as prefsApi } from '../api/client';
 import { SOURCES } from '../utils/sources';
 import SourceTag from '../components/ui/SourceTag';
 import Spinner from '../components/ui/Spinner';
@@ -81,6 +81,83 @@ function ResumePreviewModal({ data, onApply, onClose }) {
 // ---------------------------------------------------------------------------
 // Tab: Profile
 // ---------------------------------------------------------------------------
+
+function SearchFocusCard() {
+  const [targetRole, setTargetRole] = useState('');
+  const [targetSeniority, setTargetSeniority] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    prefsApi.getJob()
+      .then((res) => {
+        const p = res.data;
+        setTargetRole(p.target_role || '');
+        setTargetSeniority(p.target_seniority || '');
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!targetRole.trim()) return;
+    setSaving(true);
+    setError('');
+    setSaved(false);
+    try {
+      const res = await prefsApi.upsertJob({ target_role: targetRole.trim(), target_seniority: targetSeniority.trim() || null });
+      setTargetRole(res.data.target_role || '');
+      setTargetSeniority(res.data.target_seniority || '');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSave} className="mb-6 surface-raised p-6">
+      <h2 className="text-sm font-semibold text-slate-50">Search Focus</h2>
+      <p className="mt-1 text-xs text-slate-400">Controls what roles appear in "Hiring for" recommendations on Find Referrals.</p>
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor="search-target-role" className="mb-1 block text-sm font-medium text-slate-300">Target role</label>
+          <input
+            id="search-target-role"
+            type="text"
+            value={targetRole}
+            onChange={(e) => { setTargetRole(e.target.value); setSaved(false); }}
+            className={inputClass}
+            placeholder="e.g. Software Engineer"
+            disabled={loading}
+          />
+        </div>
+        <div>
+          <label htmlFor="search-target-seniority" className="mb-1 block text-sm font-medium text-slate-300">Seniority <span className="text-slate-500">(optional)</span></label>
+          <input
+            id="search-target-seniority"
+            type="text"
+            value={targetSeniority}
+            onChange={(e) => { setTargetSeniority(e.target.value); setSaved(false); }}
+            className={inputClass}
+            placeholder="e.g. Senior, Staff, Lead"
+            disabled={loading}
+          />
+        </div>
+      </div>
+      {error && <p className="mt-2 rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert">{error}</p>}
+      {saved && <p className="mt-2 rounded-md bg-emerald-500/10 p-2 text-sm text-emerald-400" role="status" aria-live="polite">Search focus saved!</p>}
+      <button type="submit" disabled={saving || !targetRole.trim()} className="mt-3 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50">
+        {saving ? 'Saving...' : 'Save'}
+      </button>
+    </form>
+  );
+}
 
 function ProfileTab() {
   const [form, setForm] = useState({
@@ -222,6 +299,9 @@ function ProfileTab() {
 
   return (
     <>
+      {/* Search Focus (target role for recommendations) */}
+      <SearchFocusCard />
+
       {/* Import Profile Card */}
       <div className="mb-6 surface-raised p-6">
         <h2 className="text-sm font-semibold text-slate-50">Import Profile</h2>
