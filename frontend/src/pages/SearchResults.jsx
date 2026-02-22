@@ -8,6 +8,7 @@ import Button from '../components/ui/Button';
 import Spinner from '../components/ui/Spinner';
 import Modal from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 function IntroModal({ intro, onClose }) {
   if (!intro) return null;
@@ -36,6 +37,7 @@ function IntroModal({ intro, onClose }) {
 }
 
 export default function SearchResults() {
+  useDocumentTitle('Search Results');
   const { id } = useParams();
   const toast = useToast();
   const [searchInfo, setSearchInfo] = useState(null);

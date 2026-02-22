@@ -10,6 +10,7 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
 import { useToast } from '../components/ui/Toast';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const REL_LABELS = {
   current_colleague: 'current colleague',
@@ -272,6 +273,7 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
 /* ------------------------------------------------------------------ */
 
 export default function ReferralResults() {
+  useDocumentTitle('Referral Results');
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();

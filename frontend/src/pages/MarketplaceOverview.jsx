@@ -7,6 +7,7 @@ import { MarketplaceBadge } from '../utils/marketplace';
 import EmptyState from '../components/ui/EmptyState';
 import SourceTag from '../components/ui/SourceTag';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 function StatusBadge({ status }) {
   const labels = { requested: 'Pending', reviewing: 'Reviewing', approved: 'Approved', declined: 'Declined', completed: 'Completed' };
@@ -25,6 +26,7 @@ function StatusBadge({ status }) {
 }
 
 export default function MarketplaceOverview() {
+  useDocumentTitle('Marketplace');
   const [listings, setListings] = useState([]);
   const [incoming, setIncoming] = useState([]);
   const [balance, setBalance] = useState(0);

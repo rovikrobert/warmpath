@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth as authApi, contacts as contactsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const EMPTY_ENTRY = { company: '', title: '', start_date: '', end_date: '', is_current: false };
 
@@ -46,6 +47,7 @@ function ResumePreviewModal({ data, onApply, onClose }) {
 }
 
 export default function EditProfile() {
+  useDocumentTitle('Edit Profile');
   const { user, logout } = useAuth();
   const [form, setForm] = useState({
     headline: '', current_company: '', current_title: '',

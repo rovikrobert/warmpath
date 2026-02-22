@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const SECTIONS = [
   { id: 'commitment', label: 'Our Privacy Commitment' },
@@ -52,6 +53,7 @@ function InfoCard({ icon, title, children }) {
 }
 
 export default function PrivacyPage() {
+  useDocumentTitle('Privacy Policy');
   const [rightsTab, setRightsTab] = useState('gdpr');
 
   return (

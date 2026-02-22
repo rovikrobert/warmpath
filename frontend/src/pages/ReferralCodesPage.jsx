@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { referrals as referralsApi } from '../api/client';
 import EmptyState from '../components/ui/EmptyState';
 import Spinner from '../components/ui/Spinner';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
@@ -29,6 +30,7 @@ function CopyButton({ text }) {
 }
 
 export default function ReferralCodesPage() {
+  useDocumentTitle('Invite Friends');
   const [codes, setCodes] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);

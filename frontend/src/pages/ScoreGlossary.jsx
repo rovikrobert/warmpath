@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { SCORE_GLOSSARY, LIKELIHOOD_MAP } from '../utils/scores';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 export default function ScoreGlossary() {
+  useDocumentTitle('How Scores Work');
   return (
     <div className="mx-auto max-w-2xl" role="main">
       <div className="mb-6">

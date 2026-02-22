@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { search as searchApi, preferences as prefsApi } from '../api/client';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 function ShimmerCard() {
   return (
@@ -83,6 +84,7 @@ function CompanyCard({ rec, onSearch }) {
 }
 
 export default function MarketplaceBrowse() {
+  useDocumentTitle('Browse Marketplace');
   const navigate = useNavigate();
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);

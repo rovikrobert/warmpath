@@ -2,12 +2,14 @@ import { SignIn, SignUp } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import SourceTag from '../components/ui/SourceTag';
 import { SOURCES } from '../utils/sources';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 function hashIndicatesSignup() {
   return window.location.hash.replace(/\/+$/, '') === '#sign-up';
 }
 
 export default function AuthPage() {
+  useDocumentTitle('Sign In');
   const [isSignup, setIsSignup] = useState(hashIndicatesSignup);
 
   useEffect(() => {

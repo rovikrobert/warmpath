@@ -3,18 +3,140 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#020617" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
     <title>WarmPath — Get Referred, Not Ignored</title>
-    <meta name="description" content="WarmPath helps job seekers get employee referrals instead of applying cold. Access networks at your target companies and convert at 10-40% instead of 1-3%." />
-    <link rel="canonical" href="https://web-production-b3a4a.up.railway.app/" />
+    <meta name="description" content="Employee referrals convert at 10-40% vs 1-3% for cold applications. WarmPath connects job seekers with employees at target companies for warm introductions — privacy-first, AI-powered matching across 36+ data signals." />
+    <link rel="canonical" href="https://warmpath.majiq.agency/" />
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Open Graph -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="WarmPath" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:title" content="WarmPath — Get Referred, Not Ignored" />
-    <meta property="og:description" content="Stop applying cold. Get warm referrals from employees at companies you want to work at." />
-    <meta property="og:url" content="https://web-production-b3a4a.up.railway.app/" />
-    <meta property="og:image" content="https://web-production-b3a4a.up.railway.app/og-image.png" />
+    <meta property="og:description" content="Employee referrals convert at 10-40% vs 1-3% for cold applications. Access networks at your target companies through warm introductions." />
+    <meta property="og:url" content="https://warmpath.majiq.agency/" />
+    <meta property="og:image" content="https://warmpath.majiq.agency/og-image.png" />
+    <meta property="og:image:alt" content="WarmPath — Get Referred, Not Ignored. Cold applications succeed at 1-3%. Referrals succeed at 10-40%." />
+    <meta property="og:image:width" content="1312" />
+    <meta property="og:image:height" content="736" />
+
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="WarmPath — Get Referred, Not Ignored" />
+    <meta name="twitter:description" content="Employee referrals convert at 10-40% vs 1-3% for cold applications. Access networks at your target companies." />
+    <meta name="twitter:image" content="https://warmpath.majiq.agency/og-image.png" />
+    <meta name="twitter:image:alt" content="WarmPath — Get Referred, Not Ignored" />
+
+    <!-- JSON-LD: Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "WarmPath",
+      "legalName": "Majiq Pte Ltd",
+      "url": "https://warmpath.majiq.agency",
+      "logo": "https://warmpath.majiq.agency/og-image.png",
+      "description": "AI-powered referral marketplace connecting job seekers with employees at target companies for warm introductions.",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "SG"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "email": "rovik@majiq.agency",
+        "contactType": "customer support"
+      }
+    }
+    </script>
+
+    <!-- JSON-LD: WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "WarmPath",
+      "url": "https://warmpath.majiq.agency",
+      "applicationCategory": "BusinessApplication",
+      "description": "AI-powered referral marketplace that helps job seekers get employee referrals instead of applying cold. Matches across 36+ data signals including relationship strength, role relevance, and cultural context.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD",
+        "description": "Free for network holders. Job seekers pay $20-30/month for marketplace access."
+      },
+      "featureList": [
+        "AI-powered Warm Score ranking (0-100) based on recency, relationship strength, role relevance, and tenure",
+        "Privacy-first anonymized marketplace — contact identity revealed only after network holder approval",
+        "Cultural context engine adapting intro messages to location, company culture, and relationship type",
+        "LinkedIn CSV import with automatic contact enrichment",
+        "Credit-based economy rewarding network holders for facilitating referrals",
+        "Multi-step referral messaging with tone and channel optimization"
+      ],
+      "operatingSystem": "Web browser"
+    }
+    </script>
+
+    <!-- JSON-LD: FAQPage (AEO) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do employee referrals compare to cold applications?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Employee referrals convert at 10-40% compared to 1-3% for cold applications, according to industry hiring data. Referred candidates are also hired 55% faster and tend to stay longer. WarmPath helps job seekers access referral networks at companies they want to work at."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is WarmPath?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "WarmPath is an AI-powered referral marketplace that connects job seekers with employees at their target companies. Instead of applying cold, job seekers search an anonymized marketplace of professional networks and request warm introductions through network holders who can refer them internally."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does WarmPath protect contact privacy?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "WarmPath uses a privacy-first architecture with anonymized marketplace listings that show only company, role level, and department — never names or contact details. Contact identity is revealed only when the network holder explicitly approves an intro request. Contacts can also request removal via a global suppression list."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How much does WarmPath cost?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "WarmPath is free for network holders who upload their connections. Job seekers can search their own uploaded contacts for free, and pay $20-30 per month for marketplace access to search other people's networks at target companies. Credits can also be purchased individually at $1 for 5 credits."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is a Warm Score?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A Warm Score is WarmPath's AI-generated 0-100 ranking that predicts how likely a contact is to provide a successful referral. It weighs recency of interaction (35%), relationship strength (30%), role relevance (20%), and company tenure (15%). Peers and former managers score highest because they are most likely to actually refer you."
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body class="bg-slate-950 text-slate-50 antialiased">
     <div id="root"></div>

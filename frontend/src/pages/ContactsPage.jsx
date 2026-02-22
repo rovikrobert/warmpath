@@ -11,6 +11,7 @@ import SlideOver from '../components/SlideOver';
 import ContactDetailPanel from '../components/ContactDetail';
 import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
 import UploadModal from '../components/UploadModal';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const RELATIONSHIP_TYPES = [
   { value: '', label: 'All types' },
@@ -206,6 +207,7 @@ function AddContactModal({ onClose, onSuccess, companies: companyList }) {
 // Main ContactsPage
 // ---------------------------------------------------------------------------
 export default function ContactsPage() {
+  useDocumentTitle('Contacts');
   const [contactsList, setContactsList] = useState([]);
   const [meta, setMeta] = useState({});
   const [filter, setFilter] = useState('');

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { marketplace as mpApi, applications as appsApi } from '../api/client';
 import { MarketplaceBadge } from '../utils/marketplace';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 function StatusBadge({ status }) {
   const labels = { requested: 'Pending', reviewing: 'Reviewing', approved: 'Approved', declined: 'Declined', completed: 'Completed', expired: 'Expired' };
@@ -21,6 +22,7 @@ function StatusBadge({ status }) {
 }
 
 export default function MyRequests() {
+  useDocumentTitle('My Requests');
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
