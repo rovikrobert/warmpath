@@ -311,3 +311,25 @@ class TestPersonaRouting:
         user = MagicMock()
         user.intent = None
         assert _resolve_persona(user) == "keevs"
+
+    def test_null_intent_nh_topic_returns_treb(self):
+        from app.api.coach import _resolve_persona
+
+        user = MagicMock()
+        user.intent = None
+        assert (
+            _resolve_persona(user, "how do i decide who to give my referrals to")
+            == "treb"
+        )
+
+    def test_give_referrals_detected_as_nh_topic(self):
+        assert is_nh_topic("how do i decide who to give my referrals to") is True
+
+    def test_refer_someone_detected_as_nh_topic(self):
+        assert is_nh_topic("should I refer someone from my team?") is True
+
+    def test_facilitate_intro_detected_as_nh_topic(self):
+        assert is_nh_topic("how do I facilitate an intro?") is True
+
+    def test_making_referral_detected_as_nh_topic(self):
+        assert is_nh_topic("tips for making a good referral") is True

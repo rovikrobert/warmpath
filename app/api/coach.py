@@ -55,8 +55,8 @@ def _resolve_persona(user: User, message: str | None = None) -> str:
         return "treb"
     if intent == "find_referrals":
         return "keevs"
-    # For explore users, auto-route by topic
-    if intent == "explore" and message:
+    # For any other intent (explore, None), auto-route by topic
+    if message:
         from ops_team.treb.treb_coach_service import is_nh_topic
 
         if is_nh_topic(message):
