@@ -760,3 +760,28 @@ def test_company_first_query_multiword_title():
     result = parse_query_mock("Stripe product managers")
     assert "Stripe" in result.companies
     assert "product manager" in result.titles
+
+
+# ---------------------------------------------------------------------------
+# Name fallback — when no structured criteria detected, search by name
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_nlp_search_falls_back_to_name_match(
+    nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list
+):
+    """When query matches no structured criteria, search by contact name."""
+    resp = await nlp_client.post(
+        NLP_SEARCH_URL,
+        json={"query": "Alice"},
+        headers=nlp_auth_headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "data" in body
+    results = body["data"]
+    assert len(results) >= 1
+    assert any("Alice" in r["full_name"] for r in results)
+    # Check interpretation signals name search
+    assert body["meta"]["interpretation"].get("name_search") == "Alice"

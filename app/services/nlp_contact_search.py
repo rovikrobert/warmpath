@@ -780,40 +780,77 @@ async def search_user_contacts(
             )
         total_matched = total_scanned
     else:
-        # Score and filter
-        scored: list[tuple] = []
-        resolved_ids_set = set(resolved_company_ids)
-        for contact, sco[RESEND_KEY_REDACTED] in all_rows:
-            company_matched = (
-                contact.company_id is not None
-                and contact.company_id in resolved_ids_set
-            )
-            nlp_score = sco[RESEND_KEY_REDACTED](
-                parsed,
-                contact.current_company,
-                contact.current_title,
-                contact.location,
-                contact.relationship_type,
-                company_matched,
-            )
-            if nlp_score >= 20:
-                scored.append((contact, sco[RESEND_KEY_REDACTED], nlp_score))
+        # Check if we have any structured criteria
+        has_criteria = (
+            parsed.titles
+            or parsed.companies
+            or parsed.seniority
+            or parsed.locations
+            or parsed.relationship_types
+        )
 
-        scored.sort(key=lambda r: r[2], reverse=True)
-        total_matched = len(scored)
-        results = []
-        for contact, sco[RESEND_KEY_REDACTED], nlp_score in scored[:limit]:
-            results.append(
-                {
-                    "full_name": contact.full_name,
-                    "current_company": contact.current_company,
-                    "current_title": contact.current_title,
-                    "warm_score": float(sco[RESEND_KEY_REDACTED]) if sco[RESEND_KEY_REDACTED] is not None else None,
-                    "nlp_match_score": round(nlp_score, 2),
-                    "relationship_type": contact.relationship_type,
-                    "location": contact.location,
-                }
-            )
+        if has_criteria:
+            # Score and filter using NLP criteria
+            scored: list[tuple] = []
+            resolved_ids_set = set(resolved_company_ids)
+            for contact, sco[RESEND_KEY_REDACTED] in all_rows:
+                company_matched = (
+                    contact.company_id is not None
+                    and contact.company_id in resolved_ids_set
+                )
+                nlp_score = sco[RESEND_KEY_REDACTED](
+                    parsed,
+                    contact.current_company,
+                    contact.current_title,
+                    contact.location,
+                    contact.relationship_type,
+                    company_matched,
+                )
+                if nlp_score >= 20:
+                    scored.append((contact, sco[RESEND_KEY_REDACTED], nlp_score))
+
+            scored.sort(key=lambda r: r[2], reverse=True)
+            total_matched = len(scored)
+            results = []
+            for contact, sco[RESEND_KEY_REDACTED], nlp_score in scored[:limit]:
+                results.append(
+                    {
+                        "full_name": contact.full_name,
+                        "current_company": contact.current_company,
+                        "current_title": contact.current_title,
+                        "warm_score": float(sco[RESEND_KEY_REDACTED])
+                        if sco[RESEND_KEY_REDACTED] is not None
+                        else None,
+                        "nlp_match_score": round(nlp_score, 2),
+                        "relationship_type": contact.relationship_type,
+                        "location": contact.location,
+                    }
+                )
+        else:
+            # Name fallback: no structured criteria detected, search by name
+            name_query = query_text.strip().lower()
+            name_matches = [
+                (contact, sco[RESEND_KEY_REDACTED])
+                for contact, sco[RESEND_KEY_REDACTED] in all_rows
+                if contact.full_name and name_query in contact.full_name.lower()
+            ]
+            name_matches.sort(key=lambda r: (r[1] is not None, r[1] or 0), reverse=True)
+            total_matched = len(name_matches)
+            results = []
+            for contact, sco[RESEND_KEY_REDACTED] in name_matches[:limit]:
+                results.append(
+                    {
+                        "full_name": contact.full_name,
+                        "current_company": contact.current_company,
+                        "current_title": contact.current_title,
+                        "warm_score": float(sco[RESEND_KEY_REDACTED])
+                        if sco[RESEND_KEY_REDACTED] is not None
+                        else None,
+                        "nlp_match_score": None,
+                        "relationship_type": contact.relationship_type,
+                        "location": contact.location,
+                    }
+                )
 
     interpretation = {
         "titles": parsed.titles,
@@ -823,6 +860,17 @@ async def search_user_contacts(
         "relationship_types": parsed.relationship_types,
         "raw_query": parsed.raw_query,
     }
+
+    # Signal name-based fallback to the frontend
+    has_any_criteria = (
+        parsed.titles
+        or parsed.companies
+        or parsed.seniority
+        or parsed.locations
+        or parsed.relationship_types
+    )
+    if not has_any_criteria and query_text.strip():
+        interpretation["name_search"] = query_text.strip()
 
     return {
         "results": results,
