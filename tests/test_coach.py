@@ -450,9 +450,17 @@ class TestCoachingStages:
         ctx = self._base_context()
         assert _determine_coaching_stage(ctx) == STAGE_ONBOARDING
 
-    def test_network_building_has_contacts_no_prefs(self):
+    def test_network_building_has_contacts_no_prefs_stalled_without_activity(self):
         ctx = self._base_context(
             network={"total_contacts": 50, "top_companies": []},
+        )
+        # No prefs + no apps + no searches → stalled (not network_building)
+        assert _determine_coaching_stage(ctx) == STAGE_STALLED
+
+    def test_network_building_has_contacts_no_prefs_with_apps(self):
+        ctx = self._base_context(
+            network={"total_contacts": 50, "top_companies": []},
+            pipeline={"total": 1, "follow_ups_needed": 0, "status_counts": {}},
         )
         assert _determine_coaching_stage(ctx) == STAGE_NETWORK_BUILDING
 
