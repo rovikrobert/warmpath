@@ -1,7 +1,7 @@
 """Multi-provider AI cleaning pool.
 
 Dispatches CSV cleaning batches across all configured AI providers
-(Gemini 2.0 Flash, Claude Haiku, GPT-4o-mini, Groq Llama 3.3, DeepSeek)
+(Gemini 2.0 Flash, Claude Haiku, GPT-4o-mini, Groq Llama 3.3)
 for maximum throughput. Each provider has its own rate limiter. The
 dispatcher tries providers in priority order with fast-fail retry and
 falls back to mock cleaning.
@@ -74,12 +74,6 @@ PROVIDER_CONFIGS = {
         "max_concurrent_attr": "GROQ_MAX_CONCURRENT",
         "max_tokens": 65536,
     },
-    "deepseek": {
-        "model": "deepseek-chat",
-        "key_attr": "DEEPSEEK_API_KEY",
-        "max_concurrent_attr": "DEEPSEEK_MAX_CONCURRENT",
-        "max_tokens": 8192,
-    },
 }
 
 
@@ -151,7 +145,7 @@ async def _call_anthropic(
 async def _call_openai_compat(
     client: Any, system_prompt: str, payload: list[dict], model: str, max_tokens: int
 ) -> list[dict]:
-    """Call OpenAI-compatible API (OpenAI, Groq, DeepSeek) with JSON mode."""
+    """Call OpenAI-compatible API (OpenAI, Groq) with JSON mode."""
     response = await client.chat.completions.create(
         model=model,
         messages=[
@@ -178,15 +172,6 @@ async def _call_groq(
     client: Any, system_prompt: str, payload: list[dict]
 ) -> list[dict]:
     cfg = PROVIDER_CONFIGS["groq"]
-    return await _call_openai_compat(
-        client, system_prompt, payload, cfg["model"], cfg["max_tokens"]
-    )
-
-
-async def _call_deepseek(
-    client: Any, system_prompt: str, payload: list[dict]
-) -> list[dict]:
-    cfg = PROVIDER_CONFIGS["deepseek"]
     return await _call_openai_compat(
         client, system_prompt, payload, cfg["model"], cfg["max_tokens"]
     )
@@ -242,16 +227,6 @@ def _build_provider(name: str) -> CleaningProvider:
             get_client=get_groq_client,
             call=_call_groq,
         )
-    elif name == "deepseek":
-        from app.utils.openai_compat_client import get_deepseek_client
-
-        return CleaningProvider(
-            name=name,
-            model=cfg["model"],
-            max_concurrent=max_conc,
-            get_client=get_deepseek_client,
-            call=_call_deepseek,
-        )
     else:
         raise ValueError(f"Unknown provider: {name}")
 
@@ -291,7 +266,7 @@ MAX_DISPATCH_ROUNDS = 2
 SLOT_ACQUIRE_TIMEOUT = 0.5  # seconds — fail fast so busy providers don't block
 
 # Priority order: fastest/cheapest first, paid APIs as fallback
-PROVIDER_PRIORITY = ["groq", "gemini", "deepseek", "anthropic", "openai"]
+PROVIDER_PRIORITY = ["groq", "gemini", "anthropic", "openai"]
 
 
 async def dispatch_batch(batch: list[dict]) -> list[dict]:

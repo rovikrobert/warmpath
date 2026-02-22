@@ -57,15 +57,12 @@ class TestProviderRegistry:
             s.ANTHROPIC_API_KEY = ""
             s.OPENAI_API_KEY = "key"
             s.GROQ_API_KEY = ""
-            s.DEEPSEEK_API_KEY = "key"
             s.GOOGLE_MAX_CONCURRENT = 10
             s.OPENAI_MAX_CONCURRENT = 10
-            s.DEEPSEEK_MAX_CONCURRENT = 10
             enabled = get_enabled_providers(s)
             names = [p.name for p in enabled]
             assert "gemini" in names
             assert "openai" in names
-            assert "deepseek" in names
             assert "anthropic" not in names
             assert "groq" not in names
 

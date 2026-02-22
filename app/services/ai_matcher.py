@@ -464,11 +464,12 @@ def _build_user_prompt(
     target_seniority = getattr(search, "target_seniority", None) or "Any"
 
     # Contact data — keep lean for fast scoring
+    # Privacy: only send ID, title, company. Names are PII of non-consenting
+    # third parties and are not needed for referral scoring.
     contacts_data = []
     for c in contacts:
         entry: dict = {
             "contact_id": str(c.id),
-            "name": c.full_name,
             "title": c.current_title,
             "company": c.current_company,
         }
