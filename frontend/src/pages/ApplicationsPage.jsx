@@ -91,7 +91,7 @@ function AppCard({ app, onStatusChange, updating }) {
             onChange={(e) => onStatusChange(app.id, e.target.value)}
             disabled={updating === app.id}
             aria-label={`Change status for ${app.company_name}`}
-            className="rounded border border-slate-700/50 bg-slate-800 px-1 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+            className="rounded border border-slate-700/50 bg-slate-800 px-2 py-2 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
           >
             <option value="" disabled>Move to...</option>
             {nextStatuses.map((s) => {
@@ -308,7 +308,7 @@ export default function ApplicationsPage() {
 
       {/* Stats */}
       {stats && (
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="mb-6 grid grid-cols-3 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <div className="surface-raised p-3">
             <p className="stat-label">Total</p>
             <p className="stat-number">{stats.total}</p>
@@ -448,7 +448,9 @@ export default function ApplicationsPage() {
       ) : isMobile ? (
         /* Mobile: filter chips + vertical card list */
         <div>
-          <div className="mb-4 flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="Filter by status">
+          <div className="relative mb-4">
+            <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-slate-950 to-transparent pointer-events-none z-10" />
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none" role="tablist" aria-label="Filter by status">
             <button
               role="tab"
               aria-selected={mobileFilter === 'all'}
@@ -479,6 +481,7 @@ export default function ApplicationsPage() {
                 </button>
               );
             })}
+            </div>
           </div>
           <div className="space-y-2" role="tabpanel">
             {(mobileFilter === 'all'

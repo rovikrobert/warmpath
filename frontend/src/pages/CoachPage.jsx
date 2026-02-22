@@ -65,7 +65,7 @@ export default function CoachPage() {
   const [sending, setSending] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedItems, setFeedItems] = useState([]);
-  const [feedExpanded, setFeedExpanded] = useState(true);
+  const [feedExpanded, setFeedExpanded] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const quickActionsRef = useRef(null);
@@ -79,7 +79,15 @@ export default function CoachPage() {
   useEffect(() => {
     let cancelled = false;
     feedApi.list({ limit: 5 })
-      .then((res) => { if (!cancelled) setFeedItems(res.data || []); })
+      .then((res) => {
+        if (cancelled) return;
+        // Filter out enrichment prompts (they belong on /contacts via KeevsBar)
+        // and cap at 3 items to reduce mobile clutter
+        const items = (res.data || [])
+          .filter((f) => f.item_type !== 'enrichment_prompt')
+          .slice(0, 3);
+        setFeedItems(items);
+      })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
@@ -199,7 +207,7 @@ export default function CoachPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col" role="main">
+    <div className="flex h-[calc(100dvh-8rem)] lg:h-[calc(100vh-8rem)] flex-col" role="main">
       {/* Onboarding checklist for new users */}
       <OnboardingChecklist />
 
@@ -248,36 +256,40 @@ export default function CoachPage() {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="flex-none px-4 py-2">
-        <div
-          ref={quickActionsRef}
-          className="flex gap-2 overflow-x-auto scrollbar-none"
-          role="toolbar"
-          aria-label="Quick actions"
-        >
-          {suggestedPrompts.map((prompt) => (
-            <button
-              key={prompt}
-              onClick={() => sendMessage(prompt)}
-              disabled={sending}
-              className="flex-shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {prompt}
-            </button>
-          ))}
-          {QUICK_ACTIONS.map((action) => (
-            <button
-              key={action.label}
-              onClick={() => sendMessage(action.prompt)}
-              disabled={sending}
-              className="flex-shrink-0 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-full px-4 py-2 text-sm text-slate-300 hover:text-slate-100 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {action.label}
-            </button>
-          ))}
+      {/* Quick Actions — only visible before user sends first message */}
+      {messages.length <= 1 && (
+        <div className="flex-none relative px-4 py-2">
+          {/* Scroll-fade gradient to hint at horizontal overflow */}
+          <div className="absolute right-4 top-0 bottom-0 w-8 bg-gradient-to-l from-slate-950 to-transparent pointer-events-none z-10" />
+          <div
+            ref={quickActionsRef}
+            className="flex gap-2 overflow-x-auto scrollbar-none"
+            role="toolbar"
+            aria-label="Quick actions"
+          >
+            {suggestedPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                onClick={() => sendMessage(prompt)}
+                disabled={sending}
+                className="flex-shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {prompt}
+              </button>
+            ))}
+            {QUICK_ACTIONS.map((action) => (
+              <button
+                key={action.label}
+                onClick={() => sendMessage(action.prompt)}
+                disabled={sending}
+                className="flex-shrink-0 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-full px-4 py-2 text-sm text-slate-300 hover:text-slate-100 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" aria-live="polite" aria-label="Conversation messages">

@@ -623,7 +623,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-start gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                <div className="flex items-start gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 sm:p-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10">
                     <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -638,7 +638,7 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 sm:p-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
                     <svg className="h-5 w-5 text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
@@ -650,7 +650,7 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 rounded-xl border border-purple-500/30 bg-purple-500/10 p-4">
+                <div className="flex items-start gap-3 rounded-xl border border-purple-500/30 bg-purple-500/10 p-3 sm:p-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-500/10">
                     <svg className="h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
@@ -683,7 +683,7 @@ export default function OnboardingPage() {
               </div>
 
               {/* Data flow summary */}
-              <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-3 text-xs font-medium text-slate-300">
+              <div className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 rounded-lg border border-slate-700/50 bg-slate-800/50 px-3 py-3 text-xs font-medium text-slate-300 sm:px-4">
                 <span>CSV Upload</span>
                 <span className="text-slate-500" aria-hidden="true">&rarr;</span>
                 <span className="text-amber-400">Your Private Vault</span>
@@ -698,7 +698,7 @@ export default function OnboardingPage() {
               {/* Privacy points — compact rows */}
               <div className="space-y-3">
                 {PRIVACY_STEPS.map((ps) => (
-                  <div key={ps.title} className={`flex items-start gap-3 rounded-xl border ${ps.borderColor} ${ps.bgColor} p-4`}>
+                  <div key={ps.title} className={`flex items-start gap-3 rounded-xl border ${ps.borderColor} ${ps.bgColor} p-3 sm:p-4`}>
                     <div className="shrink-0 [&>svg]:h-6 [&>svg]:w-6">{ps.icon}</div>
                     <div>
                       <p className="text-sm font-medium text-slate-100">{ps.title}</p>
