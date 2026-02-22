@@ -96,6 +96,7 @@ class Contact(Base):
     full_name: Mapped[str] = mapped_column(EncryptedString(), nullable=False)
     email: Mapped[str | None] = mapped_column(EncryptedString())
     linkedin_url: Mapped[str | None] = mapped_column(EncryptedString())
+    phone: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
 
     # Current position (from CSV or enrichment) — encrypted at rest
     current_title: Mapped[str | None] = mapped_column(EncryptedString())
