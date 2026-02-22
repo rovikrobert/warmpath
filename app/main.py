@@ -1,5 +1,7 @@
+import html as html_mod
 import logging
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -24,6 +26,7 @@ from app.api import (
     feedback,
     friends,
     health,
+    intro_review,
     jobs,
     marketplace,
     matches,
@@ -219,6 +222,7 @@ app.include_router(
 )
 app.include_router(benchmarks.router, prefix="/api/v1/benchmarks", tags=["benchmarks"])
 app.include_router(telegram.router, prefix="/api/v1/telegram", tags=["telegram"])
+app.include_router(intro_review.router, prefix="/api/v1", tags=["intro-review"])
 
 # ---------------------------------------------------------------------------
 # Social bot OG tag middleware (used by SPA catch-all)
@@ -274,13 +278,14 @@ def _serve_og_html(path: str, params: dict[str, str]) -> HTMLResponse:
     """Return minimal HTML with OG meta tags for social bot crawlers."""
     config = _get_og_config(path, params)
     # Caller must verify config is not None before calling
-    title = config["title"]  # type: ignore[index]
-    description = config["description"]  # type: ignore[index]
-    image_url = f"{settings.FRONTEND_URL}/og-image.png"
+    title = html_mod.escape(config["title"])  # type: ignore[index]
+    description = html_mod.escape(config["description"])  # type: ignore[index]
+    image_url = html_mod.escape(f"{settings.FRONTEND_URL}/og-image.png")
     page_url = f"{settings.FRONTEND_URL}/{path}"
     if params:
-        qs = "&".join(f"{k}={v}" for k, v in params.items())
+        qs = urlencode(params)
         page_url = f"{page_url}?{qs}"
+    page_url = html_mod.escape(page_url)
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
