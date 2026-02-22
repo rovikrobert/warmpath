@@ -41,6 +41,7 @@ class ParsedQuery:
     seniority: list[str] = field(default_factory=list)
     locations: list[str] = field(default_factory=list)
     relationship_types: list[str] = field(default_factory=list)
+    industries: list[str] = field(default_factory=list)
     raw_query: str = ""
 
 
@@ -286,6 +287,94 @@ _RELATIONSHIP_ENTRIES: list[tuple[str, str]] = sorted(
     _RELATIONSHIP_MAP.items(), key=lambda kv: len(kv[0]), reverse=True
 )
 
+# ---------------------------------------------------------------------------
+# Industry / sector keywords
+# ---------------------------------------------------------------------------
+
+_INDUSTRY_KEYWORDS: dict[str, dict] = {
+    "tech": {
+        "company_patterns": [
+            "google",
+            "meta",
+            "apple",
+            "amazon",
+            "microsoft",
+            "netflix",
+            "stripe",
+            "shopify",
+            "databricks",
+            "cloudflare",
+            "vercel",
+        ],
+        "title_patterns": ["engineer", "developer", "devops", "sre", "architect"],
+    },
+    "finance": {
+        "company_patterns": [
+            "goldman",
+            "jpmorgan",
+            "morgan stanley",
+            "citibank",
+            "dbs",
+            "ocbc",
+            "hsbc",
+            "barclays",
+            "ubs",
+        ],
+        "title_patterns": ["analyst", "trader", "banker", "portfolio", "quant"],
+    },
+    "consulting": {
+        "company_patterns": [
+            "mckinsey",
+            "bain",
+            "bcg",
+            "deloitte",
+            "accenture",
+            "kpmg",
+            "ey",
+            "pwc",
+        ],
+        "title_patterns": ["consultant", "advisory", "strategy"],
+    },
+    "healthcare": {
+        "company_patterns": ["pfizer", "johnson", "roche", "novartis", "merck"],
+        "title_patterns": ["nurse", "doctor", "physician", "clinical", "pharma"],
+    },
+    "startup": {
+        "company_patterns": [],
+        "title_patterns": ["founder", "co-founder", "ceo", "cto"],
+    },
+    "ecommerce": {
+        "company_patterns": ["shopify", "amazon", "lazada", "shopee", "tokopedia"],
+        "title_patterns": ["merchant", "marketplace", "ecommerce"],
+    },
+    "media": {
+        "company_patterns": ["netflix", "disney", "spotify", "tiktok", "bytedance"],
+        "title_patterns": ["content", "editor", "producer", "journalist"],
+    },
+    "education": {
+        "company_patterns": ["coursera", "udemy", "duolingo"],
+        "title_patterns": ["teacher", "professor", "instructor", "educator"],
+    },
+    "gaming": {
+        "company_patterns": ["riot", "blizzard", "ea", "ubisoft", "valve"],
+        "title_patterns": ["game", "gaming"],
+    },
+    "crypto": {
+        "company_patterns": ["coinbase", "binance", "kraken", "opensea"],
+        "title_patterns": ["blockchain", "web3", "defi", "crypto"],
+    },
+}
+
+_INDUSTRY_EXTRACTION_RE = re.compile(
+    r"\b(?:in|from|at)\s+("
+    + "|".join(re.escape(k) for k in _INDUSTRY_KEYWORDS)
+    + r")\b"
+    r"|\b("
+    + "|".join(re.escape(k) for k in _INDUSTRY_KEYWORDS)
+    + r")\s+(?:people|folks|contacts|connections|friends)\b",
+    re.IGNORECASE,
+)
+
 
 # ---------------------------------------------------------------------------
 # Private extraction helpers (keep parse_query_mock complexity manageable)
@@ -398,6 +487,16 @@ def _extract_relationship_types(query_lower: str) -> list[str]:
     return relationship_types
 
 
+def _extract_industries(query_lower: str) -> list[str]:
+    """Extract industry/sector keywords from the query."""
+    industries: list[str] = []
+    for m in _INDUSTRY_EXTRACTION_RE.finditer(query_lower):
+        industry = (m.group(1) or m.group(2)).lower()
+        if industry in _INDUSTRY_KEYWORDS and industry not in industries:
+            industries.append(industry)
+    return industries
+
+
 # ---------------------------------------------------------------------------
 # Mock parser
 # ---------------------------------------------------------------------------
@@ -424,6 +523,7 @@ def parse_query_mock(query: str) -> ParsedQuery:
             result.titles.append(t)
     result.locations = _extract_locations(q_lower)
     result.relationship_types = _extract_relationship_types(q_lower)
+    result.industries = _extract_industries(q_lower)
 
     return result
 
@@ -572,6 +672,25 @@ def _score_relationship(parsed: ParsedQuery, relationship_type: str | None) -> f
     return 0.0
 
 
+def _score_industry(
+    parsed: ParsedQuery, company_name: str | None, title: str | None
+) -> float:
+    """Score contact against industry criteria."""
+    if not parsed.industries:
+        return 0.0
+    company_lower = (company_name or "").lower()
+    title_lower = (title or "").lower()
+    for industry in parsed.industries:
+        spec = _INDUSTRY_KEYWORDS.get(industry, {})
+        for pattern in spec.get("company_patterns", []):
+            if pattern in company_lower:
+                return 100.0
+        for pattern in spec.get("title_patterns", []):
+            if pattern in title_lower:
+                return 60.0
+    return 0.0
+
+
 def score_contact(
     parsed: ParsedQuery,
     company_name: str | None,
@@ -603,6 +722,8 @@ def score_contact(
         criteria.append((0.20, loc_score))
     if parsed.relationship_types:
         criteria.append((0.10, _score_relationship(parsed, relationship_type)))
+    if parsed.industries:
+        criteria.append((0.15, _score_industry(parsed, company_name, title)))
 
     if not criteria:
         return 0.0
@@ -787,6 +908,7 @@ async def search_user_contacts(
             or parsed.seniority
             or parsed.locations
             or parsed.relationship_types
+            or parsed.industries
         )
 
         if has_criteria:
@@ -858,6 +980,7 @@ async def search_user_contacts(
         "seniority": parsed.seniority,
         "locations": parsed.locations,
         "relationship_types": parsed.relationship_types,
+        "industries": parsed.industries,
         "raw_query": parsed.raw_query,
     }
 
@@ -868,6 +991,7 @@ async def search_user_contacts(
         or parsed.seniority
         or parsed.locations
         or parsed.relationship_types
+        or parsed.industries
     )
     if not has_any_criteria and query_text.strip():
         interpretation["name_search"] = query_text.strip()
