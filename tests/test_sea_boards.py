@@ -90,7 +90,7 @@ class TestSEABoardRegistry:
     def test_lookup_grab(self):
         boards = lookup_boards("grab")
         assert boards is not None
-        assert "greenhouse" in boards
+        assert "career_page" in boards
 
     def test_lookup_razorpay(self):
         boards = lookup_boards("razorpay")
