@@ -245,7 +245,7 @@ async def _clean_async(csv_upload_id: str, user_id: str) -> None:
                     chunk.status = "cleaning"
                     await session.commit()
 
-            cleaned = await dispatch_batch(contacts)
+            cleaned = await asyncio.wait_for(dispatch_batch(contacts), timeout=120)
             await write_batch_to_stream(stream_out, cleaned, chunk_index)
 
             async with factory() as session:
