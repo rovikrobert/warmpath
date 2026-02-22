@@ -74,6 +74,52 @@ def test_software_engineer_title_extracted():
 
 
 # ---------------------------------------------------------------------------
+# Abbreviation expansion
+# ---------------------------------------------------------------------------
+
+
+def test_pm_abbreviation_expands_to_product_manager():
+    result = parse_query_mock("PMs at Stripe")
+    assert "product manager" in result.titles
+
+
+def test_swe_abbreviation_expands_to_software_engineer():
+    result = parse_query_mock("SWEs at Google")
+    assert "software engineer" in result.titles
+
+
+def test_sde_abbreviation_expands_to_software_engineer():
+    result = parse_query_mock("SDEs at Amazon")
+    assert "software engineer" in result.titles
+
+
+def test_ml_abbreviation_expands_to_machine_learning():
+    result = parse_query_mock("ML engineers at Meta")
+    assert "machine learning" in result.titles
+    assert "engineer" in result.titles
+
+
+def test_ds_abbreviation_expands_to_data_scientist():
+    result = parse_query_mock("DS at Stripe")
+    assert "data scientist" in result.titles
+
+
+def test_de_abbreviation_expands_to_data_engineer():
+    result = parse_query_mock("DE at Databricks")
+    assert "data engineer" in result.titles
+
+
+def test_tpm_abbreviation_expands_to_technical_program_manager():
+    result = parse_query_mock("TPMs at Google")
+    assert "technical program manager" in result.titles
+
+
+def test_em_abbreviation_expands_to_engineering_manager():
+    result = parse_query_mock("EMs at Stripe")
+    assert "engineering manager" in result.titles
+
+
+# ---------------------------------------------------------------------------
 # Location extraction
 # ---------------------------------------------------------------------------
 

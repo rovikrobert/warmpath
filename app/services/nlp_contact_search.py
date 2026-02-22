@@ -131,10 +131,29 @@ _TITLE_KEYWORDS: list[str] = [
     "infrastructure",
     "platform",
     "architect",
+    "engineering manager",
+    "technical program manager",
+    "artificial intelligence",
+    "quality assurance",
 ]
 
 # Sort longest-first so "software engineer" matches before "engineer"
 _TITLE_KEYWORDS.sort(key=len, reverse=True)
+
+_ABBREVIATION_MAP: dict[str, str] = {
+    "pm": "product manager",
+    "swe": "software engineer",
+    "sde": "software engineer",
+    "ml": "machine learning",
+    "ai": "artificial intelligence",
+    "qa": "quality assurance",
+    "ux": "designer",
+    "ui": "designer",
+    "ds": "data scientist",
+    "de": "data engineer",
+    "em": "engineering manager",
+    "tpm": "technical program manager",
+}
 
 # ---------------------------------------------------------------------------
 # Location keywords (covers major tech hubs)
@@ -312,10 +331,20 @@ def _extract_seniority(query_lower: str) -> tuple[list[str], list[str]]:
 def _extract_titles(query_lower: str) -> list[str]:
     """Extract title keywords from the query using word-boundary matching."""
     titles: list[str] = []
+
+    # First pass: expand abbreviations into full title keywords
+    for abbr, full in _ABBREVIATION_MAP.items():
+        if (
+            re.search(r"\b" + re.escape(abbr) + r"s?\b", query_lower)
+            and full not in titles
+        ):
+            titles.append(full)
+
+    # Second pass: match known title keywords
     for kw in _TITLE_KEYWORDS:
-        # Word boundary + optional plural "s" to match "engineers" → "engineer"
         if re.search(r"\b" + re.escape(kw) + r"s?\b", query_lower) and kw not in titles:
             titles.append(kw)
+
     return titles
 
 
