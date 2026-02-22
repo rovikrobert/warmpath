@@ -81,7 +81,15 @@ export default function ReferralJourney({ variant = 'full' }) {
   );
 
   const checkStages = useCallback(async () => {
-    const done = { ...getCache() };
+    // Skip API calls if cache is fresh (< 60s old)
+    const cached = getCache();
+    if (cached._ts && Date.now() - cached._ts < 60_000) {
+      setCompleted(cached);
+      setLoading(false);
+      return;
+    }
+
+    const done = { ...cached };
 
     try {
       const [contactsRes, prefsRes, searchRes, requestsRes] =
@@ -110,12 +118,13 @@ export default function ReferralJourney({ variant = 'full' }) {
       if (searchRes.status === 'fulfilled') {
         const searches = searchRes.value?.data || [];
         done.search = searches.length > 0;
-        // Match: at least 1 search has results
-        done.match = searches.some(
-          (s) => (s.result_count ?? s.results_count ?? 0) > 0,
-        );
-        // Store last search ID for CTA link
-        if (searches.length > 0) {
+        // Match: at least 1 search completed with results
+        done.match = searches.some((s) => s.status === 'completed');
+        // Store last completed search ID for CTA link
+        const lastCompleted = searches.find((s) => s.status === 'completed');
+        if (lastCompleted) {
+          done._lastSearchId = lastCompleted.id;
+        } else if (searches.length > 0) {
           done._lastSearchId = searches[0].id;
         }
       }
@@ -129,6 +138,7 @@ export default function ReferralJourney({ variant = 'full' }) {
       // Don't block UI on API failure
     }
 
+    done._ts = Date.now();
     setCache(done);
     setCompleted(done);
     setLoading(false);

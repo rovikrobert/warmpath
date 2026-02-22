@@ -207,7 +207,7 @@ export default function CoachPage() {
 
   return (
     <div className="flex h-[calc(100dvh-8rem)] lg:h-[calc(100vh-8rem)] flex-col" role="main">
-      {/* Onboarding checklist for new users */}
+      {/* Guided referral journey for new users */}
       <ReferralJourney variant="full" />
 
       {/* Notifications */}

@@ -273,7 +273,9 @@ async def complete_onboarding(
         await generate_feed_for_user(current_user.id, db)
         await db.commit()
     except Exception:
-        pass  # Feed seeding is best-effort — don't block onboarding
+        logger.warning(
+            "Feed seeding failed for user %s", current_user.id, exc_info=True
+        )
 
     await db.refresh(current_user)
 
