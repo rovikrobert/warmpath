@@ -269,8 +269,8 @@ def get_enabled_providers(cfg: Any = None) -> list[CleaningProvider]:
 # Dispatch algorithm
 # ---------------------------------------------------------------------------
 
-MAX_DISPATCH_ROUNDS = 3
-SLOT_ACQUIRE_TIMEOUT = 2  # seconds
+MAX_DISPATCH_ROUNDS = 2
+SLOT_ACQUIRE_TIMEOUT = 0.5  # seconds — fail fast so busy providers don't block
 
 # Priority order: fastest/cheapest first, paid APIs as fallback
 PROVIDER_PRIORITY = ["groq", "gemini", "deepseek", "anthropic", "openai"]
@@ -280,8 +280,8 @@ async def dispatch_batch(batch: list[dict]) -> list[dict]:
     """Route a cleaning batch to the first available provider.
 
     Tries providers in priority order (Groq → Gemini → others) across
-    3 retry rounds with exponential backoff. Falls back to mock cleaner
-    if all providers are exhausted.
+    2 retry rounds with 1s backoff. Falls back to mock cleaner immediately
+    if all providers fail — uploads must always complete.
     Returns post-processed (deterministic normalized) results.
     """
     enabled = get_enabled_providers()
@@ -332,11 +332,11 @@ async def dispatch_batch(batch: list[dict]) -> list[dict]:
                 )
                 continue
 
-        # All providers busy/failed this round — backoff
+        # All providers busy/failed this round — short backoff then retry
         if round_num < MAX_DISPATCH_ROUNDS - 1:
-            await asyncio.sleep(2**round_num)
+            await asyncio.sleep(1)
 
-    # All rounds exhausted
+    # All rounds exhausted — mock fallback ensures upload always completes
     logger.warning(
         "All providers exhausted after %d rounds, using mock cleaner",
         MAX_DISPATCH_ROUNDS,
