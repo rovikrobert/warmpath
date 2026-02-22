@@ -758,9 +758,14 @@ async def _fetch_and_filter_openings(
     """Fetch job board openings, filter, and return (openings, fetched, matched, status)."""
     boards, was_discovered = await lookup_or_discover_boards(company_name, db)
 
+    # Pass first target location as hint for JobSpy/Adzuna fallback
+    location_hint = target_locations[0] if target_locations else None
+
     # Let fetch_jobs_for_company run the full fallback chain
     # (ATS boards → career page → JobSpy → Adzuna) even without a known board.
-    raw_jobs = await fetcher.fetch_jobs_for_company(company_name, boards)
+    raw_jobs = await fetcher.fetch_jobs_for_company(
+        company_name, boards, location_hint=location_hint
+    )
     total_jobs_fetched = len(raw_jobs)
 
     if raw_jobs:

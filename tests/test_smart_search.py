@@ -266,7 +266,7 @@ class TestSmartSearch:
         ):
             mock_fetcher = MockFetcherClass.return_value
             mock_fetcher.fetch_jobs_for_company = AsyncMock(
-                side_effect=lambda name, boards: (
+                side_effect=lambda name, boards, location_hint=None: (
                     MOCK_STRIPE_JOBS
                     if "stripe" in name.lower()
                     else MOCK_NOTION_JOBS
@@ -316,7 +316,7 @@ class TestSmartSearch:
             mock_fetcher = MockFetcherClass.return_value
             # Only Stripe has openings; Notion and Figma don't
             mock_fetcher.fetch_jobs_for_company = AsyncMock(
-                side_effect=lambda name, boards: (
+                side_effect=lambda name, boards, location_hint=None: (
                     MOCK_STRIPE_JOBS if "stripe" in name.lower() else []
                 )
             )

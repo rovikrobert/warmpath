@@ -78,9 +78,7 @@ BOARD_REGISTRY: dict[str, dict[str, str]] = {
     "stainless": {"ashby": "stainlessapi"},
     "grafana": {"greenhouse": "grafanalabs"},
     # --- Singapore / Southeast Asia ---
-    "google": {
-        "career_page": "https://www.google.com/about/careers/applications/jobs/results"
-    },
+    "google": {"career_page": "https://www.google.com/about/careers/applications/"},
     "meta": {"career_page": "https://www.metacareers.com/jobs/"},
     "grab": {"career_page": "https://grab.careers/jobs/"},
     "sea-group": {"career_page": "https://career.sea.com/"},
@@ -686,22 +684,38 @@ async def lookup_or_discover_boards(
     discovered = await discover_boards(company_name)
 
     # 4. Cache the result (even None to avoid repeated probes)
+    #    Use a savepoint so a concurrent-insert race doesn't poison the
+    #    outer transaction (two requests can discover the same company
+    #    simultaneously; the second INSERT hits the unique constraint).
     cache_data = {"boards": discovered}
     expires = datetime.now(timezone.utc) + timedelta(days=7)
 
     if cached is not None:
         cached.data = cache_data
         cached.expires_at = expires
+        await db.flush()
     else:
-        cached = EnrichmentCache(
-            cache_key=cache_key,
-            source="board_discovery",
-            data=cache_data,
-            expires_at=expires,
-        )
-        db.add(cached)
+        from sqlalchemy.exc import IntegrityError
 
-    await db.flush()
+        try:
+            async with db.begin_nested():
+                cached = EnrichmentCache(
+                    cache_key=cache_key,
+                    source="board_discovery",
+                    data=cache_data,
+                    expires_at=expires,
+                )
+                db.add(cached)
+                await db.flush()
+        except IntegrityError:
+            # Concurrent request already inserted — update it instead
+            result = await db.execute(
+                select(EnrichmentCache).where(EnrichmentCache.cache_key == cache_key)
+            )
+            cached = result.scalar_one()
+            cached.data = cache_data
+            cached.expires_at = expires
+            await db.flush()
 
     # 5. If found, register in-memory and persist to DB
     if discovered:
