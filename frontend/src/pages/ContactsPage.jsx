@@ -222,6 +222,10 @@ export default function ContactsPage() {
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState(null);
   const [toast, setToast] = useState(null);
+  // Bulk update state
+  const [bulkRelType, setBulkRelType] = useState('');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
 
   // Enrichment prompt feed items
   const [enrichmentPrompts, setEnrichmentPrompts] = useState([]);
@@ -373,7 +377,45 @@ export default function ContactsPage() {
     }
   };
 
+  const handleBulkUpdate = async () => {
+    if (!bulkRelType) return;
+    setBulkUpdating(true);
+    setBulkConfirm(false);
+    try {
+      let body = { relationship_type: bulkRelType };
+      if (nlpResults) {
+        // NLP mode: send explicit IDs
+        body.contact_ids = nlpResults.map((c) => c.id);
+      } else {
+        // Regular filter/search mode: send filter object
+        body.filter = {};
+        if (debouncedSearch) body.filter.search = debouncedSearch;
+        if (filter) body.filter.relationship_type = filter;
+      }
+      const res = await contactsApi.bulkUpdate(body);
+      const count = res.data?.updated_count || 0;
+      const label = RELATIONSHIP_TYPES.find((r) => r.value === bulkRelType)?.label || bulkRelType;
+      setToast(`Updated ${count} contact${count !== 1 ? 's' : ''} to ${label}`);
+      setTimeout(() => setToast(null), 3000);
+      setBulkRelType('');
+      // Refresh contact list
+      if (nlpResults) {
+        handleNlpSearch();
+      } else {
+        load();
+      }
+    } catch (err) {
+      setToast(err.message || 'Bulk update failed');
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
   const totalPages = meta.total_pages || Math.ceil((meta.total || contactsList.length) / 50);
+
+  const isFiltered = !!(debouncedSearch || filter || nlpResults);
+  const bulkTotal = nlpResults ? nlpResults.length : (meta.total || 0);
 
   const unclassifiedShowSet = useMemo(() => {
     const ids = new Set();
@@ -579,6 +621,56 @@ export default function ContactsPage() {
           <span className="text-sm text-slate-400">{meta.total} contacts</span>
         )}
       </div>
+
+      {/* Bulk update bar */}
+      {isFiltered && bulkTotal > 0 && !loading && !nlpLoading && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-2.5">
+          <span className="text-sm text-slate-300">
+            {bulkTotal} contact{bulkTotal !== 1 ? 's' : ''} matched
+          </span>
+          <span className="text-slate-600">&middot;</span>
+          <label htmlFor="bulk-rel-type" className="text-sm text-slate-400">Bulk update:</label>
+          <select
+            id="bulk-rel-type"
+            value={bulkRelType}
+            onChange={(e) => setBulkRelType(e.target.value)}
+            className="rounded-md border border-slate-700/50 bg-slate-800 px-2 py-1 text-sm text-slate-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            <option value="">Relationship type...</option>
+            {RELATIONSHIP_TYPES.filter((r) => r.value).map((r) => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+          {!bulkConfirm ? (
+            <button
+              onClick={() => setBulkConfirm(true)}
+              disabled={!bulkRelType || bulkUpdating}
+              className="rounded-md bg-amber-500 px-3 py-1 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50"
+            >
+              Apply
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-amber-400">
+                Update {bulkTotal} contact{bulkTotal !== 1 ? 's' : ''} to {RELATIONSHIP_TYPES.find((r) => r.value === bulkRelType)?.label}?
+              </span>
+              <button
+                onClick={handleBulkUpdate}
+                disabled={bulkUpdating}
+                className="rounded-md bg-amber-500 px-3 py-1 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50"
+              >
+                {bulkUpdating ? 'Updating...' : 'Confirm'}
+              </button>
+              <button
+                onClick={() => setBulkConfirm(false)}
+                className="text-xs text-slate-500 hover:text-slate-400"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* NLP search result summary */}
       {nlpResults && (
@@ -933,7 +1025,7 @@ export default function ContactsPage() {
       </SlideOver>
 
       {toast && (
-        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-red-500/90 px-4 py-2 text-sm font-medium text-white shadow-lg lg:bottom-8" role="alert" aria-live="polite">
+        <div className={`fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-lg lg:bottom-8 ${toast.startsWith('Updated') ? 'bg-emerald-500/90' : 'bg-red-500/90'}`} role="alert" aria-live="polite">
           {toast}
         </div>
       )}

@@ -111,6 +111,11 @@ export const contacts = {
   createManual: (body) => api('/api/v1/contacts/manual', { method: 'POST', body }),
   bulkImport: (contactsList) =>
     api('/api/v1/contacts/manual/bulk', { method: 'POST', body: { contacts: contactsList } }),
+  bulkUpdate: (body) =>
+    api('/api/v1/contacts/bulk-update', { method: 'PATCH', body }).then((r) => {
+      track('bulk_update_contacts', { count: r.data?.updated_count });
+      return r;
+    }),
   nlpSearch: (query) =>
     api('/api/v1/contacts/nlp-search', { method: 'POST', body: { query } }).then((r) => {
       track('nlp_search', { query_length: query.length });
