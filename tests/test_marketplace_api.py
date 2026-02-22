@@ -8,12 +8,14 @@ from httpx import AsyncClient
 
 from app.models.company import Company
 from app.models.contact import Contact
+from app.models.job import UserJobPreferences
 from app.models.marketplace import (
     ConnectorReputation,
     MarketplaceListing,
     NetworkSharingPreferences,
 )
 from app.models.match_result import WarmScore
+from app.models.user import ConnectorProfile
 from app.services.credits import earn_credits, get_balance, spend_credits
 from tests.conftest import TestSessionLocal, create_test_user_in_db
 
@@ -414,6 +416,161 @@ class TestIntroRequestFlow:
         assert resp.status_code == 400
         assert "detail" in resp.json()
 
+    async def test_request_intro_enriched_snapshot(
+        self, client: AsyncClient, seeker_with_credits, marketplace_data
+    ):
+        """Intro snapshot includes ConnectorProfile and UserJobPreferences fields."""
+        seeker_uid = uuid_mod.UUID(seeker_with_credits["user_id"])
+
+        # Create ConnectorProfile and UserJobPreferences for the seeker
+        async with TestSessionLocal() as db:
+            db.add(
+                ConnectorProfile(
+                    user_id=seeker_uid,
+                    headline="Senior Backend Engineer | Python & Go",
+                    current_title="Senior Software Engineer",
+                    current_company="Acme Inc",
+                    bio_summary="Experienced backend engineer",
+                    work_history=[
+                        {
+                            "company": "Acme Inc",
+                            "title": "Senior Software Engineer",
+                            "start": "2022-01",
+                            "end": None,
+                        },
+                        {
+                            "company": "StartupCo",
+                            "title": "Software Engineer",
+                            "start": "2019-06",
+                            "end": "2021-12",
+                        },
+                    ],
+                    github_url="https://github.com/seekerdev",
+                )
+            )
+            db.add(
+                UserJobPreferences(
+                    user_id=seeker_uid,
+                    target_role="Staff Engineer",
+                    target_seniority="staff",
+                    target_industries=[],
+                    target_locations=[],
+                )
+            )
+            await db.commit()
+
+        listing_id = str(marketplace_data["listing_ids"][0])
+        resp = await client.post(
+            "/api/v1/marketplace/request-intro",
+            json={
+                "marketplace_listing_id": listing_id,
+                "profile_visibility": "full",
+                "request_type": "specific_role",
+                "job_title": "Staff Engineer",
+            },
+            headers=seeker_with_credits["headers"],
+        )
+        assert resp.status_code == 201
+        snapshot = resp.json()["data"]["job_seeker_profile_snapshot"]
+
+        # Profile fields
+        assert snapshot["headline"] == "Senior Backend Engineer | Python & Go"
+        assert snapshot["current_title"] == "Senior Software Engineer"
+        assert snapshot["current_company"] == "Acme Inc"
+        assert snapshot["bio_summary"] == "Experienced backend engineer"
+        assert snapshot["github_url"] == "https://github.com/seekerdev"
+
+        # Job preferences
+        assert snapshot["target_role"] == "Staff Engineer"
+        assert snapshot["target_seniority"] == "staff"
+
+        # Request context
+        assert snapshot["request_type"] == "specific_role"
+        assert snapshot["job_title"] == "Staff Engineer"
+
+        # Work history summary
+        assert isinstance(snapshot["work_history_summary"], list)
+        assert len(snapshot["work_history_summary"]) == 2
+
+    async def test_request_intro_general_networking_type(
+        self, client: AsyncClient, seeker_with_credits, marketplace_data
+    ):
+        """Intro with general_networking type includes exploration_context in snapshot."""
+        listing_id = str(marketplace_data["listing_ids"][0])
+        resp = await client.post(
+            "/api/v1/marketplace/request-intro",
+            json={
+                "marketplace_listing_id": listing_id,
+                "profile_visibility": "summary",
+                "request_type": "general_networking",
+                "exploration_context": "Interested in learning about eng culture",
+            },
+            headers=seeker_with_credits["headers"],
+        )
+        assert resp.status_code == 201
+        snapshot = resp.json()["data"]["job_seeker_profile_snapshot"]
+
+        assert snapshot["request_type"] == "general_networking"
+        assert (
+            snapshot["exploration_context"]
+            == "Interested in learning about eng culture"
+        )
+        # job_title should not be present when not provided
+        assert snapshot.get("job_title") is None
+
+    async def test_request_intro_generates_candidate_blurb(
+        self, client: AsyncClient, seeker_with_credits, marketplace_data
+    ):
+        """Intro request generates and stores AI candidate blurb in snapshot."""
+        seeker_uid = uuid_mod.UUID(seeker_with_credits["user_id"])
+
+        # Create ConnectorProfile and UserJobPreferences for the seeker
+        async with TestSessionLocal() as db:
+            db.add(
+                ConnectorProfile(
+                    user_id=seeker_uid,
+                    headline="Senior Backend Engineer | Python & Go",
+                    current_title="Senior Software Engineer",
+                    current_company="Acme Inc",
+                    bio_summary="Experienced backend engineer",
+                    work_history=[
+                        {
+                            "company": "Acme Inc",
+                            "title": "Senior Software Engineer",
+                            "start": "2022-01",
+                            "end": None,
+                        },
+                    ],
+                    github_url="https://github.com/seekerdev",
+                )
+            )
+            db.add(
+                UserJobPreferences(
+                    user_id=seeker_uid,
+                    target_role="Staff Engineer",
+                    target_seniority="staff",
+                    target_industries=[],
+                    target_locations=[],
+                )
+            )
+            await db.commit()
+
+        listing_id = str(marketplace_data["listing_ids"][0])
+        resp = await client.post(
+            "/api/v1/marketplace/request-intro",
+            json={
+                "marketplace_listing_id": listing_id,
+                "profile_visibility": "summary",
+                "request_type": "specific_role",
+                "job_title": "Staff Engineer",
+            },
+            headers=seeker_with_credits["headers"],
+        )
+        assert resp.status_code == 201
+        snapshot = resp.json()["data"]["job_seeker_profile_snapshot"]
+        assert "candidate_blurb" in snapshot
+        assert len(snapshot["candidate_blurb"]) > 20
+
 
 # ---------------------------------------------------------------------------
 # Duplicate Detection (contact already in seeker's vault)
@@ -614,6 +771,50 @@ class TestIncomingRequests:
         snapshot = req["job_seeker_profile_snapshot"]
         assert snapshot["full_name"] == "Job Seeker"
         assert snapshot["message"] == "Please help!"
+
+    async def test_incoming_requests_includes_relationship_context(
+        self, client: AsyncClient, seeker_with_credits, holder_auth, marketplace_data
+    ):
+        """NH review screen includes relationship_type, would_refer, and how_you_know."""
+        # Set relationship context on the first contact
+        async with TestSessionLocal() as db:
+            from sqlalchemy import select as sa_select
+
+            result = await db.execute(
+                sa_select(Contact).where(
+                    Contact.id == marketplace_data["contact_ids"][0]
+                )
+            )
+            contact = result.scalar_one()
+            contact.relationship_type = "former_colleague"
+            contact.would_refer = "probably"
+            contact.how_you_know = "Worked together at Stripe"
+            await db.commit()
+
+        # Create an intro request from the seeker
+        listing_id = str(marketplace_data["listing_ids"][0])
+        await client.post(
+            "/api/v1/marketplace/request-intro",
+            json={
+                "marketplace_listing_id": listing_id,
+                "message_to_holder": "Interested in Stripe!",
+            },
+            headers=seeker_with_credits["headers"],
+        )
+
+        # Fetch incoming requests as the NH
+        resp = await client.get(
+            "/api/v1/marketplace/incoming-requests",
+            headers=holder_auth["headers"],
+        )
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert len(data) == 1
+
+        req = data[0]
+        assert req["relationship_type"] == "former_colleague"
+        assert req["would_refer"] == "probably"
+        assert req["how_you_know"] == "Worked together at Stripe"
 
 
 # ---------------------------------------------------------------------------
@@ -883,6 +1084,73 @@ class TestLinkedInFallback:
         async with TestSessionLocal() as db:
             after = await get_balance(holder_uid, db)
         assert after == before
+
+    async def test_approve_includes_candidate_blurb_in_drafted_message(
+        self,
+        client: AsyncClient,
+        seeker_with_credits,
+        holder_auth,
+        marketplace_no_email,
+    ):
+        """LinkedIn drafted message includes candidate_blurb from snapshot."""
+        seeker_uid = uuid_mod.UUID(seeker_with_credits["user_id"])
+
+        # Create ConnectorProfile so blurb generation has material to work with
+        async with TestSessionLocal() as db:
+            db.add(
+                ConnectorProfile(
+                    user_id=seeker_uid,
+                    headline="Senior Backend Engineer | Python & Go",
+                    current_title="Senior Software Engineer",
+                    current_company="Acme Inc",
+                    bio_summary="Experienced backend engineer with 5 years in distributed systems",
+                )
+            )
+            db.add(
+                UserJobPreferences(
+                    user_id=seeker_uid,
+                    target_role="Staff Engineer",
+                    target_seniority="staff",
+                    target_industries=[],
+                    target_locations=[],
+                )
+            )
+            await db.commit()
+
+        # Request intro (generates candidate_blurb in snapshot)
+        listing_id = str(marketplace_no_email["listing_id"])
+        req_resp = await client.post(
+            "/api/v1/marketplace/request-intro",
+            json={
+                "marketplace_listing_id": listing_id,
+                "profile_visibility": "summary",
+                "request_type": "specific_role",
+                "job_title": "Staff Engineer",
+            },
+            headers=seeker_with_credits["headers"],
+        )
+        assert req_resp.status_code == 201
+        fac_id = req_resp.json()["data"]["id"]
+
+        # Verify blurb was generated in snapshot
+        snapshot = req_resp.json()["data"]["job_seeker_profile_snapshot"]
+        assert "candidate_blurb" in snapshot
+        blurb_text = snapshot["candidate_blurb"]
+        assert len(blurb_text) > 20
+
+        # NH approves — LinkedIn fallback path
+        resp = await client.patch(
+            f"/api/v1/marketplace/requests/{fac_id}",
+            json={"action": "approve"},
+            headers=holder_auth["headers"],
+        )
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert data["delivery_method"] is None  # LinkedIn fallback
+        assert "drafted_message" in data
+
+        # Drafted message should contain the blurb text
+        assert blurb_text in data["drafted_message"]
 
 
 # ---------------------------------------------------------------------------
