@@ -116,14 +116,33 @@ async def _jit_provision_user(clerk_user_id: str, db: AsyncSession) -> User | No
     try:
         await db.flush()
     except IntegrityError:
-        # Race condition: webhook or another request created the user first
+        # Could be race condition (webhook arrived) or Clerk identity change
+        # (e.g. user switched from email auth to Google OAuth — same email,
+        # new clerk_user_id).
         await db.rollback()
+        # First try by clerk_user_id (normal race condition)
         result = await db.execute(
             select(User).where(
                 User.clerk_user_id == clerk_user_id, User.deleted_at.is_(None)
             )
         )
-        return result.scalar_one_or_none()
+        existing = result.scalar_one_or_none()
+        if existing is not None:
+            return existing
+        # Then try by email — Clerk identity changed, update clerk_user_id
+        if email:
+            result = await db.execute(
+                select(User).where(User.email == email, User.deleted_at.is_(None))
+            )
+            existing = result.scalar_one_or_none()
+            if existing is not None:
+                existing.clerk_user_id = clerk_user_id
+                await db.commit()
+                logger.info(
+                    "Updated clerk_user_id for %s (email=%s)", clerk_user_id, email
+                )
+                return existing
+        return None
 
     # Award welcome bonus (same logic as webhook handler)
     from app.models.privacy import SuppressionList
