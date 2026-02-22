@@ -52,10 +52,36 @@ BOARD_REGISTRY: dict[str, dict[str, str]] = {
     "hashicorp": {"greenhouse": "hashicorp"},
     "elastic": {"greenhouse": "elastic"},
     "cloudflare": {"greenhouse": "cloudflare"},
+    "gitlab": {"greenhouse": "gitlab"},
+    "vercel": {"greenhouse": "vercel"},
+    "linear": {"ashby": "linear"},
+    "deel": {"ashby": "deel"},
+    "remote-com": {"greenhouse": "remotecom"},
+    # --- Top Startups (SF Bay Area) ---
+    "render": {"ashby": "render"},
+    "harmonic": {"greenhouse": "harmonic"},
+    "ambience-healthcare": {"ashby": "ambiencehealthcare"},
+    "vanta": {"ashby": "vanta"},
+    "harvey": {"ashby": "harvey"},
+    "clickhouse": {"greenhouse": "clickhouse"},
+    "applied-intuition": {"greenhouse": "appliedintuition"},
+    "glean": {"greenhouse": "gleanwork"},
+    "semgrep": {"ashby": "semgrep"},
+    "hightouch": {"greenhouse": "hightouch"},
+    "persona": {"ashby": "persona"},
+    # --- Top Startups (New York) ---
+    "rilla": {"ashby": "rilla"},
+    "adaptive-security": {"ashby": "adaptivesecurity"},
+    "traba": {"ashby": "traba"},
+    "tennr": {"ashby": "tennr"},
+    "kalshi": {"greenhouse": "kalshi"},
+    "stainless": {"ashby": "stainlessapi"},
+    "grafana": {"greenhouse": "grafanalabs"},
     # --- Singapore / Southeast Asia ---
     "google": {
         "career_page": "https://www.google.com/about/careers/applications/jobs/results"
     },
+    "meta": {"career_page": "https://www.metacareers.com/jobs/"},
     "grab": {"career_page": "https://grab.careers/jobs/"},
     "sea-group": {"career_page": "https://career.sea.com/"},
     "shopee": {"career_page": "https://careers.shopee.sg/"},
@@ -67,13 +93,13 @@ BOARD_REGISTRY: dict[str, dict[str, str]] = {
     "patsnap": {"lever": "patsnap"},
     "endowus": {"career_page": "https://endowus.com/careers"},
     "syfe": {"career_page": "https://www.syfe.com/careers"},
-    "aspire": {"career_page": "https://aspireapp.com/careers"},
+    "aspire": {"greenhouse": "aspireio"},
     "funding-societies": {"career_page": "https://fundingsocieties.com/career"},
     "carro": {"career_page": "https://careers.carro.sg/jobs/Careers"},
     "bytedance": {"career_page": "https://jobs.bytedance.com/en/"},
     "tiktok": {"career_page": "https://careers.tiktok.com/"},
-    "wise": {"greenhouse": "transferwise"},
-    "revolut": {"greenhouse": "revolut"},
+    "wise": {"career_page": "https://www.wise.jobs/"},
+    "revolut": {"career_page": "https://www.revolut.com/careers/"},
     "propertyguru": {"greenhouse": "propertyguru"},
     "circles-life": {"career_page": "https://www.circles.life/sg/careers/"},
     "traveloka": {"career_page": "https://www.traveloka.com/en-sg/careers"},
@@ -81,13 +107,47 @@ BOARD_REGISTRY: dict[str, dict[str, str]] = {
     "binance": {"career_page": "https://www.binance.com/en/careers"},
     "crypto-com": {"lever": "crypto"},
     "govtech": {"career_page": "https://www.tech.gov.sg/careers/"},
+    "shopback": {"career_page": "https://careers.shopback.com/"},
     "dbs": {"career_page": "https://www.dbs.com/careers/"},
     "ocbc": {"career_page": "https://www.ocbc.com/group/careers"},
     "uob": {"career_page": "https://www.uobgroup.com/careers/"},
     "standard-chartered": {"career_page": "https://www.sc.com/en/careers/"},
-    "shopback": {"career_page": "https://careers.shopback.com/"},
-    "nium": {"greenhouse": "nium"},
+    "nium": {"lever": "nium"},
     "monks-hill": {"career_page": "https://www.monkshill.com/careers"},
+    # --- Singapore MNCs (ST Best Employers 2025) ---
+    "amazon": {"career_page": "https://www.amazon.jobs/en/"},
+    "apple": {"career_page": "https://jobs.apple.com/en-sg/search"},
+    "salesforce": {"career_page": "https://careers.salesforce.com/en/jobs/"},
+    "oracle": {"career_page": "https://careers.oracle.com/"},
+    "ibm": {"career_page": "https://www.ibm.com/careers/"},
+    "intel": {"career_page": "https://jobs.intel.com/"},
+    "hp": {"career_page": "https://jobs.hp.com/"},
+    "qualcomm": {"career_page": "https://careers.qualcomm.com/"},
+    "sap": {"career_page": "https://jobs.sap.com/"},
+    "autodesk": {"career_page": "https://www.autodesk.com/careers/"},
+    "mastercard": {"career_page": "https://careers.mastercard.com/"},
+    "boeing": {"career_page": "https://jobs.boeing.com/"},
+    "rolls-royce": {"career_page": "https://careers.rolls-royce.com/"},
+    "siemens": {"career_page": "https://jobs.siemens.com/"},
+    "schneider-electric": {"career_page": "https://www.se.com/ww/en/about-us/careers/"},
+    "cognizant": {"career_page": "https://careers.cognizant.com/"},
+    "micron": {"career_page": "https://careers.micron.com/"},
+    "sony": {"career_page": "https://www.sony.com/en/careers/"},
+    "goldman-sachs": {"career_page": "https://www.goldmansachs.com/careers/"},
+    "jpmorgan": {"career_page": "https://careers.jpmorgan.com/"},
+    "hsbc": {"career_page": "https://www.hsbc.com/careers/"},
+    "citibank": {"career_page": "https://jobs.citi.com/"},
+    "deutsche-bank": {"career_page": "https://careers.db.com/"},
+    "bank-of-america": {"career_page": "https://campus.bankofamerica.com/careers/"},
+    "singtel": {"career_page": "https://www.singtel.com/about-us/careers"},
+    "st-engineering": {"career_page": "https://www.stengg.com/careers/"},
+    "temasek": {"career_page": "https://www.temasek.com.sg/en/careers"},
+    "gic": {"greenhouse": "gic"},
+    "capitaland": {"career_page": "https://www.capitaland.com/en/careers.html"},
+    "keppel": {"career_page": "https://www.keppel.com/careers"},
+    "singapore-airlines": {
+        "career_page": "https://www.singaporeair.com/en_UK/sg/careers/"
+    },
     # --- India ---
     "razorpay": {"greenhouse": "razorpay"},
     "zerodha": {"lever": "zerodha"},
@@ -121,6 +181,9 @@ REGIONS: dict[str, list[str]] = {
         "anthropic",
         "openai",
         "google",
+        "meta",
+        "amazon",
+        "apple",
         "spotify",
         "netflix",
         "snap",
@@ -137,6 +200,51 @@ REGIONS: dict[str, list[str]] = {
         "hashicorp",
         "elastic",
         "cloudflare",
+        "gitlab",
+        "vercel",
+        "linear",
+        "deel",
+        "remote-com",
+        "salesforce",
+        "oracle",
+        "ibm",
+        "intel",
+        "hp",
+        "qualcomm",
+        "sap",
+        "autodesk",
+        "mastercard",
+        "boeing",
+        "rolls-royce",
+        "siemens",
+        "schneider-electric",
+        "cognizant",
+        "micron",
+        "sony",
+        "goldman-sachs",
+        "jpmorgan",
+        "hsbc",
+        "citibank",
+        "deutsche-bank",
+        "bank-of-america",
+        "render",
+        "harmonic",
+        "ambience-healthcare",
+        "vanta",
+        "harvey",
+        "clickhouse",
+        "applied-intuition",
+        "glean",
+        "semgrep",
+        "hightouch",
+        "persona",
+        "rilla",
+        "adaptive-security",
+        "traba",
+        "tennr",
+        "kalshi",
+        "stainless",
+        "grafana",
     ],
     "Singapore / SEA": [
         "grab",
@@ -171,8 +279,23 @@ REGIONS: dict[str, list[str]] = {
         "shopback",
         "nium",
         "monks-hill",
+        "singtel",
+        "st-engineering",
+        "temasek",
+        "gic",
+        "capitaland",
+        "keppel",
+        "singapore-airlines",
     ],
-    "India": ["razorpay", "zerodha", "cred", "meesho", "phonepe", "flipkart", "swiggy"],
+    "India": [
+        "razorpay",
+        "zerodha",
+        "cred",
+        "meesho",
+        "phonepe",
+        "flipkart",
+        "swiggy",
+    ],
     "Australia / NZ": ["canva", "atlassian", "afterpay", "xero"],
 }
 
@@ -264,6 +387,63 @@ CAREERS_URLS: dict[str, str] = {
     "flipkart": "https://www.flipkartcareers.com/",
     "swiggy": "https://careers.swiggy.com/",
     "xero": "https://www.xero.com/careers/",
+    "meta": "https://www.metacareers.com/",
+    "gitlab": "https://about.gitlab.com/jobs/",
+    "vercel": "https://vercel.com/careers",
+    "linear": "https://linear.app/careers",
+    "deel": "https://www.deel.com/careers",
+    "remote-com": "https://remote.com/careers",
+    # MNCs with SG presence (ST Best Employers 2025)
+    "amazon": "https://www.amazon.jobs/en/",
+    "apple": "https://jobs.apple.com/en-sg/search",
+    "salesforce": "https://careers.salesforce.com/en/jobs/",
+    "oracle": "https://careers.oracle.com/",
+    "ibm": "https://www.ibm.com/careers/",
+    "intel": "https://jobs.intel.com/",
+    "hp": "https://jobs.hp.com/",
+    "qualcomm": "https://careers.qualcomm.com/",
+    "sap": "https://jobs.sap.com/",
+    "autodesk": "https://www.autodesk.com/careers/",
+    "mastercard": "https://careers.mastercard.com/",
+    "boeing": "https://jobs.boeing.com/",
+    "rolls-royce": "https://careers.rolls-royce.com/",
+    "siemens": "https://jobs.siemens.com/",
+    "schneider-electric": "https://www.se.com/ww/en/about-us/careers/",
+    "cognizant": "https://careers.cognizant.com/",
+    "micron": "https://careers.micron.com/",
+    "sony": "https://www.sony.com/en/careers/",
+    "goldman-sachs": "https://www.goldmansachs.com/careers/",
+    "jpmorgan": "https://careers.jpmorgan.com/",
+    "hsbc": "https://www.hsbc.com/careers/",
+    "citibank": "https://jobs.citi.com/",
+    "deutsche-bank": "https://careers.db.com/",
+    "bank-of-america": "https://campus.bankofamerica.com/careers/",
+    "singtel": "https://www.singtel.com/about-us/careers",
+    "st-engineering": "https://www.stengg.com/careers/",
+    "temasek": "https://www.temasek.com.sg/en/careers",
+    "gic": "https://www.gic.com.sg/careers/",
+    "capitaland": "https://www.capitaland.com/en/careers.html",
+    "keppel": "https://www.keppel.com/careers",
+    "singapore-airlines": "https://www.singaporeair.com/en_UK/sg/careers/",
+    # Top Startups (SF Bay Area + New York)
+    "render": "https://render.com/careers",
+    "harmonic": "https://www.harmonic.ai/careers",
+    "ambience-healthcare": "https://www.ambiencehealthcare.com/careers",
+    "vanta": "https://www.vanta.com/careers",
+    "harvey": "https://www.harvey.ai/careers",
+    "clickhouse": "https://clickhouse.com/careers",
+    "applied-intuition": "https://www.appliedintuition.com/careers",
+    "glean": "https://www.glean.com/careers",
+    "semgrep": "https://semgrep.dev/careers",
+    "hightouch": "https://hightouch.com/careers",
+    "persona": "https://withpersona.com/careers",
+    "rilla": "https://www.rilla.com/careers",
+    "adaptive-security": "https://www.adaptive.security/careers",
+    "traba": "https://www.traba.work/careers",
+    "tennr": "https://www.tennr.com/careers",
+    "kalshi": "https://kalshi.com/careers",
+    "stainless": "https://www.stainlessapi.com/careers",
+    "grafana": "https://grafana.com/about/careers/",
 }
 
 
@@ -292,35 +472,14 @@ def get_region(company_key: str) -> str | None:
 
 
 def companies_for_locations(target_locations: list[str] | None) -> list[str]:
-    """Return board registry keys relevant to the user's target locations.
+    """Return all board registry keys.
 
-    If no locations specified or none match, returns all companies.
-    Prioritizes matched-region companies first, then appends the rest.
+    Companies are not filtered or prioritised by region because MNCs
+    (Google, Amazon, Goldman Sachs, etc.) have roles in many regions.
+    Location-based filtering happens downstream at the individual-job
+    level during role matching.
     """
-    if not target_locations:
-        return list(BOARD_REGISTRY.keys())
-
-    matched_regions: set[str] = set()
-    for loc in target_locations:
-        loc_lower = loc.strip().lower()
-        for keyword, regions in _LOCATION_TO_REGIONS.items():
-            if keyword in loc_lower or loc_lower in keyword:
-                matched_regions.update(regions)
-
-    if not matched_regions:
-        return list(BOARD_REGISTRY.keys())
-
-    # Prioritized list: matched regions first, then others
-    prioritized: list[str] = []
-    rest: list[str] = []
-    for key in BOARD_REGISTRY:
-        region = _KEY_TO_REGION.get(key)
-        if region in matched_regions:
-            prioritized.append(key)
-        else:
-            rest.append(key)
-
-    return prioritized + rest
+    return list(BOARD_REGISTRY.keys())
 
 
 def lookup_boards(company_name: str) -> dict[str, str] | None:
