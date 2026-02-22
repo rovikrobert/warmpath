@@ -62,6 +62,13 @@ CAREER_PAGES: dict[str, str] = {
     "shopback": "https://careers.shopback.com/",
     "nium": "https://www.nium.com/careers",
     "monks-hill": "https://www.monkshill.com/careers",
+    "singtel": "https://www.singtel.com/about-us/careers",
+    "st-engineering": "https://www.stengg.com/careers/",
+    "temasek": "https://www.temasek.com.sg/en/careers",
+    "gic": "https://www.gic.com.sg/careers/",
+    "capitaland": "https://www.capitaland.com/en/careers.html",
+    "keppel": "https://www.keppel.com/careers",
+    "singapore-airlines": "https://www.singaporeair.com/en_UK/sg/careers/",
     # India
     "razorpay": "https://razorpay.com/jobs/",
     "zerodha": "https://zerodha.com/careers/",
