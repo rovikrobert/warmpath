@@ -129,6 +129,11 @@ BOARD_REGISTRY: dict[str, dict[str, str]] = {
     "boeing": {"career_page": "https://jobs.boeing.com/"},
     "rolls-royce": {"career_page": "https://careers.rolls-royce.com/"},
     "siemens": {"career_page": "https://jobs.siemens.com/"},
+    "siemens-energy": {"career_page": "https://jobs.siemens-energy.com/"},
+    "siemens-digital-industries": {
+        "career_page": "https://www.sw.siemens.com/en-US/careers/"
+    },
+    "hexagon": {"lever": "hexagonusfederal"},
     "schneider-electric": {"career_page": "https://www.se.com/ww/en/about-us/careers/"},
     "cognizant": {"career_page": "https://careers.cognizant.com/"},
     "micron": {"career_page": "https://careers.micron.com/"},
@@ -217,6 +222,9 @@ REGIONS: dict[str, list[str]] = {
         "boeing",
         "rolls-royce",
         "siemens",
+        "siemens-energy",
+        "siemens-digital-industries",
+        "hexagon",
         "schneider-electric",
         "cognizant",
         "micron",

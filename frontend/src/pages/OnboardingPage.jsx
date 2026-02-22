@@ -454,7 +454,7 @@ export default function OnboardingPage() {
     }
   };
 
-  const finish = async () => {
+  const _Finish = async () => {
     setSaving(true);
     setError('');
     try {
@@ -992,17 +992,18 @@ export default function OnboardingPage() {
                     </div>
                     <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
-                        <label htmlFor={`wh-start-${i}`} className="mb-1 block text-xs font-medium text-slate-300">Start</label>
+                        <label htmlFor={`wh-start-${i}`} className="mb-1 block text-xs font-medium text-slate-300">Start date (month/year)</label>
                         <input
                           id={`wh-start-${i}`}
                           type="month"
                           value={entry.start_date}
                           onChange={(e) => setWorkHistory((wh) => wh.map((en, j) => j === i ? { ...en, start_date: e.target.value } : en))}
                           className={inputClass}
+                          placeholder="YYYY-MM"
                         />
                       </div>
                       <div>
-                        <label htmlFor={`wh-end-${i}`} className="mb-1 block text-xs font-medium text-slate-300">End</label>
+                        <label htmlFor={`wh-end-${i}`} className="mb-1 block text-xs font-medium text-slate-300">End date (month/year)</label>
                         {entry.is_current ? (
                           <p className="py-2 text-sm text-slate-400">Present</p>
                         ) : (
@@ -1012,6 +1013,7 @@ export default function OnboardingPage() {
                             value={entry.end_date}
                             onChange={(e) => setWorkHistory((wh) => wh.map((en, j) => j === i ? { ...en, end_date: e.target.value } : en))}
                             className={inputClass}
+                            placeholder="YYYY-MM"
                           />
                         )}
                       </div>

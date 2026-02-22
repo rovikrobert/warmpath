@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { Command } from 'cmdk';
 import { useNavigate } from 'react-router-dom';
 import { contacts as contactsApi } from '../api/client';
+import MatchBadge from './MatchBadge';
 
 const NAV_ITEMS = [
   { label: 'Coach', path: '/coach' },
@@ -19,21 +20,6 @@ const QUICK_ACTIONS = [
   { label: 'Track Application', path: '/applications?add=true' },
   { label: 'New Referral Search', path: '/referrals' },
 ];
-
-function WarmScoreBadge({ score }) {
-  if (score == null) return null;
-  const color =
-    score >= 70
-      ? 'bg-green-500/20 text-green-400'
-      : score >= 40
-        ? 'bg-amber-500/20 text-amber-400'
-        : 'bg-slate-500/20 text-slate-400';
-  return (
-    <span className={`ml-auto shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${color}`}>
-      {score}
-    </span>
-  );
-}
 
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
@@ -193,7 +179,7 @@ export default function CommandPalette() {
                         </span>
                       )}
                     </span>
-                    <WarmScoreBadge score={c.warm_score} />
+                    {c.warm_score != null && <MatchBadge score={c.warm_score} type="warm" showScore />}
                   </Command.Item>
                 ))}
               </Command.Group>

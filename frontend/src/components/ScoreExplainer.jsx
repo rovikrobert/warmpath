@@ -8,7 +8,7 @@ import { useState, useRef, useEffect } from 'react';
  *
  * Renders a small "?" icon. Click to expand a floating tooltip card.
  */
-export default function ScoreExplainer({ title, body, tiers }) {
+export default function ScoreExplainer({ title, body, tiers, learnMoreHref }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -51,13 +51,20 @@ export default function ScoreExplainer({ title, body, tiers }) {
               ))}
             </div>
           )}
-          <button
-            onClick={() => setOpen(false)}
-            aria-label={`Close ${title} explanation`}
-            className="mt-2 text-[11px] text-amber-400 hover:text-amber-300"
-          >
-            Got it
-          </button>
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              onClick={() => setOpen(false)}
+              aria-label={`Close ${title} explanation`}
+              className="text-[11px] text-amber-400 hover:text-amber-300"
+            >
+              Got it
+            </button>
+            {learnMoreHref && (
+              <a href={learnMoreHref} className="text-[11px] text-slate-400 hover:text-slate-300">
+                Learn more
+              </a>
+            )}
+          </div>
         </div>
       )}
     </span>

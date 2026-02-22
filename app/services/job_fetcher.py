@@ -235,12 +235,22 @@ class JobFetcher:
                 )
                 all_jobs = await fetch_career_page(career_url)
 
-        # 3. If still nothing and aggregator configured, try Adzuna
+        # 3. If still nothing, try JobSpy (Indeed + optionally other boards)
+        if not all_jobs:
+            from app.services.jobspy_fetcher import search_jobs_via_jobspy
+
+            logger.info(
+                "No ATS/career-page results for '%s', trying JobSpy",
+                company_name,
+            )
+            all_jobs = await search_jobs_via_jobspy(company_name)
+
+        # 4. If still nothing and aggregator configured, try Adzuna
         if not all_jobs and settings.ADZUNA_APP_ID:
             from app.services.job_aggregator import search_jobs_by_company
 
             logger.info(
-                "No ATS/career-page results for '%s', trying Adzuna aggregator",
+                "No ATS/career-page/JobSpy results for '%s', trying Adzuna aggregator",
                 company_name,
             )
             all_jobs = await search_jobs_by_company(company_name)
@@ -282,6 +292,23 @@ class JobFetcher:
         "developer": {"developer", "engineer", "programmer"},
         "designer": {"designer", "ux", "ui"},
         "analyst": {"analyst", "associate", "coordinator"},
+        # Commercial / go-to-market roles
+        "sales": {
+            "sales",
+            "business development",
+            "bd",
+            "account",
+            "commercial",
+            "revenue",
+        },
+        "account": {"account", "sales", "client", "customer", "relationship"},
+        "business": {"business", "sales", "commercial", "strategy", "operations"},
+        "marketing": {"marketing", "growth", "brand", "communications", "content"},
+        # Operations / support roles
+        "product": {"product", "program", "project"},
+        "operations": {"operations", "ops", "logistics", "supply chain"},
+        "finance": {"finance", "accounting", "treasury", "controller"},
+        "recruiter": {"recruiter", "talent", "hiring", "people"},
     }
 
     def _mock_match_jobs(

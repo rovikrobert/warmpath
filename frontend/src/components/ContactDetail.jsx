@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { contacts as contactsApi } from '../api/client';
-import { getWarmTier, getLikelihood } from '../utils/scores';
+import { getWarmTier, getLikelihood, WARM_TIERS } from '../utils/scores';
+import ScoreExplainer from './ScoreExplainer';
 
 const RELATIONSHIP_TYPES = [
   { value: 'current_colleague', label: 'Current colleague' },
@@ -112,9 +113,19 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
 
         {/* Warm Score */}
         <div className="space-y-2">
-          <p className="label-uppercase">Warm Score</p>
+          <p className="label-uppercase">
+            Warm Score
+            <ScoreExplainer
+              title="Warm Score"
+              body="How likely this person is to respond to your referral request. Based on recency, relationship strength, role relevance, and tenure."
+              tiers={WARM_TIERS}
+              learnMoreHref="/help/scores#warm-score"
+            />
+          </p>
           {loading ? (
             <div className="h-2 rounded-full bg-slate-800 animate-pulse" />
+          ) : detail.warm_score == null ? (
+            <p className="text-xs text-slate-500">Warm Score will appear after we analyze your connection data.</p>
           ) : (
             <>
               <ScoreBar score={score} />
@@ -123,9 +134,16 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
                   {warmTier.label}
                 </span>
                 {likelihood && (
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${likelihood.color}`}>
-                    {likelihood.label}
-                  </span>
+                  <>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${likelihood.color}`}>
+                      {likelihood.label}
+                    </span>
+                    <ScoreExplainer
+                      title="Referral Likelihood"
+                      body="Our estimate of whether this person would actually refer you, based on relationship type, tenure, and past patterns."
+                      learnMoreHref="/help/scores#referral-likelihood"
+                    />
+                  </>
                 )}
               </div>
               {warmTier.desc && (

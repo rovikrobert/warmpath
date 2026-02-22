@@ -3,6 +3,7 @@ import { marketplace, auth as authApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { trackEvent } from '../utils/analytics';
 import { MarketplaceBadge } from '../utils/marketplace';
+import ScoreExplainer from './ScoreExplainer';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 
@@ -102,6 +103,11 @@ export default function RequestIntroModal({ listing, creditBalance, onClose, onS
             {listing.listing.department_category && <span>{listing.listing.department_category}</span>}
             {listing.listing.department_category && <span>&middot;</span>}
             <MarketplaceBadge value={listing.listing.warm_sco[RESEND_KEY_REDACTED]} type="strength" />
+            <ScoreExplainer
+              title="Connection Strength"
+              body="The network holder's relationship strength with this contact. Stronger connections lead to better intro outcomes."
+              learnMoreHref="/help/scores#warm-score"
+            />
           </div>
           {listing.network_holder_reputation && (
             <p className="mt-1 text-xs text-slate-500">
