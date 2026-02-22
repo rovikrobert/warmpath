@@ -621,10 +621,10 @@ async def test_marketplace_two_user_flow(client: AsyncClient):
     )
     assert app_resp.status_code == 201
 
-    # -- l) Verify User A earned credits (50 for facilitation) -----------
+    # -- l) Verify User A credits — facilitation credits deferred to delivery
     holder_bal2 = await client.get("/api/v1/credits/balance", headers=holder_headers)
-    # 50 welcome + 100 csv + 50 facilitation = 200
-    assert holder_bal2.json()["data"]["balance"] == 200
+    # 50 welcome + 100 csv = 150 (facilitation credits awarded on delivery, not on approve)
+    assert holder_bal2.json()["data"]["balance"] == 150
 
     # -- m) Verify User B credits deducted -------------------------------
     seeker_bal2 = await client.get("/api/v1/credits/balance", headers=seeker_headers)
