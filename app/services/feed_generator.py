@@ -586,6 +586,118 @@ async def generate_network_insights(
 
 
 # ---------------------------------------------------------------------------
+# Generator 7: Intro Approval Nudge (encourage NH to share more after approval)
+# "Nice one! You just helped someone get closer to their next role."
+# ---------------------------------------------------------------------------
+
+
+async def generate_intro_approval_nudge(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+) -> list[FeedItem]:
+    """After NH approves an intro, encourage them to share more connections."""
+    recent = await db.execute(
+        select(IntroFacilitation).where(
+            IntroFacilitation.network_holder_id == user_id,
+            IntroFacilitation.status == "approved",
+            IntroFacilitation.reviewed_at
+            >= datetime.now(timezone.utc) - timedelta(hours=24),
+        )
+    )
+
+    items: list[FeedItem] = []
+    for f in recent.scalars():
+        dedup_key = _dedup("intro_approval_nudge", str(f.id))
+        if await _user_has_feed_item(db, user_id, dedup_key):
+            continue
+        js_name = (f.job_seeker_profile_snapshot or {}).get("full_name", "someone")
+        item = FeedItem(
+            user_id=user_id,
+            item_type="intro_approval_nudge",
+            title="Nice one!",
+            body=(
+                f"You just helped {js_name} get one step closer to their next role. "
+                f"The more connections you share, the more referral bonuses you can capture."
+            ),
+            icon="thumbs-up",
+            action_url="/contacts",
+            action_label="Share more connections",
+            priority=60,
+            dedup_key=dedup_key,
+            metadata_={
+                "intro_id": str(f.id),
+                "job_seeker_name": js_name,
+            },
+            expires_at=datetime.now(timezone.utc) + timedelta(days=3),
+        )
+        db.add(item)
+        items.append(item)
+
+    return items
+
+
+# ---------------------------------------------------------------------------
+# Generator 8: Manual Send Reminder (NH approved but hasn't confirmed sending)
+# "Did you send the intro to Sarah? Confirm here to earn your credits."
+# ---------------------------------------------------------------------------
+
+
+async def generate_manual_send_reminder(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+) -> list[FeedItem]:
+    """Nudge NH if they approved but haven't confirmed sending after 48 hours."""
+    stale = await db.execute(
+        select(IntroFacilitation).where(
+            IntroFacilitation.network_holder_id == user_id,
+            IntroFacilitation.status == "approved",
+            IntroFacilitation.delivery_method.is_(None),
+            IntroFacilitation.reviewed_at
+            <= datetime.now(timezone.utc) - timedelta(hours=48),
+        )
+    )
+
+    items: list[FeedItem] = []
+    for f in stale.scalars():
+        dedup_key = _dedup("manual_send_reminder", str(f.id))
+        if await _user_has_feed_item(db, user_id, dedup_key):
+            continue
+
+        # Look up the contact name for the nudge message
+        listing = (
+            await db.get(MarketplaceListing, f.marketplace_listing_id)
+            if f.marketplace_listing_id
+            else None
+        )
+        contact = await db.get(Contact, listing.contact_id) if listing else None
+        contact_name = contact.first_name if contact else "your contact"
+
+        item = FeedItem(
+            user_id=user_id,
+            item_type="manual_send_reminder",
+            title=f"Did you send the intro to {contact_name}?",
+            body=(
+                "You approved an intro request a couple of days ago. "
+                "Once you send it, confirm here to earn your credits."
+            ),
+            icon="send",
+            action_url="/marketplace",
+            action_label="Confirm sent",
+            priority=75,
+            dedup_key=dedup_key,
+            metadata_={
+                "intro_id": str(f.id),
+                "contact_name": contact_name,
+            },
+            expires_at=datetime.now(timezone.utc) + timedelta(days=5),
+        )
+        db.add(item)
+        items.append(item)
+
+    return items
+
+
+# ---------------------------------------------------------------------------
 # Orchestrator: run all generators for a single user
 # ---------------------------------------------------------------------------
 
@@ -604,6 +716,8 @@ async def generate_feed_for_user(
         ("marketplace_signals", generate_marketplace_signals),
         ("follow_up_nudges", generate_follow_up_nudges),
         ("network_insights", generate_network_insights),
+        ("intro_approval_nudge", generate_intro_approval_nudge),
+        ("manual_send_reminder", generate_manual_send_reminder),
     ]
 
     for name, gen_fn in generators:

@@ -44,7 +44,8 @@ class FeedItem(Base):
             "item_type IN ("
             "'job_alert', 'contact_update', 'enrichment_prompt', "
             "'marketplace_signal', 'outcome_check', 'platform_activity', "
-            "'network_insight', 'follow_up_nudge')",
+            "'network_insight', 'follow_up_nudge', "
+            "'intro_approval_nudge', 'manual_send_reminder')",
             name="ck_feed_items_type",
         ),
         CheckConstraint(
