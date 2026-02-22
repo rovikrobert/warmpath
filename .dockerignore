@@ -80,6 +80,14 @@ junit.xml
 # Claude Code
 .claude/
 
+# Dev environment (not needed in production image)
+docker-compose.dev.yml
+Dockerfile.dev
+.env.dev
+.env.dev.example
+Makefile
+CONTRIBUTING.md
+
 # User documents
 *.docx
 *.jpeg
