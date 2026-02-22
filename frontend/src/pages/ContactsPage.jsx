@@ -232,11 +232,21 @@ export default function ContactsPage() {
 
   // NLP search state
   const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [nlpResults, setNlpResults] = useState(null);
   const [nlpInterpretation, setNlpInterpretation] = useState(null);
   const [nlpLoading, setNlpLoading] = useState(false);
   const [nlpError, setNlpError] = useState('');
   const [nlpFadingOut, setNlpFadingOut] = useState(false);
+
+  // Debounce search input for list filtering
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const handleNlpSearch = useCallback(async () => {
     const query = searchInput.trim();
@@ -270,6 +280,7 @@ export default function ContactsPage() {
     try {
       const params = { page, per_page: 50 };
       if (filter) params.relationship_type = filter;
+      if (debouncedSearch) params.search = debouncedSearch;
       const res = await contactsApi.list(params);
       setContactsList(res.data || []);
       setMeta(res.meta || {});
@@ -278,7 +289,7 @@ export default function ContactsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filter]);
+  }, [page, filter, debouncedSearch]);
 
   useEffect(() => { load(); }, [load]);
 
