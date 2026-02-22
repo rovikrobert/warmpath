@@ -384,6 +384,75 @@ def _verify_resend_signature(payload: bytes, sig_header: str, secret: str) -> bo
         return False
 
 
+async def _handle_campaign_log_event(
+    log_entry: EmailCampaignLog, event_type: str, email_id: str
+) -> None:
+    """Update EmailCampaignLog fields based on Resend event type."""
+    now = datetime.now(timezone.utc)
+
+    if event_type == "email.opened" and log_entry.opened_at is None:
+        log_entry.opened_at = now
+        logger.info("Marked email %s as opened", email_id)
+    elif event_type == "email.clicked" and log_entry.clicked_at is None:
+        log_entry.clicked_at = now
+        # Also mark as opened if not already
+        if log_entry.opened_at is None:
+            log_entry.opened_at = now
+        logger.info("Marked email %s as clicked", email_id)
+    elif event_type == "email.bounced":
+        logger.warning("Email %s bounced", email_id)
+
+
+async def _handle_intro_facilitation_event(
+    facilitation: "IntroFacilitation",  # noqa: F821
+    event_type: str,
+    db: AsyncSession,
+) -> None:
+    """Update IntroFacilitation delivery status and award credits on delivery events."""
+    from app.services.credits import earn_credits
+
+    now = datetime.now(timezone.utc)
+
+    if event_type == "email.delivered":
+        facilitation.delivery_status = "delivered"
+        facilitation.delivered_at = now
+        # Award credits if not already awarded
+        if not facilitation.credits_awarded_at:
+            await earn_credits(
+                facilitation.network_holder_id,
+                50,
+                "intro_facilitation",
+                db,
+                reference_id=facilitation.id,
+            )
+            facilitation.credits_awarded_at = now
+    elif event_type == "email.bounced":
+        facilitation.delivery_status = "bounced"
+        facilitation.delivered_at = now
+        # Partial credits for bounce (NH tried)
+        if not facilitation.credits_awarded_at:
+            await earn_credits(
+                facilitation.network_holder_id,
+                25,
+                "intro_facilitation_bounced",
+                db,
+                reference_id=facilitation.id,
+            )
+            facilitation.credits_awarded_at = now
+    elif event_type == "email.opened":
+        facilitation.delivery_status = "opened"
+
+    # TODO: Handle STOP replies via Resend inbound webhook.
+    # When contact replies STOP, add their email hash to SuppressionList.
+    # Requires Resend inbound email forwarding setup (deferred to Phase 2).
+
+    logger.info(
+        "Intro facilitation %s updated: delivery_status=%s",
+        facilitation.id,
+        facilitation.delivery_status,
+    )
+
+
 @router.post("/webhooks/resend")
 async def resend_webhook(
     request: Request,
@@ -391,61 +460,14 @@ async def resend_webhook(
 ) -> dict:
     """Receive Resend webhook events for email tracking.
 
-    Updates opened_at/clicked_at on EmailCampaignLog by matching
-    the Resend email ID stored as external_id.
-
-    Events handled: email.opened, email.clicked, email.bounced
+    Updates EmailCampaignLog (opens/clicks/bounces) and IntroFacilitation
+    (delivery/bounce/open) by matching the Resend email ID.
     """
     payload = await request.body()
 
     # Signature verification when secret is configured
     if settings.RESEND_WEBHOOK_SECRET:
-        import base64
-
-        svix_id = request.headers.get("svix-id", "")
-        svix_timestamp = request.headers.get("svix-timestamp", "")
-        svix_signature = request.headers.get("svix-signature", "")
-
-        if not svix_id or not svix_timestamp or not svix_signature:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing Svix signature headers",
-            )
-
-        # Replay protection: reject if >5 minutes old
-        try:
-            ts = int(svix_timestamp)
-            if abs(time.time() - ts) > 300:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Webhook timestamp too old",
-                )
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid timestamp",
-            ) from None
-
-        # Compute expected signature
-        sign_content = f"{svix_id}.{svix_timestamp}.".encode() + payload
-        secret_bytes = base64.b64decode(settings.RESEND_WEBHOOK_SECRET.split("_")[-1])
-        computed = base64.b64encode(
-            hmac.new(secret_bytes, sign_content, hashlib.sha256).digest()
-        ).decode()
-
-        # Check against any of the provided signatures
-        valid = False
-        for sig in svix_signature.split(" "):
-            sig = sig.strip()
-            if sig.startswith("v1,") and hmac.compa[RESEND_KEY_REDACTED](computed, sig[3:]):
-                valid = True
-                break
-
-        if not valid:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid webhook signature",
-            )
+        _verify_resend_svix_signature(request, payload)
     else:
         logger.warning(
             "RESEND_WEBHOOK_SECRET not set — accepting webhook without verification"
@@ -468,33 +490,90 @@ async def resend_webhook(
     if not email_id:
         return {"data": {"received": True, "type": event_type}, "meta": {}}
 
+    # Try campaign log first, then intro facilitation
+    matched = await _match_resend_email(db, email_id, event_type)
+
+    return {
+        "data": {"received": True, "type": event_type, "matched": matched},
+        "meta": {},
+    }
+
+
+async def _match_resend_email(db: AsyncSession, email_id: str, event_type: str) -> bool:
+    """Look up email_id in campaign logs and intro facilitations, handle the event."""
     # Look up the campaign log by external_id
     result = await db.execute(
         select(EmailCampaignLog).where(EmailCampaignLog.external_id == email_id)
     )
     log_entry = result.scalar_one_or_none()
 
-    if log_entry is None:
-        logger.debug("No campaign log found for email_id=%s", email_id)
-        return {
-            "data": {"received": True, "type": event_type, "matched": False},
-            "meta": {},
-        }
+    if log_entry is not None:
+        await _handle_campaign_log_event(log_entry, event_type, email_id)
+        await db.commit()
+        return True
 
-    now = datetime.now(timezone.utc)
+    # Check if this is an intro relay email
+    from app.models.marketplace import IntroFacilitation
 
-    if event_type == "email.opened" and log_entry.opened_at is None:
-        log_entry.opened_at = now
-        logger.info("Marked email %s as opened", email_id)
-    elif event_type == "email.clicked" and log_entry.clicked_at is None:
-        log_entry.clicked_at = now
-        # Also mark as opened if not already
-        if log_entry.opened_at is None:
-            log_entry.opened_at = now
-        logger.info("Marked email %s as clicked", email_id)
-    elif event_type == "email.bounced":
-        logger.warning("Email %s bounced", email_id)
+    facilitation_result = await db.execute(
+        select(IntroFacilitation).where(IntroFacilitation.relay_message_id == email_id)
+    )
+    facilitation = facilitation_result.scalar_one_or_none()
 
-    await db.commit()
+    if facilitation:
+        await _handle_intro_facilitation_event(facilitation, event_type, db)
+        await db.commit()
+        return True
 
-    return {"data": {"received": True, "type": event_type, "matched": True}, "meta": {}}
+    logger.debug(
+        "No campaign log or intro facilitation found for email_id=%s", email_id
+    )
+    return False
+
+
+def _verify_resend_svix_signature(request: Request, payload: bytes) -> None:
+    """Verify Svix-style HMAC-SHA256 signature on Resend webhook payload."""
+    import base64
+
+    svix_id = request.headers.get("svix-id", "")
+    svix_timestamp = request.headers.get("svix-timestamp", "")
+    svix_signature = request.headers.get("svix-signature", "")
+
+    if not svix_id or not svix_timestamp or not svix_signature:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing Svix signature headers",
+        )
+
+    # Replay protection: reject if >5 minutes old
+    try:
+        ts = int(svix_timestamp)
+        if abs(time.time() - ts) > 300:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Webhook timestamp too old",
+            )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid timestamp",
+        ) from None
+
+    # Compute expected signature
+    sign_content = f"{svix_id}.{svix_timestamp}.".encode() + payload
+    secret_bytes = base64.b64decode(settings.RESEND_WEBHOOK_SECRET.split("_")[-1])
+    computed = base64.b64encode(
+        hmac.new(secret_bytes, sign_content, hashlib.sha256).digest()
+    ).decode()
+
+    # Check against any of the provided signatures
+    valid = any(
+        sig.strip().startswith("v1,") and hmac.compa[RESEND_KEY_REDACTED](computed, sig.strip()[3:])
+        for sig in svix_signature.split(" ")
+    )
+
+    if not valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid webhook signature",
+        )
