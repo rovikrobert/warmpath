@@ -404,6 +404,103 @@ async def test_intro_pending_reminder(mock_send: object, db: AsyncSession) -> No
 
 
 # ---------------------------------------------------------------------------
+# Intro request immediate notification
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@patch("app.services.email_engagement._send_email")
+async def test_intro_request_notification_sends_email_to_nh(
+    mock_send: object, db: AsyncSession
+) -> None:
+    """When a job seeker requests an intro, NH gets an immediate email with company name."""
+    from app.models.company import Company
+    from app.models.contact import Contact
+    from app.services.email_engagement import send_intro_request_notification
+
+    nh = _make_user(intent="share_network")
+    js = _make_user(intent="find_referrals")
+    db.add_all([nh, js])
+    await db.flush()
+
+    company = Company(id=uuid.uuid4(), name="Stripe", domain="stripe.com")
+    db.add(company)
+    await db.flush()
+
+    contact = Contact(
+        user_id=nh.id,
+        company_id=company.id,
+        first_name="c",
+        last_name="t",
+        full_name="c t",
+    )
+    db.add(contact)
+    await db.flush()
+
+    listing = MarketplaceListing(
+        network_holder_id=nh.id,
+        contact_id=contact.id,
+        company_id=company.id,
+        role_level="senior",
+        department_category="engineering",
+        warm_score_range="60-80",
+        connection_recency="recent",
+    )
+    db.add(listing)
+    await db.flush()
+
+    intro = IntroFacilitation(
+        job_seeker_id=js.id,
+        network_holder_id=nh.id,
+        marketplace_listing_id=listing.id,
+        status="requested",
+        job_seeker_profile_snapshot={"full_name": "Test Seeker"},
+    )
+    db.add(intro)
+    await db.flush()
+
+    result = await send_intro_request_notification(
+        nh_user=nh,
+        company_name="Stripe",
+        role_level="senior",
+        job_seeker_snapshot={"full_name": "Test Seeker"},
+        facilitation_id=intro.id,
+        db=db,
+    )
+
+    assert result is True
+    mock_send.assert_called_once()
+    html = mock_send.call_args[0][2]
+    assert "Stripe" in html
+    assert "referral" in html.lower()
+
+
+@pytest.mark.asyncio
+@patch("app.services.email_engagement._send_email")
+async def test_intro_request_notification_skips_opted_out_nh(
+    mock_send: object, db: AsyncSession
+) -> None:
+    """NH with marketing_opt_out=True should not receive the email."""
+    from app.services.email_engagement import send_intro_request_notification
+
+    nh = _make_user(intent="share_network", marketing_opt_out=True)
+    db.add(nh)
+    await db.flush()
+
+    result = await send_intro_request_notification(
+        nh_user=nh,
+        company_name="Stripe",
+        role_level="senior",
+        job_seeker_snapshot={},
+        facilitation_id=uuid.uuid4(),
+        db=db,
+    )
+
+    assert result is False
+    mock_send.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # Weekly digest tests
 # ---------------------------------------------------------------------------
 

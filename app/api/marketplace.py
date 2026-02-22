@@ -11,6 +11,7 @@ Endpoints:
   GET    /marketplace/my-listings           — holder's own listings (with PII)
 """
 
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -53,6 +54,8 @@ from app.services.marketplace_indexer import generate_marketplace_listings
 from app.utils.hashing import hash_for_suppression
 from app.utils.privacy_checks import require_not_restricted
 from app.utils.security import get_current_user, require_verified_email
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -361,6 +364,35 @@ async def request_intro(
     )
 
     await db.commit()
+
+    # Send immediate email notification to network holder
+    from app.services.email_engagement import send_intro_request_notification
+
+    nh_user_result = await db.execute(
+        select(User).where(User.id == listing.network_holder_id)
+    )
+    nh_user = nh_user_result.scalar_one_or_none()
+    if nh_user:
+        company_result = await db.execute(
+            select(Company.name).where(Company.id == listing.company_id)
+        )
+        company_name = company_result.scalar_one_or_none() or "a company"
+        try:
+            await send_intro_request_notification(
+                nh_user=nh_user,
+                company_name=company_name,
+                role_level=listing.role_level or "unknown",
+                job_seeker_snapshot=snapshot,
+                facilitation_id=facilitation.id,
+                db=db,
+            )
+            await db.commit()
+        except Exception:
+            logger.warning(
+                "Failed to send intro request email for facilitation %s",
+                facilitation.id,
+                exc_info=True,
+            )
 
     return {
         "data": IntroFacilitationResponse.model_validate(facilitation).model_dump(

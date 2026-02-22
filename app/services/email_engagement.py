@@ -514,6 +514,58 @@ async def send_intro_pending_reminder(db: AsyncSession) -> int:
     return count
 
 
+async def send_intro_request_notification(
+    nh_user: User,
+    company_name: str,
+    role_level: str,
+    job_seeker_snapshot: dict,
+    facilitation_id: uuid.UUID,
+    db: AsyncSession,
+) -> bool:
+    """Send immediate email to NH when a job seeker requests an intro.
+
+    Returns True if email was sent, False if skipped (opt-out).
+    """
+    if nh_user.marketing_opt_out:
+        return False
+
+    first = nh_user.full_name.split()[0] if nh_user.full_name else "there"
+
+    # Build seeker summary from snapshot
+    seeker_info = ""
+    if job_seeker_snapshot.get("full_name"):
+        seeker_info = f'<p style="margin: 0 0 8px; font-size: 14px;"><strong>From:</strong> {job_seeker_snapshot["full_name"]}</p>'
+    if job_seeker_snapshot.get("message"):
+        seeker_info += f'<p style="margin: 0 0 8px; font-size: 14px; color: #4b5563;"><em>"{job_seeker_snapshot["message"]}"</em></p>'
+
+    html = f"""\
+<div lang="en" dir="ltr" style="{_base_style()}">
+  {_preheader_html(f"Someone wants a referral at {company_name}")}
+  <p style="margin: 0 0 16px;">Hi {first},</p>
+  <p style="margin: 0 0 16px;">A candidate is looking for a <strong>{role_level}-level</strong> referral at <strong>{company_name}</strong> and matched one of your contacts.</p>
+  {seeker_info}
+  <p style="margin: 0 0 16px;">If this leads to a hire, you could earn <strong>$2-10K</strong> in referral bonuses from your employer.</p>
+  <div style="margin: 16px 0;">
+    <a href="{APP_URL}/marketplace/requests" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Review Request</a>
+  </div>
+  <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff("share_network")}</p>
+  {_footer_html()}
+</div>"""
+
+    eid = _send_email(
+        nh_user.email,
+        f"Referral opportunity at {company_name} — review and earn",
+        html,
+    )
+    await _record_send(db, nh_user.id, "intro_request_notify", external_id=eid)
+    logger.info(
+        "intro_request_notify: sent to %s for facilitation %s",
+        nh_user.id,
+        facilitation_id,
+    )
+    return True
+
+
 async def send_weekly_digest(db: AsyncSession) -> int:
     """Weekly activity digest for active users (any activity in last 7d)."""
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
