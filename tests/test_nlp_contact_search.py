@@ -731,3 +731,32 @@ async def test_search_user_contacts_empty_query_returns_all(
 
     assert result["total_matched"] == 4
     assert len(result["results"]) == 4
+
+
+# ---------------------------------------------------------------------------
+# Company-first query patterns (e.g. "Grab engineers", "Google PMs")
+# ---------------------------------------------------------------------------
+
+
+def test_company_first_query_extracts_company():
+    """'Grab engineers' should extract Grab as a company."""
+    from app.services.nlp_contact_search import parse_query_mock
+
+    result = parse_query_mock("Grab engineers")
+    assert "Grab" in result.companies
+    assert "engineer" in result.titles
+
+
+def test_company_first_query_with_known_company():
+    from app.services.nlp_contact_search import parse_query_mock
+
+    result = parse_query_mock("Google PMs")
+    assert "Google" in result.companies
+
+
+def test_company_first_query_multiword_title():
+    from app.services.nlp_contact_search import parse_query_mock
+
+    result = parse_query_mock("Stripe product managers")
+    assert "Stripe" in result.companies
+    assert "product manager" in result.titles
