@@ -42,13 +42,15 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _today_str() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-
 def _dedup(item_type: str, *parts: str) -> str:
-    """Build a dedup key from item type + arbitrary parts."""
-    raw = f"{item_type}:{'|'.join(str(p) for p in parts)}:{_today_str()}"
+    """Build a stable dedup key from item type + arbitrary parts.
+
+    Date-independent so the partial unique index
+    ``(user_id, item_type, dedup_key) WHERE dismissed_at IS NULL``
+    prevents duplicate feed items.  After a user dismisses an item
+    the next generation cycle can create a fresh one.
+    """
+    raw = f"{item_type}:{'|'.join(str(p) for p in parts)}"
     return hashlib.sha256(raw.encode()).hexdigest()[:64]
 
 
