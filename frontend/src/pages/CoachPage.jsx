@@ -91,7 +91,16 @@ export default function CoachPage() {
     feedApi.list({ limit: 10, exclude_type: 'enrichment_prompt' })
       .then((res) => {
         if (cancelled) return;
-        setFeedItems(res.data || []);
+        // Deduplicate by title — keep only the newest item per unique title
+        // so recurring feed items (e.g. enrichment progress) don't flood the panel
+        const raw = res.data || [];
+        const seen = new Set();
+        const deduped = raw.filter((item) => {
+          if (seen.has(item.title)) return false;
+          seen.add(item.title);
+          return true;
+        });
+        setFeedItems(deduped);
       })
       .catch(() => {});
     return () => { cancelled = true; };
