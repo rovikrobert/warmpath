@@ -266,6 +266,154 @@ async def generate_enrichment_prompts(
 
 
 # ---------------------------------------------------------------------------
+# Generator 2b: Would-Refer Prompts (after relationship type is known)
+# "Would Sarah Chen at Stripe refer you for a role? Definitely / Probably / No"
+# ---------------------------------------------------------------------------
+
+
+async def generate_would_refer_prompts(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    batch_size: int = 3,
+) -> list[FeedItem]:
+    """Prompt for would_refer on contacts that have relationship_type but no would_refer."""
+    contacts_result = await db.execute(
+        select(Contact)
+        .where(
+            Contact.user_id == user_id,
+            Contact.deleted_at.is_(None),
+            Contact.relationship_type.isnot(None),
+            Contact.would_refer.is_(None),
+        )
+        .order_by(Contact.created_at.desc())
+        .limit(batch_size * 2)
+    )
+    contacts = contacts_result.scalars().all()
+
+    if not contacts:
+        return []
+
+    items: list[FeedItem] = []
+    for contact in contacts:
+        if len(items) >= batch_size:
+            break
+
+        dedup_key = _dedup("enrichment_prompt", str(contact.id), "would_refer")
+        if await _user_has_feed_item(db, user_id, dedup_key):
+            continue
+
+        name = contact.full_name or "a contact"
+        company = contact.current_company or "their company"
+        title = f"Would {name} refer you?"
+        body = (
+            f"You categorized {name} at {company} as '{contact.relationship_type}'. "
+            f"Would they actually refer you for a role? This is the single strongest "
+            f"signal for referral matching."
+        )
+
+        item = FeedItem(
+            user_id=user_id,
+            item_type="enrichment_prompt",
+            title=title,
+            body=body,
+            icon="user-check",
+            action_url=f"/contacts?highlight={contact.id}",
+            action_label="Rate referral likelihood",
+            priority=65,
+            dedup_key=dedup_key,
+            metadata_={
+                "contact_id": str(contact.id),
+                "contact_name": name,
+                "company_name": company,
+                "prompt_type": "would_refer",
+                "options": ["definitely", "probably", "maybe", "no"],
+            },
+            expires_at=datetime.now(timezone.utc) + timedelta(days=14),
+        )
+        db.add(item)
+        items.append(item)
+
+    return items
+
+
+# ---------------------------------------------------------------------------
+# Generator 2c: Last Interaction Prompts (for stale connections)
+# "When did you last talk to Sarah Chen? Last month / Last year / 2+ years"
+# ---------------------------------------------------------------------------
+
+
+async def generate_last_interaction_prompts(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    batch_size: int = 3,
+) -> list[FeedItem]:
+    """Prompt for last_interaction_date on old connections missing it."""
+    one_year_ago = datetime.now(timezone.utc) - timedelta(days=365)
+
+    contacts_result = await db.execute(
+        select(Contact)
+        .where(
+            Contact.user_id == user_id,
+            Contact.deleted_at.is_(None),
+            Contact.last_interaction_date.is_(None),
+            Contact.connected_on <= one_year_ago.date(),
+        )
+        .order_by(Contact.created_at.desc())
+        .limit(batch_size * 2)
+    )
+    contacts = contacts_result.scalars().all()
+
+    if not contacts:
+        return []
+
+    items: list[FeedItem] = []
+    for contact in contacts:
+        if len(items) >= batch_size:
+            break
+
+        dedup_key = _dedup("enrichment_prompt", str(contact.id), "last_interaction")
+        if await _user_has_feed_item(db, user_id, dedup_key):
+            continue
+
+        name = contact.full_name or "a contact"
+        company = contact.current_company or "their company"
+        title = f"When did you last talk to {name}?"
+        body = (
+            f"You connected with {name} at {company} a while ago. "
+            f"Recent interactions mean warmer referral paths."
+        )
+
+        item = FeedItem(
+            user_id=user_id,
+            item_type="enrichment_prompt",
+            title=title,
+            body=body,
+            icon="clock",
+            action_url=f"/contacts?highlight={contact.id}",
+            action_label="Update interaction",
+            priority=50,
+            dedup_key=dedup_key,
+            metadata_={
+                "contact_id": str(contact.id),
+                "contact_name": name,
+                "company_name": company,
+                "prompt_type": "last_interaction",
+                "options": [
+                    "last_month",
+                    "last_quarter",
+                    "last_year",
+                    "over_2_years",
+                ],
+            },
+            expires_at=datetime.now(timezone.utc) + timedelta(days=14),
+        )
+        db.add(item)
+        items.append(item)
+
+    return items
+
+
+# ---------------------------------------------------------------------------
 # Generator 3: Outcome Checks (closes the referral loop)
 # "You requested an intro at Notion 5 days ago — have you heard back?"
 # ---------------------------------------------------------------------------
@@ -368,6 +516,12 @@ async def generate_marketplace_signals(
         meta = row[0] or {}
         if "company_names" in meta:
             target_company_names.update(name.lower() for name in meta["company_names"])
+
+    # Also include dream companies from job preferences
+    if prefs and prefs.target_companies:
+        target_companies = prefs.target_companies
+        if isinstance(target_companies, list):
+            target_company_names.update(name.lower() for name in target_companies)
 
     if not target_company_names:
         return []
@@ -712,6 +866,8 @@ async def generate_feed_for_user(
     generators = [
         ("job_alerts", generate_job_alerts),
         ("enrichment_prompts", generate_enrichment_prompts),
+        ("would_refer_prompts", generate_would_refer_prompts),
+        ("last_interaction_prompts", generate_last_interaction_prompts),
         ("outcome_checks", generate_outcome_checks),
         ("marketplace_signals", generate_marketplace_signals),
         ("follow_up_nudges", generate_follow_up_nudges),

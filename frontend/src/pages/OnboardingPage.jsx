@@ -57,6 +57,7 @@ function ResumePreviewModal({ data, onApply, onClose }) {
 const EMPTY_WORK = { company: '', title: '', start_date: '', end_date: '', is_current: false };
 
 const SENIORITY_OPTIONS = ['Staff / Principal', 'Manager', 'Director', 'VP', 'C-Suite'];
+const CAREER_LEVEL_OPTIONS = ['Entry (0-2 yrs)', 'Mid (3-5 yrs)', 'Senior (6-10 yrs)', 'Staff / Principal (10+ yrs)', 'Manager', 'Director', 'VP+', 'C-Suite'];
 
 // Steps: 1=Intent, 2=Job Prefs (skipped by NHs), 3=Bonus Pitch (NH/explore only),
 // 4=Privacy (consolidated), 5=Meet Keevs, 6=Upload CSV, 7=Work History
@@ -148,8 +149,11 @@ export default function OnboardingPage() {
   const [prefs, setPrefs] = useState({
     target_role: '',
     target_seniority: '',
+    career_level: '',
     target_industries: [],
     target_locations: [],
+    target_companies: [],
+    key_skills: [],
     open_to_remote: true,
   });
 
@@ -158,6 +162,8 @@ export default function OnboardingPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
   const [optInMarketplace, setOptInMarketplace] = useState(false);
+  // Step 3 (NH): Current employer
+  const [nhEmployer, setNhEmployer] = useState('');
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
@@ -316,8 +322,11 @@ export default function OnboardingPage() {
         await preferences.upsertJob({
           target_role: prefs.target_role,
           target_seniority: prefs.target_seniority || null,
+          career_level: prefs.career_level || null,
           target_industries: prefs.target_industries.length ? prefs.target_industries : null,
           target_locations: prefs.target_locations.length ? prefs.target_locations : null,
+          target_companies: prefs.target_companies.length ? prefs.target_companies : null,
+          key_skills: prefs.key_skills.length ? prefs.key_skills : null,
           open_to_remote: prefs.open_to_remote,
         });
       }
@@ -455,14 +464,23 @@ export default function OnboardingPage() {
     }
   };
 
-  const _Finish = async () => {
+  const postWizardRoute = intent === 'share_network' ? '/contacts' : '/coach';
+
+  const skipToFinish = async () => {
     setSaving(true);
     setError('');
     try {
+      // Redeem referral code if provided (non-blocking)
+      if (referralCode) {
+        try {
+          await referralsApi.redeem({ code: referralCode });
+        } catch { /* invalid/expired — silently continue */ }
+        localStorage.removeItem('referral_code');
+      }
       await authApi.completeOnboarding();
       trackEvent('signup_completed', { intent, skipped_work_history: true });
       await refreshUser();
-      navigate('/coach');
+      navigate(postWizardRoute);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -600,6 +618,33 @@ export default function OnboardingPage() {
                 </select>
               </div>
 
+              <div>
+                <label htmlFor="onboard-career-level" className="mb-1 block text-sm font-medium text-slate-300">Career Level <span className="text-slate-500 font-normal">(optional)</span></label>
+                <select id="onboard-career-level" value={prefs.career_level} onChange={setPref('career_level')} className={inputClass}>
+                  <option value="">Select your level</option>
+                  {CAREER_LEVEL_OPTIONS.map((l) => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </select>
+                <p className="mt-0.5 text-xs text-slate-500">Helps us match you with contacts at the right seniority.</p>
+              </div>
+
+              <TagInput
+                label="Key Skills"
+                value={prefs.key_skills}
+                onChange={setArrayPref('key_skills')}
+                placeholder="e.g. React, Python, Product Strategy"
+                sublabel="Optional \u2014 improves match accuracy within departments."
+              />
+
+              <TagInput
+                label="Dream Companies"
+                value={prefs.target_companies}
+                onChange={setArrayPref('target_companies')}
+                placeholder="e.g. Stripe, Grab, Notion"
+                sublabel="Optional \u2014 we'll alert you when contacts or jobs appear at these companies."
+              />
+
               <TagInput
                 label="Target Industries"
                 value={prefs.target_industries}
@@ -644,6 +689,14 @@ export default function OnboardingPage() {
                 <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">Why share your network</p>
                 <h2 className="text-lg font-semibold text-slate-50">You're sitting on unclaimed referral bonuses</h2>
               </div>
+
+              {intent === 'share_network' && (
+                <div>
+                  <label htmlFor="onboard-nh-employer" className="mb-1 block text-sm font-medium text-slate-300">Where do you work?</label>
+                  <input id="onboard-nh-employer" type="text" value={nhEmployer} onChange={(e) => setNhEmployer(e.target.value)} className={inputClass} placeholder="e.g. Google, Grab, DBS" />
+                  <p className="mt-0.5 text-xs text-slate-500">Helps us route relevant candidates to you.</p>
+                </div>
+              )}
 
               <div className="space-y-3">
                 <div className="flex items-start gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 sm:p-4">
@@ -690,7 +743,12 @@ export default function OnboardingPage() {
                 <Button variant="secondary" onClick={() => { setError(''); setStep(intent === 'share_network' ? 1 : 2); }} className="flex-1" size="lg">
                   Back
                 </Button>
-                <Button onClick={() => setStep(4)} className="flex-1" size="lg">
+                <Button onClick={async () => {
+                  if (nhEmployer.trim()) {
+                    try { await authApi.upsertProfile({ current_company: nhEmployer.trim() }); } catch { /* best-effort */ }
+                  }
+                  setStep(4);
+                }} className="flex-1" size="lg">
                   Next
                 </Button>
               </div>
@@ -755,7 +813,7 @@ export default function OnboardingPage() {
           {/* Step 5: Meet your AI coach */}
           {step === 5 && (
             <div className="space-y-5">
-              {user?.intent === 'share_network' ? (
+              {intent === 'share_network' ? (
                 <>
                   <div className="text-center">
                     <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">Your AI network partner</p>
@@ -792,7 +850,7 @@ export default function OnboardingPage() {
                     </div>
                   </div>
                 </>
-              ) : user?.intent === 'explore' ? (
+              ) : intent === 'explore' ? (
                 <>
                   <div className="text-center">
                     <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">Your AI coaches</p>
@@ -869,8 +927,13 @@ export default function OnboardingPage() {
               <div>
                 <h2 className="text-lg font-semibold text-slate-50">Upload your LinkedIn connections</h2>
                 <p className="mt-1 text-sm text-slate-400">
-                  Export your connections from LinkedIn (Settings &rarr; Data Privacy &rarr; Get a copy of your data &rarr; Connections).
+                  Export your connections from LinkedIn (Settings &rarr; Data Privacy &rarr; Get a copy of your data).
                 </p>
+                <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                  <p className="text-xs text-amber-300/90">
+                    <span className="font-semibold">Tip:</span> LinkedIn may require you to download your <span className="font-medium text-amber-200">full data archive</span> instead of just connections. Once downloaded, unzip and look for <span className="rounded bg-slate-800 px-1 py-0.5 font-mono text-amber-300">Connections.csv</span> inside.
+                  </p>
+                </div>
               </div>
 
               <div
@@ -950,6 +1013,16 @@ export default function OnboardingPage() {
                   Upload
                 </Button>
               </div>
+              {!uploading && (
+                <button
+                  type="button"
+                  onClick={skipToFinish}
+                  disabled={saving}
+                  className="block w-full text-center text-xs text-slate-500 hover:text-slate-400 transition-colors disabled:opacity-50"
+                >
+                  Skip for now — I'll upload later
+                </button>
+              )}
             </div>
           )}
 
@@ -1153,7 +1226,7 @@ export default function OnboardingPage() {
                         has_resume: !!resumeProfileData,
                       });
                       await refreshUser();
-                      navigate('/coach');
+                      navigate(postWizardRoute);
                     } catch (err) {
                       setError(err.message);
                     } finally {
@@ -1167,6 +1240,15 @@ export default function OnboardingPage() {
                   Save & Continue
                 </Button>
               </div>
+              {workHistory.length === 0 && !saving && (
+                <button
+                  type="button"
+                  onClick={skipToFinish}
+                  className="block w-full text-center text-xs text-slate-500 hover:text-slate-400 transition-colors"
+                >
+                  Skip for now
+                </button>
+              )}
             </div>
           )}
         </div>

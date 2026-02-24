@@ -39,6 +39,10 @@ def _contact(**kwargs):
         "location": None,
         "enriched_data": None,
         "company": None,
+        "relationship_type": None,
+        "would_refer": None,
+        "last_interaction_date": None,
+        "warm_score_override": None,
     }
     defaults.update(kwargs)
     return _Stub(**defaults)
@@ -87,6 +91,26 @@ class TestRecencyScore:
 
     def test_unknown_date(self):
         assert compute_recency_score(None) == 30.0
+
+    def test_last_interaction_overrides_connected_on(self):
+        """A recent interaction should score high even with an old connection date."""
+        old_connection = date.today() - timedelta(days=2200)  # 5+ years → 15
+        recent_interaction = date.today() - timedelta(days=30)  # <6 months → 100
+        assert (
+            compute_recency_score(
+                old_connection, last_interaction_date=recent_interaction
+            )
+            == 100.0
+        )
+
+    def test_last_interaction_none_falls_back_to_connected_on(self):
+        """When last_interaction_date is None, fall back to connected_on."""
+        d = date.today() - timedelta(days=200)
+        assert compute_recency_score(d, last_interaction_date=None) == 85.0
+
+    def test_both_none(self):
+        """Both dates None should return neutral default."""
+        assert compute_recency_score(None, last_interaction_date=None) == 30.0
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +175,37 @@ class TestRelationshipScore:
         profile = _profile(current_company="Bar", location="Tokyo")
         score, _ = compute_relationship_score(contact, profile)
         assert score == 0.0
+
+    def test_would_refer_definitely_boosts_score(self):
+        contact = _contact(current_company="Acme", would_refer="definitely")
+        profile = _profile(current_company="Acme")
+        score, factors = compute_relationship_score(contact, profile)
+        # 35 (same company) + 25 (would_refer) = 60
+        assert score == 60.0
+        assert factors["would_refer"] == "definitely"
+        assert factors["would_refer_bonus"] == 25.0
+
+    def test_would_refer_no_penalises(self):
+        contact = _contact(current_company="Acme", would_refer="no")
+        profile = _profile(current_company="Acme")
+        score, factors = compute_relationship_score(contact, profile)
+        # 35 (same company) - 30 (would_refer=no) = 5
+        assert score == 5.0
+        assert factors["would_refer_bonus"] == -30.0
+
+    def test_would_refer_maybe_no_change(self):
+        contact = _contact(current_company="Acme", would_refer="maybe")
+        profile = _profile(current_company="Acme")
+        score, factors = compute_relationship_score(contact, profile)
+        assert score == 35.0
+        assert factors["would_refer_bonus"] == 0.0
+
+    def test_would_refer_none_no_effect(self):
+        contact = _contact(current_company="Acme")
+        profile = _profile(current_company="Acme")
+        score, factors = compute_relationship_score(contact, profile)
+        assert score == 35.0
+        assert factors["would_refer_bonus"] == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -490,6 +545,44 @@ class TestReferralPriorities:
         assert ceo < manager
         assert ceo == 40.0
 
+    def test_would_refer_definitely_boosts_warm_score(self):
+        """A contact marked 'definitely would refer' should score higher."""
+        base_contact = _contact(
+            connected_on=date.today() - timedelta(days=400),
+            current_title="Senior Engineer",
+            current_company="Acme",
+        )
+        refer_contact = _contact(
+            connected_on=date.today() - timedelta(days=400),
+            current_title="Senior Engineer",
+            current_company="Acme",
+            would_refer="definitely",
+        )
+        profile = _profile(current_company="Acme")
+
+        base_score = compute_warm_score(base_contact, profile)
+        refer_score = compute_warm_score(refer_contact, profile)
+        assert refer_score.total_score > base_score.total_score
+
+    def test_last_interaction_boosts_warm_score(self):
+        """Recent interaction should produce higher warm score than old connection alone."""
+        old_contact = _contact(
+            connected_on=date.today() - timedelta(days=2200),
+            current_title="Senior Engineer",
+            current_company="Other",
+        )
+        active_contact = _contact(
+            connected_on=date.today() - timedelta(days=2200),
+            current_title="Senior Engineer",
+            current_company="Other",
+            last_interaction_date=date.today() - timedelta(days=30),
+        )
+        profile = _profile(current_company="Different")
+
+        old_score = compute_warm_score(old_contact, profile)
+        active_score = compute_warm_score(active_contact, profile)
+        assert active_score.total_score > old_score.total_score
+
     def test_tenure_sweet_spot(self):
         """1-3 year tenure is the referral sweet spot."""
         scores = {
@@ -677,3 +770,46 @@ def test_compute_warm_score_ignores_override_when_none():
     result = compute_warm_score(contact, None, None)
     # Should compute algorithmically (will be low since all fields are None)
     assert result.total_score != 90.0
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — Job Preferences Schema (new fields)
+# ---------------------------------------------------------------------------
+
+
+def test_job_preferences_schema_accepts_new_fields():
+    from app.schemas.user import JobPreferencesCreate
+
+    prefs = JobPreferencesCreate(
+        target_role="Software Engineer",
+        career_level="Senior (6-10 yrs)",
+        years_experience=8,
+        key_skills=["Python", "React", "PostgreSQL"],
+        target_companies=["Stripe", "Grab", "Notion"],
+    )
+    assert prefs.career_level == "Senior (6-10 yrs)"
+    assert prefs.years_experience == 8
+    assert prefs.key_skills == ["Python", "React", "PostgreSQL"]
+    assert prefs.target_companies == ["Stripe", "Grab", "Notion"]
+
+
+def test_job_preferences_schema_new_fields_optional():
+    from app.schemas.user import JobPreferencesCreate
+
+    prefs = JobPreferencesCreate(target_role="PM")
+    assert prefs.career_level is None
+    assert prefs.years_experience is None
+    assert prefs.key_skills is None
+    assert prefs.target_companies is None
+
+
+def test_job_preferences_schema_validates_years_experience():
+    from app.schemas.user import JobPreferencesCreate
+    from pydantic import ValidationError
+    import pytest
+
+    with pytest.raises(ValidationError):
+        JobPreferencesCreate(target_role="PM", years_experience=-1)
+
+    with pytest.raises(ValidationError):
+        JobPreferencesCreate(target_role="PM", years_experience=51)

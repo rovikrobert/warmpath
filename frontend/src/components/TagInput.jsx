@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function TagInput({ label, value = [], onChange, placeholder }) {
+export default function TagInput({ label, sublabel, value = [], onChange, placeholder }) {
   const [input, setInput] = useState('');
 
   const addTags = (text) => {
@@ -69,7 +69,7 @@ export default function TagInput({ label, value = [], onChange, placeholder }) {
           className="min-w-[120px] flex-1 border-none bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
         />
       </div>
-      <p className="mt-1 text-xs text-slate-500">Press Enter or comma to add</p>
+      <p className="mt-1 text-xs text-slate-500">{sublabel || 'Press Enter or comma to add'}</p>
     </div>
   );
 }

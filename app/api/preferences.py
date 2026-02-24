@@ -30,7 +30,11 @@ async def upsert_job_preferences(
             target_seniority=body.target_seniority,
             target_industries=body.target_industries,
             target_locations=body.target_locations,
+            target_companies=body.target_companies,
             open_to_remote=body.open_to_remote,
+            career_level=body.career_level,
+            years_experience=body.years_experience,
+            key_skills=body.key_skills,
             salary_min=body.salary_min,
             salary_max=body.salary_max,
         )
@@ -40,7 +44,11 @@ async def upsert_job_preferences(
         prefs.target_seniority = body.target_seniority
         prefs.target_industries = body.target_industries
         prefs.target_locations = body.target_locations
+        prefs.target_companies = body.target_companies
         prefs.open_to_remote = body.open_to_remote
+        prefs.career_level = body.career_level
+        prefs.years_experience = body.years_experience
+        prefs.key_skills = body.key_skills
         prefs.salary_min = body.salary_min
         prefs.salary_max = body.salary_max
 

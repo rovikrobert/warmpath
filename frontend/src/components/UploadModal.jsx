@@ -180,26 +180,34 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
           <h3 className="mb-3 text-base font-medium text-slate-50">
             Export your LinkedIn connections
           </h3>
+
+          {/* Heads-up callout */}
+          <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+            <p className="text-xs text-amber-300/90">
+              <span className="font-semibold">Heads up:</span> LinkedIn recently changed their export flow. You may need to download your <span className="font-medium text-amber-200">full data archive</span> first, then find the <span className="font-medium text-amber-200">Connections.csv</span> file inside the downloaded ZIP.
+            </p>
+          </div>
+
           <ol className="mb-4 space-y-2 text-sm text-slate-400">
             <li className="flex gap-2">
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-xs font-medium text-amber-400">1</span>
-              Go to LinkedIn's data export page
+              <span>Go to LinkedIn <span className="text-slate-300">Settings &rarr; Data Privacy &rarr; Get a copy of your data</span></span>
             </li>
             <li className="flex gap-2">
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-xs font-medium text-amber-400">2</span>
-              Select "Connections" only
+              <span>Select <span className="text-slate-300">"Connections"</span> (if the option is available) or <span className="text-slate-300">"Download larger data archive"</span></span>
             </li>
             <li className="flex gap-2">
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-xs font-medium text-amber-400">3</span>
-              Click "Request archive"
+              Click "Request archive" and wait for LinkedIn's email (can be instant or up to 24 hours for full archives)
             </li>
             <li className="flex gap-2">
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-xs font-medium text-amber-400">4</span>
-              Wait for LinkedIn's email (usually 5-10 minutes)
+              Download the ZIP from the email link
             </li>
             <li className="flex gap-2">
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-xs font-medium text-amber-400">5</span>
-              Download the ZIP and extract Connections.csv
+              <span>Unzip and find <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-xs text-amber-300">Connections.csv</span> inside</span>
             </li>
           </ol>
           <a

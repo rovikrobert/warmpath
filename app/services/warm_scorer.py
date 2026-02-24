@@ -58,16 +58,23 @@ class ReferralScoreResult:
 # ---------------------------------------------------------------------------
 
 
-def compute_recency_score(connected_on: date | None) -> float:
-    """Score based on how recently the contact was connected.
+def compute_recency_score(
+    connected_on: date | None,
+    last_interaction_date: date | None = None,
+) -> float:
+    """Score based on how recently the contact was interacted with.
 
-    Recent contacts are much more likely to refer you.
+    Prefers last_interaction_date (user-confirmed) over connected_on
+    (LinkedIn connection date). A contact connected 5 years ago but
+    spoken to last month should score high on recency.
     """
-    if connected_on is None:
+    # Use the most recent meaningful date
+    best_date = last_interaction_date or connected_on
+    if best_date is None:
         return 30.0  # neutral default
 
     today = date.today()
-    delta_days = (today - connected_on).days
+    delta_days = (today - best_date).days
     months = delta_days / 30.44  # avg days per month
 
     if months < 6:
@@ -87,6 +94,14 @@ def compute_recency_score(connected_on: date | None) -> float:
 # ---------------------------------------------------------------------------
 # Component: Relationship Score (0-100, weight: 30%)
 # ---------------------------------------------------------------------------
+
+
+_WOULD_REFER_BONUSES: dict[str, float] = {
+    "definitely": 25.0,
+    "probably": 15.0,
+    "maybe": 0.0,
+    "no": -30.0,
+}
 
 
 _RELATIONSHIP_TYPE_BONUSES: dict[str, float] = {
@@ -222,6 +237,15 @@ def compute_relationship_score(
     score += bonus
     factors["relationship_type"] = rel_type
     factors["relationship_bonus"] = bonus
+
+    # Would-refer signal — strongest self-reported referral signal
+    would_refer = getattr(contact, "would_refer", None)
+    would_refer_bonus = (
+        _WOULD_REFER_BONUSES.get(would_refer, 0.0) if would_refer else 0.0
+    )
+    score += would_refer_bonus
+    factors["would_refer"] = would_refer
+    factors["would_refer_bonus"] = would_refer_bonus
 
     return max(0.0, min(score, 100.0)), factors
 
@@ -406,7 +430,10 @@ def compute_warm_score(
             factors=["manual_override"],
         )
 
-    recency = compute_recency_score(contact.connected_on)
+    recency = compute_recency_score(
+        contact.connected_on,
+        last_interaction_date=getattr(contact, "last_interaction_date", None),
+    )
     relationship, relationship_factors = compute_relationship_score(
         contact, connector_profile
     )

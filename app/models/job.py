@@ -172,11 +172,15 @@ class UserJobPreferences(Base):
     )
     target_role: Mapped[str | None] = mapped_column(String(255))
     target_seniority: Mapped[str | None] = mapped_column(String(100))
-    target_industries: Mapped[dict | None] = mapped_column(JSONB, server_default="'[]'")
-    target_locations: Mapped[dict | None] = mapped_column(JSONB, server_default="'[]'")
+    target_industries: Mapped[dict | None] = mapped_column(JSONB, server_default="[]")
+    target_locations: Mapped[dict | None] = mapped_column(JSONB, server_default="[]")
+    target_companies: Mapped[dict | None] = mapped_column(JSONB, server_default="[]")
     open_to_remote: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="true"
     )
+    career_level: Mapped[str | None] = mapped_column(String(50))
+    years_experience: Mapped[int | None] = mapped_column(Integer)
+    key_skills: Mapped[dict | None] = mapped_column(JSONB, server_default="[]")
     salary_min: Mapped[int | None] = mapped_column(Integer)
     salary_max: Mapped[int | None] = mapped_column(Integer)
     job_search_status: Mapped[str] = mapped_column(
