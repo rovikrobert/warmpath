@@ -65,7 +65,7 @@ async def test_enrichment_relationship_type_updates_contact_and_awards_credits(
         json={
             "feed_item_id": str(enrichment_setup["feed_item_id"]),
             "signal_type": "relationship_type",
-            "signal_value": "colleague",
+            "signal_value": "former_colleague",
         },
         headers=enrichment_setup["headers"],
     )
@@ -75,7 +75,7 @@ async def test_enrichment_relationship_type_updates_contact_and_awards_credits(
     assert data["signal_type"] == "relationship_type"
     assert data["applied"] is True
     assert data["credits_awarded"] == 5
-    assert data["contact"]["relationship_type"] == "colleague"
+    assert data["contact"]["relationship_type"] == "former_colleague"
     assert data["contact"]["full_name"] == "Sarah Chen"
 
     # Verify credit transaction was created
@@ -136,7 +136,7 @@ async def test_enrichment_duplicate_signal_upserts_not_duplicates(
     payload = {
         "feed_item_id": str(enrichment_setup["feed_item_id"]),
         "signal_type": "relationship_type",
-        "signal_value": "colleague",
+        "signal_value": "former_colleague",
     }
     # First submission
     resp1 = await client.post(
@@ -177,7 +177,7 @@ async def test_enrichment_invalid_feed_item_id_returns_404(
         json={
             "feed_item_id": str(uuid.uuid4()),
             "signal_type": "relationship_type",
-            "signal_value": "colleague",
+            "signal_value": "former_colleague",
         },
         headers=enrichment_setup["headers"],
     )
@@ -208,7 +208,7 @@ async def test_enrichment_feed_item_without_contact_id_returns_400(
         json={
             "feed_item_id": str(bad_item_id),
             "signal_type": "relationship_type",
-            "signal_value": "colleague",
+            "signal_value": "former_colleague",
         },
         headers=enrichment_setup["headers"],
     )
@@ -283,7 +283,7 @@ async def test_enrichment_response_awards_milestone_when_threshold_crossed(
         json={
             "feed_item_id": str(feed_item_id),
             "signal_type": "relationship_type",
-            "signal_value": "colleague",
+            "signal_value": "former_colleague",
         },
         headers=headers,
     )
@@ -328,7 +328,7 @@ async def test_enrichment_response_no_milestone_when_not_crossed(
                 source="linkedin_csv",
             )
             if i < 5:
-                c.relationship_type = "colleague"
+                c.relationship_type = "former_colleague"
             db.add(c)
             if i == 5:
                 target_contact = c
@@ -361,3 +361,21 @@ async def test_enrichment_response_no_milestone_when_not_crossed(
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["milestone_reached"] is None
+
+
+@pytest.mark.asyncio
+async def test_enrichment_rejects_invalid_relationship_type(
+    client: AsyncClient, enrichment_setup: dict
+):
+    """Invalid relationship_type values are rejected with 422."""
+    resp = await client.post(
+        "/api/v1/feed/enrichment-response",
+        json={
+            "feed_item_id": str(enrichment_setup["feed_item_id"]),
+            "signal_type": "relationship_type",
+            "signal_value": "colleague",
+        },
+        headers=enrichment_setup["headers"],
+    )
+    assert resp.status_code == 422
+    assert "Invalid relationship_type" in resp.json()["detail"]

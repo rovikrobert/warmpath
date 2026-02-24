@@ -132,6 +132,79 @@ async def _fetch_jobs(
 _FETCH_TIMEOUT = 5.0  # Total seconds for all fresh fetches combined
 
 
+async def _fetch_fresh_and_match(
+    to_fetch: list[str],
+    fetcher: JobFetcher,
+    target_role: str,
+    target_seniority: str | None,
+    location_hint: str | None,
+    db: AsyncSession,
+) -> tuple[list[dict], int]:
+    """Fetch uncached companies within timeout, cache results, return matches.
+
+    Uses asyncio.wait so that companies completing before the deadline are
+    captured even when others are still in-flight.
+
+    Returns (matched_recommendations, completed_count).
+    """
+    semaphore = asyncio.Semaphore(5)
+
+    # Create named tasks so we can map results back to companies
+    fetch_tasks: dict[asyncio.Task, str] = {}
+    for key in to_fetch:
+        boards = BOARD_REGISTRY.get(key, {})
+        task = asyncio.create_task(
+            _fetch_jobs(key, boards, fetcher, semaphore, location_hint=location_hint)
+        )
+        fetch_tasks[task] = key
+
+    # Wait up to _FETCH_TIMEOUT — collect whatever completes in time
+    done, pending = await asyncio.wait(fetch_tasks.keys(), timeout=_FETCH_TIMEOUT)
+
+    # Cancel stragglers
+    for task in pending:
+        task.cancel()
+
+    if pending:
+        logger.warning(
+            "Recommendation fresh fetch: %d/%d completed in %.1fs",
+            len(done),
+            len(fetch_tasks),
+            _FETCH_TIMEOUT,
+        )
+
+    # Collect results from completed tasks
+    fetched: dict[str, list[dict]] = {}
+    for task in done:
+        key = fetch_tasks[task]
+        try:
+            jobs = task.result()
+            if jobs:
+                fetched[key] = jobs
+        except Exception:
+            logger.exception("Failed to get result for %s", key)
+
+    # Cache completed results (each in its own savepoint)
+    for key, jobs in fetched.items():
+        try:
+            async with db.begin_nested():
+                await set_cached_jobs(key, jobs, db)
+        except Exception:
+            logger.exception("Failed to cache jobs for %s", key)
+
+    # Match fetched results in parallel
+    match_tasks_list = [
+        _match_and_build(fetcher, key, jobs, target_role, target_seniority)
+        for key, jobs in fetched.items()
+    ]
+    recs: list[dict] = []
+    if match_tasks_list:
+        match_results = await asyncio.gather(*match_tasks_list)
+        recs = [r for r in match_results if r]
+
+    return recs, len(done)
+
+
 async def _match_and_build(
     fetcher: JobFetcher,
     key: str,
@@ -279,53 +352,10 @@ async def get_recommendations(
 
     if len(recommendations) < max_results and uncached:
         to_fetch = uncached[:max_scan]
-
-        async def _fetch_and_match_batch() -> list[dict]:
-            """Fetch + match uncached companies within timeout."""
-            batch_recs: list[dict] = []
-            semaphore = asyncio.Semaphore(5)
-            tasks = []
-            for key in to_fetch:
-                boards = BOARD_REGISTRY.get(key, {})
-                tasks.append(
-                    _fetch_jobs(
-                        key, boards, fetcher, semaphore, location_hint=location_hint
-                    )
-                )
-
-            results = await asyncio.gather(*tasks)
-
-            # Sequential: write to cache (needs DB session)
-            for key, jobs in zip(to_fetch, results, strict=False):
-                if jobs:
-                    await set_cached_jobs(key, jobs, db)
-
-            # Parallel: match all fetched results (no DB needed)
-            match_tasks = [
-                _match_and_build(fetcher, key, jobs, target_role, target_seniority)
-                for key, jobs in zip(to_fetch, results, strict=False)
-                if jobs
-            ]
-            batch_recs = [r for r in await asyncio.gather(*match_tasks) if r]
-            return batch_recs
-
-        try:
-            fresh_recs = await asyncio.wait_for(
-                _fetch_and_match_batch(), timeout=_FETCH_TIMEOUT
-            )
-            recommendations.extend(fresh_recs)
-            fresh_scanned = len(to_fetch)
-        except asyncio.TimeoutError:
-            logger.warning(
-                "Recommendation fresh fetch timed out after %.1fs (tried %d companies)",
-                _FETCH_TIMEOUT,
-                len(to_fetch),
-            )
-            fresh_scanned = len(to_fetch)
-            # Timeout may interrupt mid-flush inside set_cached_jobs(),
-            # leaving the session dirty. Rollback to clear pending state.
-            await db.rollback()
-
+        fresh_recs, fresh_scanned = await _fetch_fresh_and_match(
+            to_fetch, fetcher, target_role, target_seniority, location_hint, db
+        )
+        recommendations.extend(fresh_recs)
         await db.flush()
 
     # --- Merge network signals into ATS results + add network-only entries ---

@@ -30,6 +30,7 @@ from app.database import get_db
 from app.models.contact import Contact
 from app.models.feed import ContactFreshnessSignal, FeedItem, FeedItemInteraction
 from app.models.user import User
+from app.schemas.contact import VALID_RELATIONSHIP_TYPES
 from app.services.credits import earn_credits
 from app.services.feed_ranker import (
     compute_feed_stats,
@@ -103,6 +104,7 @@ async def get_feed(
     limit: int = Query(default=20, ge=1, le=50),
     offset: int = Query(default=0, ge=0),
     item_type: str | None = Query(default=None),
+    exclude_type: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -124,6 +126,9 @@ async def get_feed(
 
     if item_type:
         query = query.where(FeedItem.item_type == item_type)
+
+    if exclude_type:
+        query = query.where(FeedItem.item_type != exclude_type)
 
     # Fetch all matching items (ranking happens in Python via learned weights)
     result = await db.execute(query)
@@ -401,6 +406,12 @@ def _apply_signal_to_contact(
 ) -> None:
     """Write enrichment signal back to the contact record."""
     if signal_type == "relationship_type":
+        if signal_value not in VALID_RELATIONSHIP_TYPES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid relationship_type '{signal_value}'. "
+                f"Must be one of: {', '.join(sorted(VALID_RELATIONSHIP_TYPES))}",
+            )
         contact.relationship_type = signal_value
     elif signal_type == "would_refer":
         contact.would_refer = signal_value
