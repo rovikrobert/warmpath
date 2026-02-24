@@ -88,12 +88,10 @@ export default function CoachPage() {
   // Load feed items on mount (don't auto-mark as seen — let user read them first)
   useEffect(() => {
     let cancelled = false;
-    feedApi.list({ limit: 10 })
+    feedApi.list({ limit: 10, exclude_type: 'enrichment_prompt' })
       .then((res) => {
         if (cancelled) return;
-        const items = (res.data || [])
-          .filter((f) => f.item_type !== 'enrichment_prompt');
-        setFeedItems(items);
+        setFeedItems(res.data || []);
       })
       .catch(() => {});
     return () => { cancelled = true; };

@@ -623,10 +623,12 @@ export default function ContactsPage() {
       </div>
 
       {/* Bulk update bar */}
-      {isFiltered && bulkTotal > 0 && !loading && !nlpLoading && (
+      {bulkTotal > 0 && !loading && !nlpLoading && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-2.5">
           <span className="text-sm text-slate-300">
-            {bulkTotal} contact{bulkTotal !== 1 ? 's' : ''} matched
+            {isFiltered
+              ? `${bulkTotal} contact${bulkTotal !== 1 ? 's' : ''} matched`
+              : `${bulkTotal} contact${bulkTotal !== 1 ? 's' : ''}`}
           </span>
           <span className="text-slate-600">&middot;</span>
           <label htmlFor="bulk-rel-type" className="text-sm text-slate-400">Bulk update:</label>
@@ -674,55 +676,7 @@ export default function ContactsPage() {
 
       {/* NLP search result summary */}
       {nlpResults && (
-        <div className={`mb-4 space-y-2 transition-opacity duration-200 ${nlpFadingOut ? 'opacity-0' : 'opacity-100'}`}>
-          {/* Interpretation chips */}
-          {nlpInterpretation && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs text-slate-500">Searching for:</span>
-              {nlpInterpretation.titles?.map((t) => (
-                <span key={`t-${t}`} className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400">
-                  {t}
-                </span>
-              ))}
-              {nlpInterpretation.companies?.map((c) => (
-                <span key={`c-${c}`} className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
-                  at {c}
-                </span>
-              ))}
-              {nlpInterpretation.locations?.map((l) => (
-                <span key={`l-${l}`} className="inline-flex items-center rounded-full bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-400">
-                  in {l}
-                </span>
-              ))}
-              {nlpInterpretation.seniority?.map((s) => (
-                <span key={`s-${s}`} className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">
-                  {s.replace(/_/g, ' ')}
-                </span>
-              ))}
-              {nlpInterpretation.relationship_types?.map((r) => (
-                <span key={`r-${r}`} className="inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs font-medium text-cyan-400">
-                  {r.replace(/_/g, ' ')}
-                </span>
-              ))}
-              {nlpInterpretation.industries?.map((ind) => (
-                <span key={`i-${ind}`} className="inline-flex items-center rounded-full bg-rose-500/10 px-2 py-0.5 text-xs font-medium text-rose-400">
-                  {ind}
-                </span>
-              ))}
-              {nlpInterpretation?.name_search && (
-                <span className="inline-flex items-center rounded-full bg-slate-700/50 px-2 py-0.5 text-xs font-medium text-slate-300">
-                  name: {nlpInterpretation.name_search}
-                </span>
-              )}
-            </div>
-          )}
-          {nlpInterpretation && !nlpInterpretation.titles?.length && !nlpInterpretation.companies?.length && !nlpInterpretation.locations?.length && !nlpInterpretation.seniority?.length && !nlpInterpretation.relationship_types?.length && (
-            <p className="text-xs text-slate-500">
-              No criteria detected — try: &ldquo;engineers at [company name]&rdquo;
-            </p>
-          )}
-
-          {/* Existing result count + clear button */}
+        <div className={`mb-4 transition-opacity duration-200 ${nlpFadingOut ? 'opacity-0' : 'opacity-100'}`}>
           <div className="flex items-center gap-3">
             <span className="text-sm text-slate-400">
               {(() => {

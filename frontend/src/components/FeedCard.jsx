@@ -73,11 +73,12 @@ export function EnrichmentActions({ item, onRespond }) {
 
   const options = signalType === 'relationship_type'
     ? [
-        { label: 'Colleague', value: 'colleague' },
+        { label: 'Former colleague', value: 'former_colleague' },
+        { label: 'Current colleague', value: 'current_colleague' },
         { label: 'Manager', value: 'manager' },
-        { label: 'Report', value: 'report' },
         { label: 'Friend', value: 'friend' },
-        { label: 'Acquaintance', value: 'acquaintance' },
+        { label: 'Alumni', value: 'alumni' },
+        { label: 'Other', value: 'other' },
       ]
     : signalType === 'would_refer'
     ? [

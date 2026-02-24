@@ -758,6 +758,16 @@ valid JSON with these keys:
 - relationship_types: list from [former_colleague, current_colleague, manager, \
 alumni, industry_peer, friend, mentor, recruiter]
 
+IMPORTANT rules:
+- Only extract fields that the user EXPLICITLY mentions. Do NOT infer or guess.
+- If the query is about people at a company/organization, put the full org name \
+in "companies" and leave other fields empty unless the user specifies them.
+- Words like "board", "development", "economic" that are part of an org name \
+are NOT job titles or seniority levels.
+- "people at X" or "people in X" means company=X, not titles=["people"].
+- Do NOT add seniority, titles, or relationship_types unless the user explicitly \
+asks for them (e.g. "senior engineers", "my former colleagues").
+
 Return ONLY the JSON object. No explanation, no markdown fences."""
 
 
@@ -890,6 +900,7 @@ async def search_user_contacts(
         for contact, sco[RESEND_KEY_REDACTED] in all_rows[:limit]:
             results.append(
                 {
+                    "id": str(contact.id),
                     "full_name": contact.full_name,
                     "current_company": contact.current_company,
                     "current_title": contact.current_title,
@@ -913,23 +924,42 @@ async def search_user_contacts(
 
         if has_criteria:
             # Score and filter using NLP criteria
-            scored: list[tuple] = []
             resolved_ids_set = set(resolved_company_ids)
-            for contact, sco[RESEND_KEY_REDACTED] in all_rows:
-                company_matched = (
-                    contact.company_id is not None
-                    and contact.company_id in resolved_ids_set
+
+            def _sco[RESEND_KEY_REDACTED](pq: ParsedQuery) -> list[tuple]:
+                out: list[tuple] = []
+                for contact, sco[RESEND_KEY_REDACTED] in all_rows:
+                    company_matched = (
+                        contact.company_id is not None
+                        and contact.company_id in resolved_ids_set
+                    )
+                    nlp_score = sco[RESEND_KEY_REDACTED](
+                        pq,
+                        contact.current_company,
+                        contact.current_title,
+                        contact.location,
+                        contact.relationship_type,
+                        company_matched,
+                    )
+                    if nlp_score >= 20:
+                        out.append((contact, sco[RESEND_KEY_REDACTED], nlp_score))
+                return out
+
+            scored = _sco[RESEND_KEY_REDACTED](parsed)
+
+            # Progressive fallback: if 0 results, drop criteria that the
+            # LLM may have over-inferred (relationship → seniority → titles)
+            # and re-score with a more lenient query.
+            if not scored and (
+                parsed.titles or parsed.seniority or parsed.relationship_types
+            ):
+                relaxed = ParsedQuery(
+                    companies=parsed.companies,
+                    locations=parsed.locations,
+                    industries=parsed.industries,
+                    raw_query=parsed.raw_query,
                 )
-                nlp_score = sco[RESEND_KEY_REDACTED](
-                    parsed,
-                    contact.current_company,
-                    contact.current_title,
-                    contact.location,
-                    contact.relationship_type,
-                    company_matched,
-                )
-                if nlp_score >= 20:
-                    scored.append((contact, sco[RESEND_KEY_REDACTED], nlp_score))
+                scored = _sco[RESEND_KEY_REDACTED](relaxed)
 
             scored.sort(key=lambda r: r[2], reverse=True)
             total_matched = len(scored)
@@ -937,6 +967,7 @@ async def search_user_contacts(
             for contact, sco[RESEND_KEY_REDACTED], nlp_score in scored[:limit]:
                 results.append(
                     {
+                        "id": str(contact.id),
                         "full_name": contact.full_name,
                         "current_company": contact.current_company,
                         "current_title": contact.current_title,
@@ -962,6 +993,7 @@ async def search_user_contacts(
             for contact, sco[RESEND_KEY_REDACTED] in name_matches[:limit]:
                 results.append(
                     {
+                        "id": str(contact.id),
                         "full_name": contact.full_name,
                         "current_company": contact.current_company,
                         "current_title": contact.current_title,

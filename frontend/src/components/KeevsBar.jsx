@@ -85,6 +85,12 @@ export default function KeevsBar() {
   const [expanded, setExpanded] = useState(false);
   const location = useLocation();
   const { user } = useAuth();
+  const isBeta = import.meta.env.VITE_BETA_MODE === 'true';
+  // Mobile: above bottom tab bar (bottom-20); beta adds feedback FAB so go higher (bottom-36)
+  // Desktop: bottom-4 default; beta shifts above feedback FAB (bottom-20)
+  const bottomClass = isBeta
+    ? 'bottom-36 lg:bottom-20'
+    : 'bottom-20 lg:bottom-4';
 
   const relevantType = getRelevantType(location.pathname);
 
@@ -100,8 +106,8 @@ export default function KeevsBar() {
     let cancelled = false;
     async function load() {
       try {
-        const resp = await feedApi.list({ limit: 5, unseen_only: true });
-        const items = resp?.data?.items || [];
+        const resp = await feedApi.list({ limit: 5, exclude_type: 'enrichment_prompt' });
+        const items = resp?.data || [];
         const match = items.find((i) => i.item_type === relevantType) || items[0];
         if (!cancelled && match) {
           setItem(match);
@@ -148,7 +154,7 @@ export default function KeevsBar() {
 
   if (!expanded) {
     return (
-      <div className="fixed bottom-4 right-4 z-40">
+      <div className={`fixed ${bottomClass} right-4 z-40`}>
         <button
           type="button"
           onClick={() => setExpanded(true)}
@@ -163,7 +169,7 @@ export default function KeevsBar() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 w-80 rounded-lg border border-slate-700 bg-slate-900 p-3 shadow-xl">
+    <div className={`fixed ${bottomClass} right-4 z-40 w-80 rounded-lg border border-slate-700 bg-slate-900 p-3 shadow-xl`}>
       <div className="flex items-start gap-2">
         <Avatar size="sm" />
         <div className="min-w-0 flex-1">
