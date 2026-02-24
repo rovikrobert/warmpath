@@ -317,14 +317,19 @@ export default function ContactsPage() {
     try {
       await feedApi.enrichmentResponse({
         feed_item_id: item.id,
-        contact_id: item.metadata?.contact_id,
         signal_type: signalType,
         signal_value: signalValue,
       });
       setEnrichmentPrompts((prev) => prev.filter((p) => p.id !== item.id));
       setEnrichmentRefreshKey((k) => k + 1);
-    } catch {
-      // Silently fail — prompt remains visible
+      // Update the contact in the list if visible
+      const contactId = item.metadata?.contact_id;
+      if (contactId && signalType === 'relationship_type') {
+        handleContactUpdate(contactId, { relationship_type: signalValue }, true);
+      }
+    } catch (err) {
+      setToast(err.message || 'Failed to save — please try again');
+      setTimeout(() => setToast(null), 4000);
     }
   };
 
