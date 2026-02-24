@@ -35,9 +35,7 @@ async def _verify_email(client: AsyncClient, email: str) -> None:
 
     async with TestSessionLocal() as db:
         await db.execute(
-            update(User)
-            .where(User.email == email)
-            .values(is_verified=True, email_verified=True)
+            update(User).where(User.email == email).values(email_verified=True)
         )
         await db.commit()
 

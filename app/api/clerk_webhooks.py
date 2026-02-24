@@ -227,3 +227,73 @@ async def _handle_user_deleted(clerk_user_id: str, db: AsyncSession) -> None:
     await db.execute(delete(User).where(User.id == user_id))
     await db.commit()
     logger.info("Deleted user %s from Clerk webhook", clerk_user_id)
+
+
+def _requi[RESEND_KEY_REDACTED]() -> "User":
+    from app.utils.security import get_current_user
+
+    return get_current_user
+
+
+@router.post("/admin/clerk-reconcile")
+async def clerk_reconcile_endpoint(
+    current_user: User = Depends(_requi[RESEND_KEY_REDACTED]()),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Admin endpoint: reconcile DB users against Clerk to clean up orphans."""
+    if not getattr(current_user, "is_admin", False):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
+    summary = await reconcile_clerk_users(db)
+    return {"data": summary, "meta": {}}
+
+
+async def reconcile_clerk_users(db: AsyncSession) -> dict:
+    """Reconcile DB users against Clerk — delete orphans whose Clerk accounts no longer exist.
+
+    Handles missed user.deleted webhooks. Calls Clerk API for each DB user
+    with a clerk_user_id to verify they still exist. Orphans are deleted
+    using the same pipeline as the webhook handler (audit log, suppression
+    list, credit archive, hard delete).
+
+    Returns summary dict with counts.
+    """
+    import httpx
+
+    if not settings.CLERK_SECRET_KEY:
+        return {"error": "CLERK_SECRET_KEY not configured", "checked": 0, "deleted": 0}
+
+    result = await db.execute(
+        select(User).where(User.clerk_user_id.isnot(None), User.deleted_at.is_(None))
+    )
+    db_users = result.scalars().all()
+
+    checked = 0
+    deleted = 0
+    errors = 0
+
+    async with httpx.AsyncClient() as client:
+        for user in db_users:
+            try:
+                resp = await client.get(
+                    f"https://api.clerk.com/v1/users/{user.clerk_user_id}",
+                    headers={"Authorization": f"Bearer {settings.CLERK_SECRET_KEY}"},
+                    timeout=5.0,
+                )
+                checked += 1
+
+                if resp.status_code == 404:
+                    # User deleted from Clerk but webhook missed — clean up
+                    logger.warning(
+                        "Orphan found: clerk_user_id=%s email=%s — deleting",
+                        user.clerk_user_id,
+                        user.email,
+                    )
+                    await _handle_user_deleted(user.clerk_user_id, db)
+                    deleted += 1
+            except httpx.HTTPError as exc:
+                errors += 1
+                logger.warning("Clerk API error for %s: %s", user.clerk_user_id, exc)
+
+    summary = {"checked": checked, "deleted": deleted, "errors": errors}
+    logger.info("Clerk reconciliation complete: %s", summary)
+    return summary
