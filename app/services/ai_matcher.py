@@ -475,13 +475,30 @@ def _build_user_prompt(
         }
         contacts_data.append(entry)
 
+    # Key skills and career level from job preferences (if available)
+
+    key_skills_str = ""
+    career_level_str = ""
+    if profile:
+        # These are passed via the search request metadata or user prefs
+        pass
+    # Pull from search metadata if present
+    search_meta = getattr(search, "metadata_", None) or {}
+    if isinstance(search_meta, dict):
+        meta_skills = search_meta.get("key_skills")
+        if meta_skills:
+            key_skills_str = f"\nKey Skills: {', '.join(meta_skills)}"
+        meta_level = search_meta.get("career_level")
+        if meta_level:
+            career_level_str = f"\nCareer Level: {meta_level}"
+
     return f"""USER PROFILE:
 {profile_info}
 
 TARGET:
 Company: {", ".join(target_companies) if target_companies else "Any"}
 Role: {target_role}
-Seniority: {target_seniority}
+Seniority: {target_seniority}{career_level_str}{key_skills_str}
 
 CONTACTS:
 {json.dumps(contacts_data, indent=2)}"""

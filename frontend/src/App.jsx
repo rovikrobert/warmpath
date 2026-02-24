@@ -60,7 +60,7 @@ function RootRedirect() {
   return (
     <>
       <SignedIn>
-        <Navigate to={user?.onboarding_complete ? '/coach' : '/onboarding'} replace />
+        <Navigate to={!user?.onboarding_complete ? '/onboarding' : user?.intent === 'sha[RESEND_KEY_REDACTED]' ? '/contacts' : '/coach'} replace />
       </SignedIn>
       <SignedOut><AuthPage /></SignedOut>
     </>

@@ -21,6 +21,39 @@ const ROUTE_FEED_TYPE = {
 
 const TREB_ROUTES = ['/marketplace', '/settings'];
 
+/**
+ * Static seed nudges for first-session users (no feed items yet).
+ * Keyed by route prefix → { title, action_label, action_url }.
+ * Intent-specific overrides via `_nh` suffix for sha[RESEND_KEY_REDACTED] users.
+ */
+const SEED_NUDGES = {
+  '/contacts': {
+    title: 'Upload your LinkedIn CSV to discover warm paths at your target companies.',
+    action_label: 'Upload CSV',
+    action_url: '/contacts',
+  },
+  '/contacts_nh': {
+    title: 'Your imported connections are here. Review and manage what you share on the marketplace.',
+    action_label: 'Manage sharing',
+    action_url: '/settings',
+  },
+  '/referrals': {
+    title: 'Search for people at your target companies — we\'ll find warm introductions.',
+    action_label: 'Start a search',
+    action_url: '/referrals',
+  },
+  '/applications': {
+    title: 'Track your applications here. Referred applications convert 10x better than cold ones.',
+    action_label: 'Find referrals',
+    action_url: '/referrals',
+  },
+  '/marketplace': {
+    title: 'Browse the marketplace to find connections at companies you\'re targeting.',
+    action_label: 'Explore',
+    action_url: '/marketplace',
+  },
+};
+
 function getRelevantType(pathname) {
   for (const [route, type] of Object.entries(ROUTE_FEED_TYPE)) {
     if (pathname.startsWith(route)) return type;
@@ -70,14 +103,29 @@ export default function KeevsBar() {
         const resp = await feedApi.list({ limit: 5, unseen_only: true });
         const items = resp?.data?.items || [];
         const match = items.find((i) => i.item_type === relevantType) || items[0];
-        if (!cancelled && match) setItem(match);
+        if (!cancelled && match) {
+          setItem(match);
+          return;
+        }
       } catch {
-        // silently fail
+        // fall through to seed nudge
+      }
+      // No feed items — use seed nudge for first-session users
+      if (!cancelled) {
+        const route = Object.keys(SEED_NUDGES)
+          .filter((k) => !k.includes('_'))
+          .find((k) => location.pathname.startsWith(k));
+        if (route) {
+          const nhKey = `${route}_nh`;
+          const seed = (user?.intent === 'sha[RESEND_KEY_REDACTED]' && SEED_NUDGES[nhKey])
+            || SEED_NUDGES[route];
+          if (seed) setItem({ id: '__seed', ...seed });
+        }
       }
     }
     load();
     return () => { cancelled = true; };
-  }, [relevantType]);
+  }, [relevantType, location.pathname, user?.intent]);
 
   useEffect(() => {
     setDismissed(false);
@@ -87,6 +135,10 @@ export default function KeevsBar() {
   if (!item || dismissed) return null;
 
   const handleDismiss = async () => {
+    if (item.id === '__seed') {
+      setDismissed(true);
+      return;
+    }
     try {
       await feedApi.dismiss(item.id);
       setDismissed(true);

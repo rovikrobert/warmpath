@@ -91,7 +91,11 @@ class JobPreferencesCreate(BaseModel):
     target_seniority: str | None = Field(default=None, max_length=100)
     target_industries: list[str] | None = None
     target_locations: list[str] | None = None
+    target_companies: list[str] | None = None
     open_to_remote: bool = True
+    career_level: str | None = Field(default=None, max_length=50)
+    years_experience: int | None = Field(default=None, ge=0, le=50)
+    key_skills: list[str] | None = None
     salary_min: int | None = None
     salary_max: int | None = None
 
@@ -103,7 +107,11 @@ class JobPreferencesResponse(BaseModel):
     target_seniority: str | None = None
     target_industries: list[str] | None = None
     target_locations: list[str] | None = None
+    target_companies: list[str] | None = None
     open_to_remote: bool = True
+    career_level: str | None = None
+    years_experience: int | None = None
+    key_skills: list[str] | None = None
     salary_min: int | None = None
     salary_max: int | None = None
     job_search_status: str = "active"

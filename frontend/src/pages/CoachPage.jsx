@@ -184,7 +184,7 @@ export default function CoachPage() {
               setMessages((prev) => {
                 const updated = [...prev];
                 const last = updated[keevsIdx];
-                if (last && last.role === 'keevs') {
+                if (last && last.role !== 'user') {
                   updated[keevsIdx] = { ...last, content: last.content + t };
                 }
                 return updated;
@@ -199,7 +199,7 @@ export default function CoachPage() {
       setMessages((prev) => {
         const updated = [...prev];
         const last = updated[keevsIdx];
-        if (last && last.role === 'keevs' && !last.content) {
+        if (last && last.role !== 'user' && !last.content) {
           updated[keevsIdx] = { ...last, content: "Sorry, I couldn't process that. Try again in a moment." };
         }
         return updated;

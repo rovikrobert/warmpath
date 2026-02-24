@@ -217,25 +217,24 @@ def _build_seeker_profile_snapshot(
 
     # 3. Enrich with UserJobPreferences
     if prefs:
-        if prefs.target_role:
-            snapshot["target_role"] = prefs.target_role
-        if prefs.target_seniority:
-            snapshot["target_seniority"] = prefs.target_seniority
+        for field in ("target_role", "target_seniority", "career_level", "key_skills"):
+            value = getattr(prefs, field, None)
+            if value:
+                snapshot[field] = value
+        if prefs.years_experience is not None:
+            snapshot["years_experience"] = prefs.years_experience
 
     # 4. Request type + conditional context fields
     snapshot["request_type"] = request_type
-    if job_title:
-        snapshot["job_title"] = job_title
-    if job_url:
-        snapshot["job_url"] = job_url
-    if job_description:
-        snapshot["job_description"] = job_description
-    if exploration_context:
-        snapshot["exploration_context"] = exploration_context
-
-    # 5. Message
-    if message:
-        snapshot["message"] = message
+    for key, val in (
+        ("job_title", job_title),
+        ("job_url", job_url),
+        ("job_description", job_description),
+        ("exploration_context", exploration_context),
+        ("message", message),
+    ):
+        if val:
+            snapshot[key] = val
 
     return snapshot
 
