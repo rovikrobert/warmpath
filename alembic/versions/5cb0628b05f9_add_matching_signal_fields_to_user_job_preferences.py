@@ -35,7 +35,7 @@ def upgrade() -> None:
         sa.Column(
             "key_skills",
             postgresql.JSONB(),
-            server_default="'[]'",
+            server_default=sa.text("'[]'"),
             nullable=True,
         ),
     )
@@ -44,7 +44,7 @@ def upgrade() -> None:
         sa.Column(
             "target_companies",
             postgresql.JSONB(),
-            server_default="'[]'",
+            server_default=sa.text("'[]'"),
             nullable=True,
         ),
     )

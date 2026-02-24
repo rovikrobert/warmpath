@@ -67,6 +67,7 @@ function getPriorityColor(priority) {
  * Renders quick-tap buttons for relationship type, would_refer, etc.
  */
 export function EnrichmentActions({ item, onRespond }) {
+  const [loading, setLoading] = useState(false);
   const meta = item.metadata || {};
   const signalType = meta.signal_type || 'relationship_type';
   const contactName = meta.contact_name || 'this contact';
@@ -91,14 +92,24 @@ export function EnrichmentActions({ item, onRespond }) {
 
   if (options.length === 0) return null;
 
+  const handleClick = async (opt) => {
+    setLoading(true);
+    try {
+      await onRespond(item, signalType, opt.value);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
       {options.map((opt) => (
         <button
           key={opt.label}
           type="button"
-          onClick={() => onRespond(item, signalType, opt.value)}
-          className="rounded-full border border-slate-600 bg-slate-800 px-3 py-1 text-xs font-medium text-slate-300 transition hover:border-amber-500 hover:bg-amber-500/10 hover:text-amber-400"
+          disabled={loading}
+          onClick={() => handleClick(opt)}
+          className="rounded-full border border-slate-600 bg-slate-800 px-3 py-1 text-xs font-medium text-slate-300 transition hover:border-amber-500 hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {opt.label}
         </button>
