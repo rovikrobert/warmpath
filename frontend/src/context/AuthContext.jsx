@@ -27,8 +27,14 @@ export function AuthProvider({ children }) {
           identifyUser(res.data.id, { email: res.data.email });
           setLoading(false);
         })
-        .catch(() => {
+        .catch((err) => {
           setUser(null);
+          // If backend returned 401 (user not found / deleted) while Clerk
+          // thinks we're signed in, clear the stale Clerk session so the
+          // user sees the sign-up page instead of a broken onboarding flow.
+          if (err?.status === 401) {
+            signOut();
+          }
           setLoading(false);
         });
     } else {
@@ -36,7 +42,7 @@ export function AuthProvider({ children }) {
       resetAnalytics();
       setLoading(false);
     }
-  }, [isSignedIn, clerkUser, authLoaded, userLoaded]);
+  }, [isSignedIn, clerkUser, authLoaded, userLoaded, signOut]);
 
   const refreshUser = useCallback(async () => {
     const res = await authApi.me();

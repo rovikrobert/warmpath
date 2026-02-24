@@ -192,6 +192,75 @@ async def test_jit_provision_skipped_when_no_clerk_secret(client: AsyncClient):
     assert "not found" in resp.json()["detail"].lower()
 
 
+async def test_jit_provision_blocked_for_deleted_user(
+    client: AsyncClient,
+    monkeypatch,
+):
+    """JIT provisioning is blocked when user's email is on suppression list."""
+    import hashlib
+    from datetime import datetime, timezone
+
+    import httpx
+
+    from app.models.privacy import SuppressionList
+
+    clerk_id = f"user_{uuid.uuid4().hex[:12]}"
+    email = "deleted-user@test.com"
+
+    # Add email to suppression list (simulating prior account deletion)
+    email_hash = hashlib.sha256(email.lower().strip().encode()).hexdigest()
+    async with TestSessionLocal() as db:
+        db.add(
+            SuppressionList(
+                email_hash=email_hash,
+                reason="account_deleted",
+                requested_at=datetime.now(timezone.utc),
+            )
+        )
+        await db.commit()
+
+    # Mock Clerk API to return user data with the deleted email
+    clerk_api_response = {
+        "id": clerk_id,
+        "email_addresses": [
+            {
+                "email_address": email,
+                "verification": {"status": "verified"},
+            }
+        ],
+        "first_name": "Deleted",
+        "last_name": "User",
+    }
+
+    class MockResponse:
+        status_code = 200
+
+        def json(self):
+            return clerk_api_response
+
+    class MockClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def get(self, url, **kwargs):
+            return MockResponse()
+
+    monkeypatch.setattr(httpx, "AsyncClient", MockClient)
+    monkeypatch.setattr("app.config.settings.CLERK_SECRET_KEY", "sk_test_fake")
+
+    token = create_test_clerk_token(clerk_id)
+    resp = await client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    # Should return 401 — JIT provisioning is blocked for deleted users
+    assert resp.status_code == 401
+    assert "not found" in resp.json()["detail"].lower()
+
+
 async def test_jit_provision_handles_race_condition(
     client: AsyncClient,
     monkeypatch,
