@@ -105,6 +105,29 @@ async def _jit_provision_user(clerk_user_id: str, db: AsyncSession) -> User | No
     parts = [data.get("first_name", ""), data.get("last_name", "")]
     full_name = " ".join(p for p in parts if p).strip() or "User"
 
+    # Check suppression list — don't re-provision deleted users.
+    # When a user deletes their account, their email hash is added to the
+    # suppression list.  If a stale Clerk session triggers JIT provisioning,
+    # we must NOT silently recreate their account (which would dump them into
+    # the onboarding wizard).  Returning None causes a 401 which the frontend
+    # handles by clearing the Clerk session and showing the sign-up page.
+    from app.models.privacy import SuppressionList
+
+    email_hash = hashlib.sha256(email.lower().strip().encode()).hexdigest()
+    suppression_check = await db.execute(
+        select(SuppressionList).where(
+            SuppressionList.email_hash == email_hash,
+            SuppressionList.reason == "account_deleted",
+        )
+    )
+    if suppression_check.scalars().first() is not None:
+        logger.info(
+            "Skipping JIT provision for deleted user (clerk_user_id=%s, email_hash=%s)",
+            clerk_user_id,
+            email_hash[:12],
+        )
+        return None
+
     user = User(
         email=email,
         full_name=full_name,
@@ -144,11 +167,10 @@ async def _jit_provision_user(clerk_user_id: str, db: AsyncSession) -> User | No
                 return existing
         return None
 
-    # Award welcome bonus (same logic as webhook handler)
-    from app.models.privacy import SuppressionList
+    # Award welcome bonus — the suppression check above already blocked
+    # deleted users, so anyone reaching here is genuinely new.
     from app.services.credits import earn_credits
 
-    email_hash = hashlib.sha256(email.lower().strip().encode()).hexdigest()
     suppression_result = await db.execute(
         select(SuppressionList).where(
             SuppressionList.email_hash == email_hash,
