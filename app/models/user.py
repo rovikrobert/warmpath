@@ -28,9 +28,6 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="true"
     )
-    is_verified: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default="false"
-    )
     plan_tier: Mapped[str] = mapped_column(
         String(50), nullable=False, server_default="free"
     )
