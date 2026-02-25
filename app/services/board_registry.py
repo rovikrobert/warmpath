@@ -489,15 +489,38 @@ def get_region(company_key: str) -> str | None:
     return _KEY_TO_REGION.get(company_key)
 
 
-def companies_for_locations(target_locations: list[str] | None) -> list[str]:
-    """Return all board registry keys.
+def _resolve_regions(target_locations: list[str] | None) -> set[str]:
+    """Map user target_locations to region names via _LOCATION_TO_REGIONS."""
+    if not target_locations:
+        return set()
+    regions: set[str] = set()
+    for loc in target_locations:
+        loc_lower = loc.strip().lower()
+        if loc_lower in _LOCATION_TO_REGIONS:
+            regions.update(_LOCATION_TO_REGIONS[loc_lower])
+    return regions
 
-    Companies are not filtered or prioritised by region because MNCs
-    (Google, Amazon, Goldman Sachs, etc.) have roles in many regions.
-    Location-based filtering happens downstream at the individual-job
-    level during role matching.
+
+def companies_for_locations(target_locations: list[str] | None) -> list[str]:
+    """Return board registry keys, prioritised by the user's target locations.
+
+    Companies in matched regions appear first so that cache checks and
+    fresh-fetch slots are spent on the most relevant companies.  All
+    companies are still returned (MNCs have roles in many regions), but
+    region-matched ones come first.
     """
-    return list(BOARD_REGISTRY.keys())
+    matched_regions = _resolve_regions(target_locations)
+    if not matched_regions:
+        return list(BOARD_REGISTRY.keys())
+
+    prioritized: list[str] = []
+    rest: list[str] = []
+    for key in BOARD_REGISTRY:
+        if _KEY_TO_REGION.get(key) in matched_regions:
+            prioritized.append(key)
+        else:
+            rest.append(key)
+    return prioritized + rest
 
 
 def lookup_boards(company_name: str) -> dict[str, str] | None:

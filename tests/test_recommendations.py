@@ -124,6 +124,20 @@ class TestBoardRegistryHelpers:
         result = companies_for_locations(["Mars"])
         assert len(result) > 50
 
+    def test_companies_for_locations_prioritizes_matched_region(self):
+        """Singapore location puts SEA companies before US companies."""
+        result = companies_for_locations(["Singapore"])
+        grab_idx = result.index("grab")
+        stripe_idx = result.index("stripe")
+        assert grab_idx < stripe_idx, "SEA company should appear before US company"
+
+    def test_companies_for_locations_us_prioritizes_us(self):
+        """US location puts US companies before SEA companies."""
+        result = companies_for_locations(["San Francisco"])
+        stripe_idx = result.index("stripe")
+        grab_idx = result.index("grab")
+        assert stripe_idx < grab_idx, "US company should appear before SEA company"
+
 
 # ---------------------------------------------------------------------------
 # Test: Recommendations Endpoint
@@ -296,13 +310,14 @@ class TestNetworkFirstCascade:
         data = resp.json()["data"]
         recs = data["recommendations"]
 
-        # Should find Grab via network signal
+        # Should find Grab with network data (may come from board_registry
+        # or network_signal depending on whether the board scan found it)
         grab = next((r for r in recs if r["company"] == "grab"), None)
         assert grab is not None
         assert "network_density" in grab
         assert grab["network_density"] >= 1
         assert "network_label" in grab
-        assert grab["source"] == "network_signal"
+        assert grab["source"] in ("network_signal", "board_registry")
 
     async def test_recommendations_scan_stats_include_network(self, client):
         """scan_stats includes network_matches count."""
