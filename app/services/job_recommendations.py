@@ -140,6 +140,7 @@ async def _fetch_fresh_and_match(
     target_seniority: str | None,
     location_hint: str | None,
     db: AsyncSession,
+    target_locations: list[str] | None = None,
 ) -> tuple[list[dict], int]:
     """Fetch uncached companies within timeout, cache results, return matches.
 
@@ -195,7 +196,9 @@ async def _fetch_fresh_and_match(
 
     # Match fetched results in parallel
     match_tasks_list = [
-        _match_and_build(fetcher, key, jobs, target_role, target_seniority)
+        _match_and_build(
+            fetcher, key, jobs, target_role, target_seniority, target_locations
+        )
         for key, jobs in fetched.items()
     ]
     recs: list[dict] = []
@@ -212,6 +215,7 @@ async def _match_and_build(
     jobs: list[dict],
     target_role: str,
     target_seniority: str | None,
+    target_locations: list[str] | None = None,
 ) -> dict | None:
     """Match jobs for one company and build a recommendation entry."""
     if not jobs:
@@ -220,8 +224,24 @@ async def _match_and_build(
     if not matched:
         return None
 
-    avg_relevance = sum(j.get("role_relevance", 0) for j in matched) / len(matched)
-    top_titles = [j.get("title", "") for j in matched[:3]]
+    # Re-rank so in-region jobs appear first in matching_openings
+    if target_locations:
+        loc_terms = [loc.strip().lower() for loc in target_locations if loc.strip()]
+        ranked = sorted(
+            matched,
+            key=lambda j: (
+                not (
+                    any(t in (j.get("location") or "").lower() for t in loc_terms)
+                    or j.get("is_remote", False)
+                ),
+                -j.get("role_relevance", 0),
+            ),
+        )
+    else:
+        ranked = matched
+
+    avg_relevance = sum(j.get("role_relevance", 0) for j in ranked) / len(ranked)
+    top_titles = [j.get("title", "") for j in ranked[:3]]
 
     return {
         "company": key,
@@ -235,12 +255,12 @@ async def _match_and_build(
                 "is_remote": j.get("is_remote", False),
                 "relevance": j.get("role_relevance", 0),
             }
-            for j in matched[:5]
+            for j in ranked[:5]
         ],
-        "matching_count": len(matched),
+        "matching_count": len(ranked),
         "total_openings": len(jobs),
         "top_titles": top_titles,
-        "score": len(matched) * avg_relevance,
+        "score": len(ranked) * avg_relevance,
         "source": "board_registry",
     }
 
@@ -337,7 +357,9 @@ async def get_recommendations(
 
     # Phase 2: Match cached results in parallel (no DB access needed)
     match_tasks = [
-        _match_and_build(fetcher, key, jobs, target_role, target_seniority)
+        _match_and_build(
+            fetcher, key, jobs, target_role, target_seniority, target_locations
+        )
         for key, jobs in cached_results.items()
     ]
     match_results = await asyncio.gather(*match_tasks)
@@ -354,7 +376,13 @@ async def get_recommendations(
     if len(recommendations) < max_results and uncached:
         to_fetch = uncached[:max_scan]
         fresh_recs, fresh_scanned = await _fetch_fresh_and_match(
-            to_fetch, fetcher, target_role, target_seniority, location_hint, db
+            to_fetch,
+            fetcher,
+            target_role,
+            target_seniority,
+            location_hint,
+            db,
+            target_locations=target_locations,
         )
         recommendations.extend(fresh_recs)
         await db.flush()
