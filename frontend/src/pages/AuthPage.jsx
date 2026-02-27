@@ -5,7 +5,10 @@ import { SOURCES } from '../utils/sources';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 function hashIndicatesSignup() {
-  return window.location.hash.replace(/\/+$/, '') === '#sign-up';
+  const h = window.location.hash;
+  // Match #sign-up and any Clerk sub-routes (#/sign-up/verify-email-address, etc.)
+  // so the SignUp component stays mounted through multi-step flows like email verification.
+  return h === '#sign-up' || h.startsWith('#sign-up/') || h.startsWith('#/sign-up');
 }
 
 export default function AuthPage() {
