@@ -14,10 +14,11 @@ from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Request
 
 from app.agent_runtime.events.ingestion import create_event
+from app.config import settings
 
 router = APIRouter()
 
-_GITHUB_WEBHOOK_SECRET = ""
+_GITHUB_WEBHOOK_SECRET = settings.GITHUB_AGENT_WEBHOOK_SECRET
 
 
 def _verify_github_signature(body: bytes, signature: str | None) -> bool:

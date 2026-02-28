@@ -21,22 +21,17 @@ _compiled_graph = None
 
 
 def _get_compiled_graph():
-    """Lazy-compile the graph with Redis checkpoint (if available)."""
+    """Lazy-compile the graph (Phase 1: in-memory, no checkpointer).
+
+    Redis checkpointing will be added in Phase 2 when long-running
+    workflows with human-in-the-loop require durable state.
+    """
     global _compiled_graph
     if _compiled_graph is not None:
         return _compiled_graph
 
     graph_builder = build_graph()
-
-    try:
-        from langgraph.checkpoint.redis.aio import AsyncRedisSaver  # noqa: F401
-
-        # Will be initialized in the async context
-        _compiled_graph = graph_builder.compile()
-    except Exception:
-        logger.warning("Redis checkpoint unavailable, using in-memory")
-        _compiled_graph = graph_builder.compile()
-
+    _compiled_graph = graph_builder.compile()
     return _compiled_graph
 
 
@@ -58,7 +53,11 @@ async def process_event(event: dict[str, Any]) -> dict[str, Any]:
         "handoffs": [],
     }
 
-    config = {"configurable": {"thread_id": event.get("dedup_key", "default")}}
+    # 6 nodes per loop iteration × 5 max loops; guards against infinite handoff cycles
+    config = {
+        "configurable": {"thread_id": event.get("dedup_key", "default")},
+        "recursion_limit": 30,
+    }
     result = await graph.ainvoke(initial_state, config=config)
     return result
 
