@@ -1,4 +1,4 @@
-"""Entry point for: python3 -m app.agent_runtime.runner"""
+"""Entry point for: python3 -m app.agent_runtime"""
 
 import asyncio
 import logging

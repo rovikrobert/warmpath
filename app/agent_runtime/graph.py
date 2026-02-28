@@ -41,10 +41,15 @@ def _consume_handoffs(state: WarmPathState) -> dict:
     return {"routed_teams": teams, "handoffs": []}  # Clear processed handoffs
 
 
+MAX_HANDOFF_LOOPS = 5
+
+
 def build_graph() -> StateGraph:
     """Build the CoS supervisor graph (uncompiled).
 
-    Call .compile(checkpointer=...) to get a runnable graph with persistence.
+    Call .compile() to get a runnable graph. The recursion_limit is set
+    to MAX_HANDOFF_LOOPS * nodes_per_loop to guard against infinite
+    cross-team handoff cycles.
     """
     builder = StateGraph(WarmPathState)
 
