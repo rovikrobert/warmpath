@@ -995,3 +995,29 @@ class TestRelationshipContextInMockDrafts:
         drafts = _mock_referral_drafts(contact, _profile(), match, None, "linkedin")
         for draft in drafts:
             assert len(draft.message_body) <= LINKEDIN_CHAR_LIMIT
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — Privacy M1: contact name excluded from AI prompts
+# ---------------------------------------------------------------------------
+
+
+class TestPrivacyM1ContactNameStripping:
+    def test_build_referral_prompt_excludes_contact_name(self):
+        """Contact full_name must NOT appear in the AI prompt (privacy M1)."""
+        from app.services.intro_drafter import _build_referral_prompt
+
+        c = _contact(full_name="Alice Smith", relationship_type=None, how_you_know=None)
+        p = _profile()
+        prompt = _build_referral_prompt(c, p, _match_result(), None, "linkedin")
+        assert "Alice Smith" not in prompt
+        assert "[CONTACT_NAME]" in prompt
+
+    async def test_mock_draft_messages_contain_real_contact_name(self):
+        """Mock drafts should still use the real contact first name."""
+        c = _contact(full_name="Alice Smith", first_name="Alice")
+        p = _profile()
+        messages = await draft_referral_request(c, p, _match_result())
+        for msg in messages:
+            assert "[CONTACT_NAME]" not in msg.message_body
+            assert "Alice" in msg.message_body

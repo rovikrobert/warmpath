@@ -175,7 +175,6 @@ async def _sync_listings(db: AsyncSession | None = None) -> int:
                         "role_level": listing.role_level,
                         "department_category": listing.department_category,
                         "warm_score_range": listing.warm_score_range,
-                        "network_holder_id": str(listing.network_holder_id),
                     }
                 )
 

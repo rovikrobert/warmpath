@@ -46,6 +46,7 @@ from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.middleware.usage import UsageTrackingMiddleware
 from app.utils.error_reporter import send_error_alert
 from app.utils.exceptions import AppError
+from app.utils.weave_init import init_weave
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,11 @@ if not settings.AI_MOCK_MODE:
                 "CSV_PIPELINE_V2 enabled but no cleaning provider API keys set. "
                 "AI cleaning will fall back to mock for all batches."
             )
+
+# ---------------------------------------------------------------------------
+# W&B Weave AI observability (conditional)
+# ---------------------------------------------------------------------------
+init_weave()
 
 # ---------------------------------------------------------------------------
 # CORS

@@ -29,6 +29,13 @@ from app.models.match_result import MatchResult
 from app.models.search_request import SearchRequest
 from app.models.user import ConnectorProfile, User
 
+try:
+    import weave
+
+    _weave_available = True
+except ImportError:
+    _weave_available = False
+
 logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 25  # contacts per API call (keep small to avoid response truncation)
@@ -638,6 +645,10 @@ async def _call_groq_api(
         )
 
     return results, usage
+
+
+if _weave_available:
+    _call_groq_api = weave.op()(_call_groq_api)
 
 
 # ---------------------------------------------------------------------------

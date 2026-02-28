@@ -11,6 +11,13 @@ import logging
 
 from app.config import settings
 
+try:
+    import weave
+
+    _weave_available = True
+except ImportError:
+    _weave_available = False
+
 logger = logging.getLogger(__name__)
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
@@ -140,6 +147,10 @@ async def _ai_parse(text: str) -> dict:
         await release_slot("google", used_redis)
 
     return json.loads(response.text)
+
+
+if _weave_available:
+    _ai_parse = weave.op()(_ai_parse)
 
 
 async def parse_resume(pdf_bytes: bytes) -> dict:

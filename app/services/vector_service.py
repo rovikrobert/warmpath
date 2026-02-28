@@ -1,12 +1,17 @@
 """Qdrant vector service — collection management, upsert, search, delete.
 
 Single unified collection with doc_type payload filter.
-All operations are no-ops when VECTOR_SEARCH_ENABLED is False.
+Callers gate on VECTOR_SEARCH_ENABLED before invoking these functions.
+Sync QdrantClient calls are wrapped in asyncio.to_thread to avoid blocking
+the FastAPI event loop.
 """
 
+import asyncio
 import logging
 import uuid
+
 from qdrant_client import QdrantClient, models
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -33,8 +38,8 @@ def make_point_id(doc_type: str, key: str) -> str:
     return str(uuid.uuid5(_NAMESPACE, f"{doc_type}:{key}"))
 
 
-async def ensure_collection() -> None:
-    """Create the collection if it doesn't exist."""
+def _ensure_collection_sync() -> None:
+    """Sync implementation: create collection if it doesn't exist."""
     client = _get_qdrant_client()
     if client.collection_exists(settings.QDRANT_COLLECTION):
         return
@@ -46,36 +51,25 @@ async def ensure_collection() -> None:
             distance=models.Distance.COSINE,
         ),
     )
-    # Create payload index for doc_type filter
-    client.create_payload_index(
-        collection_name=settings.QDRANT_COLLECTION,
-        field_name="doc_type",
-        field_schema=models.PayloadSchemaType.KEYWORD,
-    )
-    # Create payload index for user_id filter (contact search)
-    client.create_payload_index(
-        collection_name=settings.QDRANT_COLLECTION,
-        field_name="user_id",
-        field_schema=models.PayloadSchemaType.KEYWORD,
-    )
-    # Create payload index for company_id filter (job search)
-    client.create_payload_index(
-        collection_name=settings.QDRANT_COLLECTION,
-        field_name="company_id",
-        field_schema=models.PayloadSchemaType.KEYWORD,
-    )
+    for field_name in ("doc_type", "user_id", "company_id", "company"):
+        client.create_payload_index(
+            collection_name=settings.QDRANT_COLLECTION,
+            field_name=field_name,
+            field_schema=models.PayloadSchemaType.KEYWORD,
+        )
     logger.info("Created Qdrant collection '%s'", settings.QDRANT_COLLECTION)
 
 
-async def upsert_points(
+async def ensure_collection() -> None:
+    """Create the collection if it doesn't exist."""
+    await asyncio.to_thread(_ensure_collection_sync)
+
+
+def _upsert_points_sync(
     ids: list[str],
     vectors: list[list[float]],
     payloads: list[dict],
 ) -> None:
-    """Upsert points into the collection."""
-    if not ids:
-        return
-
     client = _get_qdrant_client()
     points = [
         models.PointStruct(id=pid, vector=vec, payload=pay)
@@ -88,16 +82,23 @@ async def upsert_points(
     )
 
 
-async def search_similar(
+async def upsert_points(
+    ids: list[str],
+    vectors: list[list[float]],
+    payloads: list[dict],
+) -> None:
+    """Upsert points into the collection."""
+    if not ids:
+        return
+    await asyncio.to_thread(_upsert_points_sync, ids, vectors, payloads)
+
+
+def _search_similar_sync(
     query_vector: list[float],
     doc_type: str,
-    limit: int = 20,
-    filters: dict | None = None,
+    limit: int,
+    filters: dict | None,
 ) -> list[dict]:
-    """Search for similar vectors filtered by doc_type and optional payload filters.
-
-    Returns list of {"id": str, "score": float, "payload": dict}.
-    """
     client = _get_qdrant_client()
 
     must_conditions = [
@@ -129,13 +130,31 @@ async def search_similar(
     ]
 
 
-async def delete_points(point_ids: list[str]) -> None:
-    """Delete specific points by ID."""
-    if not point_ids:
-        return
+async def search_similar(
+    query_vector: list[float],
+    doc_type: str,
+    limit: int = 20,
+    filters: dict | None = None,
+) -> list[dict]:
+    """Search for similar vectors filtered by doc_type and optional payload filters.
 
+    Returns list of {"id": str, "score": float, "payload": dict}.
+    """
+    return await asyncio.to_thread(
+        _search_similar_sync, query_vector, doc_type, limit, filters
+    )
+
+
+def _delete_points_sync(point_ids: list[str]) -> None:
     client = _get_qdrant_client()
     client.delete(
         collection_name=settings.QDRANT_COLLECTION,
         points_selector=models.PointIdsList(points=point_ids),
     )
+
+
+async def delete_points(point_ids: list[str]) -> None:
+    """Delete specific points by ID."""
+    if not point_ids:
+        return
+    await asyncio.to_thread(_delete_points_sync, point_ids)

@@ -21,6 +21,13 @@ if TYPE_CHECKING:
     from app.models.job import UserJobPreferences
     from app.models.user import ConnectorProfile
 
+try:
+    import weave
+
+    _weave_available = True
+except ImportError:
+    _weave_available = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -51,7 +58,7 @@ def _detect_work_history_overlap(
             role_part = f" as {title}" if title else ""
             return (
                 f"Previously at {contact.current_company}{role_part}{period}"
-                f" where they overlapped with {contact.full_name}."
+                f" where they overlapped with [CONTACT_NAME]."
             )
     return None
 
@@ -191,7 +198,7 @@ def _format_candidate_info(profile: ConnectorProfile | None) -> str:
 
 def _format_contact_info(contact: Contact) -> str:
     """Format contact fields into a prompt-friendly string (no email -- privacy)."""
-    parts = [f"Name: {contact.full_name}"]
+    parts = ["Name: [CONTACT_NAME]"]
     if contact.current_title:
         parts.append(f"Title: {contact.current_title}")
     if contact.current_company:
@@ -246,7 +253,8 @@ def _build_blurb_prompt(
 ) -> str:
     """Build the Claude prompt for candidate blurb generation.
 
-    Privacy boundary: contact name IS sent, contact email is NOT sent.
+    Privacy boundary: contact name and email are NOT sent (privacy M1).
+    Contact name is replaced with [CONTACT_NAME] placeholder.
     """
     candidate_info = _format_candidate_info(profile)
     contact_info = _format_contact_info(contact)
@@ -342,7 +350,19 @@ async def _call_claude_for_blurb(
     ):
         raw = raw[1:-1].strip()
 
+    # Substitute contact name placeholder (privacy M1)
+    contact_name = (
+        contact.first_name
+        if hasattr(contact, "first_name") and contact.first_name
+        else contact.full_name.split()[0]
+    )
+    raw = raw.replace("[CONTACT_NAME]", contact_name)
+
     return raw
+
+
+if _weave_available:
+    _call_claude_for_blurb = weave.op()(_call_claude_for_blurb)
 
 
 # ---------------------------------------------------------------------------

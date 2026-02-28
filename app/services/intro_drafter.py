@@ -23,6 +23,13 @@ from app.models.job import JobOpening
 from app.models.match_result import MatchResult
 from app.models.user import ConnectorProfile
 
+try:
+    import weave
+
+    _weave_available = True
+except ImportError:
+    _weave_available = False
+
 logger = logging.getLogger(__name__)
 
 LINKEDIN_CHAR_LIMIT = 300
@@ -502,7 +509,7 @@ def _build_referral_prompt(
         sender_info = "No profile available — write as a generic professional"
 
     # --- Recipient info ---
-    contact_parts = [f"Name: {contact.full_name}"]
+    contact_parts = ["Name: [CONTACT_NAME]"]
     if contact.current_title:
         contact_parts.append(f"Title: {contact.current_title}")
     if contact.current_company:
@@ -647,15 +654,19 @@ async def _call_claude_api(
 
     parsed = json.loads(raw)
 
+    contact_first = contact.first_name or contact.full_name.split()[0]
     results: list[DraftedMessage] = []
     for item in parsed:
-        body = item["message_body"]
+        body = item["message_body"].replace("[CONTACT_NAME]", contact_first)
         if channel == "linkedin" and len(body) > LINKEDIN_CHAR_LIMIT:
             body = body[: LINKEDIN_CHAR_LIMIT - 3] + "..."
+        subj = item.get("subject_line")
+        if subj:
+            subj = subj.replace("[CONTACT_NAME]", contact_first)
         results.append(
             DraftedMessage(
                 variant_label=item["variant_label"],
-                subject_line=item.get("subject_line"),
+                subject_line=subj,
                 message_body=body,
                 sequence_step=item["sequence_step"],
                 step_label=item["step_label"],
@@ -665,6 +676,10 @@ async def _call_claude_api(
         )
 
     return results, usage
+
+
+if _weave_available:
+    _call_claude_api = weave.op()(_call_claude_api)
 
 
 # ---------------------------------------------------------------------------
