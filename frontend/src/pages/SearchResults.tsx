@@ -1,0 +1,297 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { search as searchApi, matches as matchesApi } from '../api/client';
+import MatchBadge from '../components/MatchBadge';
+import ScoreExplainer from '../components/ScoreExplainer';
+import { MATCH_TIERS } from '../utils/scores';
+import Button from '../components/ui/Button';
+import Spinner from '../components/ui/Spinner';
+import Modal from '../components/ui/Modal';
+import { useToast } from '../components/ui/Toast';
+import useDocumentTitle from '../hooks/useDocumentTitle';
+
+function IntroModal({ intro, onClose }) {
+  if (!intro) return null;
+  return (
+    <Modal open={!!intro} onClose={onClose} title="Intro Drafts" maxWidth="max-w-xl">
+      <div className="space-y-4">
+        {intro.messages?.map((msg) => (
+          <div key={msg.id} className="rounded-lg border border-border p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                {msg.variant_label}
+              </span>
+              <span className="text-xs text-muted-foreground">{msg.ai_model_version}</span>
+            </div>
+            {msg.subject_line && (
+              <p className="mb-1 text-xs text-muted-foreground">
+                Subject: <span className="font-medium text-secondary-foreground">{msg.subject_line}</span>
+              </p>
+            )}
+            <p className="whitespace-pre-wrap text-sm text-secondary-foreground">{msg.message_body}</p>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
+export default function SearchResults() {
+  useDocumentTitle('Search Results');
+  const { id } = useParams();
+  const toast = useToast();
+  const [searchInfo, setSearchInfo] = useState(null);
+  const [results, setResults] = useState<any[]>([]);
+  const [meta, setMeta] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    min_relevance: 40, min_warm: '', match_type: '', company: '', page: 1, per_page: 20,
+  });
+  const [introLoading, setIntroLoading] = useState(null);
+  const [introModal, setIntroModal] = useState(null);
+
+  const loadResults = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = { ...filters };
+      if (!params.min_warm) delete params.min_warm;
+      if (!params.match_type) delete params.match_type;
+      if (!params.company) delete params.company;
+      const res = await searchApi.results(id, params);
+      setResults(res.data);
+      setMeta(res.meta);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [id, filters]);
+
+  useEffect(() => {
+    searchApi.get(id).then((res) => setSearchInfo(res.data)).catch(console.error);
+  }, [id]);
+
+  useEffect(() => { loadResults(); }, [loadResults]);
+
+  const setFilter = (key, value) => {
+    setFilters((f) => ({ ...f, [key]: value, page: 1 }));
+  };
+
+  const handleDraftIntro = async (contactId) => {
+    setIntroLoading(contactId);
+    try {
+      const res = await matchesApi.createIntro({
+        contact_id: contactId,
+        tone: 'professional',
+        channel: 'linkedin',
+      });
+      setIntroModal(res.data);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIntroLoading(null);
+    }
+  };
+
+  const dist = meta.score_distribution || {};
+
+  return (
+    <div role="main">
+      {/* Header */}
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <Link to="/coach" className="mb-1 inline-block text-sm text-primary hover:text-primary">&larr; Coach</Link>
+          <h1 className="text-2xl font-bold text-foreground">{searchInfo?.name || 'Search Results'}</h1>
+          {searchInfo?.description && (
+            <p className="mt-1 text-sm text-muted-foreground">{searchInfo.description}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Stats summary */}
+      {meta.total_matches !== undefined && (
+        <div className="mb-4 grid grid-cols-3 gap-3">
+          <div className="rounded-lg bg-card p-3 border border-border">
+            <p className="text-xs text-muted-foreground">Total Matches</p>
+            <p className="text-lg font-bold text-foreground">{meta.total_matches}</p>
+          </div>
+          <div className="rounded-lg bg-card p-3 border border-border">
+            <p className="text-xs text-muted-foreground">
+              Avg Match Strength
+              <ScoreExplainer
+                title="Match Strength"
+                body="Combines role relevance (50%) and relationship warmth (50%)."
+                tiers={MATCH_TIERS}
+                learnMoreHref="/help/scores#match-strength"
+              />
+            </p>
+            <p className="text-lg font-bold text-foreground">
+              {meta.avg_relevance != null && meta.avg_warm != null
+                ? Math.round((meta.avg_relevance + meta.avg_warm) / 2)
+                : meta.avg_relevance ?? '—'}
+            </p>
+          </div>
+          <div className="rounded-lg bg-card p-3 border border-border">
+            <p className="text-xs text-muted-foreground">Strong+ Matches</p>
+            <p className="text-lg font-bold text-emerald-400">
+              {(dist['90-100'] || 0) + (dist['70-89'] || 0)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 items-end gap-3 rounded-lg bg-card p-3 border border-border" role="search" aria-label="Filter search results">
+        <div>
+          <label htmlFor="filter-min-relevance" className="mb-1 block text-xs text-muted-foreground">
+            Min Match Strength
+            <ScoreExplainer title="Match Strength" body="Filters out contacts below this combined score (relevance + warmth)." learnMoreHref="/help/scores#match-strength" />
+          </label>
+          <input
+            id="filter-min-relevance"
+            type="range"
+            min="0" max="100" step="10"
+            value={filters.min_relevance}
+            onChange={(e) => setFilter('min_relevance', Number(e.target.value))}
+            aria-valuenow={filters.min_relevance}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            className="w-full sm:w-28 accent-primary"
+          />
+          <span className="ml-1 text-xs text-muted-foreground" aria-hidden="true">{filters.min_relevance}</span>
+        </div>
+        <div>
+          <label htmlFor="filter-match-type" className="mb-1 block text-xs text-muted-foreground">Match Type</label>
+          <select
+            id="filter-match-type"
+            value={filters.match_type}
+            onChange={(e) => setFilter('match_type', e.target.value)}
+            className="rounded-md border-border bg-muted px-2 py-1.5 text-xs text-foreground focus:border-ring"
+          >
+            <option value="">All</option>
+            <option value="direct">Direct</option>
+            <option value="indirect">Indirect</option>
+            <option value="weak">Weak</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="filter-company" className="mb-1 block text-xs text-muted-foreground">Company</label>
+          <input
+            id="filter-company"
+            type="text"
+            value={filters.company}
+            onChange={(e) => setFilter('company', e.target.value)}
+            placeholder="Filter..."
+            className="w-full sm:w-32 rounded-md border-border bg-muted px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-ring"
+          />
+        </div>
+      </div>
+
+      {/* Results table */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12" aria-live="polite">
+          <Spinner size="md" />
+        </div>
+      ) : results.length === 0 ? (
+        <div className="rounded-xl bg-card p-12 text-center border border-border" aria-live="polite">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted" aria-hidden="true">
+            <svg className="h-7 w-7 text-muted-foreground" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+          </div>
+          <h2 className="mb-2 text-base font-semibold text-foreground">No matches found</h2>
+          <p className="mx-auto mb-4 max-w-sm text-sm text-muted-foreground">
+            No contacts matched your current filters. Try lowering the minimum match strength or clearing the company filter.
+          </p>
+          <button
+            onClick={() => setFilters({ min_relevance: 0, min_warm: '', match_type: '', company: '', page: 1, per_page: 20 })}
+            className="inline-block rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white hover:bg-primary/90"
+          >
+            Reset Filters
+          </button>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl bg-card border border-border">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-border bg-muted/50">
+              <tr>
+                <th className="px-4 py-3 font-medium text-muted-foreground">Contact</th>
+                <th className="hidden px-4 py-3 font-medium text-muted-foreground md:table-cell">Company</th>
+                <th className="px-3 py-3 font-medium text-muted-foreground text-center">
+                  Match Strength
+                  <ScoreExplainer title="Match Strength" body="Combines role relevance (50%) and relationship warmth (50%)." tiers={MATCH_TIERS} learnMoreHref="/help/scores#match-strength" />
+                </th>
+                <th className="hidden px-3 py-3 font-medium text-muted-foreground text-center sm:table-cell">Type</th>
+                <th className="px-4 py-3 font-medium text-muted-foreground"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {results.map((r) => (
+                <tr key={r.id} className="hover:bg-muted/50">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-foreground">{r.contact_name}</p>
+                    <p className="text-xs text-muted-foreground">{r.contact_title}</p>
+                    <p className="text-xs text-muted-foreground md:hidden">{r.contact_company}</p>
+                  </td>
+                  <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{r.contact_company}</td>
+                  <td className="px-3 py-3 text-center">
+                    <MatchBadge score={r.combined_score} showScore />
+                  </td>
+                  <td className="hidden px-3 py-3 text-center sm:table-cell">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      r.match_type === 'direct' ? 'bg-emerald-500/10 text-emerald-400' :
+                      r.match_type === 'indirect' ? 'bg-primary/10 text-primary' :
+                      'bg-muted/50 text-muted-foreground'
+                    }`}>
+                      {r.match_type}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Button
+                      onClick={() => handleDraftIntro(r.contact_id)}
+                      loading={introLoading === r.contact_id}
+                      size="sm"
+                    >
+                      Draft Intro
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {meta.total_pages > 1 && (
+        <nav className="mt-4 flex items-center justify-between" aria-label="Search results pagination">
+          <p className="text-sm text-muted-foreground">
+            Showing {results.length} of {meta.total_matches} matches (page {meta.page}/{meta.total_pages})
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))}
+              disabled={filters.page <= 1}
+              aria-label="Previous page"
+            >
+              Prev
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
+              disabled={filters.page >= meta.total_pages}
+              aria-label="Next page"
+            >
+              Next
+            </Button>
+          </div>
+        </nav>
+      )}
+
+      {introModal && <IntroModal intro={introModal} onClose={() => setIntroModal(null)} />}
+    </div>
+  );
+}

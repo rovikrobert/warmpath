@@ -137,9 +137,17 @@
       ]
     }
     </script>
+
+    <script>
+      (function() {
+        var t = localStorage.getItem('theme') || 'dark';
+        if (t === 'system') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.classList.add(t);
+      })();
+    </script>
   </head>
   <body class="bg-slate-950 text-slate-50 antialiased">
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
