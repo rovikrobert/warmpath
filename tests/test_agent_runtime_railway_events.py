@@ -2,7 +2,13 @@ from app.agent_runtime.events.railway import parse_error_logs, should_alert
 
 
 def test_parse_error_logs_counts_errors():
-    logs = ["INFO Starting", "ERROR Internal server error", "ERROR DB failed", "WARNING Slow", "ERROR Timeout"]
+    logs = [
+        "INFO Starting",
+        "ERROR Internal server error",
+        "ERROR DB failed",
+        "WARNING Slow",
+        "ERROR Timeout",
+    ]
     result = parse_error_logs(logs)
     assert result["error_count"] == 3
     assert len(result["sample_errors"]) == 3
