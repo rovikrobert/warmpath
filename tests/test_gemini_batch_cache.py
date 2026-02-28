@@ -1,7 +1,7 @@
 """Tests for Gemini batch API and context caching features."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 class TestGeminiBatchCacheConfig:
@@ -136,3 +136,99 @@ class TestGeminiCacheLifecycle:
 
         assert result is None
         mock_client.caches.create.assert_not_called()
+
+
+class TestCacheAwareDispatch:
+    """Test that dispatch_batch passes cache_name to Gemini provider."""
+
+    @pytest.mark.asyncio
+    async def test_dispatch_passes_cache_name_to_gemini_call(self):
+        from app.services.ai_provider_pool import dispatch_batch
+
+        mock_cleaned = [{"current_company": "Google", "current_title": "Engineer"}]
+        batch = [
+            {
+                "first_name": "alice",
+                "last_name": "smith",
+                "current_company": "google",
+                "current_title": "eng",
+                "email": None,
+                "linkedin_url": None,
+                "full_name": "alice smith",
+                "fingerprint": "old",
+                "connected_on": None,
+            }
+        ]
+
+        with (
+            patch("app.services.ai_provider_pool.get_enabled_providers") as mock_get,
+            patch(
+                "app.services.ai_provider_pool.acqui[RESEND_KEY_REDACTED]",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                "app.services.ai_provider_pool.release_slot",
+                new_callable=AsyncMock,
+            ),
+        ):
+            mock_provider = MagicMock()
+            mock_provider.name = "gemini"
+            mock_provider.call = AsyncMock(return_value=mock_cleaned)
+            mock_provider.max_concurrent = 5
+            mock_provider.get_client = MagicMock()
+            mock_get.return_value = [mock_provider]
+
+            await dispatch_batch(batch, cache_name="cachedContents/test123")
+
+            # Verify cache_name was passed through to the call
+            call_args = mock_provider.call.call_args
+            assert call_args is not None
+            # cache_name should be the 4th positional arg or a kwarg
+            args, kwargs = call_args
+            assert (
+                "cachedContents/test123" in args
+                or kwargs.get("cache_name") == "cachedContents/test123"
+            )
+
+    @pytest.mark.asyncio
+    async def test_dispatch_without_cache_name_works_unchanged(self):
+        from app.services.ai_provider_pool import dispatch_batch
+
+        mock_cleaned = [{"current_company": "Google", "current_title": "Engineer"}]
+        batch = [
+            {
+                "first_name": "alice",
+                "last_name": "smith",
+                "current_company": "google",
+                "current_title": "eng",
+                "email": None,
+                "linkedin_url": None,
+                "full_name": "alice smith",
+                "fingerprint": "old",
+                "connected_on": None,
+            }
+        ]
+
+        with (
+            patch("app.services.ai_provider_pool.get_enabled_providers") as mock_get,
+            patch(
+                "app.services.ai_provider_pool.acqui[RESEND_KEY_REDACTED]",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                "app.services.ai_provider_pool.release_slot",
+                new_callable=AsyncMock,
+            ),
+        ):
+            mock_provider = MagicMock()
+            mock_provider.name = "test"
+            mock_provider.call = AsyncMock(return_value=mock_cleaned)
+            mock_provider.max_concurrent = 5
+            mock_provider.get_client = MagicMock()
+            mock_get.return_value = [mock_provider]
+
+            result = await dispatch_batch(batch)
+            assert len(result) == 1
+            assert result[0]["first_name"] == "Alice"

@@ -106,20 +106,25 @@ def _is_provider_enabled(name: str, cfg: Any = None) -> bool:
 
 
 async def _call_gemini(
-    client: Any, system_prompt: str, payload: list[dict]
+    client: Any, system_prompt: str, payload: list[dict], cache_name: str | None = None
 ) -> list[dict]:
-    """Call Gemini API with native JSON mode."""
+    """Call Gemini API with native JSON mode, optionally using cached content."""
     from google import genai
+
+    config = genai.types.GenerateContentConfig(
+        response_mime_type="application/json",
+        max_output_tokens=PROVIDER_CONFIGS["gemini"]["max_tokens"],
+        temperature=0,
+    )
+    if cache_name:
+        config.cached_content = cache_name
+    else:
+        config.system_instruction = system_prompt
 
     response = await client.aio.models.generate_content(
         model=PROVIDER_CONFIGS["gemini"]["model"],
         contents=json.dumps(payload),
-        config=genai.types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            response_mime_type="application/json",
-            max_output_tokens=PROVIDER_CONFIGS["gemini"]["max_tokens"],
-            temperature=0,
-        ),
+        config=config,
     )
     return _extract_contacts_array(json.loads(response.text))
 
@@ -269,13 +274,18 @@ SLOT_ACQUIRE_TIMEOUT = 0.5  # seconds — fail fast so busy providers don't bloc
 PROVIDER_PRIORITY = ["groq", "gemini", "anthropic", "openai"]
 
 
-async def dispatch_batch(batch: list[dict]) -> list[dict]:
+async def dispatch_batch(
+    batch: list[dict], cache_name: str | None = None
+) -> list[dict]:
     """Route a cleaning batch to the first available provider.
 
     Tries providers in priority order (Groq → Gemini → others) across
     2 retry rounds with 1s backoff. Falls back to mock cleaner immediately
     if all providers fail — uploads must always complete.
     Returns post-processed (deterministic normalized) results.
+
+    If cache_name is provided, it will be passed to Gemini calls to use
+    cached content instead of the system prompt (reduces input token costs).
     """
     enabled = get_enabled_providers()
     if not enabled:
@@ -298,9 +308,14 @@ async def dispatch_batch(batch: list[dict]) -> list[dict]:
                 )
                 try:
                     client = provider.get_client()
-                    ai_result = await provider.call(
-                        client, _CLEANUP_SYSTEM_PROMPT, payload
-                    )
+                    if cache_name and provider.name == "gemini":
+                        ai_result = await provider.call(
+                            client, _CLEANUP_SYSTEM_PROMPT, payload, cache_name
+                        )
+                    else:
+                        ai_result = await provider.call(
+                            client, _CLEANUP_SYSTEM_PROMPT, payload
+                        )
 
                     # Post-process: deterministic normalization on top of AI output
                     cleaned = []
