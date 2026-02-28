@@ -15,10 +15,12 @@ from fastapi import APIRouter, Header, HTTPException, Request
 
 from app.agent_runtime.events.ingestion import create_event
 from app.config import settings
+from app.utils.redis_streams import stream_add
 
 router = APIRouter()
 
 _GITHUB_WEBHOOK_SECRET = settings.GITHUB_AGENT_WEBHOOK_SECRET
+_runtime_enabled = settings.AGENT_RUNTIME_ENABLED
 
 
 def _verify_github_signature(body: bytes, signature: str | None) -> bool:
@@ -39,6 +41,9 @@ async def github_webhook(
     x_github_event: str | None = Header(None),
 ) -> dict[str, Any]:
     """Receive GitHub webhooks and convert to agent runtime events."""
+    if not _runtime_enabled:
+        raise HTTPException(status_code=503, detail="Agent runtime disabled")
+
     body = await request.body()
 
     if not _verify_github_signature(body, x_hub_signatu[RESEND_KEY_REDACTED]):
@@ -59,5 +64,5 @@ async def github_webhook(
         payload_key=payload.get("after", str(payload.get("commits", []))),
     )
 
-    # TODO Task 11: Dispatch event to LangGraph runtime via Redis Stream
+    await stream_add("warmpath:agent_events", {"event": json.dumps(event)})
     return {"status": "accepted", "dedup_key": event["dedup_key"]}

@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from app.agent_runtime.teams.engineering import run_existing_scanners
+from app.agent_runtime.teams.engineering import EngineeringTeam, run_existing_scanners
 from agents.shared.report import AgentReport, Finding
 
 
@@ -23,8 +23,9 @@ def test_run_existing_scanners_returns_findings_list():
             )
         ],
     )
-    with patch(
-        "app.agent_runtime.teams.engineering._run_scanner",
+    with patch.object(
+        EngineeringTeam,
+        "_run_scanner",
         return_value=mock_report,
     ):
         findings = run_existing_scanners(["architect"])
@@ -35,8 +36,9 @@ def test_run_existing_scanners_returns_findings_list():
 
 
 def test_run_existing_scanners_handles_scanner_failure():
-    with patch(
-        "app.agent_runtime.teams.engineering._run_scanner",
+    with patch.object(
+        EngineeringTeam,
+        "_run_scanner",
         side_effect=Exception("Scanner crashed"),
     ):
         findings = run_existing_scanners(["architect"])

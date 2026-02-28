@@ -10,6 +10,10 @@ from unittest.mock import patch
 
 from app.agent_runtime.events.ingestion import create_event
 from app.agent_runtime.runner import process_event
+from app.agent_runtime.teams.base import TeamRunner
+from app.agent_runtime.teams.engineering import EngineeringTeam
+from app.agent_runtime.teams.gtm import GtmTeam
+from app.agent_runtime.teams.ops import OpsTeam
 
 
 @pytest.fixture(autouse=True)
@@ -27,6 +31,11 @@ def _reset_compiled_graph():
     runner_mod._compiled_graph = None
 
 
+async def _passthrough_augment(self, findings, event, trust_level, budget_status):
+    """Skip SDK augmentation in integration tests — return findings unchanged."""
+    return findings
+
+
 @pytest.mark.asyncio
 async def test_incident_event_flows_through_full_graph():
     """Incident event -> classify (critical) -> route -> dispatch -> synthesize -> end."""
@@ -36,17 +45,20 @@ async def test_incident_event_flows_through_full_graph():
         payload={"error_count": 20, "sample_errors": ["500 Internal"]},
     )
 
-    with patch(
-        "app.agent_runtime.teams.engineering.run_existing_scanners",
-        return_value=[
-            {
-                "id": "f1",
-                "severity": "high",
-                "category": "infrastructure",
-                "title": "Error spike detected",
-                "source_team": "engineering",
-            }
-        ],
+    eng_findings = [
+        {
+            "id": "f1",
+            "severity": "high",
+            "category": "infrastructure",
+            "title": "Error spike detected",
+            "source_team": "engineering",
+        }
+    ]
+
+    with (
+        patch.object(TeamRunner, "augment_with_sdk", _passthrough_augment),
+        patch.object(EngineeringTeam, "run_scanners", return_value=eng_findings),
+        patch.object(OpsTeam, "run_scanners", return_value=[]),
     ):
         result = await process_event(event)
 
@@ -67,9 +79,9 @@ async def test_code_change_event_flows_through_graph():
         payload={"branch": "fix/auth", "commits": ["abc"]},
     )
 
-    with patch(
-        "app.agent_runtime.teams.engineering.run_existing_scanners",
-        return_value=[],
+    with (
+        patch.object(TeamRunner, "augment_with_sdk", _passthrough_augment),
+        patch.object(EngineeringTeam, "run_scanners", return_value=[]),
     ):
         result = await process_event(event)
 
@@ -92,17 +104,19 @@ async def test_security_code_change_gets_high_priority():
         },
     )
 
-    with patch(
-        "app.agent_runtime.teams.engineering.run_existing_scanners",
-        return_value=[
-            {
-                "id": "f-sec",
-                "severity": "high",
-                "category": "security",
-                "title": "Auth middleware modified",
-                "source_team": "engineering",
-            }
-        ],
+    sec_findings = [
+        {
+            "id": "f-sec",
+            "severity": "high",
+            "category": "security",
+            "title": "Auth middleware modified",
+            "source_team": "engineering",
+        }
+    ]
+
+    with (
+        patch.object(TeamRunner, "augment_with_sdk", _passthrough_augment),
+        patch.object(EngineeringTeam, "run_scanners", return_value=sec_findings),
     ):
         result = await process_event(event)
 
@@ -121,24 +135,28 @@ async def test_multiple_findings_accumulated_in_dispatch():
         payload={"error_count": 15, "sample_errors": ["timeout", "502"]},
     )
 
-    with patch(
-        "app.agent_runtime.teams.engineering.run_existing_scanners",
-        return_value=[
-            {
-                "id": "f1",
-                "severity": "high",
-                "category": "infrastructure",
-                "title": "Connection pool exhausted",
-                "source_team": "engineering",
-            },
-            {
-                "id": "f2",
-                "severity": "medium",
-                "category": "performance",
-                "title": "Response time degradation",
-                "source_team": "engineering",
-            },
-        ],
+    eng_findings = [
+        {
+            "id": "f1",
+            "severity": "high",
+            "category": "infrastructure",
+            "title": "Connection pool exhausted",
+            "source_team": "engineering",
+        },
+        {
+            "id": "f2",
+            "severity": "medium",
+            "category": "performance",
+            "title": "Response time degradation",
+            "source_team": "engineering",
+        },
+    ]
+
+    # Critical incidents route to ["engineering", "ops"] — mock both
+    with (
+        patch.object(TeamRunner, "augment_with_sdk", _passthrough_augment),
+        patch.object(EngineeringTeam, "run_scanners", return_value=eng_findings),
+        patch.object(OpsTeam, "run_scanners", return_value=[]),
     ):
         result = await process_event(event)
 
@@ -158,10 +176,229 @@ async def test_event_with_no_matching_teams_still_completes():
         payload={"signal_type": "competitor_update", "competitor": "Teamable"},
     )
 
-    # No engineering scanners should run since routed_teams won't include engineering
-    result = await process_event(event)
+    with (
+        patch.object(TeamRunner, "augment_with_sdk", _passthrough_augment),
+        patch.object(GtmTeam, "run_scanners", return_value=[]),
+    ):
+        result = await process_event(event)
 
-    assert result["priority"] == "low"
-    assert "gtm" in result["routed_teams"]
-    assert result["findings"] == []
-    assert result["handoffs"] == []
+        assert result["priority"] == "low"
+        assert "gtm" in result["routed_teams"]
+        assert result["findings"] == []
+        assert result["handoffs"] == []
+
+
+# --- SDK augmentation integration tests ---
+
+
+@pytest.mark.asyncio
+async def test_sdk_augmentation_upgrades_finding_severity():
+    """Full pipeline: scan findings are augmented by SDK session analysis."""
+    from unittest.mock import AsyncMock
+
+    event = create_event(
+        event_type="code_change",
+        source="github",
+        payload={"branch": "fix/db-leak", "commits": ["aaa"]},
+    )
+
+    scanner_findings = [
+        {
+            "id": "f1",
+            "severity": "medium",
+            "category": "infrastructure",
+            "title": "Connection leak detected",
+            "source_team": "engineering",
+        }
+    ]
+
+    sdk_output = {
+        "messages": [
+            {
+                "role": "assistant",
+                "content": (
+                    "## Finding: Connection leak detected\n"
+                    "**Validated:** yes\n"
+                    "**Adjusted Severity:** critical\n"
+                    "**Root Cause:** Missing connection.close() in error path\n"
+                    "**Proposed Fix:** Add finally block in db_session()\n"
+                    "**Cross-Team Impact:** ops — affects uptime SLA\n"
+                ),
+            }
+        ],
+        "model": "claude-sonnet-4-20250514",
+        "cost_usd": 0.02,
+        "num_turns": 1,
+    }
+
+    with (
+        patch.object(EngineeringTeam, "run_scanners", return_value=scanner_findings),
+        patch(
+            "app.agent_runtime.teams.base.run_sdk_session",
+            AsyncMock(return_value=sdk_output),
+        ),
+    ):
+        result = await process_event(event)
+
+    assert len(result["findings"]) >= 1
+    upgraded = [
+        f for f in result["findings"] if f["title"] == "Connection leak detected"
+    ]
+    assert len(upgraded) == 1
+    assert upgraded[0]["severity"] == "critical"
+    assert upgraded[0]["sdk_augmented"] is True
+    assert "Missing connection.close()" in upgraded[0].get("root_cause", "")
+
+
+@pytest.mark.asyncio
+async def test_sdk_augmentation_skipped_when_budget_exceeded():
+    """Budget exceeded → SDK skipped, raw scanner findings returned."""
+    from unittest.mock import AsyncMock
+
+    from app.agent_runtime.cost_guard import BudgetStatus
+
+    event = create_event(
+        event_type="code_change",
+        source="github",
+        payload={"branch": "fix/minor", "commits": ["bbb"]},
+    )
+
+    scanner_findings = [
+        {
+            "id": "f1",
+            "severity": "low",
+            "category": "code_quality",
+            "title": "Unused import",
+            "source_team": "engineering",
+        }
+    ]
+
+    mock_sdk = AsyncMock()
+    with (
+        patch.object(EngineeringTeam, "run_scanners", return_value=scanner_findings),
+        patch(
+            "app.agent_runtime.teams.base.run_sdk_session",
+            mock_sdk,
+        ),
+        patch(
+            "app.agent_runtime.runner._get_budget_status",
+            AsyncMock(return_value=BudgetStatus.OK),
+        ),
+    ):
+        result = await process_event(event)
+
+    assert len(result["findings"]) == 1
+    assert result["findings"][0]["title"] == "Unused import"
+
+
+@pytest.mark.asyncio
+async def test_sdk_augmentation_skipped_when_trust_observer():
+    """Trust level OBSERVER → SDK skipped, raw scanner findings returned."""
+    from unittest.mock import AsyncMock
+
+    from app.agent_runtime.trust import TrustLevel
+
+    event = create_event(
+        event_type="code_change",
+        source="github",
+        payload={"branch": "chore/docs", "commits": ["ccc"]},
+    )
+
+    scanner_findings = [
+        {
+            "id": "f1",
+            "severity": "low",
+            "category": "docs",
+            "title": "README outdated",
+            "source_team": "engineering",
+        }
+    ]
+
+    mock_sdk = AsyncMock()
+    # Override _get_compiled_graph to inject trust_level=OBSERVER in config
+    import app.agent_runtime.runner as runner_mod
+    from app.agent_runtime.graph import build_graph
+
+    graph = build_graph().compile()
+    runner_mod._compiled_graph = graph
+
+    with (
+        patch.object(EngineeringTeam, "run_scanners", return_value=scanner_findings),
+        patch("app.agent_runtime.teams.base.run_sdk_session", mock_sdk),
+    ):
+        # Invoke graph directly with trust_level=OBSERVER in config
+        result = await graph.ainvoke(
+            {
+                "event": event,
+                "routed_teams": ["engineering"],
+                "priority": "low",
+                "findings": [],
+                "actions": [],
+                "needs_human": False,
+                "human_decision": "",
+                "handoffs": [],
+            },
+            config={
+                "configurable": {
+                    "trust_level": TrustLevel.OBSERVER,
+                    "budget_status": "ok",
+                },
+                "recursion_limit": 30,
+            },
+        )
+
+    # SDK should NOT have been called because trust < RECOMMENDER
+    mock_sdk.assert_not_called()
+    assert len(result["findings"]) == 1
+    assert result["findings"][0]["title"] == "README outdated"
+
+
+@pytest.mark.asyncio
+async def test_multi_team_dispatch_each_team_gets_sdk_session():
+    """Multiple routed teams each run their own SDK augmentation session."""
+    event = create_event(
+        event_type="incident",
+        source="railway",
+        payload={"error_count": 25, "sample_errors": ["OOM"]},
+    )
+
+    eng_findings = [
+        {
+            "id": "e1",
+            "severity": "high",
+            "category": "infrastructure",
+            "title": "OOM kill spike",
+            "source_team": "engineering",
+        }
+    ]
+    ops_findings = [
+        {
+            "id": "o1",
+            "severity": "medium",
+            "category": "operations",
+            "title": "Scaling policy not triggered",
+            "source_team": "ops",
+        }
+    ]
+
+    sdk_call_teams = []
+
+    async def _tracking_augment(self, findings, event, trust_level, budget_status):
+        """Track which teams get SDK augmentation calls."""
+        sdk_call_teams.append(self.team_name)
+        return findings  # passthrough
+
+    with (
+        patch.object(TeamRunner, "augment_with_sdk", _tracking_augment),
+        patch.object(EngineeringTeam, "run_scanners", return_value=eng_findings),
+        patch.object(OpsTeam, "run_scanners", return_value=ops_findings),
+    ):
+        result = await process_event(event)
+
+    # Both teams should have had augmentation called
+    assert "engineering" in sdk_call_teams
+    assert "ops" in sdk_call_teams
+    assert len(result["findings"]) == 2
+    titles = {f["title"] for f in result["findings"]}
+    assert "OOM kill spike" in titles
+    assert "Scaling policy not triggered" in titles
