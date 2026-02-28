@@ -66,6 +66,51 @@ async def _create_gemini_cache(csv_upload_id: str) -> str | None:
         return None
 
 
+async def _notify_csv_completion(
+    factory,
+    user_uuid: uuid.UUID,
+    upload_uuid: uuid.UUID,
+    contacts_created: int,
+    duplicates_skipped: int,
+) -> None:
+    """Send completion email and create feed item after CSV import finishes."""
+    # Feed item
+    try:
+        from app.services.feed_generator import generate_csv_completion
+
+        async with factory() as session:
+            items = await generate_csv_completion(
+                user_uuid, session, upload_uuid, contacts_created, duplicates_skipped
+            )
+            await session.commit()
+            if items:
+                logger.info("Created CSV completion feed item for user %s", user_uuid)
+    except Exception:
+        logger.warning(
+            "Failed to create CSV completion feed item for user %s",
+            user_uuid,
+            exc_info=True,
+        )
+
+    # Email
+    try:
+        from app.models.user import User
+        from app.services.email_engagement import send_csv_completion_email
+
+        async with factory() as session:
+            result = await session.execute(select(User).where(User.id == user_uuid))
+            user = result.scalar_one_or_none()
+            if user:
+                await send_csv_completion_email(user, session, contacts_created)
+                await session.commit()
+    except Exception:
+        logger.warning(
+            "Failed to send CSV completion email for user %s",
+            user_uuid,
+            exc_info=True,
+        )
+
+
 async def _delete_gemini_cache(cache_name: str | None) -> None:
     """Delete a Gemini context cache if one was created."""
     if not cache_name:
@@ -682,6 +727,11 @@ async def _import_async(csv_upload_id: str, user_id: str) -> None:
                 processed_count=created + duplicates,
                 completed_at=datetime.now(timezone.utc),
                 progress_phase=None,
+            )
+
+            # Send completion notifications (email + feed item)
+            await _notify_csv_completion(
+                factory, user_uuid, upload_uuid, created, duplicates
             )
 
             # Cleanup Redis streams

@@ -938,6 +938,56 @@ async def generate_feed_for_all_active_users(
 
 
 # ---------------------------------------------------------------------------
+# Generator 11: CSV Completion Notification
+# "Your CSV upload is complete — 1,234 new contacts scored and ready"
+# ---------------------------------------------------------------------------
+
+
+async def generate_csv_completion(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    upload_id: uuid.UUID,
+    contacts_created: int,
+    duplicates_skipped: int,
+) -> list[FeedItem]:
+    """Create a feed item when CSV processing completes.
+
+    Called directly from the import pipeline, not from the periodic generator.
+    """
+    dedup_key = _dedup("csv_completion", str(upload_id))
+    if await _user_has_feed_item(db, user_id, dedup_key):
+        return []
+
+    contacts_str = f"{contacts_created:,}"
+    body = (
+        f"Your {contacts_str} contacts have been cleaned, scored, and imported. "
+        f"You earned 100 credits for uploading."
+    )
+    if duplicates_skipped > 0:
+        body += f" ({duplicates_skipped:,} duplicates skipped.)"
+
+    item = FeedItem(
+        user_id=user_id,
+        item_type="csv_completion",
+        title=f"Your CSV upload is complete — {contacts_str} new contacts!",
+        body=body,
+        icon="upload",
+        action_url="/contacts",
+        action_label="View contacts",
+        priority=80,
+        dedup_key=dedup_key,
+        metadata_={
+            "upload_id": str(upload_id),
+            "contacts_created": contacts_created,
+            "duplicates_skipped": duplicates_skipped,
+        },
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+    )
+    db.add(item)
+    return [item]
+
+
+# ---------------------------------------------------------------------------
 # Feed digest: pick top unseen items for email
 # ---------------------------------------------------------------------------
 

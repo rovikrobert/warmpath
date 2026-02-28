@@ -112,6 +112,50 @@ def _footer_html() -> str:
 # ---------------------------------------------------------------------------
 
 
+async def send_csv_completion_email(
+    user: User, db: AsyncSession, contacts_created: int, company_count: int = 0
+) -> bool:
+    """Email sent when CSV processing completes (especially for large batch uploads)."""
+    if user.marketing_opt_out:
+        return False
+    if await _already_sent(db, user.id, "csv_completion"):
+        return False
+
+    first = user.full_name.split()[0] if user.full_name else "there"
+    contacts_str = f"{contacts_created:,}"
+    company_line = (
+        f" across <strong>{company_count}</strong> companies"
+        if company_count > 0
+        else ""
+    )
+    html = f"""\
+<div lang="en" dir="ltr" style="{_base_style()}">
+  {_preheader_html(f"Your {contacts_str} contacts are scored and ready")}
+  <div style="padding: 24px; background: #10b981; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px 12px 0 0; color: #fff; text-align: center;">
+    <h1 style="margin: 0 0 4px; font-size: 24px;">Your contacts are ready, {first}!</h1>
+    <p style="margin: 0; opacity: 0.9;">{contacts_str} contacts imported{company_line}.</p>
+  </div>
+  <div style="padding: 24px;">
+    <p style="margin: 0 0 16px;">Your LinkedIn connections have been cleaned, scored, and imported. Every contact now has a <strong>Warm Score</strong> showing how strong your connection is.</p>
+    <div style="margin: 0 0 16px; padding: 12px 16px; background: #ecfdf5; border-radius: 8px;">
+      <strong>What's next:</strong> Run a Smart Search to find who can refer you to your target companies.
+    </div>
+    <div style="text-align: center; margin: 24px 0;">
+      <a href="{APP_URL}/contacts" style="display: inline-block; padding: 12px 28px; background: #10b981; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600;">View Your Contacts</a>
+    </div>
+    <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {_agent_signoff()}</p>
+  </div>
+  {_footer_html()}
+</div>"""
+    eid = _send_email(
+        user.email,
+        f"Your {contacts_str} contacts are scored and ready, {first}",
+        html,
+    )
+    await _record_send(db, user.id, "csv_completion", external_id=eid)
+    return True
+
+
 async def send_welcome_email_js(user: User, db: AsyncSession) -> bool:
     """Welcome email for job seekers."""
     if user.marketing_opt_out:

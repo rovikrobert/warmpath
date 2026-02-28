@@ -563,3 +563,83 @@ class TestBatchStatusEndpoint:
 
         source = inspect.getsource(get_upload_status)
         assert "batch_job_name" in source or "batch" in source
+
+
+class TestCsvCompletionNotifications:
+    """Test email and feed item on CSV completion."""
+
+    def test_csv_completion_email_function_exists(self):
+        from app.services.email_engagement import send_csv_completion_email
+
+        assert callable(send_csv_completion_email)
+
+    def test_csv_completion_feed_generator_exists(self):
+        from app.services.feed_generator import generate_csv_completion
+
+        assert callable(generate_csv_completion)
+
+    def test_csv_completion_is_valid_feed_item_type(self):
+        """csv_completion is in the FeedItem CHECK constraint."""
+        from app.models.feed import FeedItem
+
+        # The CHECK constraint string should include csv_completion
+        for constraint in FeedItem.__table_args__:
+            if hasattr(constraint, "name") and constraint.name == "ck_feed_items_type":
+                assert "csv_completion" in str(constraint.sqltext)
+                break
+        else:
+            pytest.fail("ck_feed_items_type constraint not found")
+
+    @pytest.mark.asyncio
+    async def test_csv_completion_email_respects_opt_out(self, db):
+        from app.services.email_engagement import send_csv_completion_email
+
+        user, _ = await create_test_user_in_db(db)
+        user.marketing_opt_out = True
+        await db.flush()
+
+        result = await send_csv_completion_email(user, db, 100)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_csv_completion_feed_item_deduplicates(self, db):
+        import uuid as uuid_mod
+
+        from app.services.feed_generator import generate_csv_completion
+
+        user, _ = await create_test_user_in_db(db)
+        upload_id = uuid_mod.uuid4()
+
+        items1 = await generate_csv_completion(user.id, db, upload_id, 50, 5)
+        await db.flush()
+        assert len(items1) == 1
+
+        items2 = await generate_csv_completion(user.id, db, upload_id, 50, 5)
+        assert len(items2) == 0  # Deduped
+
+    @pytest.mark.asyncio
+    async def test_csv_completion_feed_item_fields(self, db):
+        import uuid as uuid_mod
+
+        from app.services.feed_generator import generate_csv_completion
+
+        user, _ = await create_test_user_in_db(db)
+        upload_id = uuid_mod.uuid4()
+
+        items = await generate_csv_completion(user.id, db, upload_id, 1234, 10)
+        await db.flush()
+        assert len(items) == 1
+        item = items[0]
+        assert item.item_type == "csv_completion"
+        assert "1,234" in item.title
+        assert item.action_url == "/contacts"
+        assert item.priority == 80
+
+    def test_notify_csv_completion_wired_into_pipeline(self):
+        """The import pipeline calls _notify_csv_completion."""
+        import inspect
+
+        from app.tasks import csv_pipeline
+
+        src = inspect.getsource(csv_pipeline._import_async)
+        assert "_notify_csv_completion" in src
