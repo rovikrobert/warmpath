@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 
 from app.api import (
+    agent_webhooks,
     agents,
     applications,
     auth,
@@ -223,6 +224,11 @@ app.include_router(
 app.include_router(benchmarks.router, prefix="/api/v1/benchmarks", tags=["benchmarks"])
 app.include_router(telegram.router, prefix="/api/v1/telegram", tags=["telegram"])
 app.include_router(intro_review.router, prefix="/api/v1", tags=["intro-review"])
+app.include_router(
+    agent_webhooks.router,
+    prefix="/api/v1/agent-webhooks",
+    tags=["agent-webhooks"],
+)
 
 # ---------------------------------------------------------------------------
 # Social bot OG tag middleware (used by SPA catch-all)
