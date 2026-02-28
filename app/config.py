@@ -80,6 +80,12 @@ class Settings(BaseSettings):
     POSTHOG_API_KEY: str = ""
     POSTHOG_PROJECT_ID: str = ""
     POSTHOG_HOST: str = "https://app.posthog.com"
+    # Agent runtime (LangGraph)
+    AGENT_RUNTIME_ENABLED: bool = False
+    AGENT_RUNTIME_BUDGET_DAILY_USD: float = 10.0
+    AGENT_RUNTIME_EVENT_COOLDOWN_SECONDS: int = 900  # 15 min dedup
+    AGENT_RUNTIME_MAX_TURNS_DEFAULT: int = 20
+    GITHUB_AGENT_WEBHOOK_SECRET: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

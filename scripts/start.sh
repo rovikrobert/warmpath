@@ -55,12 +55,16 @@ case "$ROLE" in
         echo "[entrypoint] Running agent scans"
         exec python3 scripts/run_agent_scans.py
         ;;
+    agent-runtime)
+        echo "[entrypoint] Starting agent runtime"
+        exec python3 -m app.agent_runtime
+        ;;
     mcp)
         echo "[entrypoint] Starting MCP server (SSE, port=${PORT:-8001})"
         exec python3 -m mcp_server --transport sse --port "${PORT:-8001}"
         ;;
     *)
-        echo "[entrypoint] Unknown SERVICE_ROLE: $ROLE (expected: web, worker, beat, scan, mcp)"
+        echo "[entrypoint] Unknown SERVICE_ROLE: $ROLE (expected: web, worker, beat, scan, agent-runtime, mcp)"
         exit 1
         ;;
 esac

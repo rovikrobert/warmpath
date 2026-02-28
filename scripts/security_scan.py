@@ -72,7 +72,8 @@ def _parse_requirements() -> dict[str, str]:
             if op in line:
                 name, ver = line.split(op, 1)
                 name = name.strip().split("[")[0]  # strip extras like [cryptography]
-                pkgs[name] = ver.strip()
+                ver = ver.split("#")[0].strip()  # strip inline comments
+                pkgs[name] = ver
                 break
     return pkgs
 
