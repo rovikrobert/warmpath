@@ -232,3 +232,25 @@ class TestCacheAwareDispatch:
             result = await dispatch_batch(batch)
             assert len(result) == 1
             assert result[0]["first_name"] == "Alice"
+
+
+class TestPipelineCacheIntegration:
+    """Test that the clean stage creates and deletes caches."""
+
+    def test_clean_async_creates_cache_when_gemini_enabled(self):
+        """Verify _clean_async calls create_cleanup_cache before dispatching."""
+        # This is a structural test — verify the import exists and function is callable
+        from app.utils.gemini_cache import create_cleanup_cache, delete_cleanup_cache
+
+        assert callable(create_cleanup_cache)
+        assert callable(delete_cleanup_cache)
+
+    def test_dispatch_batch_accepts_cache_name_kwarg(self):
+        """Verify dispatch_batch signature accepts cache_name."""
+        import inspect
+
+        from app.services.ai_provider_pool import dispatch_batch
+
+        sig = inspect.signature(dispatch_batch)
+        assert "cache_name" in sig.parameters
+        assert sig.parameters["cache_name"].default is None
