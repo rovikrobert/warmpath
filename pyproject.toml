@@ -1,5 +1,6 @@
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+timeout = 30
 filterwarnings = [
     "error::DeprecationWarning",
     # passlib imports deprecated crypt module (removed in 3.13) — suppress until passlib updates

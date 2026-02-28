@@ -23,6 +23,8 @@ from app.services.feed_ranker import (
 )
 from tests.conftest import TestSessionLocal, create_test_user_in_db
 
+pytestmark = pytest.mark.usefixtures("truncate_tables")
+
 
 # ---------------------------------------------------------------------------
 # Helpers

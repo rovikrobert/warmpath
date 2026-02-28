@@ -335,7 +335,7 @@ NLP_SEARCH_URL = "/api/v1/contacts/nlp-search"
 
 
 @pytest_asyncio.fixture
-async def nlp_client() -> AsyncClient:  # type: ignore[misc]
+async def nlp_client(truncate_tables) -> AsyncClient:  # type: ignore[misc]
     transport = ASGITransport(app=_app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
