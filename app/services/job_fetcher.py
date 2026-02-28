@@ -318,6 +318,7 @@ class JobFetcher:
         jobs: list[dict],
         target_role: str,
         target_seniority: str | None = None,
+        company_name: str = "",
     ) -> list[dict]:
         """Score job titles for relevance to a target role.
 
@@ -329,10 +330,9 @@ class JobFetcher:
             return []
 
         # Vector search path
-        if settings.VECTOR_SEARCH_ENABLED:
+        if settings.VECTOR_SEARCH_ENABLED and company_name:
             try:
-                company = jobs[0].get("company", "") if jobs else ""
-                result = await _vector_match_jobs(jobs, target_role, company)
+                result = await _vector_match_jobs(jobs, target_role, company_name)
                 if result:
                     return result
             except Exception:

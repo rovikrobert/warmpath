@@ -26,6 +26,10 @@ class TestSyncContactsTask:
 
         with (
             patch(
+                "app.tasks.vector_tasks.ensure_collection",
+                new_callable=AsyncMock,
+            ),
+            patch(
                 "app.tasks.vector_tasks._load_contacts",
                 new_callable=AsyncMock,
                 return_value=[mock_contact],
@@ -80,6 +84,10 @@ class TestSyncListingsTask:
 
         with (
             patch(
+                "app.tasks.vector_tasks.ensure_collection",
+                new_callable=AsyncMock,
+            ),
+            patch(
                 "app.tasks.vector_tasks._load_listings",
                 new_callable=AsyncMock,
                 return_value=[(mock_listing, "Stripe")],
@@ -131,6 +139,10 @@ class TestSyncJobsTask:
         mock_db.execute = AsyncMock(return_value=mock_result)
 
         with (
+            patch(
+                "app.tasks.vector_tasks.ensure_collection",
+                new_callable=AsyncMock,
+            ),
             patch(
                 "app.tasks.vector_tasks.generate_embeddings",
                 new_callable=AsyncMock,
@@ -186,3 +198,77 @@ class TestCeleryTaskGating:
             result = sync_all_jobs()
 
         assert result == 0
+
+
+class TestEnsureCollectionCalledInIncrementalSync:
+    """Verify ensure_collection is called in all incremental sync paths."""
+
+    @pytest.mark.asyncio
+    async def test_sync_contacts_calls_ensure_collection(self):
+        from app.tasks.vector_tasks import _sync_contacts_for_user
+
+        mock_db = AsyncMock()
+
+        with (
+            patch(
+                "app.tasks.vector_tasks.ensure_collection",
+                new_callable=AsyncMock,
+            ) as mock_ensure,
+            patch(
+                "app.tasks.vector_tasks._load_contacts",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            await _sync_contacts_for_user(uuid.uuid4(), db=mock_db)
+
+        mock_ensure.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_sync_listings_calls_ensure_collection(self):
+        from app.tasks.vector_tasks import _sync_listings
+
+        mock_db = AsyncMock()
+
+        with (
+            patch(
+                "app.tasks.vector_tasks.ensure_collection",
+                new_callable=AsyncMock,
+            ) as mock_ensure,
+            patch(
+                "app.tasks.vector_tasks._load_listings",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            await _sync_listings(db=mock_db)
+
+        mock_ensure.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_sync_jobs_calls_ensure_collection(self):
+        from app.tasks.vector_tasks import _sync_jobs
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=mock_result)
+
+        with patch(
+            "app.tasks.vector_tasks.ensure_collection",
+            new_callable=AsyncMock,
+        ) as mock_ensure:
+            await _sync_jobs(db=mock_db)
+
+        mock_ensure.assert_called_once()
+
+
+class TestVectorTasksUseDatabaseEngine:
+    """Verify vector_tasks reuses database.py engine (not a local one)."""
+
+    def test_imports_session_factory_from_database(self):
+        """The _get_session_factory should come from app.database, not a local def."""
+        import app.tasks.vector_tasks as vt
+        import app.database as db_mod
+
+        assert vt._get_session_factory is db_mod._get_session_factory

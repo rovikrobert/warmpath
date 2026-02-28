@@ -256,7 +256,7 @@ async def scan_target_companies(
         # Count role-relevant ones
         if target_role:
             matched = await fetcher.match_jobs_to_role(
-                jobs, target_role, target_seniority
+                jobs, target_role, target_seniority, company_name=company_name
             )
             relevant_openings += len(matched)
 

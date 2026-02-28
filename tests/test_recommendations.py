@@ -80,7 +80,7 @@ def _mock_fetch(name, boards, location_hint=None):
     return MOCK_JOBS
 
 
-def _mock_match(jobs, role, sen=None):
+def _mock_match(jobs, role, sen=None, company_name=""):
     """Return all jobs as matched."""
     return jobs
 
