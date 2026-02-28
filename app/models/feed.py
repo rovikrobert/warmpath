@@ -45,7 +45,8 @@ class FeedItem(Base):
             "'job_alert', 'contact_update', 'enrichment_prompt', "
             "'marketplace_signal', 'outcome_check', 'platform_activity', "
             "'network_insight', 'follow_up_nudge', "
-            "'intro_approval_nudge', 'manual_send_reminder')",
+            "'intro_approval_nudge', 'manual_send_reminder', "
+            "'csv_completion')",
             name="ck_feed_items_type",
         ),
         CheckConstraint(
