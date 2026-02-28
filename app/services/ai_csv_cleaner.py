@@ -389,6 +389,31 @@ _SUFFIX_PATTERN = re.compile(
 )
 
 
+def build_cached_cleanup_content() -> str:
+    """Build expanded cleanup content for Gemini context caching.
+
+    Bundles the system prompt with the full company canonical dictionary
+    and title abbreviation dictionary as reference data. This combined
+    content exceeds Gemini's 2,048-token minimum for caching and improves
+    AI accuracy by providing the canonical lists directly.
+    """
+    import json
+
+    return f"""{_CLEANUP_SYSTEM_PROMPT}
+
+## Reference: Canonical Company Names
+Use this list to normalize company names. If the input company matches
+(case-insensitive, after stripping suffixes like Inc/LLC/Ltd), use the
+canonical form from this list:
+
+{json.dumps(_COMPANY_CANONICAL, indent=2)}
+
+## Reference: Title Abbreviations
+Expand these abbreviations when found in job titles:
+
+{json.dumps(_TITLE_ABBREVS, indent=2)}"""
+
+
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
