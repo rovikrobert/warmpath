@@ -9,9 +9,6 @@ from typing import Any
 from agents.shared.report import AgentReport
 
 from app.agent_runtime.cost_guard import BudgetStatus, select_model
-from app.agent_runtime.sdk.parser import merge_findings, parse_sdk_output
-from app.agent_runtime.sdk.prompts import build_augmentation_prompt, get_system_prompt
-from app.agent_runtime.sdk.runner import run_sdk_session
 from app.agent_runtime.trust import TrustLevel, get_allowed_tools, get_max_turns
 
 logger = logging.getLogger(__name__)
@@ -91,6 +88,14 @@ class TeamRunner:
         if model is None:
             logger.info("SDK augmentation skipped: budget exceeded")
             return findings
+
+        # Lazy imports — keeps module importable without claude_code_sdk
+        from app.agent_runtime.sdk.parser import merge_findings, parse_sdk_output
+        from app.agent_runtime.sdk.prompts import (
+            build_augmentation_prompt,
+            get_system_prompt,
+        )
+        from app.agent_runtime.sdk.runner import run_sdk_session
 
         prompt = build_augmentation_prompt(self.team_name, findings, event)
         allowed_tools = get_allowed_tools(TrustLevel(trust_level))

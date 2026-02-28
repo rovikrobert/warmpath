@@ -234,7 +234,7 @@ async def test_sdk_augmentation_upgrades_finding_severity():
     with (
         patch.object(EngineeringTeam, "run_scanners", return_value=scanner_findings),
         patch(
-            "app.agent_runtime.teams.base.run_sdk_session",
+            "app.agent_runtime.sdk.runner.run_sdk_session",
             AsyncMock(return_value=sdk_output),
         ),
     ):
@@ -277,7 +277,7 @@ async def test_sdk_augmentation_skipped_when_budget_exceeded():
     with (
         patch.object(EngineeringTeam, "run_scanners", return_value=scanner_findings),
         patch(
-            "app.agent_runtime.teams.base.run_sdk_session",
+            "app.agent_runtime.sdk.runner.run_sdk_session",
             mock_sdk,
         ),
         patch(
@@ -324,7 +324,7 @@ async def test_sdk_augmentation_skipped_when_trust_observer():
 
     with (
         patch.object(EngineeringTeam, "run_scanners", return_value=scanner_findings),
-        patch("app.agent_runtime.teams.base.run_sdk_session", mock_sdk),
+        patch("app.agent_runtime.sdk.runner.run_sdk_session", mock_sdk),
     ):
         # Invoke graph directly with trust_level=OBSERVER in config
         result = await graph.ainvoke(

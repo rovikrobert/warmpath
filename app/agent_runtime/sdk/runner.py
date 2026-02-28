@@ -9,9 +9,6 @@ from __futu[RESEND_KEY_REDACTED] import annotations
 import logging
 from typing import Any
 
-from claude_code_sdk import ClaudeCodeOptions, query
-from claude_code_sdk.types import AssistantMessage, ResultMessage, TextBlock
-
 logger = logging.getLogger(__name__)
 
 
@@ -31,6 +28,11 @@ async def run_sdk_session(
         cost_usd: actual cost from ResultMessage (or 0.0)
         num_turns: number of turns from ResultMessage (or 0)
     """
+    # Lazy import — claude_code_sdk is only needed at runtime, not at
+    # module load time.  This lets tests and CI run without it installed.
+    from claude_code_sdk import ClaudeCodeOptions, query
+    from claude_code_sdk.types import AssistantMessage, ResultMessage, TextBlock
+
     options = ClaudeCodeOptions(
         system_prompt=system_prompt,
         max_turns=max_turns,

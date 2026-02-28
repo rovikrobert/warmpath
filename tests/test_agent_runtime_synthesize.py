@@ -47,6 +47,18 @@ def test_synthesize_no_handoff_when_no_cross_team():
     assert len(result["handoffs"]) == 0
 
 
+def test_synthesize_sets_needs_human_on_critical_priority():
+    state = _make_state(priority="critical")
+    result = synthesize_findings(state)
+    assert result["needs_human"] is True
+
+
+def test_synthesize_no_escalation_on_low_priority():
+    state = _make_state(priority="low")
+    result = synthesize_findings(state)
+    assert result["needs_human"] is False
+
+
 def test_evaluate_returns_done_when_no_handoffs():
     state = _make_state(handoffs=[])
     result = evaluate_handoffs(state)

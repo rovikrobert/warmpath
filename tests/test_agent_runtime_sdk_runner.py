@@ -4,6 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
+pytest.importorskip("claude_code_sdk", reason="claude-code-sdk not installed")
+
 from app.agent_runtime.sdk.runner import run_sdk_session
 
 
@@ -44,7 +46,7 @@ async def _mock_query_gen(*_args, **_kwargs):
 @pytest.mark.asyncio
 async def test_run_sdk_session_collects_messages_and_cost():
     """SDK runner collects assistant messages and extracts cost from result."""
-    with patch("app.agent_runtime.sdk.runner.query", side_effect=_mock_query_gen):
+    with patch("claude_code_sdk.query", side_effect=_mock_query_gen):
         result = await run_sdk_session(
             prompt="Analyze these findings",
             system_prompt="You are a code reviewer",
@@ -67,7 +69,7 @@ async def _mock_query_empty(*_args, **_kwargs):
 @pytest.mark.asyncio
 async def test_run_sdk_session_handles_empty_response():
     """SDK runner handles sessions with no assistant messages."""
-    with patch("app.agent_runtime.sdk.runner.query", side_effect=_mock_query_empty):
+    with patch("claude_code_sdk.query", side_effect=_mock_query_empty):
         result = await run_sdk_session(
             prompt="Nothing to analyze",
             system_prompt="You are a reviewer",
