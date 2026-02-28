@@ -69,14 +69,16 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
   }, []);
 
   const pollUploadStatus = async (uploadId) => {
-    const maxAttempts = 540; // up to ~9 minutes (matches backend soft_time_limit)
+    let maxAttempts = 540;
+    let pollInterval = 1000;
+    let isBatchMode = false;
+
     for (let i = 0; i < maxAttempts; i++) {
-      await new Promise((r) => setTimeout(r, 1000));
+      await new Promise((r) => setTimeout(r, pollInterval));
       try {
         const poll = await contactsApi.getUploadStatus(uploadId);
         const s = poll.data;
 
-        // Update real progress from backend chunk data
         const total = s.total_chunks || 0;
         const cleaned = s.chunks_cleaned || 0;
         const imported = s.chunks_imported || 0;
@@ -85,13 +87,22 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
         const phase = s.progress_phase;
         const contactLabel = rowCount > 0 ? ` — ${rowCount.toLocaleString()} contacts` : '';
 
+        // Detect batch mode and adjust polling
+        if (phase && phase.startsWith('batch_') && !isBatchMode) {
+          isBatchMode = true;
+          pollInterval = 10000;
+          maxAttempts = 360;
+        }
+
         if (total > 0) {
-          // Cleaning ~60%, importing ~35%, scoring ~5%
           let pct;
           if (phase === 'scoring') {
             pct = 95;
           } else if (imported > 0) {
             pct = Math.min(60 + (imported / total) * 35, 94);
+          } else if (phase === 'batch_submitted' || phase === 'batch_processing') {
+            pct = Math.min(10 + (cleaned / total) * 50, 55);
+            setProgressMsg(`Processing in background${contactLabel}...`);
           } else {
             pct = Math.min((cleaned / total) * 60, 59);
           }
@@ -101,6 +112,10 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
             setProgressMsg(`Scoring contacts... (${created.toLocaleString()} imported)`);
           } else if (imported > 0) {
             setProgressMsg(`Importing contacts${contactLabel} (${imported}/${total} batches)`);
+          } else if (phase === 'batch_submitted') {
+            setProgressMsg(`Processing in background${contactLabel}...`);
+          } else if (phase === 'batch_processing') {
+            setProgressMsg(`AI cleaning in background${contactLabel} (${cleaned}/${total} batches)`);
           } else if (cleaned > 0) {
             setProgressMsg(`AI cleaning${contactLabel} (${cleaned}/${total} batches)`);
           } else {
@@ -110,6 +125,9 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
           if (phase === 'parsing') {
             setProgressMsg('Parsing contacts...');
             setProgressWidth(8);
+          } else if (phase === 'batch_submitted') {
+            setProgressMsg('Submitting to background processor...');
+            setProgressWidth(12);
           } else {
             setProgressMsg(`Processing${contactLabel}...`);
           }
@@ -118,6 +136,8 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
         // Update ETA
         if (s.estimated_seconds_remaining != null) {
           setEtaSeconds(Math.round(s.estimated_seconds_remaining));
+        } else if (isBatchMode) {
+          setEtaSeconds(null);
         }
 
         if (s.status === 'completed') {
@@ -127,6 +147,14 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
           return s;
         }
         if (s.status === 'failed') throw new Error(s.error_message || 'CSV processing failed');
+
+        // After 15 min of batch polling, stop and show background message
+        if (isBatchMode && i > 90) {
+          setProgressWidth(50);
+          setProgressMsg("We'll email you when your contacts are ready.");
+          setEtaSeconds(null);
+          return s;
+        }
       } catch (err) {
         if (err.message?.includes('failed')) throw err;
       }
