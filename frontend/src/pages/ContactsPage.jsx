@@ -227,6 +227,9 @@ export default function ContactsPage() {
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [bulkConfirm, setBulkConfirm] = useState(false);
 
+  // Batch processing banner state (set when upload completes in batch mode)
+  const [batchUpload, setBatchUpload] = useState(null);
+
   // Enrichment prompt feed items
   const [enrichmentPrompts, setEnrichmentPrompts] = useState([]);
   const [enrichmentRefreshKey, setEnrichmentRefreshKey] = useState(0);
@@ -534,6 +537,18 @@ export default function ContactsPage() {
       </div>
 
       <EnrichmentProgress key={enrichmentRefreshKey} />
+
+      {/* Batch processing banner */}
+      {batchUpload && batchUpload.progress_phase?.startsWith('batch_') && (
+        <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+            <p className="text-sm text-amber-200">
+              Importing <span className="font-medium">{batchUpload.filename}</span> — processing in background...
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Enrichment prompt feed items */}
       {enrichmentPrompts.length > 0 && (
@@ -967,7 +982,14 @@ export default function ContactsPage() {
       {showBulkModal && (
         <UploadModal
           onClose={() => setShowBulkModal(false)}
-          onComplete={() => load()}
+          onComplete={(uploadResult) => {
+            load();
+            if (uploadResult?.progress_phase?.startsWith('batch_')) {
+              setBatchUpload(uploadResult);
+            } else {
+              setBatchUpload(null);
+            }
+          }}
           hasContacts={contactsList.length > 0}
         />
       )}
