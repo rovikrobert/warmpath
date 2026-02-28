@@ -108,7 +108,7 @@ async def test_augment_calls_sdk_and_merges_findings():
     }
 
     with patch(
-        "app.agent_runtime.teams.base.run_sdk_session",
+        "app.agent_runtime.sdk.runner.run_sdk_session",
         AsyncMock(return_value=sdk_output),
     ):
         result = await team.augment_with_sdk(
@@ -140,7 +140,7 @@ async def test_augment_records_spend_after_sdk_session():
     mock_record = AsyncMock()
     with (
         patch(
-            "app.agent_runtime.teams.base.run_sdk_session",
+            "app.agent_runtime.sdk.runner.run_sdk_session",
             AsyncMock(return_value=sdk_output),
         ),
         patch(
@@ -166,7 +166,7 @@ async def test_augment_returns_originals_on_sdk_failure():
     scanner_findings = [{"title": "Test", "severity": "low"}]
 
     with patch(
-        "app.agent_runtime.teams.base.run_sdk_session",
+        "app.agent_runtime.sdk.runner.run_sdk_session",
         AsyncMock(side_effect=Exception("SDK crashed")),
     ):
         result = await team.augment_with_sdk(
@@ -194,7 +194,7 @@ async def test_run_full_pipeline_scan_then_augment():
     with (
         patch.object(team, "_run_scanner", return_value=_mock_report()),
         patch(
-            "app.agent_runtime.teams.base.run_sdk_session",
+            "app.agent_runtime.sdk.runner.run_sdk_session",
             AsyncMock(return_value=sdk_output),
         ),
     ):
@@ -216,7 +216,7 @@ async def test_run_skips_augment_when_no_findings():
             "_run_scanner",
             return_value=AgentReport(agent="a", findings=[]),
         ),
-        patch("app.agent_runtime.teams.base.run_sdk_session", mock_sdk),
+        patch("app.agent_runtime.sdk.runner.run_sdk_session", mock_sdk),
     ):
         result = await team.run(event={"type": "test"})
 
