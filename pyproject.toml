@@ -5,6 +5,8 @@ filterwarnings = [
     "error::DeprecationWarning",
     # passlib imports deprecated crypt module (removed in 3.13) — suppress until passlib updates
     "ignore:'crypt' is deprecated:DeprecationWarning:passlib",
+    # weave uses deprecated logger.warn() internally (Python 3.11 only; removed in 3.12)
+    "ignore:The 'warn' method is deprecated:DeprecationWarning",
 ]
 
 [tool.mypy]
