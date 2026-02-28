@@ -68,6 +68,15 @@ class Settings(BaseSettings):
     ADZUNA_APP_KEY: str = ""
     JOBSPY_ENABLED: bool = True
     JOBSPY_SEARCH_ALL_SITES: bool = True
+
+    # Vector search (Qdrant)
+    VECTOR_SEARCH_ENABLED: bool = False
+    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_API_KEY: str = ""
+    QDRANT_COLLECTION: str = "warmpath"
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+    OPENAI_EMBEDDING_DIMS: int = 1536
+
     POSTHOG_API_KEY: str = ""
     POSTHOG_PROJECT_ID: str = ""
     POSTHOG_HOST: str = "https://app.posthog.com"

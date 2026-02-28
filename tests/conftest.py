@@ -6,6 +6,8 @@ from collections.abc import AsyncGenerator
 
 # Force mock mode for tests — must be set before importing app modules
 os.environ["AI_MOCK_MODE"] = "true"
+# Disable vector search in tests by default
+os.environ["VECTOR_SEARCH_ENABLED"] = "false"
 # Disable async CSV processing so uploads complete inline during tests
 os.environ["CSV_ASYNC_PROCESSING"] = "false"
 # Disable Resend in tests — prevents real email sends
