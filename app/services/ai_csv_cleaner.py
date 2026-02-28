@@ -397,8 +397,6 @@ def build_cached_cleanup_content() -> str:
     content exceeds Gemini's 2,048-token minimum for caching and improves
     AI accuracy by providing the canonical lists directly.
     """
-    import json
-
     return f"""{_CLEANUP_SYSTEM_PROMPT}
 
 ## Reference: Canonical Company Names
@@ -411,7 +409,50 @@ canonical form from this list:
 ## Reference: Title Abbreviations
 Expand these abbreviations when found in job titles:
 
-{json.dumps(_TITLE_ABBREVS, indent=2)}"""
+{json.dumps(_TITLE_ABBREVS, indent=2)}
+
+## Additional Cleaning Rules
+
+### Company Name Edge Cases
+- Strip legal suffixes in any order: Inc, LLC, Ltd, Corp, Co, Pte, PLC, GmbH,
+  AG, SA, NV, BV, SE, KK, AS, AB, Oy, S.A., S.r.l., e.V.
+- "Pte Ltd" and "Pte. Ltd." both normalize to nothing (common in Singapore).
+- Domain-style names (e.g. "google.com") should map to the company name
+  ("Google") if present in the canonical list above.
+- Preserve intentional capitalization: "IBM" not "Ibm", "NVIDIA" not "Nvidia",
+  "DBS" not "Dbs". Follow the canonical list exactly.
+- If a company has rebranded (e.g. "Facebook" → "Meta"), use the current name.
+- Subsidiary names: keep the subsidiary, not the parent.
+  E.g. "Instagram" stays "Instagram", not "Meta".
+- Remove parenthetical clarifiers: "Google (Alphabet)" → "Google".
+
+### Title Normalization Edge Cases
+- Compound abbreviations: "Sr. SWE" → "Senior Software Engineer",
+  "Jr. PM" → "Junior Product Manager", "Staff SRE" → "Staff Site Reliability Engineer".
+- Level prefixes are preserved: Staff, Principal, Distinguished, Fellow, Lead.
+- "IC" or "Individual Contributor" after a title is removed — all titles are IC
+  unless they contain management keywords.
+- Roman numerals for levels: "Engineer II" stays "Engineer II",
+  "SWE III" → "Software Engineer III".
+- Slash-separated dual roles: "PM/Designer" stays as-is.
+- "Intern" suffix or prefix is preserved: "SWE Intern" → "Software Engineer Intern".
+- Regional titles: "Bucho" (部長) → "General Manager",
+  "Kacho" (課長) → "Section Manager" (Japanese corporate).
+- Freelance/contract indicators: "Contract SWE" → "Contract Software Engineer".
+- "C-level" abbreviations: "CTO" → "Chief Technology Officer",
+  "CFO" → "Chief Financial Officer", "COO" → "Chief Operating Officer",
+  "CMO" → "Chief Marketing Officer", "CISO" → "Chief Information Security Officer",
+  "CPO" → "Chief Product Officer", "CRO" → "Chief Revenue Officer".
+  Keep the abbreviation if the full title is not in common use.
+- VP titles: "VP Eng" → "VP of Engineering", "SVP Product" → "SVP of Product".
+- "Head of X" stays as-is — do not abbreviate or expand.
+
+### Output Format Reminders
+- Return valid JSON only — no markdown fencing, no commentary.
+- Preserve the exact number of input records in the output array.
+- If a field is empty or null in the input, keep it as empty string in output.
+- Never invent or hallucinate company names or titles — only clean what is given.
+- If you cannot confidently clean a value, return it unchanged."""
 
 
 # ---------------------------------------------------------------------------
