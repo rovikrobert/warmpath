@@ -46,6 +46,7 @@ class CsvUpload(Base):
     chunks_cleaned: Mapped[int | None] = mapped_column(Integer, server_default="0")
     chunks_imported: Mapped[int | None] = mapped_column(Integer, server_default="0")
     error_message: Mapped[str | None] = mapped_column(Text)
+    batch_job_name: Mapped[str | None] = mapped_column(String(200))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
