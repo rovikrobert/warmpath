@@ -77,7 +77,7 @@
         "description": "Free for network holders. Job seekers pay $20-30/month for marketplace access."
       },
       "featureList": [
-        "AI-powered Warm Score ranking (0-100) based on recency, relationship strength, role relevance, and tenure",
+        "AI-powered Connection Score ranking (0-100) based on recency, relationship strength, role relevance, and tenure",
         "Privacy-first anonymized marketplace — contact identity revealed only after network holder approval",
         "Cultural context engine adapting intro messages to location, company culture, and relationship type",
         "LinkedIn CSV import with automatic contact enrichment",
@@ -128,18 +128,26 @@
         },
         {
           "@type": "Question",
-          "name": "What is a Warm Score?",
+          "name": "What is a Connection Score?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "A Warm Score is WarmPath's AI-generated 0-100 ranking that predicts how likely a contact is to provide a successful referral. It weighs recency of interaction (35%), relationship strength (30%), role relevance (20%), and company tenure (15%). Peers and former managers score highest because they are most likely to actually refer you."
+            "text": "A Connection Score is WarmPath's AI-generated 0-100 ranking that predicts how likely a contact is to provide a successful referral. It weighs recency of interaction (35%), relationship strength (30%), role relevance (20%), and company tenure (15%). Peers and former managers score highest because they are most likely to actually refer you."
           }
         }
       ]
     }
     </script>
+
+    <script>
+      (function() {
+        var t = localStorage.getItem('theme') || 'dark';
+        if (t === 'system') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.classList.add(t);
+      })();
+    </script>
   </head>
-  <body class="bg-slate-950 text-slate-50 antialiased">
+  <body class="antialiased">
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

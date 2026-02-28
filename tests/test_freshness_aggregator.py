@@ -17,6 +17,8 @@ from app.models.feed import (
 )
 from tests.conftest import TestSessionLocal, create_test_user_in_db
 
+pytestmark = pytest.mark.usefixtures("truncate_tables")
+
 
 def _name_company_hash(full_name: str, company: str) -> str:
     """Reproduce the hash logic from app/api/feed.py."""

@@ -11,6 +11,8 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import settings
 from sqlalchemy.orm import selectinload
 
 from app.models.contact import Contact
@@ -317,4 +319,11 @@ async def generate_marketplace_listings(
         created += 1
 
     await db.flush()
+
+    # Trigger vector sync for marketplace listings
+    if settings.VECTOR_SEARCH_ENABLED:
+        from app.tasks.vector_tasks import sync_all_listings
+
+        sync_all_listings.delay()
+
     return created

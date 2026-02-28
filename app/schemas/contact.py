@@ -38,6 +38,7 @@ class CsvUploadResponse(BaseModel):
     completed_at: datetime | None = None
     progress_phase: str | None = None
     error_message: str | None = None
+    batch_job_name: str | None = None
     estimated_seconds_remaining: float | None = None
     created_at: datetime
 

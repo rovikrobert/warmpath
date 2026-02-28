@@ -367,6 +367,12 @@ async def process_csv_upload_core(
 
         await db.flush()
 
+        # Trigger vector sync for this user's contacts
+        if settings.VECTOR_SEARCH_ENABLED:
+            from app.tasks.vector_tasks import sync_user_contacts
+
+            sync_user_contacts.delay(str(user_uuid))
+
     except Exception as exc:
         csv_upload.status = "failed"
         csv_upload.error_message = str(exc)

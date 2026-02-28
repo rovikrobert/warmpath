@@ -23,6 +23,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.database import get_db
 from app.models.company import Company
 from app.models.contact import Contact
@@ -240,6 +241,101 @@ def _build_seeker_profile_snapshot(
 
 
 # ---------------------------------------------------------------------------
+# Vector marketplace search helper
+# ---------------------------------------------------------------------------
+
+
+async def _apply_friend_filter(
+    query, friend_filter: str | None, user_id: uuid.UUID, db: AsyncSession
+):
+    """Apply friend filter to marketplace query. Returns (query, empty_result_or_None)."""
+    if not friend_filter or friend_filter == "all":
+        return query, None
+    if friend_filter == "friends_only":
+        fids = await get_friend_ids(user_id, db)
+        if not fids:
+            return query, {"data": [], "meta": {"total": 0}}
+        return query.where(MarketplaceListing.network_holder_id.in_(fids)), None
+    if friend_filter == "friends_and_fof":
+        fids, fof_ids = await get_friend_and_fof_ids(user_id, db)
+        all_ids = fids | fof_ids
+        if not all_ids:
+            return query, {"data": [], "meta": {"total": 0}}
+        return query.where(MarketplaceListing.network_holder_id.in_(all_ids)), None
+    return query, None
+
+
+async def _run_vector_marketplace_search(
+    body, current_user_id: uuid.UUID, db: AsyncSession
+) -> dict | None:
+    """Execute vector marketplace search and return formatted results, or None."""
+    listing_ids = await _vector_marketplace_search(
+        query=body.query,
+        role_levels=body.role_levels,
+        departments=body.departments,
+    )
+    if not listing_ids:
+        return None
+
+    stmt = select(MarketplaceListing).where(
+        MarketplaceListing.id.in_([uuid.UUID(lid) for lid in listing_ids]),
+        MarketplaceListing.is_available.is_(True),
+        MarketplaceListing.deleted_at.is_(None),
+        MarketplaceListing.network_holder_id != current_user_id,
+    )
+    if body.role_levels:
+        stmt = stmt.where(MarketplaceListing.role_level.in_(body.role_levels))
+    if body.departments:
+        stmt = stmt.where(MarketplaceListing.department_category.in_(body.departments))
+    vresult = await db.execute(stmt)
+    vlistings = list(vresult.scalars())
+    if not vlistings:
+        return None
+
+    vcompany_ids = {vl.company_id for vl in vlistings}
+    cresult = await db.execute(select(Company).where(Company.id.in_(vcompany_ids)))
+    vcompany_map = {c.id: c.name for c in cresult.scalars()}
+    vholder_ids = {vl.network_holder_id for vl in vlistings}
+    rep_result = await db.execute(
+        select(ConnectorReputation).where(ConnectorReputation.user_id.in_(vholder_ids))
+    )
+    vrep_map = {r.user_id: r for r in rep_result.scalars()}
+    results = []
+    for listing in vlistings:
+        company_name = vcompany_map.get(listing.company_id, "Unknown")
+        reputation = vrep_map.get(listing.network_holder_id)
+        results.append(
+            _build_listing_summary(listing, company_name, reputation).model_dump(
+                mode="json"
+            )
+        )
+    return {"data": results, "meta": {"total": len(results)}}
+
+
+async def _vector_marketplace_search(
+    query: str,
+    role_levels: list[str] | None = None,
+    departments: list[str] | None = None,
+    limit: int = 50,
+) -> list[str]:
+    """Search marketplace listings by semantic similarity. Returns listing IDs."""
+    from app.services.embedding_service import generate_embeddings
+    from app.services.vector_service import search_similar
+
+    vectors = await generate_embeddings([query])
+    if not vectors:
+        return []
+
+    results = await search_similar(
+        query_vector=vectors[0],
+        doc_type="listing",
+        limit=limit,
+    )
+
+    return [r["payload"]["listing_id"] for r in results]
+
+
+# ---------------------------------------------------------------------------
 # POST /marketplace/search
 # ---------------------------------------------------------------------------
 
@@ -261,6 +357,15 @@ async def marketplace_search(
             detail="Insufficient credits. You need 5 credits for a marketplace search. "
             "Upgrade your plan or earn credits by uploading your network.",
         )
+
+    # Vector search path (when enabled and query is provided)
+    if settings.VECTOR_SEARCH_ENABLED and body.query:
+        try:
+            vresult = await _run_vector_marketplace_search(body, current_user.id, db)
+            if vresult is not None:
+                return vresult
+        except Exception:
+            logger.exception("Vector marketplace search failed, falling back")
 
     # Look up company IDs by name (single query instead of per-name loop)
     company_map: dict[uuid.UUID, str] = {}
@@ -293,18 +398,11 @@ async def marketplace_search(
         )
 
     # Friend filter: restrict to network holders who are friends (or FoF)
-    if body.friend_filter and body.friend_filter != "all":
-        if body.friend_filter == "friends_only":
-            fids = await get_friend_ids(current_user.id, db)
-            if not fids:
-                return {"data": [], "meta": {"total": 0}}
-            query = query.where(MarketplaceListing.network_holder_id.in_(fids))
-        elif body.friend_filter == "friends_and_fof":
-            fids, fof_ids = await get_friend_and_fof_ids(current_user.id, db)
-            all_ids = fids | fof_ids
-            if not all_ids:
-                return {"data": [], "meta": {"total": 0}}
-            query = query.where(MarketplaceListing.network_holder_id.in_(all_ids))
+    query, early_return = await _apply_friend_filter(
+        query, body.friend_filter, current_user.id, db
+    )
+    if early_return is not None:
+        return early_return
 
     result = await db.execute(query)
     listings = list(result.scalars())

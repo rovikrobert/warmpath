@@ -59,10 +59,24 @@ class Settings(BaseSettings):
     CSV_STREAM_TTL_SECONDS: int = 3600  # 1 hour TTL for Redis Streams
     CLEANUP_PROVIDER: str = "gemini"  # "anthropic" | "gemini"
     QUEUE_DEPTH_THRESHOLD: int = 20
+    # Gemini optimization settings
+    GEMINI_CACHE_ENABLED: bool = True  # Cache system prompt + reference data
+    GEMINI_BATCH_THRESHOLD: int = 5000  # Contact count threshold for batch mode
+    GEMINI_BATCH_POLL_INTERVAL: int = 60  # Seconds between batch status polls
+    GEMINI_BATCH_MAX_POLLS: int = 120  # Max poll attempts (~2 hours)
     ADZUNA_APP_ID: str = ""
     ADZUNA_APP_KEY: str = ""
     JOBSPY_ENABLED: bool = True
     JOBSPY_SEARCH_ALL_SITES: bool = True
+
+    # Vector search (Qdrant)
+    VECTOR_SEARCH_ENABLED: bool = False
+    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_API_KEY: str = ""
+    QDRANT_COLLECTION: str = "warmpath"
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+    OPENAI_EMBEDDING_DIMS: int = 1536
+
     POSTHOG_API_KEY: str = ""
     POSTHOG_PROJECT_ID: str = ""
     POSTHOG_HOST: str = "https://app.posthog.com"
