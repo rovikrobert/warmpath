@@ -11,14 +11,16 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-_client: AsyncOpenAI | None = None
-
 
 def _get_openai_client() -> AsyncOpenAI:
-    global _client
-    if _client is None:
-        _client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    return _client
+    """Create a fresh AsyncOpenAI client per call.
+
+    Not cached because the underlying httpx.AsyncClient is bound to the
+    event loop at creation time. Celery tasks use asyncio.run() which
+    creates a new loop per invocation — a cached client from a previous
+    loop would raise 'Event loop is closed'.
+    """
+    return AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
 
 def build_contact_text(

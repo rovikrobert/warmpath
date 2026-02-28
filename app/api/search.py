@@ -778,7 +778,7 @@ async def _fetch_and_filter_openings(
         )
 
     matched_jobs = await fetcher.match_jobs_to_role(
-        raw_jobs, target_role, target_seniority
+        raw_jobs, target_role, target_seniority, company_name=company_name
     )
     filtered_jobs = fetcher.filter_and_rank_jobs(
         matched_jobs,

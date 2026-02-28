@@ -275,7 +275,7 @@ class TestSmartSearch:
                 )
             )
             mock_fetcher.match_jobs_to_role = AsyncMock(
-                side_effect=lambda jobs, role, sen=None: jobs
+                side_effect=lambda jobs, role, sen=None, company_name="": jobs
             )
             mock_fetcher.filter_and_rank_jobs = MagicMock(
                 side_effect=_passthrough_filter
@@ -321,7 +321,7 @@ class TestSmartSearch:
                 )
             )
             mock_fetcher.match_jobs_to_role = AsyncMock(
-                side_effect=lambda jobs, role, sen=None: jobs
+                side_effect=lambda jobs, role, sen=None, company_name="": jobs
             )
             mock_fetcher.filter_and_rank_jobs = MagicMock(
                 side_effect=_passthrough_filter
@@ -473,7 +473,7 @@ class TestSmartSearch:
                 return_value=MOCK_STRIPE_JOBS
             )
             mock_fetcher.match_jobs_to_role = AsyncMock(
-                side_effect=lambda jobs, role, sen=None: jobs
+                side_effect=lambda jobs, role, sen=None, company_name="": jobs
             )
             mock_fetcher.filter_and_rank_jobs = MagicMock(
                 side_effect=_passthrough_filter
