@@ -153,6 +153,23 @@ async def _submit_batch_mode(
     job_name = await submit_cleanup_batch(client, batches, csv_upload_id)
 
     if job_name:
+        # Store raw batches in Redis for post-processing after batch completes
+        from app.utils.redis_streams import _get_redis_client
+
+        redis = _get_redis_client()
+        if redis:
+            try:
+                key = f"csv:batch_originals:{csv_upload_id}"
+                await redis.set(key, json.dumps(batches, default=str), ex=7200)
+            except Exception:
+                logger.warning(
+                    "Failed to store batch originals in Redis for upload %s",
+                    csv_upload_id,
+                    exc_info=True,
+                )
+            finally:
+                await redis.aclose()
+
         await _update_upload(
             factory,
             upload_uuid,
@@ -725,20 +742,55 @@ async def _poll_batch_async(csv_upload_id: str, user_id: str, poll_count: int) -
     )
 
     if state == "JOB_STATE_SUCCEEDED" and results is not None:
+        # Load original batches from Redis for post-processing
+        from app.services.ai_csv_cleaner import post_process_ai_output
+        from app.utils.redis_streams import _get_redis_client
+
+        original_batches = None
+        redis = _get_redis_client()
+        if redis:
+            try:
+                raw = await redis.get(f"csv:batch_originals:{csv_upload_id}")
+                original_batches = json.loads(raw) if raw else None
+            except Exception:
+                logger.warning(
+                    "Failed to load batch originals from Redis for upload %s",
+                    csv_upload_id,
+                    exc_info=True,
+                )
+            finally:
+                await redis.aclose()
+
         # Write results to cleaned stream and trigger import
         stream_out = cleaned_stream_key(csv_upload_id)
         await ensure_consumer_group(stream_out, "importers")
 
         for i, chunk_results in enumerate(results):
             cleaned = []
-            for _j, ai_fields in enumerate(chunk_results):
-                # Post-process with deterministic normalization
-                # Note: original contacts needed for merge — stored in Redis
-                cleaned.append(ai_fields)
+            if original_batches and i < len(original_batches):
+                for j, ai_fields in enumerate(chunk_results):
+                    if j < len(original_batches[i]):
+                        cleaned.append(
+                            post_process_ai_output(original_batches[i][j], ai_fields)
+                        )
+                    else:
+                        cleaned.append(ai_fields)
+            else:
+                cleaned = chunk_results  # No originals — use AI output as-is
 
             await write_batch_to_stream(stream_out, cleaned, i)
 
         await write_sentinel(stream_out, len(results))
+
+        # Clean up Redis originals
+        redis = _get_redis_client()
+        if redis:
+            try:
+                await redis.delete(f"csv:batch_originals:{csv_upload_id}")
+            except Exception:
+                pass  # Will expire via TTL anyway
+            finally:
+                await redis.aclose()
 
         await _update_upload(
             factory,
