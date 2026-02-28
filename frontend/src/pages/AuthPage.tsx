@@ -1,5 +1,6 @@
-import { SignIn, SignUp } from '@clerk/clerk-react';
+import { SignIn, SignUp, useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import SourceTag from '../components/ui/SourceTag';
 import { SOURCES } from '../utils/sources';
 import useDocumentTitle from '../hooks/useDocumentTitle';
@@ -14,6 +15,16 @@ function hashIndicatesSignup() {
 export default function AuthPage() {
   useDocumentTitle('Sign In');
   const [isSignup, setIsSignup] = useState(hashIndicatesSignup);
+  const { isSignedIn } = useAuth();
+  const navigate = useNavigate();
+
+  // When email-link verification completes in another tab, Clerk syncs
+  // the session across tabs. Redirect once we detect sign-in.
+  useEffect(() => {
+    if (isSignedIn) {
+      navigate('/coach', { replace: true });
+    }
+  }, [isSignedIn, navigate]);
 
   useEffect(() => {
     const onHashChange = () => setIsSignup(hashIndicatesSignup());

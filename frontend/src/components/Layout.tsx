@@ -164,7 +164,7 @@ export default function Layout() {
   const visibleNav = NAV_ITEMS.filter((item) => item.show(user));
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen overflow-x-hidden bg-background">
       {/* Desktop Sidebar */}
       <aside className={`hidden lg:flex flex-col border-r border-border bg-card transition-all ${collapsed ? 'w-16' : 'w-56'}`}>
         {/* Logo */}
@@ -355,7 +355,7 @@ export default function Layout() {
       )}
 
       {/* Main content area */}
-      <div className="flex flex-1 flex-col overflow-hidden lg:overflow-visible">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Spacer for mobile top bar */}
         <div className="h-14 lg:hidden" />
 
