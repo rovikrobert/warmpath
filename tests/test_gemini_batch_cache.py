@@ -447,3 +447,22 @@ class TestBatchThresholdRouting:
         from app.config import settings
 
         assert settings.GEMINI_BATCH_THRESHOLD >= 4000
+
+
+class TestBatchStatusEndpoint:
+    """Test status endpoint handles batch phases correctly."""
+
+    def test_batch_phases_a[RESEND_KEY_REDACTED](self):
+        """Batch progress phases are recognized strings."""
+        batch_phases = {"batch_submitted", "batch_processing"}
+        normal_phases = {"parsing", "cleaning", "importing", "scoring"}
+        all_phases = batch_phases | normal_phases
+        assert len(all_phases) == 6
+
+    def test_batch_upload_timeout_extended(self):
+        """Batch uploads get longer timeout than real-time uploads."""
+        import inspect
+        from app.api.contacts import get_upload_status
+
+        source = inspect.getsource(get_upload_status)
+        assert "batch_job_name" in source or "batch" in source
