@@ -1,7 +1,10 @@
 """Tests for Gemini batch API and context caching features."""
 
 import pytest
+import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
+
+from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 class TestGeminiBatchCacheConfig:
@@ -254,3 +257,52 @@ class TestPipelineCacheIntegration:
         sig = inspect.signature(dispatch_batch)
         assert "cache_name" in sig.parameters
         assert sig.parameters["cache_name"].default is None
+
+
+@pytest_asyncio.fixture
+async def db():
+    """Yield a test DB session."""
+    async with TestSessionLocal() as session:
+        yield session
+
+
+class TestBatchJobNameColumn:
+    """Test batch_job_name column on CsvUpload model."""
+
+    @pytest.mark.asyncio
+    async def test_csv_upload_has_batch_job_name_column(self, db):
+        """CsvUpload model has batch_job_name column."""
+        from app.models.contact import CsvUpload
+
+        user, _ = await create_test_user_in_db(db)
+        upload = CsvUpload(
+            user_id=user.id,
+            filename="test.csv",
+            status="pending",
+            batch_job_name="batches/abc123",
+        )
+        db.add(upload)
+        await db.flush()
+        assert upload.batch_job_name == "batches/abc123"
+
+    @pytest.mark.asyncio
+    async def test_csv_upload_batch_job_name_nullable(self, db):
+        """batch_job_name is nullable (None for non-batch uploads)."""
+        from app.models.contact import CsvUpload
+
+        user, _ = await create_test_user_in_db(db)
+        upload = CsvUpload(
+            user_id=user.id,
+            filename="test.csv",
+            status="pending",
+        )
+        db.add(upload)
+        await db.flush()
+        assert upload.batch_job_name is None
+
+    def test_csv_upload_response_schema_has_batch_job_name(self):
+        """CsvUploadResponse schema includes batch_job_name field."""
+        from app.schemas.contact import CsvUploadResponse
+
+        fields = CsvUploadResponse.model_fields
+        assert "batch_job_name" in fields
