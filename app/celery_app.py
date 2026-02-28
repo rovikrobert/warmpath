@@ -101,6 +101,11 @@ celery_app.conf.update(
             "task": "app.tasks.vector_tasks.full_vector_reindex",
             "schedule": crontab(hour=3, minute=0),
         },
+        # --- Agent runtime: Railway log polling ---
+        "agent-runtime-railway-poll": {
+            "task": "app.tasks.agent_runtime_tasks.poll_[RAILWAY_TOKEN_REDACTED]",
+            "schedule": crontab(minute="*/15"),  # Every 15 minutes
+        },
     },
 )
 celery_app.conf.include = [
@@ -111,4 +116,5 @@ celery_app.conf.include = [
     "app.tasks.infra_tasks",
     "app.tasks.job_scan_tasks",
     "app.tasks.vector_tasks",
+    "app.tasks.agent_runtime_tasks",
 ]
