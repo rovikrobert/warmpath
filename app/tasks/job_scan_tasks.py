@@ -8,6 +8,7 @@ import asyncio
 import logging
 
 from app.celery_app import celery_app
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +133,13 @@ def warm_job_cache_global():
                 total,
                 len(to_fetch),
             )
+
+            # Trigger vector sync for jobs
+            if settings.VECTOR_SEARCH_ENABLED:
+                from app.tasks.vector_tasks import sync_all_jobs
+
+                sync_all_jobs.delay()
+
             return total
 
     return _run_async(_run())

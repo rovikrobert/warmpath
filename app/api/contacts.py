@@ -199,9 +199,15 @@ async def get_upload_status(
         if ref_time.tzinfo is None:
             ref_time = ref_time.replace(tzinfo=timezone.utc)
         age = (now - ref_time).total_seconds()
-        # 15 min for "processing" (matches Celery soft_time_limit),
-        # 10 min for "pending"/"queued" (worker never picked it up)
-        threshold = 900 if csv_upload.status == "processing" else 600
+        # Batch uploads (Gemini batch API) get much longer timeout (2 hours)
+        # Regular processing: 15 min (matches Celery soft_time_limit)
+        # Pending/queued (worker never picked it up): 10 min
+        if csv_upload.batch_job_name:
+            threshold = 7200  # 2 hours for batch processing
+        elif csv_upload.status == "processing":
+            threshold = 900
+        else:
+            threshold = 600
         if age > threshold:
             csv_upload.status = "failed"
             csv_upload.error_message = "Processing timed out — please re-upload"
@@ -599,7 +605,7 @@ async def export_contacts_csv(
             "Email",
             "Location",
             "Relationship",
-            "Warm Score",
+            "Connection Score",
             "Connected On",
             "Source",
         ]

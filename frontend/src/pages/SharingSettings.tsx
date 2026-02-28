@@ -1,0 +1,249 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { marketplace as mpApi, contacts as contactsApi } from '../api/client';
+import { SOURCES } from '../utils/sources';
+import SourceTag from '../components/ui/SourceTag';
+import Spinner from '../components/ui/Spinner';
+import useDocumentTitle from '../hooks/useDocumentTitle';
+
+const DEPARTMENT_OPTIONS = [
+  'Engineering', 'Product', 'Design', 'Marketing', 'Sales',
+  'Finance', 'Operations', 'HR / People', 'Legal', 'Data / Analytics',
+  'Customer Success', 'Executive', 'Other',
+];
+
+export default function SharingSettings() {
+  useDocumentTitle('Sharing Settings');
+  const [prefs, setPrefs] = useState<any>(null);
+  const [contacts, setContacts] = useState([]);
+  const [excludedIds, setExcludedIds] = useState([]);
+  const [categoryFilters, setCategoryFilters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [prefsRes, contactsRes] = await Promise.all([
+          mpApi.getSharingPrefs().catch(() => ({ data: { opt_in_marketplace: false, is_paused: false } })),
+          contactsApi.list(1, 500).catch(() => ({ data: [] })),
+        ]);
+        const p = prefsRes.data;
+        setPrefs(p);
+        setCategoryFilters(p.category_filters?.include_departments || []);
+        setExcludedIds(p.excluded_contact_ids || []);
+        setContacts(contactsRes.data || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    try {
+      const body = {
+        opt_in_marketplace: prefs.opt_in_marketplace,
+        is_paused: prefs.is_paused,
+        category_filters: categoryFilters.length > 0 ? { include_departments: categoryFilters } : null,
+        excluded_contact_ids: excludedIds.length > 0 ? excludedIds : null,
+      };
+      const res = await mpApi.updateSharingPrefs(body);
+      setPrefs(res.data);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleDepartment = (dept) => {
+    setCategoryFilters((prev) =>
+      prev.includes(dept) ? prev.filter((d) => d !== dept) : [...prev, dept]
+    );
+  };
+
+  const toggleExclude = (id) => {
+    setExcludedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const filteredContacts = contacts.filter((c) => {
+    if (!searchTerm) return false; // Only show when searching
+    const term = searchTerm.toLowerCase();
+    return (
+      c.full_name?.toLowerCase().includes(term) ||
+      c.current_company?.toLowerCase().includes(term) ||
+      c.current_title?.toLowerCase().includes(term)
+    );
+  });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20" aria-live="polite" aria-busy="true">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6" role="main">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold text-foreground">Sharing Settings</h1>
+        <Link to="/marketplace" className="text-sm text-primary hover:text-primary">
+          &larr; Back to Marketplace
+        </Link>
+      </div>
+
+      {/* Privacy explainer */}
+      <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
+        <h3 className="mb-1 text-sm font-semibold text-blue-400">How marketplace sharing works</h3>
+        <p className="text-sm text-blue-400">
+          Candidates see <strong>role level and department only</strong> &mdash; never names or contact details.
+          When someone requests an intro, you see their profile and choose whether to introduce them to your contact.
+          Names and details are never revealed without your explicit approval.
+        </p>
+      </div>
+
+      {/* Share toggle */}
+      <div className="rounded-xl bg-card p-5 border border-border">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Share my network on the marketplace</h2>
+            <p className="text-sm text-muted-foreground">
+              {prefs?.opt_in_marketplace
+                ? <>Your contacts are visible (anonymized) to candidates. When a hire happens, the referral bonus ({SOURCES.REFERRAL_BONUS_RANGE.claim}) goes to you. <SourceTag source={SOURCES.REFERRAL_BONUS_RANGE.source} label={SOURCES.REFERRAL_BONUS_RANGE.label} /></>
+                : <>Enable sharing to capture referral bonuses ({SOURCES.REFERRAL_BONUS_RANGE.claim} per hire) and earn credits. <SourceTag source={SOURCES.REFERRAL_BONUS_RANGE.source} label={SOURCES.REFERRAL_BONUS_RANGE.label} /></>}
+            </p>
+          </div>
+          <button
+            onClick={() => setPrefs({ ...prefs, opt_in_marketplace: !prefs.opt_in_marketplace })}
+            role="switch"
+            aria-checked={!!prefs?.opt_in_marketplace}
+            aria-label="Share my network on the marketplace"
+            className={`relative h-6 w-11 rounded-full transition ${
+              prefs?.opt_in_marketplace ? 'bg-primary' : 'bg-muted-foreground'
+            }`}
+          >
+            <span aria-hidden="true" className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+              prefs?.opt_in_marketplace ? 'left-5.5' : 'left-0.5'
+            }`} style={{ left: prefs?.opt_in_marketplace ? '22px' : '2px' }} />
+          </button>
+        </div>
+      </div>
+
+      {/* Pause toggle */}
+      <div className="rounded-xl bg-card p-5 border border-border">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Temporarily hide all my listings</h2>
+            <p className="text-sm text-muted-foreground">
+              Pause sharing without losing your listings. You can resume anytime.
+            </p>
+          </div>
+          <button
+            onClick={() => setPrefs({ ...prefs, is_paused: !prefs.is_paused })}
+            role="switch"
+            aria-checked={!!prefs?.is_paused}
+            aria-label="Temporarily hide all my listings"
+            className={`relative h-6 w-11 rounded-full transition ${
+              prefs?.is_paused ? 'bg-primary' : 'bg-muted-foreground'
+            }`}
+          >
+            <span aria-hidden="true" className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition"
+              style={{ left: prefs?.is_paused ? '22px' : '2px' }} />
+          </button>
+        </div>
+      </div>
+
+      {/* Category filters */}
+      <div className="rounded-xl bg-card p-5 border border-border">
+        <h2 className="mb-1 text-base font-semibold text-foreground">Department Filters</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Only share contacts in selected departments. Leave all unchecked to share all departments.
+        </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {DEPARTMENT_OPTIONS.map((dept) => (
+            <label key={dept} className="flex items-center gap-2 rounded-lg border border-border p-2 text-sm hover:bg-muted">
+              <input
+                type="checkbox"
+                checked={categoryFilters.includes(dept)}
+                onChange={() => toggleDepartment(dept)}
+                className="h-4 w-4 rounded border-border bg-muted text-primary focus:ring-ring"
+              />
+              <span className="text-secondary-foreground">{dept}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Excluded contacts */}
+      <div className="rounded-xl bg-card p-5 border border-border">
+        <h2 className="mb-1 text-base font-semibold text-foreground">Excluded Contacts</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Search and select specific contacts to exclude from the marketplace.
+        </p>
+
+        <label htmlFor="exclude-search" className="sr-only">Search contacts to exclude</label>
+        <input
+          id="exclude-search"
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search contacts by name, company, or title..."
+          aria-label="Search contacts to exclude from marketplace"
+          className="mb-3 w-full rounded-lg border border-border bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+
+        {/* Search results */}
+        {filteredContacts.length > 0 && (
+          <div className="mb-3 max-h-48 overflow-y-auto rounded-lg border border-border">
+            {filteredContacts.slice(0, 20).map((c) => (
+              <label key={c.id} className="flex items-center gap-2 border-b border-border px-3 py-2 text-sm last:border-0 hover:bg-muted">
+                <input
+                  type="checkbox"
+                  checked={excludedIds.includes(c.id)}
+                  onChange={() => toggleExclude(c.id)}
+                  className="h-4 w-4 rounded border-border bg-muted text-red-500 focus:ring-red-500"
+                />
+                <span className="text-foreground">{c.full_name}</span>
+                {c.current_title && <span className="text-muted-foreground">— {c.current_title}</span>}
+                {c.current_company && <span className="text-xs text-muted-foreground">at {c.current_company}</span>}
+              </label>
+            ))}
+          </div>
+        )}
+
+        {/* Excluded count */}
+        {excludedIds.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {excludedIds.length} contact{excludedIds.length !== 1 ? 's' : ''} excluded
+          </p>
+        )}
+      </div>
+
+      {/* Save button */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : 'Save Settings'}
+        </button>
+        {saved && (
+          <span className="text-sm text-emerald-400" role="status" aria-live="polite">Settings saved!</span>
+        )}
+      </div>
+    </div>
+  );
+}

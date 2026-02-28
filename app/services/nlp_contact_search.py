@@ -833,6 +833,101 @@ def parse_query(query: str) -> ParsedQuery:
 
 
 # ---------------------------------------------------------------------------
+# Vector search helpers
+# ---------------------------------------------------------------------------
+
+
+async def _vector_search_contacts(
+    user_id: uuid.UUID,
+    query_text: str,
+    limit: int = 50,
+) -> list[dict]:
+    """Search contacts using vector similarity. Returns scored results."""
+    from app.services.embedding_service import generate_embeddings
+    from app.services.vector_service import search_similar
+
+    vectors = await generate_embeddings([query_text])
+    if not vectors:
+        return []
+
+    results = await search_similar(
+        query_vector=vectors[0],
+        doc_type="contact",
+        limit=limit,
+        filters={"user_id": str(user_id)},
+    )
+
+    return [
+        {
+            "contact_id": r["payload"].get("contact_id"),
+            "vector_score": r["score"],
+            "warm_score": r["payload"].get("warm_score", 0.0),
+        }
+        for r in results
+    ]
+
+
+def _combine_vector_and_warm(results: list[dict]) -> list[dict]:
+    """Combine vector similarity with warm score. Returns sorted list."""
+    for r in results:
+        # vector_score is 0-1 cosine similarity, scale to 0-100
+        r["combined_score"] = r["vector_score"] * 50 + r["warm_score"] * 0.5
+    return sorted(results, key=lambda r: r["combined_score"], reverse=True)
+
+
+async def _try_vector_contact_search(
+    user_id: uuid.UUID,
+    query_text: str,
+    db: "AsyncSession",
+    limit: int = 20,
+) -> dict | None:
+    """Attempt vector contact search. Returns formatted results or None on failure."""
+    from app.config import settings as _settings
+
+    if not (_settings.VECTOR_SEARCH_ENABLED and query_text.strip()):
+        return None
+
+    from sqlalchemy import select as sa_select
+
+    from app.models.contact import Contact
+
+    try:
+        vector_results = await _vector_search_contacts(user_id, query_text, limit=limit)
+        if not vector_results:
+            return None
+
+        ranked = _combine_vector_and_warm(vector_results)
+        contact_ids = [uuid.UUID(r["contact_id"]) for r in ranked[:limit]]
+        result = await db.execute(sa_select(Contact).where(Contact.id.in_(contact_ids)))
+        contacts_map = {str(c.id): c for c in result.scalars().all()}
+        results = []
+        for r in ranked[:limit]:
+            c = contacts_map.get(r["contact_id"])
+            if c:
+                results.append(
+                    {
+                        "id": str(c.id),
+                        "full_name": c.full_name,
+                        "current_company": c.current_company,
+                        "current_title": c.current_title,
+                        "warm_score": r["warm_score"],
+                        "nlp_match_score": round(r["combined_score"], 1),
+                        "relationship_type": c.relationship_type,
+                        "location": c.location,
+                    }
+                )
+        return {
+            "results": results,
+            "interpretation": {"raw_query": query_text, "mode": "vector"},
+            "total_scanned": len(vector_results),
+            "total_matched": len(results),
+        }
+    except Exception:
+        logger.exception("Vector search failed, falling back to keyword search")
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Service function: search a user's contacts via NLP query
 # ---------------------------------------------------------------------------
 
@@ -856,6 +951,11 @@ async def search_user_contacts(
     from app.models.company import Company
     from app.models.contact import Contact
     from app.models.match_result import WarmScore
+
+    # Vector search path (when enabled) — returns early or falls back
+    vresult = await _try_vector_contact_search(user_id, query_text, db, limit)
+    if vresult is not None:
+        return vresult
 
     parsed = parse_query(query_text)
 

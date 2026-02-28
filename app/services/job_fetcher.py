@@ -33,6 +33,50 @@ def _clean_job_title(title: str) -> str:
     return title
 
 
+async def _vector_match_jobs(
+    jobs: list[dict],
+    target_role: str,
+    company_name: str,
+) -> list[dict]:
+    """Match jobs to target role using vector similarity.
+
+    Returns jobs with role_relevance score (0-100), filtered to >= 50.
+    """
+    if not jobs or not target_role:
+        return []
+
+    from app.services.embedding_service import generate_embeddings
+    from app.services.vector_service import search_similar
+
+    vectors = await generate_embeddings([target_role])
+    if not vectors:
+        return []
+
+    results = await search_similar(
+        query_vector=vectors[0],
+        doc_type="job",
+        limit=50,
+        filters={"company": company_name},
+    )
+
+    # Build lookup: normalized title → vector score
+    sco[RESEND_KEY_REDACTED] = {}
+    for r in results:
+        title = r["payload"].get("title", "").lower().strip()
+        sco[RESEND_KEY_REDACTED][title] = r["score"]
+
+    matched = []
+    for job in jobs:
+        title = job.get("title", "").lower().strip()
+        vector_score = sco[RESEND_KEY_REDACTED].get(title, 0.0)
+        # Map cosine similarity (0-1) to relevance (0-100)
+        relevance = int(vector_score * 100)
+        if relevance >= 50:
+            matched.append({**job, "role_relevance": relevance})
+
+    return sorted(matched, key=lambda j: j["role_relevance"], reverse=True)
+
+
 class JobFetcher:
     """Fetches and normalizes job listings from ATS platforms."""
 
@@ -277,11 +321,22 @@ class JobFetcher:
     ) -> list[dict]:
         """Score job titles for relevance to a target role.
 
-        Uses Claude API when AI_MOCK_MODE=false, keyword matching otherwise.
+        Uses vector search when VECTOR_SEARCH_ENABLED, Claude API when
+        AI_MOCK_MODE=false, keyword matching otherwise.
         Returns jobs with relevance >= 50, sorted by score descending.
         """
         if not jobs or not target_role:
             return []
+
+        # Vector search path
+        if settings.VECTOR_SEARCH_ENABLED:
+            try:
+                company = jobs[0].get("company", "") if jobs else ""
+                result = await _vector_match_jobs(jobs, target_role, company)
+                if result:
+                    return result
+            except Exception:
+                logger.exception("Vector job match failed, falling back")
 
         if settings.AI_MOCK_MODE:
             return self._mock_match_jobs(jobs, target_role, target_seniority)

@@ -21,7 +21,7 @@ from tests.conftest import TestSessionLocal, create_test_user_in_db
 
 
 @pytest_asyncio.fixture
-async def db_session():
+async def db_session(truncate_tables):
     """Yield a test DB session."""
     async with TestSessionLocal() as session:
         yield session
