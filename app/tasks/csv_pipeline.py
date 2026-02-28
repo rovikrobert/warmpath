@@ -620,3 +620,104 @@ async def _import_async(csv_upload_id: str, user_id: str) -> None:
                 progress_phase=None,
             )
             raise
+
+
+# ---------------------------------------------------------------------------
+# Gemini Batch Polling
+# ---------------------------------------------------------------------------
+
+
+@celery_app.task(
+    name="app.tasks.csv_pipeline.poll_gemini_batch",
+    soft_time_limit=120,
+    time_limit=180,
+    max_retries=120,  # ~2 hours at 60s intervals
+)
+def poll_gemini_batch(csv_upload_id: str, user_id: str, poll_count: int = 0) -> None:
+    """Poll Gemini batch job status. Re-schedules itself until complete."""
+    asyncio.run(_poll_batch_async(csv_upload_id, user_id, poll_count))
+
+
+async def _poll_batch_async(csv_upload_id: str, user_id: str, poll_count: int) -> None:
+    await _dispose_engine()
+    factory = _get_session_factory()
+    upload_uuid = uuid.UUID(csv_upload_id)
+
+    from app.services.gemini_batch import TERMINAL_STATES, get_batch_results
+    from app.utils.gemini_client import get_gemini_client
+
+    # Load upload to get batch_job_name
+    async with factory() as session:
+        result = await session.execute(
+            select(CsvUpload).where(CsvUpload.id == upload_uuid)
+        )
+        upload = result.scalar_one()
+        job_name = upload.batch_job_name
+
+    if not job_name:
+        logger.error("No batch_job_name for upload %s", csv_upload_id)
+        return
+
+    client = get_gemini_client()
+    state, results = await get_batch_results(client, job_name)
+
+    logger.info(
+        "Batch poll #%d for upload %s: state=%s", poll_count, csv_upload_id, state
+    )
+
+    if state == "JOB_STATE_SUCCEEDED" and results is not None:
+        # Write results to cleaned stream and trigger import
+        stream_out = cleaned_stream_key(csv_upload_id)
+        await ensure_consumer_group(stream_out, "importers")
+
+        for i, chunk_results in enumerate(results):
+            cleaned = []
+            for _j, ai_fields in enumerate(chunk_results):
+                # Post-process with deterministic normalization
+                # Note: original contacts needed for merge — stored in Redis
+                cleaned.append(ai_fields)
+
+            await write_batch_to_stream(stream_out, cleaned, i)
+
+        await write_sentinel(stream_out, len(results))
+
+        await _update_upload(
+            factory,
+            upload_uuid,
+            progress_phase="importing",
+            chunks_cleaned=len(results),
+        )
+
+        # Trigger import stage
+        csv_import_task.delay(csv_upload_id, user_id)
+
+    elif state in TERMINAL_STATES:
+        # Failed/cancelled/expired — fall back to real-time pipeline
+        logger.warning(
+            "Batch job %s ended with state %s, falling back to real-time",
+            job_name,
+            state,
+        )
+        await _update_upload(
+            factory, upload_uuid, progress_phase="cleaning", batch_job_name=None
+        )
+        csv_clean_worker.delay(csv_upload_id, user_id)
+
+    elif poll_count >= settings.GEMINI_BATCH_MAX_POLLS:
+        # Timeout — fall back to real-time
+        logger.warning(
+            "Batch poll timeout for upload %s after %d polls",
+            csv_upload_id,
+            poll_count,
+        )
+        await _update_upload(
+            factory, upload_uuid, progress_phase="cleaning", batch_job_name=None
+        )
+        csv_clean_worker.delay(csv_upload_id, user_id)
+
+    else:
+        # Still running — re-schedule
+        poll_gemini_batch.apply_async(
+            args=[csv_upload_id, user_id, poll_count + 1],
+            countdown=settings.GEMINI_BATCH_POLL_INTERVAL,
+        )

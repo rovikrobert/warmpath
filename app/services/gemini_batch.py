@@ -79,3 +79,52 @@ async def submit_cleanup_batch(
             exc_info=True,
         )
         return None
+
+
+TERMINAL_STATES = {
+    "JOB_STATE_SUCCEEDED",
+    "JOB_STATE_FAILED",
+    "JOB_STATE_CANCELLED",
+    "JOB_STATE_EXPIRED",
+}
+
+
+async def get_batch_results(
+    client: object, job_name: str
+) -> tuple[str, list[list[dict]] | None]:
+    """Check batch job status and retrieve results if complete.
+
+    Returns:
+        Tuple of (state_name, results_or_none).
+        results is a list of cleaned contact lists (one per chunk), or None if not done.
+    """
+    job = client.batches.get(name=job_name)
+    state = job.state.name
+
+    if state != "JOB_STATE_SUCCEEDED":
+        return state, None
+
+    results = []
+    for resp in job.dest.inlined_responses:
+        if resp.error:
+            logger.warning("Batch chunk error: %s", resp.error)
+            results.append([])
+            continue
+        try:
+            parsed = json.loads(resp.response.text)
+            if isinstance(parsed, list):
+                results.append(parsed)
+            elif isinstance(parsed, dict):
+                for v in parsed.values():
+                    if isinstance(v, list):
+                        results.append(v)
+                        break
+                else:
+                    results.append([parsed])
+            else:
+                results.append([])
+        except (json.JSONDecodeError, AttributeError):
+            logger.warning("Failed to parse batch chunk response")
+            results.append([])
+
+    return state, results
