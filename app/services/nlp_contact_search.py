@@ -24,6 +24,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+try:
+    import weave
+
+    _weave_available = True
+except ImportError:
+    _weave_available = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -807,6 +814,10 @@ def parse_query_real(query: str) -> ParsedQuery:
     except Exception:
         logger.warning("Groq parse failed for query %r, falling back to mock", query)
         return parse_query_mock(query)
+
+
+if _weave_available:
+    parse_query_real = weave.op()(parse_query_real)
 
 
 # ---------------------------------------------------------------------------
