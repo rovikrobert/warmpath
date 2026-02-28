@@ -29,6 +29,7 @@ markdownify>=0.14.1  # GHSA-7mpr-5m44-h73r fix (transitive dep of python-jobspy)
 mcp>=1.26.0
 # Agent runtime (LangGraph + Claude Agent SDK)
 langgraph>=1.0.6
+langgraph-checkpoint>=4.0.0  # GHSA-wwqv-p2pp-99h5 + GHSA-mhr3-j7m5-c7c9 (RCE in serializer/cache)
 langgraph-checkpoint-redis>=0.1.0
 langchain-anthropic>=0.3.0
 langchain-core>=0.3.81
