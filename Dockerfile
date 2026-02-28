@@ -37,6 +37,9 @@ COPY finance_team/ ./finance_team/
 COPY gtm_team/ ./gtm_team/
 COPY ops_team/ ./ops_team/
 
+# Copy MCP server
+COPY mcp_server/ ./mcp_server/
+
 # Copy entrypoint and scan scripts
 COPY scripts/start.sh scripts/run_agent_scans.py ./scripts/
 
