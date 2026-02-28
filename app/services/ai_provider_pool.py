@@ -83,7 +83,7 @@ class CleaningProvider:
     model: str
     max_concurrent: int
     get_client: Callable[[], Any]
-    call: Callable  # async (client, system_prompt, payload) -> list[dict]
+    call: Callable  # async (client, system_prompt, payload, cache_name?) -> list[dict]
 
 
 def _is_provider_enabled(name: str, cfg: Any = None) -> bool:
