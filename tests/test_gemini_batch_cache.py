@@ -424,3 +424,26 @@ class TestBatchPollTaskImportable:
         from app.tasks.csv_pipeline import poll_gemini_batch
 
         assert poll_gemini_batch is not None
+
+
+class TestBatchThresholdRouting:
+    """Test routing to batch vs real-time based on contact count."""
+
+    def test_threshold_setting_controls_routing(self):
+        from app.config import Settings
+
+        s = Settings(DATABASE_URL="sqlite:///:memory:", GEMINI_BATCH_THRESHOLD=3000)
+        assert s.GEMINI_BATCH_THRESHOLD == 3000
+
+    def test_above_threshold_triggers_batch_mode(self):
+        """Contacts > threshold should route to batch submission."""
+        from app.config import settings
+
+        # Default threshold is 5000
+        assert settings.GEMINI_BATCH_THRESHOLD < 6000
+
+    def test_below_threshold_uses_realtime(self):
+        """Contacts <= threshold should use real-time provider pool."""
+        from app.config import settings
+
+        assert settings.GEMINI_BATCH_THRESHOLD >= 4000

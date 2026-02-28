@@ -131,6 +131,48 @@ def csv_parse_task(csv_upload_id: str, user_id: str, file_content_b64: str) -> N
     asyncio.run(_parse_async(csv_upload_id, user_id, file_content_b64))
 
 
+def _is_gemini_enabled() -> bool:
+    """Check if Gemini is available for batch processing."""
+    from app.services.ai_provider_pool import _is_provider_enabled
+
+    return _is_provider_enabled("gemini")
+
+
+async def _submit_batch_mode(
+    factory,
+    upload_uuid: uuid.UUID,
+    csv_upload_id: str,
+    user_id: str,
+    batches: list[list[dict]],
+) -> None:
+    """Submit batches to Gemini batch API and start polling."""
+    from app.services.gemini_batch import submit_cleanup_batch
+    from app.utils.gemini_client import get_gemini_client
+
+    client = get_gemini_client()
+    job_name = await submit_cleanup_batch(client, batches, csv_upload_id)
+
+    if job_name:
+        await _update_upload(
+            factory,
+            upload_uuid,
+            progress_phase="batch_submitted",
+            batch_job_name=job_name,
+        )
+        # Start polling for results
+        poll_gemini_batch.apply_async(
+            args=[csv_upload_id, user_id, 0],
+            countdown=settings.GEMINI_BATCH_POLL_INTERVAL,
+        )
+    else:
+        # Batch submission failed — fall back to real-time
+        logger.warning(
+            "Batch submission failed for upload %s, falling back to real-time",
+            csv_upload_id,
+        )
+        csv_clean_worker.delay(csv_upload_id, user_id)
+
+
 async def _parse_async(csv_upload_id: str, user_id: str, file_content_b64: str) -> None:
     await _dispose_engine()
     factory = _get_session_factory()
@@ -186,8 +228,22 @@ async def _parse_async(csv_upload_id: str, user_id: str, file_content_b64: str) 
             stream,
         )
 
-        # Dispatch clean worker for this upload
-        csv_clean_worker.delay(csv_upload_id, user_id)
+        # Route: batch mode for large uploads, real-time for smaller ones
+        total_contacts = len(parsed)
+        if total_contacts > settings.GEMINI_BATCH_THRESHOLD and _is_gemini_enabled():
+            # Large upload — submit to Gemini batch API
+            logger.info(
+                "Upload %s has %d contacts (> %d threshold), using batch mode",
+                csv_upload_id,
+                total_contacts,
+                settings.GEMINI_BATCH_THRESHOLD,
+            )
+            await _submit_batch_mode(
+                factory, upload_uuid, csv_upload_id, user_id, batches
+            )
+        else:
+            # Normal upload — real-time provider pool
+            csv_clean_worker.delay(csv_upload_id, user_id)
 
     except Exception as exc:
         logger.exception("Parse failed for upload %s", csv_upload_id)
