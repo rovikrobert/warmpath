@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     AGENT_RUNTIME_BUDGET_DAILY_USD: float = 10.0
     AGENT_RUNTIME_EVENT_COOLDOWN_SECONDS: int = 900  # 15 min dedup
     AGENT_RUNTIME_MAX_TURNS_DEFAULT: int = 20
+    GITHUB_AGENT_WEBHOOK_SECRET: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
