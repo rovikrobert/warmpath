@@ -6,6 +6,7 @@ Used when contact count exceeds GEMINI_BATCH_THRESHOLD (default 5,000).
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 
@@ -97,34 +98,52 @@ async def get_batch_results(
     Returns:
         Tuple of (state_name, results_or_none).
         results is a list of cleaned contact lists (one per chunk), or None if not done.
+        Returns ("POLL_ERROR", None) on transient API errors so callers can retry.
     """
-    job = client.batches.get(name=job_name)
+    try:
+        job = client.batches.get(name=job_name)
+    except Exception:
+        logger.warning(
+            "Failed to poll batch job %s, will retry", job_name, exc_info=True
+        )
+        return "POLL_ERROR", None
     state = job.state.name
 
     if state != "JOB_STATE_SUCCEEDED":
         return state, None
 
-    results = []
+    # Parse responses into (chunk_index, contacts) pairs
+    indexed_results: list[tuple[int, list[dict]]] = []
     for resp in job.dest.inlined_responses:
+        # Extract chunk index from key (e.g. "chunk-3" → 3)
+        chunk_idx = 0
+        if hasattr(resp, "key") and resp.key:
+            with contextlib.suppress(ValueError, IndexError):
+                chunk_idx = int(resp.key.split("-", 1)[1])
+
         if resp.error:
-            logger.warning("Batch chunk error: %s", resp.error)
-            results.append([])
+            logger.warning("Batch chunk %d error: %s", chunk_idx, resp.error)
+            indexed_results.append((chunk_idx, []))
             continue
         try:
             parsed = json.loads(resp.response.text)
             if isinstance(parsed, list):
-                results.append(parsed)
+                indexed_results.append((chunk_idx, parsed))
             elif isinstance(parsed, dict):
                 for v in parsed.values():
                     if isinstance(v, list):
-                        results.append(v)
+                        indexed_results.append((chunk_idx, v))
                         break
                 else:
-                    results.append([parsed])
+                    indexed_results.append((chunk_idx, [parsed]))
             else:
-                results.append([])
+                indexed_results.append((chunk_idx, []))
         except (json.JSONDecodeError, AttributeError):
-            logger.warning("Failed to parse batch chunk response")
-            results.append([])
+            logger.warning("Failed to parse batch chunk %d response", chunk_idx)
+            indexed_results.append((chunk_idx, []))
+
+    # Sort by chunk index to guarantee correct ordering
+    indexed_results.sort(key=lambda x: x[0])
+    results = [contacts for _, contacts in indexed_results]
 
     return state, results
