@@ -375,7 +375,7 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
                 </p>
               </div>
               <Button
-                onClick={() => { onComplete?.(); onClose(); }}
+                onClick={() => { onComplete?.(result); onClose(); }}
                 className="w-full"
               >
                 Start searching
@@ -400,7 +400,7 @@ export default function UploadModal({ onClose, onComplete, hasContacts }) {
                     </>}
               </p>
               <Button
-                onClick={() => { onComplete?.(); onClose(); }}
+                onClick={() => { onComplete?.(result); onClose(); }}
                 className="w-full"
               >
                 Start searching
