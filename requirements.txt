@@ -25,3 +25,4 @@ google-auth>=2.25.0
 openai>=1.0.0
 python-jobspy>=1.1.0
 markdownify>=0.14.1  # GHSA-7mpr-5m44-h73r fix (transitive dep of python-jobspy)
+mcp>=1.26.0
