@@ -1,0 +1,81 @@
+"""Gemini Batch API integration for large CSV cleanup.
+
+Submits all cleanup batches as a single async batch job at 50% token cost.
+Used when contact count exceeds GEMINI_BATCH_THRESHOLD (default 5,000).
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+
+from app.services.ai_csv_cleaner import (
+    _build_cleanup_payload,
+    build_cached_cleanup_content,
+)
+
+logger = logging.getLogger(__name__)
+
+GEMINI_BATCH_MODEL = "gemini-2.0-flash"
+
+
+async def submit_cleanup_batch(
+    client: object,
+    batches: list[list[dict]],
+    upload_id: str,
+) -> str | None:
+    """Submit all cleanup batches as a single Gemini batch job.
+
+    Args:
+        client: Gemini client instance.
+        batches: List of contact batches (each batch is a list of contact dicts).
+        upload_id: CSV upload ID for display name.
+
+    Returns:
+        Batch job name (e.g. "batches/abc123") or None on failure.
+    """
+    try:
+        cached_content = build_cached_cleanup_content()
+
+        inline_requests = []
+        for i, batch in enumerate(batches):
+            payload = _build_cleanup_payload(batch)
+            inline_requests.append(
+                {
+                    "key": f"chunk-{i}",
+                    "contents": [
+                        {
+                            "parts": [{"text": json.dumps(payload)}],
+                            "role": "user",
+                        }
+                    ],
+                    "config": {
+                        "system_instruction": {"parts": [{"text": cached_content}]},
+                        "response_mime_type": "application/json",
+                        "temperature": 0,
+                        "max_output_tokens": 8192,
+                    },
+                }
+            )
+
+        batch_job = client.batches.create(
+            model=GEMINI_BATCH_MODEL,
+            src=inline_requests,
+            config={"display_name": f"csv-clean-{upload_id}"},
+        )
+
+        logger.info(
+            "Submitted Gemini batch job %s for upload %s (%d chunks)",
+            batch_job.name,
+            upload_id,
+            len(batches),
+        )
+        return batch_job.name
+
+    except Exception:
+        logger.warning(
+            "Failed to submit Gemini batch for upload %s",
+            upload_id,
+            exc_info=True,
+        )
+        return None
