@@ -67,7 +67,7 @@ def _make_csv_upload(user_id: uuid.UUID) -> CsvUpload:
 
 
 @pytest_asyncio.fixture
-async def db() -> AsyncSession:
+async def db(truncate_tables) -> AsyncSession:
     async with TestSessionLocal() as session:
         yield session
 

@@ -109,7 +109,7 @@ async def _setup_facilitation(
 
 
 @pytest_asyncio.fixture
-async def db() -> AsyncSession:
+async def db(truncate_tables) -> AsyncSession:
     async with TestSessionLocal() as session:
         yield session
 

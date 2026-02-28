@@ -8,10 +8,13 @@ import base64
 import contextlib
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from sqlalchemy import select
 
 from app.models.contact import CsvUpload
 from tests.conftest import TestSessionLocal, create_test_user_in_db
+
+pytestmark = pytest.mark.usefixtures("truncate_tables")
 
 
 async def test_failed_upload_status_persists_after_rollback():

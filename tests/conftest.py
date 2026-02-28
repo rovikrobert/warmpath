@@ -118,12 +118,11 @@ async def create_tables():
         await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest_asyncio.fixture(autouse=True)
+@pytest_asyncio.fixture
 async def truncate_tables():
-    """Delete all rows between tests — much faster than DROP/CREATE."""
+    """Delete all rows between tests — only used by tests that touch the DB."""
     yield
     async with engine.begin() as conn:
-        # Disable FK checks for clean truncation, then re-enable
         await conn.execute(text("PRAGMA foreign_keys = OFF"))
         for table in reversed(Base.metadata.sorted_tables):
             await conn.execute(table.delete())
@@ -139,7 +138,7 @@ app.dependency_overrides[get_db] = override_get_db
 
 
 @pytest_asyncio.fixture
-async def client() -> AsyncGenerator[AsyncClient, None]:
+async def client(truncate_tables) -> AsyncGenerator[AsyncClient, None]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

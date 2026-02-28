@@ -50,7 +50,7 @@ async def admin_headers(client: AsyncClient) -> dict:
 
 
 @pytest_asyncio.fixture
-async def db_session():
+async def db_session(truncate_tables):
     """Yield a test DB session."""
     async with TestSessionLocal() as session:
         yield session
