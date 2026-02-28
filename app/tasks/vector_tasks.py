@@ -10,10 +10,11 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.celery_app import celery_app
 from app.config import settings
+from app.database import _get_session_factory
 from app.services.embedding_service import (
     build_contact_text,
     build_listing_text,
@@ -29,16 +30,6 @@ from app.services.vector_service import (
 logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 100  # Embed/upsert in batches of 100
-
-
-def _get_engine():
-    return create_async_engine(settings.DATABASE_URL, pool_p[RESEND_KEY_REDACTED]=True)
-
-
-def _get_session_factory():
-    return async_sessionmaker(
-        _get_engine(), class_=AsyncSession, expi[RESEND_KEY_REDACTED]=False
-    )
 
 
 async def _load_contacts(user_id: uuid.UUID, db: AsyncSession):
@@ -71,6 +62,8 @@ async def _sync_contacts_for_user(
     user_id: uuid.UUID, db: AsyncSession | None = None
 ) -> int:
     """Embed and upsert all contacts for a user. Returns count."""
+    await ensu[RESEND_KEY_REDACTED]()
+
     close_db = False
     if db is None:
         factory = _get_session_factory()
@@ -141,6 +134,8 @@ async def _load_listings(db: AsyncSession):
 
 async def _sync_listings(db: AsyncSession | None = None) -> int:
     """Embed and upsert all marketplace listings. Returns count."""
+    await ensu[RESEND_KEY_REDACTED]()
+
     close_db = False
     if db is None:
         factory = _get_session_factory()
@@ -192,6 +187,8 @@ async def _sync_listings(db: AsyncSession | None = None) -> int:
 async def _sync_jobs(db: AsyncSession | None = None) -> int:
     """Embed and upsert cached jobs. Returns count."""
     from app.models.enrichment import EnrichmentCache
+
+    await ensu[RESEND_KEY_REDACTED]()
 
     close_db = False
     if db is None:

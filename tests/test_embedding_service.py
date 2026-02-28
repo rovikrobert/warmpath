@@ -82,6 +82,21 @@ class TestBuildEmbeddingText:
         assert "Singapore" in text
 
 
+class TestOpenAIClientCreation:
+    """Verify AsyncOpenAI client is fresh per call (not singleton)."""
+
+    def test_get_openai_client_returns_new_instance_each_call(self):
+        from app.services.embedding_service import _get_openai_client
+
+        with patch("app.services.embedding_service.AsyncOpenAI") as mock_cls:
+            mock_cls.return_value = MagicMock()
+            _get_openai_client()
+            _get_openai_client()
+
+        # Should create a new client each time (not cached singleton)
+        assert mock_cls.call_count == 2
+
+
 class TestGenerateEmbeddings:
     """Tests for OpenAI embedding API calls (mocked)."""
 

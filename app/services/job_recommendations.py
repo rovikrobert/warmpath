@@ -220,7 +220,9 @@ async def _match_and_build(
     """Match jobs for one company and build a recommendation entry."""
     if not jobs:
         return None
-    matched = await fetcher.match_jobs_to_role(jobs, target_role, target_seniority)
+    matched = await fetcher.match_jobs_to_role(
+        jobs, target_role, target_seniority, company_name=key
+    )
     if not matched:
         return None
 
