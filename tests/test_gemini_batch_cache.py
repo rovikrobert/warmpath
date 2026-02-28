@@ -306,3 +306,57 @@ class TestBatchJobNameColumn:
 
         fields = CsvUploadResponse.model_fields
         assert "batch_job_name" in fields
+
+
+class TestGeminiBatchSubmission:
+    """Test batch job creation for large CSV uploads."""
+
+    @pytest.mark.asyncio
+    async def test_submit_batch_returns_job_name(self):
+        from app.services.gemini_batch import submit_cleanup_batch
+
+        mock_client = MagicMock()
+        mock_job = MagicMock()
+        mock_job.name = "batches/job-123"
+        mock_client.batches.create = MagicMock(return_value=mock_job)
+
+        batches = [
+            [{"current_company": "google", "current_title": "eng"}],
+            [{"current_company": "meta", "current_title": "pm"}],
+        ]
+
+        result = await submit_cleanup_batch(mock_client, batches, "upload-abc")
+        assert result == "batches/job-123"
+        mock_client.batches.create.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_submit_batch_builds_correct_inline_requests(self):
+        from app.services.gemini_batch import submit_cleanup_batch
+
+        mock_client = MagicMock()
+        mock_job = MagicMock()
+        mock_job.name = "batches/job-456"
+        mock_client.batches.create = MagicMock(return_value=mock_job)
+
+        batches = [
+            [{"current_company": "stripe", "current_title": "swe"}],
+        ]
+
+        await submit_cleanup_batch(mock_client, batches, "upload-xyz")
+
+        call_kwargs = mock_client.batches.create.call_args
+        src = call_kwargs.kwargs.get("src") or call_kwargs[1].get("src")
+        assert len(src) == 1
+        assert src[0]["key"] == "chunk-0"
+
+    @pytest.mark.asyncio
+    async def test_submit_batch_returns_none_on_failure(self):
+        from app.services.gemini_batch import submit_cleanup_batch
+
+        mock_client = MagicMock()
+        mock_client.batches.create = MagicMock(side_effect=Exception("Quota exceeded"))
+
+        batches = [[{"current_company": "x", "current_title": "y"}]]
+
+        result = await submit_cleanup_batch(mock_client, batches, "upload-err")
+        assert result is None
