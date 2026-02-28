@@ -707,7 +707,10 @@ async def _poll_batch_async(csv_upload_id: str, user_id: str, poll_count: int) -
         result = await session.execute(
             select(CsvUpload).where(CsvUpload.id == upload_uuid)
         )
-        upload = result.scalar_one()
+        upload = result.scalar_one_or_none()
+        if not upload:
+            logger.warning("Upload %s not found during batch poll", csv_upload_id)
+            return
         job_name = upload.batch_job_name
 
     if not job_name:
