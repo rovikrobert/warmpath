@@ -5,7 +5,7 @@ import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const SECTION_IDS = {
   'Match Strength': 'match-strength',
-  'Warm Score': 'warm-score',
+  'Connection Score': 'connection-score',
   'Job Fit': 'job-fit',
   'Referral Likelihood': 'referral-likelihood',
 };
@@ -46,8 +46,8 @@ export default function ScoreGlossary() {
           <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
             <ul className="space-y-1.5">
               <li><strong className="text-secondary-foreground">Match Strength</strong> — your main score in search results. It balances role relevance with connection warmth. Trust it to rank your options.</li>
-              <li><strong className="text-secondary-foreground">Warm Score</strong> — matters when choosing who to ask from your own network. Higher means they're more likely to respond.</li>
-              <li><strong className="text-secondary-foreground">Connection Strength</strong> — the marketplace version of Warm Score. Tells you how strong the network holder's relationship is with a contact before you spend credits.</li>
+              <li><strong className="text-secondary-foreground">Connection Score</strong> — matters when choosing who to ask from your own network. Higher means they're more likely to respond.</li>
+              <li><strong className="text-secondary-foreground">Connection Strength</strong> — the marketplace version of Connection Score. Tells you how strong the relationship is with a contact before you spend credits.</li>
             </ul>
           </div>
         )}
@@ -65,8 +65,8 @@ export default function ScoreGlossary() {
         {guidanceOpen === 'holder' && (
           <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
             <ul className="space-y-1.5">
-              <li><strong className="text-secondary-foreground">Warm Score</strong> — reflects your relationship strength with each contact. It determines the Connection Strength label job seekers see in the marketplace.</li>
-              <li><strong className="text-secondary-foreground">Connection Strength</strong> — the anonymized version of your Warm Score that appears in marketplace listings. Higher scores attract more intro requests.</li>
+              <li><strong className="text-secondary-foreground">Connection Score</strong> — reflects your relationship strength with each contact. It determines the Connection Strength label job seekers see in the marketplace.</li>
+              <li><strong className="text-secondary-foreground">Connection Strength</strong> — the anonymized version of your Connection Score that appears in marketplace listings. Higher scores attract more intro requests.</li>
             </ul>
           </div>
         )}
@@ -119,10 +119,10 @@ export default function ScoreGlossary() {
           </p>
           <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
             <li><strong className="text-secondary-foreground">Role Relevance (50%)</strong> — How well the contact's role and company match what you're looking for.</li>
-            <li><strong className="text-secondary-foreground">Warm Score (50%)</strong> — How strong your connection is to this person.</li>
+            <li><strong className="text-secondary-foreground">Connection Score (50%)</strong> — How strong your connection is to this person.</li>
           </ul>
           <p className="mt-3 text-xs text-muted-foreground">
-            Formula: Match Strength = (Relevance &times; 0.5) + (Warm Score &times; 0.5)
+            Formula: Match Strength = (Relevance &times; 0.5) + (Connection Score &times; 0.5)
           </p>
         </div>
 

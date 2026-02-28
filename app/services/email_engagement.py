@@ -136,7 +136,7 @@ async def send_csv_completion_email(
     <p style="margin: 0; opacity: 0.9;">{contacts_str} contacts imported{company_line}.</p>
   </div>
   <div style="padding: 24px;">
-    <p style="margin: 0 0 16px;">Your LinkedIn connections have been cleaned, scored, and imported. Every contact now has a <strong>Warm Score</strong> showing how strong your connection is.</p>
+    <p style="margin: 0 0 16px;">Your LinkedIn connections have been cleaned, scored, and imported. Every contact now has a <strong>Connection Score</strong> showing how strong your connection is.</p>
     <div style="margin: 0 0 16px; padding: 12px 16px; background: #ecfdf5; border-radius: 8px;">
       <strong>What's next:</strong> Run a Smart Search to find who can refer you to your target companies.
     </div>

@@ -570,8 +570,8 @@ export default function MarketplaceOverview() {
                           <MarketplaceBadge value={l.warm_sco[RESEND_KEY_REDACTED]} type="strength" />
                           <ScoreExplainer
                             title="Connection Strength"
-                            body="How job seekers see your connection strength with this contact. Based on the contact's Warm Score."
-                            learnMoreHref="/help/scores#warm-score"
+                            body="How job seekers see your connection strength with this contact. Based on the contact's Connection Score."
+                            learnMoreHref="/help/scores#connection-score"
                           />
                         </div>
                       </>

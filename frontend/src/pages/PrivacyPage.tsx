@@ -434,7 +434,7 @@ export default function PrivacyPage() {
         </SectionHeading>
         <div className="space-y-3">
           <div>
-            <h4 className="mb-1 font-semibold text-foreground">Warm Score Computation</h4>
+            <h4 className="mb-1 font-semibold text-foreground">Connection Score Computation</h4>
             <Paragraph>
               Our algorithm computes referral likelihood scores based on connection recency,
               relationship strength, role relevance, and company tenure. Scores are indicative
