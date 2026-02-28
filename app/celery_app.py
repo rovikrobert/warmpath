@@ -96,6 +96,11 @@ celery_app.conf.update(
             "task": "app.tasks.job_scan_tasks.warm_job_cache_global",
             "schedule": crontab(hour="1,5,9,13,17,21", minute=0),  # Every 4 hours
         },
+        # --- Agent runtime: Railway log polling ---
+        "agent-runtime-railway-poll": {
+            "task": "app.tasks.agent_runtime_tasks.poll_railway_logs",
+            "schedule": crontab(minute="*/15"),  # Every 15 minutes
+        },
     },
 )
 celery_app.conf.include = [
@@ -105,4 +110,5 @@ celery_app.conf.include = [
     "app.tasks.feed_tasks",
     "app.tasks.infra_tasks",
     "app.tasks.job_scan_tasks",
+    "app.tasks.agent_runtime_tasks",
 ]

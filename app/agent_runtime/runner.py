@@ -12,7 +12,9 @@ import json
 import logging
 from typing import Any
 
+from app.agent_runtime.cost_guard import BudgetStatus, check_budget
 from app.agent_runtime.graph import build_graph
+from app.agent_runtime.redis_store import AgentRuntimeRedis
 from app.agent_runtime.state import WarmPathState
 
 logger = logging.getLogger(__name__)
@@ -35,11 +37,31 @@ def _get_compiled_graph():
     return _compiled_graph
 
 
+async def _get_budget_status() -> BudgetStatus:
+    """Check daily budget against configured limit."""
+    from app.config import settings
+
+    try:
+        store = AgentRuntimeRedis(redis_url=settings.REDIS_URL)
+        daily_spend = await store.get_daily_spend()
+        return check_budget(daily_spend, settings.AGENT_RUNTIME_BUDGET_DAILY_USD)
+    except Exception:
+        logger.debug("Budget check failed, assuming OK", exc_info=True)
+        return BudgetStatus.OK
+
+
 async def process_event(event: dict[str, Any]) -> dict[str, Any]:
     """Run a single event through the CoS supervisor graph.
 
     Returns the final graph state with findings, actions, and handoff results.
+    Skips processing if the daily budget is exceeded.
     """
+    budget_status = await _get_budget_status()
+
+    if budget_status == BudgetStatus.EXCEEDED:
+        logger.warning("Daily budget exceeded, skipping event %s", event.get("type"))
+        return {"findings": [], "actions": [], "budget_exceeded": True}
+
     graph = _get_compiled_graph()
 
     initial_state: WarmPathState = {
@@ -55,7 +77,10 @@ async def process_event(event: dict[str, Any]) -> dict[str, Any]:
 
     # 6 nodes per loop iteration × 5 max loops; guards against infinite handoff cycles
     config = {
-        "configurable": {"thread_id": event.get("dedup_key", "default")},
+        "configurable": {
+            "thread_id": event.get("dedup_key", "default"),
+            "budget_status": budget_status.value,
+        },
         "recursion_limit": 30,
     }
     result = await graph.ainvoke(initial_state, config=config)
@@ -70,9 +95,11 @@ async def run_consumer_loop() -> None:
     """
     import redis.asyncio as aioredis
 
-    from app.config import Settings
+    from app.config import settings
 
-    settings = Settings()
+    if not settings.AGENT_RUNTIME_ENABLED:
+        logger.info("Agent runtime disabled, exiting")
+        return
     r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     stream_key = "warmpath:agent_events"
 
