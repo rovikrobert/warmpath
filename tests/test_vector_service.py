@@ -1,8 +1,9 @@
 """Tests for vector_service — Qdrant client wrapper."""
 
 import uuid
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 
 
 class TestPointId:
@@ -148,3 +149,88 @@ class TestDeletePoints:
             await delete_points(point_ids=["point-1", "point-2"])
 
         mock_client.delete.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_delete_empty_is_noop(self):
+        from app.services.vector_service import delete_points
+
+        mock_client = MagicMock()
+        with patch(
+            "app.services.vector_service._get_qdrant_client",
+            return_value=mock_client,
+        ):
+            await delete_points(point_ids=[])
+
+        mock_client.delete.assert_not_called()
+
+
+class TestEnsureCollectionIndexes:
+    """Verify all payload indexes are created."""
+
+    @pytest.mark.asyncio
+    async def test_creates_four_payload_indexes(self):
+        from app.services.vector_service import ensure_collection
+
+        mock_client = MagicMock()
+        mock_client.collection_exists = MagicMock(return_value=False)
+        mock_client.create_collection = MagicMock()
+        mock_client.create_payload_index = MagicMock()
+
+        with patch(
+            "app.services.vector_service._get_qdrant_client",
+            return_value=mock_client,
+        ):
+            await ensure_collection()
+
+        # doc_type, user_id, company_id, company
+        assert mock_client.create_payload_index.call_count == 4
+        indexed_fields = {
+            call.kwargs["field_name"]
+            for call in mock_client.create_payload_index.call_args_list
+        }
+        assert indexed_fields == {"doc_type", "user_id", "company_id", "company"}
+
+
+class TestSearchEmpty:
+    """Search returns empty list when collection has no matches."""
+
+    @pytest.mark.asyncio
+    async def test_search_no_results(self):
+        from app.services.vector_service import search_similar
+
+        mock_client = MagicMock()
+        mock_client.query_points = MagicMock(return_value=MagicMock(points=[]))
+
+        with patch(
+            "app.services.vector_service._get_qdrant_client",
+            return_value=mock_client,
+        ):
+            results = await search_similar(
+                query_vector=[0.1] * 1536,
+                doc_type="contact",
+            )
+
+        assert results == []
+
+
+class TestQdrantConnectionError:
+    """Qdrant unreachable raises exception (callers handle gracefully)."""
+
+    @pytest.mark.asyncio
+    async def test_search_raises_on_connection_error(self):
+        from app.services.vector_service import search_similar
+
+        mock_client = MagicMock()
+        mock_client.query_points = MagicMock(side_effect=ConnectionError("unreachable"))
+
+        with (
+            patch(
+                "app.services.vector_service._get_qdrant_client",
+                return_value=mock_client,
+            ),
+            pytest.raises(ConnectionError),
+        ):
+            await search_similar(
+                query_vector=[0.1] * 1536,
+                doc_type="contact",
+            )

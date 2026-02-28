@@ -30,6 +30,33 @@ class TestBuildEmbeddingText:
         assert isinstance(text, str)
         assert len(text) > 0  # should not be empty even with all None
 
+    def test_contact_text_all_none_returns_unknown(self):
+        from app.services.embedding_service import build_contact_text
+
+        text = build_contact_text(
+            title=None,
+            company=None,
+            location=None,
+            relationship_type=None,
+            tags=None,
+        )
+        assert text == "unknown contact"
+
+    def test_contact_text_has_no_pii(self):
+        """Verify embedding text never contains names or emails."""
+        from app.services.embedding_service import build_contact_text
+
+        text = build_contact_text(
+            title="CTO",
+            company="Acme Inc",
+            location="NYC",
+            relationship_type="manager",
+            tags=["leadership"],
+        )
+        # Function signature doesn't accept name/email — privacy by design
+        assert "name" not in text.lower() or "company name" in text.lower()
+        assert "@" not in text
+
     def test_listing_text(self):
         from app.services.embedding_service import build_listing_text
 
