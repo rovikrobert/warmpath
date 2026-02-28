@@ -13,6 +13,9 @@ class MarketplaceSearchBody(BaseModel):
     company_names: list[str]
     role_levels: list[str] | None = None
     departments: list[str] | None = None
+    query: str | None = (
+        None  # Free-text semantic search (requires VECTOR_SEARCH_ENABLED)
+    )
     friend_filter: str | None = Field(
         default=None,
         pattern="^(all|friends_only|friends_and_fof)$",
