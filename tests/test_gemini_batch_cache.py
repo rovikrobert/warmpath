@@ -61,11 +61,11 @@ class TestCachedCleanupContent:
         from app.services.ai_csv_cleaner import build_cached_cleanup_content
 
         content = build_cached_cleanup_content()
-        # Content must be substantial enough for Gemini caching.
-        # The canonical company dict + title abbrevs + system prompt
-        # combined should comfortably exceed 4,000 chars. As the dicts
-        # grow, this will surpass Gemini's 2,048-token caching minimum.
-        assert len(content) > 4000
+        # Gemini requires at least 2,048 tokens for caching.
+        # Rough estimate: 1 token ~ 4 chars → 2,048 tokens ~ 8,192 chars.
+        # The system prompt + company registry + title abbrevs should
+        # comfortably exceed this floor.
+        assert len(content) > 8000
 
 
 class TestGeminiCacheLifecycle:
