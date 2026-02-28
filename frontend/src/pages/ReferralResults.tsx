@@ -214,10 +214,10 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
                       </p>
                       <MatchBadge score={path.contact.warm_score} type="warm" />
                       <ScoreExplainer
-                        title="Warm Score"
+                        title="Connection Score"
                         body="Your connection strength with this person. Higher means they're more likely to help."
                         tiers={WARM_TIERS}
-                        learnMoreHref="/help/scores#warm-score"
+                        learnMoreHref="/help/scores#connection-score"
                       />
                     </div>
                     <p className="truncate text-xs text-muted-foreground" title={`${path.contact.title} at ${path.contact.company}`}>

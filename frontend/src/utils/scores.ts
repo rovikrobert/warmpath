@@ -14,7 +14,7 @@ export const MATCH_TIERS = [
   { min: 0,  label: 'Fair',      color: 'bg-muted/50 text-muted-foreground', dot: 'bg-muted-foreground' },
 ];
 
-// -- Warm Score (contact relationship warmth) --------------------------------
+// -- Connection Score (contact relationship warmth) ---------------------------
 
 export const WARM_TIERS = [
   { min: 70, label: 'Strong',   color: 'bg-emerald-500/10 text-emerald-400', desc: 'Recent contact, strong relationship — ideal referral path' },
@@ -78,7 +78,7 @@ export const SCORE_GLOSSARY = [
     tiers: MATCH_TIERS,
   },
   {
-    name: 'Warm Score',
+    name: 'Connection Score',
     range: '0-100',
     description: 'How likely this person is to respond to your referral request. Based on recency (35%), relationship strength (30%), role relevance (20%), and tenure (15%).',
     tiers: WARM_TIERS,

@@ -605,7 +605,7 @@ async def export_contacts_csv(
             "Email",
             "Location",
             "Relationship",
-            "Warm Score",
+            "Connection Score",
             "Connected On",
             "Source",
         ]
