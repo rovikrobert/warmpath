@@ -360,3 +360,67 @@ class TestGeminiBatchSubmission:
 
         result = await submit_cleanup_batch(mock_client, batches, "upload-err")
         assert result is None
+
+
+class TestGeminiBatchPollResult:
+    """Test batch result processing."""
+
+    @pytest.mark.asyncio
+    async def test_get_batch_results_succeeded(self):
+        from app.services.gemini_batch import get_batch_results
+
+        mock_client = MagicMock()
+        mock_job = MagicMock()
+        mock_job.state.name = "JOB_STATE_SUCCEEDED"
+        mock_resp_0 = MagicMock()
+        mock_resp_0.response.text = (
+            '[{"current_company": "Google", "current_title": "Engineer"}]'
+        )
+        mock_resp_0.error = None
+        mock_resp_1 = MagicMock()
+        mock_resp_1.response.text = (
+            '[{"current_company": "Meta", "current_title": "PM"}]'
+        )
+        mock_resp_1.error = None
+        mock_job.dest.inlined_responses = [mock_resp_0, mock_resp_1]
+        mock_client.batches.get = MagicMock(return_value=mock_job)
+
+        state, results = await get_batch_results(mock_client, "batches/job-1")
+        assert state == "JOB_STATE_SUCCEEDED"
+        assert len(results) == 2
+        assert results[0][0]["current_company"] == "Google"
+
+    @pytest.mark.asyncio
+    async def test_get_batch_results_still_running(self):
+        from app.services.gemini_batch import get_batch_results
+
+        mock_client = MagicMock()
+        mock_job = MagicMock()
+        mock_job.state.name = "JOB_STATE_RUNNING"
+        mock_client.batches.get = MagicMock(return_value=mock_job)
+
+        state, results = await get_batch_results(mock_client, "batches/job-2")
+        assert state == "JOB_STATE_RUNNING"
+        assert results is None
+
+    @pytest.mark.asyncio
+    async def test_get_batch_results_failed(self):
+        from app.services.gemini_batch import get_batch_results
+
+        mock_client = MagicMock()
+        mock_job = MagicMock()
+        mock_job.state.name = "JOB_STATE_FAILED"
+        mock_client.batches.get = MagicMock(return_value=mock_job)
+
+        state, results = await get_batch_results(mock_client, "batches/job-3")
+        assert state == "JOB_STATE_FAILED"
+        assert results is None
+
+
+class TestBatchPollTaskImportable:
+    """Verify poll task is registered and importable."""
+
+    def test_poll_gemini_batch_importable(self):
+        from app.tasks.csv_pipeline import poll_gemini_batch
+
+        assert poll_gemini_batch is not None
