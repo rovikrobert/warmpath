@@ -417,6 +417,79 @@ class TestGeminiBatchPollResult:
         assert results is None
 
 
+class TestBatchResultOrdering:
+    """Test that batch results are reordered by chunk key."""
+
+    @pytest.mark.asyncio
+    async def test_results_sorted_by_chunk_key(self):
+        from app.services.gemini_batch import get_batch_results
+
+        mock_client = MagicMock()
+        mock_job = MagicMock()
+        mock_job.state.name = "JOB_STATE_SUCCEEDED"
+
+        # Simulate out-of-order responses
+        resp_2 = MagicMock()
+        resp_2.key = "chunk-2"
+        resp_2.error = None
+        resp_2.response.text = '[{"current_company": "Stripe"}]'
+
+        resp_0 = MagicMock()
+        resp_0.key = "chunk-0"
+        resp_0.error = None
+        resp_0.response.text = '[{"current_company": "Google"}]'
+
+        resp_1 = MagicMock()
+        resp_1.key = "chunk-1"
+        resp_1.error = None
+        resp_1.response.text = '[{"current_company": "Meta"}]'
+
+        mock_job.dest.inlined_responses = [resp_2, resp_0, resp_1]
+        mock_client.batches.get = MagicMock(return_value=mock_job)
+
+        state, results = await get_batch_results(mock_client, "batches/job-order")
+        assert state == "JOB_STATE_SUCCEEDED"
+        assert len(results) == 3
+        assert results[0][0]["current_company"] == "Google"
+        assert results[1][0]["current_company"] == "Meta"
+        assert results[2][0]["current_company"] == "Stripe"
+
+    @pytest.mark.asyncio
+    async def test_results_handle_missing_key_attribute(self):
+        """Responses without key attribute default to index 0."""
+        from app.services.gemini_batch import get_batch_results
+
+        mock_client = MagicMock()
+        mock_job = MagicMock()
+        mock_job.state.name = "JOB_STATE_SUCCEEDED"
+
+        resp = MagicMock(spec=["response", "error"])
+        resp.error = None
+        resp.response.text = '[{"current_company": "Test"}]'
+
+        mock_job.dest.inlined_responses = [resp]
+        mock_client.batches.get = MagicMock(return_value=mock_job)
+
+        state, results = await get_batch_results(mock_client, "batches/job-nokey")
+        assert state == "JOB_STATE_SUCCEEDED"
+        assert len(results) == 1
+
+
+class TestBatchPollErrorHandling:
+    """Test transient error handling in batch polling."""
+
+    @pytest.mark.asyncio
+    async def test_get_batch_results_returns_poll_error_on_api_failure(self):
+        from app.services.gemini_batch import get_batch_results
+
+        mock_client = MagicMock()
+        mock_client.batches.get = MagicMock(side_effect=Exception("Network timeout"))
+
+        state, results = await get_batch_results(mock_client, "batches/job-err")
+        assert state == "POLL_ERROR"
+        assert results is None
+
+
 class TestBatchPollTaskImportable:
     """Verify poll task is registered and importable."""
 
@@ -424,6 +497,21 @@ class TestBatchPollTaskImportable:
         from app.tasks.csv_pipeline import poll_gemini_batch
 
         assert poll_gemini_batch is not None
+
+    def test_poll_task_has_acks_late(self):
+        """Poll task uses acks_late for worker crash recovery."""
+        from app.tasks.csv_pipeline import poll_gemini_batch
+
+        assert poll_gemini_batch.acks_late is True
+
+    def test_poll_task_has_reject_on_worker_lost(self):
+        """Poll task rejects on worker lost for redelivery."""
+        import inspect
+
+        from app.tasks import csv_pipeline
+
+        src = inspect.getsource(csv_pipeline)
+        assert "reject_on_worker_lost=True" in src
 
 
 class TestBatchThresholdRouting:
@@ -447,6 +535,15 @@ class TestBatchThresholdRouting:
         from app.config import settings
 
         assert settings.GEMINI_BATCH_THRESHOLD >= 4000
+
+    def test_batch_threshold_has_minimum_floor(self):
+        """Batch threshold enforces minimum 100 contacts."""
+        import inspect
+
+        from app.tasks import csv_pipeline
+
+        src = inspect.getsource(csv_pipeline)
+        assert "max(settings.GEMINI_BATCH_THRESHOLD, 100)" in src
 
 
 class TestBatchStatusEndpoint:

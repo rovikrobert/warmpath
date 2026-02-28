@@ -160,7 +160,9 @@ async def _submit_batch_mode(
         if redis:
             try:
                 key = f"csv:batch_originals:{csv_upload_id}"
-                await redis.set(key, json.dumps(batches, default=str), ex=7200)
+                # TTL must exceed max poll duration (120 polls * 60s = 7200s)
+                # Use 10800s (3h) for safety margin
+                await redis.set(key, json.dumps(batches, default=str), ex=10800)
             except Exception:
                 logger.warning(
                     "Failed to store batch originals in Redis for upload %s",
@@ -177,10 +179,21 @@ async def _submit_batch_mode(
             batch_job_name=job_name,
         )
         # Start polling for results
-        poll_gemini_batch.apply_async(
-            args=[csv_upload_id, user_id, 0],
-            countdown=settings.GEMINI_BATCH_POLL_INTERVAL,
-        )
+        try:
+            poll_gemini_batch.apply_async(
+                args=[csv_upload_id, user_id, 0],
+                countdown=settings.GEMINI_BATCH_POLL_INTERVAL,
+            )
+        except Exception:
+            logger.warning(
+                "Failed to schedule poll task for upload %s, falling back to real-time",
+                csv_upload_id,
+                exc_info=True,
+            )
+            await _update_upload(
+                factory, upload_uuid, progress_phase="cleaning", batch_job_name=None
+            )
+            csv_clean_worker.delay(csv_upload_id, user_id)
     else:
         # Batch submission failed — fall back to real-time
         logger.warning(
@@ -247,13 +260,15 @@ async def _parse_async(csv_upload_id: str, user_id: str, file_content_b64: str) 
 
         # Route: batch mode for large uploads, real-time for smaller ones
         total_contacts = len(parsed)
-        if total_contacts > settings.GEMINI_BATCH_THRESHOLD and _is_gemini_enabled():
+        # Enforce minimum floor of 100 contacts for batch mode
+        batch_threshold = max(settings.GEMINI_BATCH_THRESHOLD, 100)
+        if total_contacts > batch_threshold and _is_gemini_enabled():
             # Large upload — submit to Gemini batch API
             logger.info(
                 "Upload %s has %d contacts (> %d threshold), using batch mode",
                 csv_upload_id,
                 total_contacts,
-                settings.GEMINI_BATCH_THRESHOLD,
+                batch_threshold,
             )
             await _submit_batch_mode(
                 factory, upload_uuid, csv_upload_id, user_id, batches
@@ -705,6 +720,8 @@ async def _import_async(csv_upload_id: str, user_id: str) -> None:
     soft_time_limit=120,
     time_limit=180,
     max_retries=120,  # ~2 hours at 60s intervals
+    acks_late=True,
+    reject_on_worker_lost=True,
 )
 def poll_gemini_batch(csv_upload_id: str, user_id: str, poll_count: int = 0) -> None:
     """Poll Gemini batch job status. Re-schedules itself until complete."""
@@ -761,13 +778,30 @@ async def _poll_batch_async(csv_upload_id: str, user_id: str, poll_count: int) -
             finally:
                 await redis.aclose()
 
+        if not original_batches:
+            # Originals lost (Redis eviction/restart) — fall back to real-time
+            # rather than importing contacts without fingerprints/emails/names
+            logger.warning(
+                "Batch originals lost for upload %s, falling back to real-time",
+                csv_upload_id,
+            )
+            await _update_upload(
+                factory, upload_uuid, progress_phase="cleaning", batch_job_name=None
+            )
+            csv_clean_worker.delay(csv_upload_id, user_id)
+            return
+
+        # Use original chunk count for sentinel (not len(results) which may
+        # be fewer if some chunks failed in the batch)
+        total_chunks = len(original_batches)
+
         # Write results to cleaned stream and trigger import
         stream_out = cleaned_stream_key(csv_upload_id)
         await ensu[RESEND_KEY_REDACTED](stream_out, "importers")
 
         for i, chunk_results in enumerate(results):
             cleaned = []
-            if original_batches and i < len(original_batches):
+            if i < len(original_batches):
                 for j, ai_fields in enumerate(chunk_results):
                     if j < len(original_batches[i]):
                         cleaned.append(
@@ -776,11 +810,11 @@ async def _poll_batch_async(csv_upload_id: str, user_id: str, poll_count: int) -
                     else:
                         cleaned.append(ai_fields)
             else:
-                cleaned = chunk_results  # No originals — use AI output as-is
+                cleaned = chunk_results  # Extra results beyond originals
 
             await write_batch_to_stream(stream_out, cleaned, i)
 
-        await write_sentinel(stream_out, len(results))
+        await write_sentinel(stream_out, total_chunks)
 
         # Clean up Redis originals
         redis = _get_redis_client()
