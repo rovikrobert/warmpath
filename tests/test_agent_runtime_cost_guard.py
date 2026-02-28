@@ -14,12 +14,27 @@ def test_check_budget_exceeded_when_over_limit():
 
 
 def test_select_model_downgrades_on_warning():
-    assert select_model(preferred="claude-sonnet-4-20250514", budget_status=BudgetStatus.WARNING) == "claude-haiku-4-5-20251001"
+    assert (
+        select_model(
+            preferred="claude-sonnet-4-20250514", budget_status=BudgetStatus.WARNING
+        )
+        == "claude-haiku-4-5-20251001"
+    )
 
 
 def test_select_model_uses_preferred_when_ok():
-    assert select_model(preferred="claude-sonnet-4-20250514", budget_status=BudgetStatus.OK) == "claude-sonnet-4-20250514"
+    assert (
+        select_model(
+            preferred="claude-sonnet-4-20250514", budget_status=BudgetStatus.OK
+        )
+        == "claude-sonnet-4-20250514"
+    )
 
 
 def test_select_model_blocks_on_exceeded():
-    assert select_model(preferred="claude-sonnet-4-20250514", budget_status=BudgetStatus.EXCEEDED) is None
+    assert (
+        select_model(
+            preferred="claude-sonnet-4-20250514", budget_status=BudgetStatus.EXCEEDED
+        )
+        is None
+    )
