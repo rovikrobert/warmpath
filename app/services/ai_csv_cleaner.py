@@ -25,6 +25,13 @@ from app.config import settings
 from app.services.csv_parser import generate_fingerprint
 from app.utils.performance import timed
 
+try:
+    import weave
+
+    _weave_available = True
+except ImportError:
+    _weave_available = False
+
 logger = logging.getLogger(__name__)
 
 CLEANUP_MODEL = getattr(settings, "CLEANUP_MODEL", "claude-haiku-4-5-20251001")
@@ -893,6 +900,10 @@ async def clean_contacts_real(contacts: list[dict]) -> list[dict]:
     except Exception:
         logger.exception("AI cleanup failed, falling back to mock cleaner")
         return clean_contacts_mock(contacts)
+
+
+if _weave_available:
+    clean_contacts_real = weave.op()(clean_contacts_real)
 
 
 # ---------------------------------------------------------------------------

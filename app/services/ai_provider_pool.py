@@ -24,6 +24,13 @@ from app.services.ai_csv_cleaner import (
 )
 from app.utils.rate_limiter import acqui[RESEND_KEY_REDACTED], release_slot
 
+try:
+    import weave
+
+    _weave_available = True
+except ImportError:
+    _weave_available = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -129,6 +136,10 @@ async def _call_gemini(
     return _extract_contacts_array(json.loads(response.text))
 
 
+if _weave_available:
+    _call_gemini = weave.op()(_call_gemini)
+
+
 async def _call_anthropic(
     client: Any, system_prompt: str, payload: list[dict]
 ) -> list[dict]:
@@ -145,6 +156,10 @@ async def _call_anthropic(
         raw = raw.split("\n", 1)[1]
         raw = raw.rsplit("```", 1)[0].strip()
     return _extract_contacts_array(json.loads(raw))
+
+
+if _weave_available:
+    _call_anthropic = weave.op()(_call_anthropic)
 
 
 async def _call_openai_compat(
@@ -180,6 +195,11 @@ async def _call_groq(
     return await _call_openai_compat(
         client, system_prompt, payload, cfg["model"], cfg["max_tokens"]
     )
+
+
+if _weave_available:
+    _call_openai = weave.op()(_call_openai)
+    _call_groq = weave.op()(_call_groq)
 
 
 # ---------------------------------------------------------------------------
@@ -350,3 +370,7 @@ async def dispatch_batch(
         MAX_DISPATCH_ROUNDS,
     )
     return clean_contacts_mock(batch)
+
+
+if _weave_available:
+    dispatch_batch = weave.op()(dispatch_batch)

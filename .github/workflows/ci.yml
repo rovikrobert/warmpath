@@ -134,4 +134,6 @@ jobs:
         run: uv pip install --system pip-audit==2.9.0
 
       - name: Audit dependencies
-        run: pip-audit -r requirements.txt
+        # GHSA-w8v5-vhqr-4h9v: diskcache pickle deserialization (transitive via weave).
+        # Local-only (CVSS 5.2), no fix version available. Revisit when diskcache >5.6.3 ships.
+        run: pip-audit -r requirements.txt --ignore-vuln GHSA-w8v5-vhqr-4h9v
