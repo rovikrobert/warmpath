@@ -47,6 +47,38 @@ IMPORT_BATCH_SIZE = 500
 CLEAN_CONSUMER_GROUP = "cleaners"
 
 
+async def _create_gemini_cache(csv_upload_id: str) -> str | None:
+    """Create a Gemini context cache for this upload if enabled."""
+    if not settings.GEMINI_CACHE_ENABLED:
+        return None
+    try:
+        from app.utils.gemini_cache import create_cleanup_cache
+        from app.utils.gemini_client import get_gemini_client
+
+        gemini_client = get_gemini_client()
+        return await create_cleanup_cache(gemini_client, csv_upload_id)
+    except Exception:
+        logger.warning(
+            "Gemini cache creation failed for upload %s, proceeding without cache",
+            csv_upload_id,
+            exc_info=True,
+        )
+        return None
+
+
+async def _delete_gemini_cache(cache_name: str | None) -> None:
+    """Delete a Gemini context cache if one was created."""
+    if not cache_name:
+        return
+    try:
+        from app.utils.gemini_cache import delete_cleanup_cache
+        from app.utils.gemini_client import get_gemini_client
+
+        await delete_cleanup_cache(get_gemini_client(), cache_name)
+    except Exception:
+        logger.warning("Failed to delete Gemini cache %s", cache_name, exc_info=True)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -193,6 +225,8 @@ async def _clean_async(csv_upload_id: str, user_id: str) -> None:
 
     warm_up_providers()
 
+    cache_name = await _create_gemini_cache(csv_upload_id)
+
     stream_in = parsed_stream_key(csv_upload_id)
     stream_out = cleaned_stream_key(csv_upload_id)
     consumer_name = f"worker-{uuid.uuid4().hex[:8]}"
@@ -257,7 +291,9 @@ async def _clean_async(csv_upload_id: str, user_id: str) -> None:
                     chunk.status = "cleaning"
                     await session.commit()
 
-            cleaned = await asyncio.wait_for(dispatch_batch(contacts), timeout=120)
+            cleaned = await asyncio.wait_for(
+                dispatch_batch(contacts, cache_name=cache_name), timeout=120
+            )
             await write_batch_to_stream(stream_out, cleaned, chunk_index)
 
             async with factory() as session:
@@ -297,6 +333,8 @@ async def _clean_async(csv_upload_id: str, user_id: str) -> None:
         *[_clean_one(mid, ci, cts) for mid, ci, cts in pending],
         return_exceptions=True,
     )
+
+    await _delete_gemini_cache(cache_name)
 
     logger.info(
         "Clean complete: %d batches for upload %s", batches_cleaned, csv_upload_id
