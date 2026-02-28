@@ -55,8 +55,12 @@ case "$ROLE" in
         echo "[entrypoint] Running agent scans"
         exec python3 scripts/run_agent_scans.py
         ;;
+    agent-runtime)
+        echo "[entrypoint] Starting agent runtime"
+        exec python3 -m app.agent_runtime.runner
+        ;;
     *)
-        echo "[entrypoint] Unknown SERVICE_ROLE: $ROLE (expected: web, worker, beat, scan)"
+        echo "[entrypoint] Unknown SERVICE_ROLE: $ROLE (expected: web, worker, beat, scan, agent-runtime)"
         exit 1
         ;;
 esac
