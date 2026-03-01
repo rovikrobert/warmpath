@@ -100,3 +100,4 @@ finance_team_spec.json
 # Ruler backup files
 AGENTS.md.bak
 CLAUDE.md.bak
+.mcp.json
