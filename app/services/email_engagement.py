@@ -489,6 +489,55 @@ async def send_first_search_nudge_d2(db: AsyncSession) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Upload failure notification
+# ---------------------------------------------------------------------------
+
+
+async def send_upload_failu[RESEND_KEY_REDACTED](
+    user: User, upload_id: uuid.UUID, db: AsyncSession
+) -> bool:
+    """Notify a user that their CSV upload failed (detected by watchdog).
+
+    One-time per upload — deduped by email_type + upload_id in external_id.
+    """
+    # Dedup: check if we already notified about this specific upload
+    result = await db.execute(
+        select(EmailCampaignLog.id).where(
+            EmailCampaignLog.user_id == user.id,
+            EmailCampaignLog.email_type == "upload_failed",
+            EmailCampaignLog.external_id == str(upload_id),
+        )
+    )
+    if result.scalar_one_or_none() is not None:
+        return False
+
+    if user.marketing_opt_out:
+        return False
+
+    first = user.full_name.split()[0] if user.full_name else "there"
+    html = f"""\
+<div lang="en" dir="ltr" style="{_base_style()}">
+  {_preheader_html("Your upload didn't go through — here's how to fix it")}
+  <p style="margin: 0 0 16px;">Hi {first},</p>
+  <p style="margin: 0 0 16px;">Your LinkedIn CSV upload ran into an issue on our end and didn't process. <strong>This wasn't anything you did wrong</strong> — it was a problem with our system.</p>
+  <p style="margin: 0 0 16px;">You can re-upload the same file and it should work now:</p>
+  <div style="margin: 16px 0;">
+    <a href="{APP_URL}/contacts" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Re-Upload CSV</a>
+  </div>
+  <p style="margin: 0 0 16px; font-size: 14px; color: #6b7280;">If it doesn't work or you'd like help, just reply to this email.</p>
+  <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; Rovik, WarmPath</p>
+  {_footer_html()}
+</div>"""
+    _send_email(
+        user.email,
+        f"{first}, your upload didn't go through — easy fix",
+        html,
+    )
+    await _record_send(db, user.id, "upload_failed", external_id=str(upload_id))
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Operational reminders
 # ---------------------------------------------------------------------------
 
