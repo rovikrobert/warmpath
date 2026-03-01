@@ -26,9 +26,6 @@ async def _run_email_task(task_name: str, func_name: str) -> int:
     from app.database import _get_engine, _get_session_factory
     from app.services import email_engagement
 
-    # _run_async() creates a new event loop each time, but the @lru_cache
-    # engine retains asyncpg connections bound to the previous loop.
-    # Dispose stale connections so asyncpg reconnects on the current loop.
     await _get_engine().dispose()
 
     async with _get_session_factory()() as db:
@@ -37,9 +34,17 @@ async def _run_email_task(task_name: str, func_name: str) -> int:
             count = await fn(db)
             logger.info("[%s] sent %d emails", task_name, count)
             return count
-        except Exception:
+        except Exception as exc:
             logger.exception("[%s] failed", task_name)
             await db.rollback()
+            try:
+                from app.utils.task_escalation import escalate_task_failure
+
+                await escalate_task_failure(
+                    task_name=task_name, error=exc, severity="high"
+                )
+            except Exception:
+                logger.warning("[%s] escalation also failed", task_name)
             return 0
 
 

@@ -813,19 +813,43 @@ async def generate_manual_send_reminder(
         )
     )
 
+    # Batch-load listings and contacts to avoid N+1 queries
+    facilitations = list(stale.scalars())
+
+    listing_ids = [
+        f.marketplace_listing_id for f in facilitations if f.marketplace_listing_id
+    ]
+    listings_map: dict[uuid.UUID, MarketplaceListing] = {}
+    contacts_map: dict[uuid.UUID, Contact] = {}
+
+    if listing_ids:
+        listing_result = await db.execute(
+            select(MarketplaceListing).where(MarketplaceListing.id.in_(listing_ids))
+        )
+        listings_map = {ml.id: ml for ml in listing_result.scalars()}
+
+        contact_ids = [ml.contact_id for ml in listings_map.values()]
+        if contact_ids:
+            contact_result = await db.execute(
+                select(Contact).where(
+                    Contact.id.in_(contact_ids),
+                    Contact.user_id == user_id,
+                )
+            )
+            contacts_map = {c.id: c for c in contact_result.scalars()}
+
     items: list[FeedItem] = []
-    for f in stale.scalars():
+    for f in facilitations:
         dedup_key = _dedup("manual_send_reminder", str(f.id))
         if await _user_has_feed_item(db, user_id, dedup_key):
             continue
 
-        # Look up the contact name for the nudge message
         listing = (
-            await db.get(MarketplaceListing, f.marketplace_listing_id)
+            listings_map.get(f.marketplace_listing_id)
             if f.marketplace_listing_id
             else None
         )
-        contact = await db.get(Contact, listing.contact_id) if listing else None
+        contact = contacts_map.get(listing.contact_id) if listing else None
         contact_name = contact.first_name if contact else "your contact"
 
         item = FeedItem(

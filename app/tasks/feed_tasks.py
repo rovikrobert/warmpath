@@ -66,9 +66,19 @@ def generate_feed_all_users():
                 total = await generate_feed_for_all_active_users(db)
                 logger.info("Feed generation task complete: %d items", total)
                 return total
-            except Exception:
+            except Exception as exc:
                 logger.exception("Feed generation task failed")
                 await db.rollback()
+                try:
+                    from app.utils.task_escalation import escalate_task_failure
+
+                    await escalate_task_failure(
+                        task_name="generate_feed_all_users",
+                        error=exc,
+                        severity="high",
+                    )
+                except Exception:
+                    logger.warning("Feed task escalation failed")
                 return 0
 
     return _run_async(_run())
@@ -100,8 +110,18 @@ def recompute_feed_weights():
                 await set_cached_weights(weights)
                 logger.info("Feed weights recomputed: %s", weights)
                 return weights
-            except Exception:
+            except Exception as exc:
                 logger.exception("Feed weight recomputation failed")
+                try:
+                    from app.utils.task_escalation import escalate_task_failure
+
+                    await escalate_task_failure(
+                        task_name="recompute_feed_weights",
+                        error=exc,
+                        severity="medium",
+                    )
+                except Exception:
+                    logger.warning("Feed task escalation failed")
                 return {}
 
     return _run_async(_run())
@@ -148,9 +168,19 @@ def cleanup_expired_feed_items():
                 count = result.rowcount
                 logger.info("Cleaned up %d expired/dismissed feed items", count)
                 return count
-            except Exception:
+            except Exception as exc:
                 logger.exception("Feed cleanup task failed")
                 await db.rollback()
+                try:
+                    from app.utils.task_escalation import escalate_task_failure
+
+                    await escalate_task_failure(
+                        task_name="cleanup_expired_feed_items",
+                        error=exc,
+                        severity="medium",
+                    )
+                except Exception:
+                    logger.warning("Feed task escalation failed")
                 return 0
 
     return _run_async(_run())
@@ -193,9 +223,19 @@ def aggregate_freshness():
                     "contacts_updated": result.contacts_updated,
                     "feed_items_created": result.feed_items_created,
                 }
-            except Exception:
+            except Exception as exc:
                 logger.exception("Freshness aggregation task failed")
                 await db.rollback()
+                try:
+                    from app.utils.task_escalation import escalate_task_failure
+
+                    await escalate_task_failure(
+                        task_name="aggregate_freshness",
+                        error=exc,
+                        severity="medium",
+                    )
+                except Exception:
+                    logger.warning("Feed task escalation failed")
                 return {"error": "task_failed"}
 
     return _run_async(_run())
@@ -251,9 +291,19 @@ def send_smart_digest():
                     len(user_ids),
                 )
                 return sent
-            except Exception:
+            except Exception as exc:
                 logger.exception("Smart digest task failed")
                 await db.rollback()
+                try:
+                    from app.utils.task_escalation import escalate_task_failure
+
+                    await escalate_task_failure(
+                        task_name="send_smart_digest",
+                        error=exc,
+                        severity="high",
+                    )
+                except Exception:
+                    logger.warning("Feed task escalation failed")
                 return 0
 
     return _run_async(_run())

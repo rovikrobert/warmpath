@@ -29,6 +29,28 @@ def _should_alert(endpoint_key: str) -> bool:
     return True
 
 
+def _write_to_finding_store(finding: dict) -> None:
+    """Best-effort write to FindingStore for agent consumption."""
+    try:
+        import asyncio
+
+        from app.agent_runtime.finding_store import FindingStore
+        from app.config import settings
+
+        if not settings.REDIS_URL:
+            return
+
+        store = FindingStore(redis_url=settings.REDIS_URL)
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(store.classify_findings([finding]))
+        finally:
+            loop.close()
+    except Exception:
+        logger.warning("FindingStore write failed for error alert", exc_info=True)
+
+
 def send_error_alert(
     method: str,
     path: str,
@@ -81,6 +103,23 @@ def send_error_alert(
         filepath = ALERT_DIR / filename
         filepath.write_text(message, encoding="utf-8")
         logger.info("Error alert saved: %s", filepath)
+
+        # Write to FindingStore for agent consumption
+        _write_to_finding_store(
+            {
+                "source_team": "engineering",
+                "category": "http_500_error",
+                "title": f"500 error: {method} {path} — {error_type}",
+                "severity": "high",
+                "metadata": {
+                    "method": method,
+                    "path": path,
+                    "error_type": error_type,
+                    "error_message": error_msg,
+                    "user_email": user_email or "unauthenticated",
+                },
+            }
+        )
 
         # Send via Telegram if configured
         if os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID"):

@@ -909,7 +909,12 @@ async def _try_vector_contact_search(
 
         ranked = _combine_vector_and_warm(vector_results)
         contact_ids = [uuid.UUID(r["contact_id"]) for r in ranked[:limit]]
-        result = await db.execute(sa_select(Contact).where(Contact.id.in_(contact_ids)))
+        result = await db.execute(
+            sa_select(Contact).where(
+                Contact.id.in_(contact_ids),
+                Contact.user_id == user_id,
+            )
+        )
         contacts_map = {str(c.id): c for c in result.scalars().all()}
         results = []
         for r in ranked[:limit]:

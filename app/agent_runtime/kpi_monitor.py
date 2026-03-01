@@ -101,7 +101,7 @@ async def _collect_current_metrics() -> dict[str, float]:
         metrics["daily_agent_spend_usd"] = float(spend) if spend else 0.0
         await r.aclose()
     except Exception:
-        logger.debug("Failed to collect spend metric", exc_info=True)
+        logger.warning("Failed to collect spend metric", exc_info=True)
 
     try:
         # Finding store stats (if available)
@@ -111,7 +111,7 @@ async def _collect_current_metrics() -> dict[str, float]:
         stats = await store.get_stats()
         metrics["open_findings"] = float(stats.get("new", 0) + stats.get("known", 0))
     except Exception:
-        logger.debug("Failed to collect finding stats", exc_info=True)
+        logger.warning("Failed to collect finding stats", exc_info=True)
 
     try:
         # Job scan metrics from latest cache entries
@@ -144,7 +144,7 @@ async def _collect_current_metrics() -> dict[str, float]:
             zero_count = zero_result.scalar() or 0
             metrics["job_scan_zero_companies"] = float(zero_count)
     except Exception:
-        logger.debug("Failed to collect job scan metrics", exc_info=True)
+        logger.warning("Failed to collect job scan metrics", exc_info=True)
 
     return metrics
 

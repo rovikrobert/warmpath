@@ -6,6 +6,7 @@ States: new → known → resolved.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import logging
@@ -45,22 +46,30 @@ class FindingStore:
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Split findings into new and already-known.
 
-        Returns (new_findings, known_findings). Each finding gets a
-        `finding_hash` and `finding_state` field added.
+        Returns (new_findings, known_findings). Degrades gracefully if Redis
+        is unavailable (returns empty lists).
         """
-        r = await self._get_redis()
+        try:
+            r = await self._get_redis()
+        except Exception:
+            logger.warning("FindingStore Redis unavailable — skipping classification")
+            return [], []
+
         new: list[dict[str, Any]] = []
         known: list[dict[str, Any]] = []
 
         for finding in findings:
             fhash = _finding_hash(finding)
             key = f"{PREFIX}:{fhash}"
-            existing = await r.get(key)
+            try:
+                existing = await r.get(key)
+            except Exception:
+                logger.warning("FindingStore Redis error during classify")
+                continue
 
             finding["finding_hash"] = fhash
 
             if existing is None:
-                # First time seeing this finding
                 finding["finding_state"] = "new"
                 record = {
                     "title": finding.get("title", ""),
@@ -70,45 +79,63 @@ class FindingStore:
                     "seen_count": 1,
                     "state": "new",
                 }
-                await r.set(key, json.dumps(record), ex=FINDING_TTL_SECONDS)
+                with contextlib.suppress(Exception):
+                    await r.set(key, json.dumps(record), ex=FINDING_TTL_SECONDS)
                 new.append(finding)
             else:
-                # Already known — increment seen_count, refresh TTL
                 record = json.loads(existing)
                 record["seen_count"] = record.get("seen_count", 0) + 1
                 record["state"] = "known"
                 finding["finding_state"] = "known"
                 finding["seen_count"] = record["seen_count"]
-                await r.set(key, json.dumps(record), ex=FINDING_TTL_SECONDS)
+                with contextlib.suppress(Exception):
+                    await r.set(key, json.dumps(record), ex=FINDING_TTL_SECONDS)
                 known.append(finding)
 
         return new, known
 
     async def mark_resolved(self, finding_hash: str) -> bool:
-        """Mark a finding as resolved. Returns True if it existed."""
-        r = await self._get_redis()
-        key = f"{PREFIX}:{finding_hash}"
-        existing = await r.get(key)
-        if existing is None:
+        """Mark a finding as resolved. Returns True if it existed.
+
+        Degrades gracefully if Redis is unavailable (returns False).
+        """
+        try:
+            r = await self._get_redis()
+        except Exception:
+            logger.warning("FindingStore Redis unavailable — skipping mark_resolved")
             return False
-        record = json.loads(existing)
-        record["state"] = "resolved"
-        await r.set(key, json.dumps(record), ex=FINDING_TTL_SECONDS)
-        return True
+
+        try:
+            key = f"{PREFIX}:{finding_hash}"
+            existing = await r.get(key)
+            if existing is None:
+                return False
+            record = json.loads(existing)
+            record["state"] = "resolved"
+            await r.set(key, json.dumps(record), ex=FINDING_TTL_SECONDS)
+            return True
+        except Exception:
+            logger.warning("FindingStore Redis error during mark_resolved")
+            return False
 
     async def get_stats(self) -> dict[str, int]:
-        """Return counts of findings by state."""
-        r = await self._get_redis()
-        cursor = "0"
+        """Return counts of findings by state. Degrades gracefully on Redis failure."""
         stats: dict[str, int] = {"new": 0, "known": 0, "resolved": 0}
-        while True:
-            cursor, keys = await r.scan(cursor=cursor, match=f"{PREFIX}:*", count=100)
-            for key in keys:
-                val = await r.get(key)
-                if val:
-                    record = json.loads(val)
-                    state = record.get("state", "new")
-                    stats[state] = stats.get(state, 0) + 1
-            if cursor == 0 or cursor == "0":
-                break
+        try:
+            r = await self._get_redis()
+            cursor = "0"
+            while True:
+                cursor, keys = await r.scan(
+                    cursor=cursor, match=f"{PREFIX}:*", count=100
+                )
+                for key in keys:
+                    val = await r.get(key)
+                    if val:
+                        record = json.loads(val)
+                        state = record.get("state", "new")
+                        stats[state] = stats.get(state, 0) + 1
+                if cursor == 0 or cursor == "0":
+                    break
+        except Exception:
+            logger.warning("FindingStore Redis unavailable for stats")
         return stats

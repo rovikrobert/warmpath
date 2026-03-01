@@ -497,7 +497,10 @@ async def request_intro(
     from app.services.candidate_blurb import generate_candidate_blurb
 
     contact_result = await db.execute(
-        select(Contact).where(Contact.id == listing.contact_id)
+        select(Contact).where(
+            Contact.id == listing.contact_id,
+            Contact.user_id == listing.network_holder_id,
+        )
     )
     contact_for_blurb = contact_result.scalar_one_or_none()
 

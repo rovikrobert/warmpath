@@ -106,7 +106,30 @@ async def stripe_webhook(
 
     handler = _EVENT_HANDLERS.get(event_type)
     if handler:
-        await handler(event, db)
+        try:
+            await handler(event, db)
+            await db.commit()
+        except Exception as exc:
+            logger.exception("Stripe webhook handler failed: %s", event_type)
+            await db.rollback()
+            try:
+                from app.services.audit_logger import log_event
+
+                await log_event(
+                    db,
+                    "webhook_handler_error",
+                    metadata={
+                        "event_type": event_type,
+                        "error": str(exc)[:200],
+                    },
+                )
+                await db.commit()
+            except Exception:
+                logger.warning("Failed to log webhook_handler_error audit event")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Webhook handler failed",
+            ) from exc
     else:
         logger.debug("Unhandled Stripe event type: %s", event_type)
 
