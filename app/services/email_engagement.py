@@ -70,6 +70,62 @@ async def _record_send(
 
 
 # ---------------------------------------------------------------------------
+# Per-user email circuit breaker (G1)
+# ---------------------------------------------------------------------------
+
+MAX_MARKETING_EMAILS_PER_WEEK = 3
+
+
+async def _user_email_budget_exhausted(db: AsyncSession, user_id: uuid.UUID) -> bool:
+    """Check if user has hit weekly marketing email cap.
+
+    Transactional emails (upload_failed, intro_request_notification,
+    intro_pending_24h, intro_relay) are excluded from the cap."""
+    seven_days_ago = (datetime.now(timezone.utc) - timedelta(days=7)).strftime(
+        "%Y-%m-%d"
+    )
+    transactional = {
+        "upload_failed",
+        "intro_request_notification",
+        "intro_pending_24h",
+        "intro_relay",
+    }
+    result = await db.execute(
+        select(func.count()).select_from(
+            select(EmailCampaignLog.id)
+            .where(
+                EmailCampaignLog.user_id == user_id,
+                EmailCampaignLog.sent_date >= seven_days_ago,
+                EmailCampaignLog.email_type.not_in(transactional),
+            )
+            .subquery()
+        )
+    )
+    return (result.scalar() or 0) >= MAX_MARKETING_EMAILS_PER_WEEK
+
+
+# ---------------------------------------------------------------------------
+# Email precondition asserts (G4)
+# ---------------------------------------------------------------------------
+
+
+async def _user_has_contacts(db: AsyncSession, user_id: uuid.UUID) -> bool:
+    """Verify user actually has imported contacts (not just a csv_upload record)."""
+    result = await db.execute(
+        select(func.count()).select_from(
+            select(Contact.id)
+            .where(
+                Contact.user_id == user_id,
+                Contact.deleted_at.is_(None),
+            )
+            .limit(1)
+            .subquery()
+        )
+    )
+    return (result.scalar() or 0) >= 1
+
+
+# ---------------------------------------------------------------------------
 # Template helpers
 # ---------------------------------------------------------------------------
 
@@ -278,6 +334,8 @@ async def send_csv_reminder_d1(db: AsyncSession) -> int:
     for u in users:
         if u.id in already_sent_ids:
             continue
+        if await _user_email_budget_exhausted(db, u.id):
+            continue
         first = u.full_name.split()[0] if u.full_name else "there"
         agent = _agent_signoff(u.intent)
         html = f"""\
@@ -345,6 +403,8 @@ async def send_csv_reminder_d3(db: AsyncSession) -> int:
     for u in users:
         if u.id in already_sent_ids:
             continue
+        if await _user_email_budget_exhausted(db, u.id):
+            continue
         first = u.full_name.split()[0] if u.full_name else "there"
         agent = _agent_signoff(u.intent)
         html = f"""\
@@ -408,6 +468,10 @@ async def send_nh_sharing_reminder_d2(db: AsyncSession) -> int:
     count = 0
     for u in users:
         if u.id in already_sent_ids:
+            continue
+        if await _user_email_budget_exhausted(db, u.id):
+            continue
+        if not await _user_has_contacts(db, u.id):
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
         html = f"""\
@@ -474,6 +538,10 @@ async def send_first_search_nudge_d2(db: AsyncSession) -> int:
     count = 0
     for u in users:
         if u.id in already_sent_ids:
+            continue
+        if await _user_email_budget_exhausted(db, u.id):
+            continue
+        if not await _user_has_contacts(db, u.id):
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
         html = f"""\
@@ -758,6 +826,10 @@ async def send_weekly_digest(db: AsyncSession) -> int:
     for u in users:
         if u.id in already_sent_ids:
             continue
+        if await _user_email_budget_exhausted(db, u.id):
+            continue
+        if not await _user_has_contacts(db, u.id):
+            continue
         first = u.full_name.split()[0] if u.full_name else "there"
 
         search_count = search_counts.get(u.id, 0)
@@ -863,6 +935,8 @@ async def send_reengagement_d30(db: AsyncSession) -> int:
     for u in users:
         if u.id in already_sent_ids:
             continue
+        if await _user_email_budget_exhausted(db, u.id):
+            continue
         first = u.full_name.split()[0] if u.full_name else "there"
         agent = _agent_signoff(u.intent)
         html = f"""\
@@ -931,6 +1005,8 @@ async def send_reengagement_d90(db: AsyncSession) -> int:
     count = 0
     for u in users:
         if u.id in already_sent_ids:
+            continue
+        if await _user_email_budget_exhausted(db, u.id):
             continue
         first = u.full_name.split()[0] if u.full_name else "there"
         agent = _agent_signoff(u.intent)

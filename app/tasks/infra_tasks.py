@@ -106,7 +106,37 @@ async def _stuck_upload_watchdog_run() -> None:
     factory = _get_session_factory()
 
     async with factory() as db:
-        await detect_and_fail_stuck_uploads(db)
+        failed_count, notified_count = await detect_and_fail_stuck_uploads(db)
+
+    if failed_count > 0:
+        await _send_watchdog_telegram_alert(failed_count, notified_count)
+
+
+async def _send_watchdog_telegram_alert(failed_count: int, notified_count: int) -> None:
+    """Send a Telegram alert when the watchdog marks stuck uploads as failed."""
+    import os
+
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id:
+        logger.debug("Telegram not configured — skipping watchdog alert")
+        return
+
+    msg = (
+        f"\u26a0\ufe0f Upload watchdog: {failed_count} stuck upload(s) marked failed, "
+        f"{notified_count} user(s) emailed."
+    )
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": msg},
+            )
+        logger.info("Watchdog Telegram alert sent")
+    except Exception:
+        logger.warning("Failed to send watchdog Telegram alert", exc_info=True)
 
 
 async def detect_and_fail_stuck_uploads(db) -> tuple[int, int]:

@@ -303,8 +303,29 @@ export default function UploadModal({ onClose, onComplete, hasContacts }: Upload
             )}
           </div>
 
-          {error && (
-            <p className="mb-3 text-sm text-red-400">{error}</p>
+          {/* Large file pre-warning (>1MB as proxy for >10K rows) */}
+          {file && file.size > 1024 * 1024 && !uploading && !error && (
+            <div className="mb-3 rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 py-2.5">
+              <p className="text-xs text-blue-300">
+                Large file detected — this may take a few minutes. We'll show progress as it processes.
+              </p>
+            </div>
+          )}
+
+          {error && !uploading && (
+            <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
+              <p className="text-sm font-medium text-red-300">Upload failed</p>
+              <p className="mt-1 text-xs text-red-300/80">{error}</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                If this keeps happening, try a smaller file or reply to our support email.
+              </p>
+              <button
+                onClick={() => { setError(''); setFile(null); setProgressWidth(0); setProgressMsg(''); }}
+                className="mt-2 rounded-md bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-200 hover:bg-red-500/30"
+              >
+                Try Again
+              </button>
+            </div>
           )}
 
           {uploading && (
