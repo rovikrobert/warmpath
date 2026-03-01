@@ -254,6 +254,17 @@ async def test_csv_reminder_d3_finds_eligible(
     db.add(user)
     await db.flush()
 
+    # D3 requires D1 to have been sent first
+    d1_log = EmailCampaignLog(
+        user_id=user.id,
+        email_type="csv_reminder_d1",
+        sent_date=(datetime.now(timezone.utc) - timedelta(hours=48)).strftime(
+            "%Y-%m-%d"
+        ),
+    )
+    db.add(d1_log)
+    await db.flush()
+
     count = await send_csv_reminder_d3(db)
     assert count == 1
 
