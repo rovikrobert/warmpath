@@ -160,10 +160,16 @@ class TestRecommendationsEndpoint:
     async def test_recommendations_returns_results(
         self, client: AsyncClient, auth_headers: dict, prefs_set: None
     ):
-        """Happy path: returns recommendations with mocked job fetcher."""
+        """Happy path: returns recommendations from cached job data."""
+        # Pre-populate cache for a known company so Phase 2 matching finds it
+        async with TestSessionLocal() as db:
+            from app.services.job_recommendations import set_cached_jobs
+
+            await set_cached_jobs("grab", MOCK_JOBS, db)
+            await db.commit()
+
         with patch("app.services.job_recommendations.JobFetcher") as MockCls:
             mock = MockCls.return_value
-            mock.fetch_jobs_for_company = AsyncMock(side_effect=_mock_fetch)
             mock.match_jobs_to_role = AsyncMock(side_effect=_mock_match)
 
             resp = await client.get(

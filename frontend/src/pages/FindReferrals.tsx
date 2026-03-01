@@ -91,7 +91,6 @@ export default function FindReferrals() {
   const [error, setError] = useState('');
   const [recommendations, setRecommendations] = useState([]);
   const [loadingRecs, setLoadingRecs] = useState(false);
-  const [recsStale, setRecsStale] = useState(false);
   const [companyCounts, setCompanyCounts] = useState({});
   const [discoveryStatus, setDiscoveryStatus] = useState({});
 
@@ -108,21 +107,25 @@ export default function FindReferrals() {
   useEffect(() => {
     if (hasPrefs !== true) return;
     setLoadingRecs(true);
-    setRecsStale(false);
 
-    // Show "still loading" message after 3 seconds
-    const staleTimer = setTimeout(() => setRecsStale(true), 3000);
-
+    let retryTimer;
     searchApi.recommendations({ limit: 8 })
-      .then((r) => setRecommendations(r.data?.recommendations ?? []))
+      .then((r) => {
+        setRecommendations(r.data?.recommendations ?? []);
+        // If backend is warming uncached companies, silently refresh after 6s
+        const uncached = r.data?.scan_stats?.uncached_count ?? 0;
+        if (uncached > 0) {
+          retryTimer = setTimeout(() => {
+            searchApi.recommendations({ limit: 8 })
+              .then((r2) => setRecommendations(r2.data?.recommendations ?? []))
+              .catch(() => {});
+          }, 6000);
+        }
+      })
       .catch(() => {})
-      .finally(() => {
-        clearTimeout(staleTimer);
-        setLoadingRecs(false);
-        setRecsStale(false);
-      });
+      .finally(() => setLoadingRecs(false));
 
-    return () => clearTimeout(staleTimer);
+    return () => clearTimeout(retryTimer);
   }, [hasPrefs]);
 
   // Fetch connection counts for newly added companies
@@ -396,11 +399,6 @@ export default function FindReferrals() {
               Edit
             </button>
           </div>
-          {loadingRecs && recsStale && (
-            <p className="mb-2 text-xs text-muted-foreground" aria-live="polite">
-              Scanning job boards — this may take a moment...
-            </p>
-          )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {loadingRecs
               ? Array.from({ length: 4 }).map((_, i) => <ShimmerCard key={i} />)

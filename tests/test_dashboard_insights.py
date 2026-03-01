@@ -149,7 +149,7 @@ MOCK_RECS = {
     "scan_stats": {
         "companies_scanned": 15,
         "cache_hits": 10,
-        "fresh_scans": 5,
+        "uncached_count": 0,
     },
 }
 
