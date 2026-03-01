@@ -863,6 +863,8 @@ async def _build_referral_paths(
                     "company": contact.current_company,
                     "warm_score": warm_result.total_score,
                     "referral_likelihood": match.referral_likelihood,
+                    "linkedin_url": contact.linkedin_url,
+                    "relationship_type": contact.relationship_type,
                 },
                 "match_type": match.match_type,
                 "relevance_score": adjusted_relevance,
