@@ -3,6 +3,9 @@
 Called when a network holder opts into marketplace sharing. Reads their
 contacts, checks sharing preferences (category filters, exclusions),
 checks the suppression list, and creates anonymized MarketplaceListing rows.
+
+Also provides vault-overlap helpers for filtering marketplace search results
+so seekers don't see listings for contacts already in their own network.
 """
 
 import re
@@ -327,3 +330,73 @@ async def generate_marketplace_listings(
         sync_all_listings.delay()
 
     return created
+
+
+# ---------------------------------------------------------------------------
+# Vault-overlap filtering for marketplace search
+# ---------------------------------------------------------------------------
+
+
+async def build_seeker_hash_set(
+    seeker_user_id: uuid.UUID, db: AsyncSession
+) -> set[str]:
+    """Pre-compute the seeker's contact hashes for vault overlap detection.
+
+    Returns a set of SHA-256 hashes (email + name_company) for all of the
+    seeker's non-deleted contacts.  O(N) for N contacts, done once per search.
+    """
+    result = await db.execute(
+        select(Contact).where(
+            Contact.user_id == seeker_user_id,
+            Contact.deleted_at.is_(None),
+        )
+    )
+    hashes: set[str] = set()
+    for c in result.scalars():
+        if c.email:
+            hashes.add(hash_for_suppression(c.email))
+        if c.first_name and c.last_name and c.current_company:
+            hashes.add(
+                hash_for_suppression(f"{c.first_name}{c.last_name}{c.current_company}")
+            )
+    return hashes
+
+
+async def filter_vault_overlap(
+    listings: list[MarketplaceListing],
+    seeker_hashes: set[str],
+    db: AsyncSession,
+) -> list[MarketplaceListing]:
+    """Remove listings whose underlying contact is already in the seeker's vault.
+
+    Batch-loads the listed contacts and checks against the pre-computed seeker
+    hash set.  O(M) for M listings with O(1) hash lookups.
+    """
+    if not listings or not seeker_hashes:
+        return listings
+
+    contact_ids = [listing.contact_id for listing in listings]
+    contact_result = await db.execute(
+        select(Contact).where(Contact.id.in_(contact_ids))
+    )
+    contact_map: dict[uuid.UUID, Contact] = {c.id: c for c in contact_result.scalars()}
+
+    filtered: list[MarketplaceListing] = []
+    for listing in listings:
+        contact = contact_map.get(listing.contact_id)
+        if contact is None:
+            filtered.append(listing)
+            continue
+        overlap = False
+        if contact.email and hash_for_suppression(contact.email) in seeker_hashes:
+            overlap = True
+        elif contact.first_name and contact.last_name and contact.current_company:
+            h = hash_for_suppression(
+                f"{contact.first_name}{contact.last_name}{contact.current_company}"
+            )
+            if h in seeker_hashes:
+                overlap = True
+        if not overlap:
+            filtered.append(listing)
+
+    return filtered

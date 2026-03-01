@@ -743,7 +743,7 @@ async def _run_smart_search(
         ),
     }
 
-    return {"companies": companies_results, "summary": summary}
+    return {"companies": companies_results, "summary": summary, "scope": scope}
 
 
 async def _fetch_and_filter_openings(
@@ -978,6 +978,15 @@ async def _search_marketplace_for_company(
         )
     )
     listings = list(result.scalars())
+
+    # Exclude listings for contacts already in the seeker's vault
+    from app.services.marketplace_indexer import (
+        build_seeker_hash_set,
+        filter_vault_overlap,
+    )
+
+    seeker_hashes = await build_seeker_hash_set(user_id, db)
+    listings = await filter_vault_overlap(listings, seeker_hashes, db)
 
     # Load reputations
     holder_ids = {listing.network_holder_id for listing in listings}
