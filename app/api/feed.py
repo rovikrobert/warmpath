@@ -37,6 +37,7 @@ from app.services.feed_ranker import (
     get_type_weights,
     rank_feed_items,
 )
+from app.config import settings
 from app.utils.security import get_current_user
 from app.utils.tracking import track_action
 
@@ -129,6 +130,11 @@ async def get_feed(
 
     if exclude_type:
         query = query.where(FeedItem.item_type != exclude_type)
+
+    # In beta mode, suppress Naiv collection prompts (enrichment_prompt)
+    # to reduce noise for early testers
+    if settings.BETA_SANDBOX_MODE:
+        query = query.where(FeedItem.item_type != "enrichment_prompt")
 
     # Fetch all matching items (ranking happens in Python via learned weights)
     result = await db.execute(query)

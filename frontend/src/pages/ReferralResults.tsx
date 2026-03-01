@@ -506,6 +506,7 @@ export default function ReferralResults() {
           onSuccess={() => {
             setIntroModal(null);
             setBalance((b) => Math.max(0, b - 20));
+            window.dispatchEvent(new Event('journey-updated'));
           }}
         />
       )}
