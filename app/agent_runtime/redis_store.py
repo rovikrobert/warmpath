@@ -24,14 +24,12 @@ class AgentRuntimeRedis:
         return self._redis
 
     async def is_duplicate(self, dedup_key: str, cooldown_seconds: int) -> bool:
-        """Check if this event was seen within the cooldown window."""
+        """Check if this event was seen within the cooldown window (atomic)."""
         r = await self._get_redis()
         key = f"{PREFIX}:dedup:{dedup_key}"
-        exists = await r.exists(key)
-        if exists:
-            return True
-        await r.set(key, "1", ex=cooldown_seconds)
-        return False
+        # SET returns True if set (new key), None if already exists
+        was_set = await r.set(key, "1", ex=cooldown_seconds, nx=True)
+        return was_set is None  # True = duplicate (key already existed)
 
     async def get_trust_level(self, agent_name: str) -> TrustLevel:
         """Get agent's current trust level (default: OBSERVER)."""

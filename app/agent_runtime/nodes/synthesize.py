@@ -32,8 +32,8 @@ def synthesize_findings(state: WarmPathState) -> dict[str, Any]:
             )
 
     # Determine if the event warrants human escalation.
-    # Default trust level is RECOMMENDER (1) from runner.py config.
     priority = state.get("priority", "low")
-    needs_human = should_escalate(priority, max_trust_level=1)
+    trust_level = state.get("trust_level", 1)
+    needs_human = should_escalate(priority, max_trust_level=trust_level)
 
     return {"handoffs": handoffs, "needs_human": needs_human}

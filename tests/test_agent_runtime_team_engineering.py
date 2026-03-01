@@ -1,9 +1,17 @@
 """Tests for engineering team subgraph wrapper."""
 
+import importlib
 from unittest.mock import patch
 
 from app.agent_runtime.teams.engineering import EngineeringTeam, run_existing_scanners
 from agents.shared.report import AgentReport, Finding
+
+
+def test_all_scanner_module_paths_a[RESEND_KEY_REDACTED]():
+    """Every scanner_modules path resolves to a real Python module."""
+    for name, path in EngineeringTeam.scanner_modules.items():
+        mod = importlib.import_module(path)
+        assert mod is not None, f"Scanner '{name}' path '{path}' failed to import"
 
 
 def test_run_existing_scanners_returns_findings_list():
