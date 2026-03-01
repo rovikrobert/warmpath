@@ -130,83 +130,62 @@ async def _fetch_jobs(
             return []
 
 
-_FETCH_TIMEOUT = 5.0  # Total seconds for all fresh fetches combined
+_warming_in_progress: set[str] = set()
 
 
-async def _fetch_fresh_and_match(
-    to_fetch: list[str],
-    fetcher: JobFetcher,
-    target_role: str,
-    target_seniority: str | None,
+def _schedule_background_warm(
+    company_keys: list[str],
     location_hint: str | None,
-    db: AsyncSession,
-    target_locations: list[str] | None = None,
-) -> tuple[list[dict], int]:
-    """Fetch uncached companies within timeout, cache results, return matches.
+) -> None:
+    """Fire-and-forget background task to warm the job cache for uncached companies.
 
-    Uses asyncio.wait so that companies completing before the deadline are
-    captured even when others are still in-flight.
-
-    Returns (matched_recommendations, completed_count).
+    Deduplicates: companies already being warmed by another request are skipped.
     """
-    semaphore = asyncio.Semaphore(5)
+    to_warm = [k for k in company_keys if k not in _warming_in_progress]
+    if not to_warm:
+        return
+    _warming_in_progress.update(to_warm)
 
-    # Create named tasks so we can map results back to companies
-    fetch_tasks: dict[asyncio.Task, str] = {}
-    for key in to_fetch:
-        boards = BOARD_REGISTRY.get(key, {})
-        task = asyncio.create_task(
-            _fetch_jobs(key, boards, fetcher, semaphore, location_hint=location_hint)
-        )
-        fetch_tasks[task] = key
+    async def _warm() -> None:
+        from app.database import _get_session_factory
 
-    # Wait up to _FETCH_TIMEOUT — collect whatever completes in time
-    done, pending = await asyncio.wait(fetch_tasks.keys(), timeout=_FETCH_TIMEOUT)
-
-    # Cancel stragglers
-    for task in pending:
-        task.cancel()
-
-    if pending:
-        logger.warning(
-            "Recommendation fresh fetch: %d/%d completed in %.1fs",
-            len(done),
-            len(fetch_tasks),
-            _FETCH_TIMEOUT,
-        )
-
-    # Collect results from completed tasks
-    fetched: dict[str, list[dict]] = {}
-    for task in done:
-        key = fetch_tasks[task]
         try:
-            jobs = task.result()
-            if jobs:
-                fetched[key] = jobs
+            fetcher = JobFetcher()
+            semaphore = asyncio.Semaphore(5)
+            tasks = [
+                _fetch_jobs(
+                    key,
+                    BOARD_REGISTRY.get(key, {}),
+                    fetcher,
+                    semaphore,
+                    location_hint=location_hint,
+                )
+                for key in to_warm
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            async with _get_session_factory()() as db:
+                for key, jobs in zip(to_warm, results, strict=False):
+                    if isinstance(jobs, list) and jobs:
+                        await set_cached_jobs(key, jobs, db)
+                await db.commit()
+                logger.info(
+                    "Background warm: cached %d/%d companies",
+                    sum(1 for j in results if isinstance(j, list) and j),
+                    len(to_warm),
+                )
         except Exception:
-            logger.exception("Failed to get result for %s", key)
+            logger.warning("Background warm failed", exc_info=True)
+        finally:
+            _warming_in_progress.difference_update(to_warm)
 
-    # Cache completed results (each in its own savepoint)
-    for key, jobs in fetched.items():
-        try:
-            async with db.begin_nested():
-                await set_cached_jobs(key, jobs, db)
-        except Exception:
-            logger.exception("Failed to cache jobs for %s", key)
-
-    # Match fetched results in parallel
-    match_tasks_list = [
-        _match_and_build(
-            fetcher, key, jobs, target_role, target_seniority, target_locations
-        )
-        for key, jobs in fetched.items()
-    ]
-    recs: list[dict] = []
-    if match_tasks_list:
-        match_results = await asyncio.gather(*match_tasks_list)
-        recs = [r for r in match_results if r]
-
-    return recs, len(done)
+    try:
+        loop = asyncio.get_running_loop()
+        task = loop.create_task(_warm())
+        # Retrieve exception on completion to suppress "exception was never retrieved"
+        task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+    except RuntimeError:
+        _warming_in_progress.difference_update(to_warm)
 
 
 async def _match_and_build(
@@ -303,20 +282,11 @@ async def get_recommendations(
 ) -> dict:
     """Return top companies with live openings matching the user's target role.
 
-    Performance strategy (cache-first):
-      1. Return cached results immediately — no external HTTP if cache has enough.
-      2. Only fetch fresh data if cached results < limit, with a 5s total timeout.
+    Performance strategy (cache-first, non-blocking):
+      1. Return cached + network results immediately — no external HTTP.
+      2. If uncached companies exist, fire background warming so the next
+         request hits cache.
       3. Location-scoped scanning: skip non-matching regions when location is set.
-
-    Returns:
-        {
-            "recommendations": [...],
-            "scan_stats": {
-                "companies_scanned": int,
-                "cache_hits": int,
-                "fresh_scans": int,
-            }
-        }
     """
     fetcher = JobFetcher()
     max_results = min(limit, settings.RECOMMENDATION_MAX_RESULTS * 3)
@@ -370,24 +340,14 @@ async def get_recommendations(
     # Derive a single location hint for fallback fetchers (JobSpy / Adzuna)
     location_hint = target_locations[0] if target_locations else None
 
-    # Phase 3: Only fetch fresh data if we don't have enough results.
-    # Use a tight timeout so we never block longer than _FETCH_TIMEOUT.
-    fresh_scanned = 0
-    max_scan = settings.RECOMMENDATION_MAX_SCAN
-
-    if len(recommendations) < max_results and uncached:
-        to_fetch = uncached[:max_scan]
-        fresh_recs, fresh_scanned = await _fetch_fresh_and_match(
-            to_fetch,
-            fetcher,
-            target_role,
-            target_seniority,
+    # Phase 3: Background warming — never block the request for fresh fetches.
+    # If uncached companies exist, fire a background task to warm them so the
+    # next request hits cache.  The user sees cached + network results instantly.
+    if uncached:
+        _schedule_background_warm(
+            uncached[: settings.RECOMMENDATION_MAX_SCAN],
             location_hint,
-            db,
-            target_locations=target_locations,
         )
-        recommendations.extend(fresh_recs)
-        await db.flush()
 
     # --- Merge network signals into ATS results + add network-only entries ---
     merged: list[dict] = []
@@ -460,13 +420,15 @@ async def get_recommendations(
             len(merged),
         )
 
+    uncached_count = len(uncached)
+
     return {
         "recommendations": merged,
         "scan_stats": {
-            "companies_scanned": cache_hits + fresh_scanned,
+            "companies_scanned": cache_hits,
             "cache_hits": cache_hits,
-            "fresh_scans": fresh_scanned,
             "network_matches": network_count,
+            "uncached_count": uncached_count,
         },
     }
 
