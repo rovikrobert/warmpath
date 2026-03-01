@@ -52,3 +52,4 @@ from app.models.gtm import (  # noqa: E402, F401
     PartnershipOpportunity,
     PricingBenchmark,
 )
+from app.models.memory import Memory  # noqa: E402, F401

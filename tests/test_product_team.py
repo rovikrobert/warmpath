@@ -16,7 +16,28 @@ Tests cover:
 from __futu[RESEND_KEY_REDACTED] import annotations
 
 import json
+from unittest.mock import patch
+
 import pytest
+
+from agents.shared.web_tools import SearchResult
+
+# ---------------------------------------------------------------------------
+# Shared mock helpers — avoid real HTTP calls in scan() tests
+# ---------------------------------------------------------------------------
+
+_FAKE_SEARCH_RESULTS = [
+    SearchResult(
+        title="Referral platform discussion",
+        url="https://reddit.com/r/jobs/example",
+        snippet="Users discuss warm intro tools for job searching",
+    ),
+]
+
+
+def _mock_web_search(query: str, max_results: int = 5) -> list[SearchResult]:
+    """Return canned search results instead of hitting DuckDuckGo."""
+    return _FAKE_SEARCH_RESULTS[:max_results]
 
 
 # ---------------------------------------------------------------------------
@@ -261,23 +282,27 @@ class TestDesignLeadScan:
 # ---------------------------------------------------------------------------
 
 
+@patch(
+    "product_team.user_researcher.user_researcher.web_search",
+    side_effect=_mock_web_search,
+)
 class TestUserResearcherScan:
     """UserResearcher scan() should return a ProductTeamReport."""
 
-    def test_scan_returns_report(self):
+    def test_scan_returns_report(self, _ws):
         from product_team.user_researcher.user_researcher import scan
 
         report = scan()
         assert report.agent == "user_researcher"
         assert isinstance(report.scan_duration_seconds, float)
 
-    def test_scan_maps_journeys(self):
+    def test_scan_maps_journeys(self, _ws):
         from product_team.user_researcher.user_researcher import scan
 
         report = scan()
         assert "pages_found" in report.metrics or "total_page_files" in report.metrics
 
-    def test_scan_produces_insights(self):
+    def test_scan_produces_insights(self, _ws):
         from product_team.user_researcher.user_researcher import scan
 
         report = scan()
@@ -675,10 +700,14 @@ class TestCosIntegration:
 # ---------------------------------------------------------------------------
 
 
+@patch(
+    "product_team.user_researcher.user_researcher.web_search",
+    side_effect=_mock_web_search,
+)
 class TestUserResearcherPostHog:
     """UserResearcher PostHog analytics integration."""
 
-    def test_analyze_posthog_no_api_key(self, monkeypatch):
+    def test_analyze_posthog_no_api_key(self, _ws, monkeypatch):
         monkeypatch.delenv("POSTHOG_API_KEY", raising=False)
         monkeypatch.delenv("POSTHOG_PROJECT_ID", raising=False)
         from product_team.user_researcher.user_researcher import _analyze_posthog_data
@@ -689,7 +718,7 @@ class TestUserResearcherPostHog:
         assert len(insights) == 1
         assert metrics.get("posthog_configured") is False
 
-    def test_analyze_posthog_with_mock_data(self, monkeypatch):
+    def test_analyze_posthog_with_mock_data(self, _ws, monkeypatch):
         monkeypatch.setenv("POSTHOG_API_KEY", "phx_test_key")
         monkeypatch.setenv("POSTHOG_PROJECT_ID", "12345")
         mock_response = {
@@ -709,7 +738,7 @@ class TestUserResearcherPostHog:
         assert metrics.get("posthog_configured") is True
         assert len(insights) >= 1
 
-    def test_scan_includes_posthog(self):
+    def test_scan_includes_posthog(self, _ws):
         from product_team.user_researcher.user_researcher import scan
 
         report = scan()
@@ -721,10 +750,14 @@ class TestUserResearcherPostHog:
 # ---------------------------------------------------------------------------
 
 
+@patch(
+    "product_team.user_researcher.user_researcher.web_search",
+    side_effect=_mock_web_search,
+)
 class TestUserResearcherCompetitors:
     """UserResearcher competitive monitoring."""
 
-    def test_monitor_competitors_loads_registry(self):
+    def test_monitor_competitors_loads_registry(self, _ws):
         from product_team.user_researcher.user_researcher import _monitor_competitors
 
         insights = []
@@ -734,7 +767,7 @@ class TestUserResearcherCompetitors:
         assert "competitors_tracked" in metrics
         assert metrics["competitors_tracked"] >= 4
 
-    def test_monitor_competitors_produces_insights(self):
+    def test_monitor_competitors_produces_insights(self, _ws):
         from product_team.user_researcher.user_researcher import _monitor_competitors
 
         insights = []
@@ -743,7 +776,7 @@ class TestUserResearcherCompetitors:
         _monitor_competitors(insights, findings, metrics)
         assert len(insights) >= 1
 
-    def test_scan_includes_competitors(self):
+    def test_scan_includes_competitors(self, _ws):
         from product_team.user_researcher.user_researcher import scan
 
         report = scan()

@@ -77,6 +77,16 @@ class Settings(BaseSettings):
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
     OPENAI_EMBEDDING_DIMS: int = 1536
 
+    # Unified Memory Service
+    MEMORY_SERVICE_ENABLED: bool = False
+    MEMORY_QDRANT_COLLECTION: str = "warmpath_memory"
+    MEMORY_BM25_WEIGHT: float = 0.4
+    MEMORY_VECTOR_WEIGHT: float = 0.6
+    MEMORY_TEMPORAL_HALF_LIFE_DAYS: int = 90
+    MEMORY_SESSION_HALF_LIFE_DAYS: int = 30
+    MEMORY_MMR_LAMBDA: float = 0.7
+    MEMORY_CANDIDATE_POOL: int = 50
+
     POSTHOG_API_KEY: str = ""
     POSTHOG_PROJECT_ID: str = ""
     POSTHOG_HOST: str = "https://app.posthog.com"
