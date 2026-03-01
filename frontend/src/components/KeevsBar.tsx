@@ -11,6 +11,7 @@ import TrebAvatar from './TrebAvatar';
  */
 const ROUTE_FEED_TYPE = {
   '/coach': null,
+  '/notifications': null,
   '/contacts': 'enrichment_prompt',
   '/referrals': 'marketplace_signal',
   '/applications': 'outcome_check',
