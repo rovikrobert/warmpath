@@ -80,3 +80,42 @@ async def notify_kpi_anomaly(
 
     message = _format_kpi_alert(anomalies)
     await _send_telegram(message)
+
+
+def _format_job_scan_alert(anomalies: list[dict[str, Any]]) -> str:
+    """Format job scan anomaly alerts for Telegram."""
+    count = len(anomalies)
+    lines = [
+        f"[!] Job Scan Anomaly — {count} issue{'s' if count != 1 else ''} detected",
+        "",
+    ]
+
+    for a in anomalies[:10]:
+        sev = a.get("severity", "medium").upper()
+        title = a.get("title", "unknown")
+        lines.append(f"  [{sev}] {title}")
+
+    lines.append("")
+    lines.append("Next scan: ~4h")
+    return "\n".join(lines)
+
+
+async def notify_job_scan_anomalies(
+    anomalies: list[dict[str, Any]],
+    redis_url: str,
+) -> None:
+    """Send a Telegram alert for job scan anomalies.
+
+    Deduplicates: max one job scan alert per day.
+    """
+    if not anomalies:
+        return
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    if await _mark_notified(redis_url, "job_scan_anomaly", today):
+        logger.info("Job scan anomaly alert already sent today — skipping")
+        return
+
+    message = _format_job_scan_alert(anomalies)
+    await _send_telegram(message)

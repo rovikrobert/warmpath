@@ -113,6 +113,39 @@ async def _collect_current_metrics() -> dict[str, float]:
     except Exception:
         logger.debug("Failed to collect finding stats", exc_info=True)
 
+    try:
+        # Job scan metrics from latest cache entries
+        import sqlalchemy as sa
+        from sqlalchemy import func, select
+
+        from app.database import _get_session_factory
+        from app.models.enrichment import EnrichmentCache
+
+        job_count_int = func.cast(
+            EnrichmentCache.data["job_count"].as_string(), sa.Integer
+        )
+
+        async with _get_session_factory()() as db:
+            result = await db.execute(
+                select(
+                    func.sum(job_count_int).label("total_jobs"),
+                ).where(EnrichmentCache.source == "job_scan")
+            )
+            total_jobs = result.scalar() or 0
+            metrics["job_scan_total_jobs"] = float(total_jobs)
+
+            # Count companies with zero jobs
+            zero_result = await db.execute(
+                select(func.count()).where(
+                    EnrichmentCache.source == "job_scan",
+                    job_count_int == 0,
+                )
+            )
+            zero_count = zero_result.scalar() or 0
+            metrics["job_scan_zero_companies"] = float(zero_count)
+    except Exception:
+        logger.debug("Failed to collect job scan metrics", exc_info=True)
+
     return metrics
 
 
