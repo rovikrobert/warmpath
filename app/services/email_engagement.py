@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models.contact import CsvUpload
+from app.models.contact import Contact, CsvUpload
 from app.models.email_campaign import EmailCampaignLog
 from app.models.enrichment import UsageLog
 from app.models.marketplace import IntroFacilitation, NetworkSharingPreferences
@@ -367,11 +367,16 @@ async def send_csv_reminder_d3(db: AsyncSession) -> int:
 
 
 async def send_nh_sharing_reminder_d2(db: AsyncSession) -> int:
-    """Nudge network holders who uploaded CSV but haven't enabled sharing."""
+    """Nudge network holders who have contacts but haven't enabled sharing."""
     cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
 
-    # Users who have CSV uploads but no opt-in
-    uploaded_subq = select(CsvUpload.user_id).distinct().scalar_subquery()
+    # Users who have actual contacts (not just a csv_upload record)
+    has_contacts_subq = (
+        select(Contact.user_id)
+        .where(Contact.deleted_at.is_(None))
+        .distinct()
+        .scalar_subquery()
+    )
     opted_in_subq = (
         select(NetworkSharingPreferences.user_id)
         .where(NetworkSharingPreferences.opt_in_marketplace.is_(True))
@@ -382,7 +387,7 @@ async def send_nh_sharing_reminder_d2(db: AsyncSession) -> int:
             User.deleted_at.is_(None),
             User.marketing_opt_out.is_(False),
             User.created_at < cutoff,
-            User.id.in_(uploaded_subq),
+            User.id.in_(has_contacts_subq),
             User.id.not_in(opted_in_subq),
         )
     )
@@ -433,17 +438,22 @@ async def send_nh_sharing_reminder_d2(db: AsyncSession) -> int:
 
 
 async def send_first_search_nudge_d2(db: AsyncSession) -> int:
-    """Nudge job seekers who uploaded CSV but haven't searched."""
+    """Nudge job seekers who have contacts but haven't searched."""
     cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
 
-    uploaded_subq = select(CsvUpload.user_id).distinct().scalar_subquery()
+    has_contacts_subq = (
+        select(Contact.user_id)
+        .where(Contact.deleted_at.is_(None))
+        .distinct()
+        .scalar_subquery()
+    )
     searched_subq = select(SearchRequest.user_id).distinct().scalar_subquery()
     result = await db.execute(
         select(User).where(
             User.deleted_at.is_(None),
             User.marketing_opt_out.is_(False),
             User.created_at < cutoff,
-            User.id.in_(uploaded_subq),
+            User.id.in_(has_contacts_subq),
             User.id.not_in(searched_subq),
         )
     )
