@@ -222,3 +222,73 @@ async def test_run_skips_augment_when_no_findings():
 
     assert result == []
     mock_sdk.assert_not_called()
+
+
+def test_save_report_writes_latest_json(tmp_path):
+    """_save_report persists AgentReport as {agent}_latest.json."""
+    import json
+
+    from app.agent_runtime.teams.base import _TEAM_REPORTS_DIRS
+
+    # Point test_team to tmp_path
+    _TEAM_REPORTS_DIRS["test_team"] = tmp_path
+
+    team = _TestTeam()
+    report = _mock_report()
+    team._save_report(report)
+
+    path = tmp_path / "scanner_a_latest.json"
+    assert path.exists()
+    data = json.loads(path.read_text())
+    assert data["agent"] == "scanner_a"
+    assert len(data["findings"]) == 1
+    assert data["findings"][0]["title"] == "Test finding"
+
+    # Cleanup
+    del _TEAM_REPORTS_DIRS["test_team"]
+
+
+def test_save_report_skips_when_no_reports_dir():
+    """_save_report silently skips when team has no report directory."""
+    from app.agent_runtime.teams.base import _TEAM_REPORTS_DIRS
+
+    _TEAM_REPORTS_DIRS["test_team"] = None
+
+    team = _TestTeam()
+    report = _mock_report()
+    # Should not raise
+    team._save_report(report)
+
+    del _TEAM_REPORTS_DIRS["test_team"]
+
+
+def test_run_scanners_saves_report_after_scan(tmp_path):
+    """run_scanners calls _save_report for each successful scan."""
+    from app.agent_runtime.teams.base import _TEAM_REPORTS_DIRS
+
+    _TEAM_REPORTS_DIRS["test_team"] = tmp_path
+
+    team = _TestTeam()
+    with patch.object(team, "_run_scanner", return_value=_mock_report()):
+        findings = team.run_scanners()
+
+    assert len(findings) == 1
+    assert (tmp_path / "scanner_a_latest.json").exists()
+
+    del _TEAM_REPORTS_DIRS["test_team"]
+
+
+def test_resolve_reports_dir_engineering():
+    """_resolve_reports_dir returns correct path for engineering."""
+    from app.agent_runtime.teams.base import _TEAM_REPORTS_DIRS, _resolve_reports_dir
+
+    # Clear cache for clean test
+    _TEAM_REPORTS_DIRS.pop("engineering", None)
+
+    result = _resolve_reports_dir("engineering")
+    assert result is not None
+    assert result.name == "reports"
+    assert "agents" in str(result)
+
+    # Cleanup
+    _TEAM_REPORTS_DIRS.pop("engineering", None)

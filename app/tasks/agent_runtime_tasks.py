@@ -63,6 +63,27 @@ def dispatch_kpi_check() -> None:
         return
 
     anomalies = asyncio.get_event_loop().run_until_complete(check_all_kpis())
+
+    # Send consolidated Telegram alert for anomalies (deduped: max once/day)
+    if anomalies:
+        from app.agent_runtime.notifications import notify_kpi_anomaly
+
+        asyncio.get_event_loop().run_until_complete(
+            notify_kpi_anomaly(
+                anomalies=[
+                    {
+                        "severity": a["severity"],
+                        "metric": a["metric"],
+                        "value": f"{a['current_value']:.2f}"
+                        if isinstance(a["current_value"], float)
+                        else str(a["current_value"]),
+                    }
+                    for a in anomalies
+                ],
+                redis_url=settings.REDIS_URL,
+            )
+        )
+
     for anomaly in anomalies:
         event = create_event(
             event_type="agent_finding",

@@ -162,3 +162,96 @@ async def test_consumer_loop_skips_duplicate_events_and_acks():
         mock_process.assert_not_called()
         # Message was still ACK'd
         mock_redis.xack.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run_cos_brief_calls_run_daily_for_daily_cadence():
+    """_run_cos_brief calls CoS run_daily for daily scans."""
+    from app.agent_runtime.runner import _run_cos_brief
+
+    with patch(
+        "agents.chief_of_staff.cos_agent.run_daily", return_value="# Daily Brief"
+    ) as mock_daily:
+        await _run_cos_brief("daily")
+    mock_daily.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run_cos_brief_calls_run_weekly_for_weekly_cadence():
+    """_run_cos_brief calls CoS run_weekly for weekly scans."""
+    from app.agent_runtime.runner import _run_cos_brief
+
+    with patch(
+        "agents.chief_of_staff.cos_agent.run_weekly", return_value="# Weekly Brief"
+    ) as mock_weekly:
+        await _run_cos_brief("weekly")
+    mock_weekly.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run_cos_brief_handles_failu[RESEND_KEY_REDACTED]():
+    """_run_cos_brief logs exception but does not raise."""
+    from app.agent_runtime.runner import _run_cos_brief
+
+    with patch(
+        "agents.chief_of_staff.cos_agent.run_daily",
+        side_effect=Exception("Notion down"),
+    ):
+        # Should not raise
+        await _run_cos_brief("daily")
+
+
+@pytest.mark.asyncio
+async def test_consumer_loop_calls_cos_brief_after_scheduled_scan():
+    """After processing a scheduled_scan event, consumer calls _run_cos_brief."""
+    import asyncio
+
+    from app.agent_runtime.runner import run_consumer_loop
+
+    event = create_event(
+        event_type="scheduled_scan",
+        source="celery_beat",
+        payload={"cadence": "daily"},
+        payload_key="scheduled_daily",
+    )
+    event_json = json.dumps(event)
+
+    mock_redis = AsyncMock()
+    mock_redis.xgroup_create = AsyncMock()
+    mock_redis.xreadgroup = AsyncMock(
+        side_effect=[
+            [("warmpath:agent_events", [("1-0", {"event": event_json})])],
+            asyncio.CancelledError(),
+        ]
+    )
+    mock_redis.xack = AsyncMock()
+    mock_redis.aclose = AsyncMock()
+
+    mock_settings = type(
+        "S",
+        (),
+        {
+            "AGENT_RUNTIME_ENABLED": True,
+            "REDIS_URL": "redis://localhost:6379/0",
+            "AGENT_RUNTIME_EVENT_COOLDOWN_SECONDS": 900,
+        },
+    )()
+
+    mock_process = AsyncMock(
+        return_value={"findings": [], "actions": [], "routed_teams": ["engineering"]}
+    )
+
+    with (
+        patch("app.config.settings", mock_settings),
+        patch("redis.asyncio.from_url", return_value=mock_redis),
+        patch(
+            "app.agent_runtime.runner.AgentRuntimeRedis.is_duplicate",
+            AsyncMock(return_value=False),
+        ),
+        patch("app.agent_runtime.runner.process_event", mock_process),
+        patch("app.agent_runtime.runner._run_cos_brief") as mock_cos,
+    ):
+        await run_consumer_loop()
+
+    mock_process.assert_called_once()
+    mock_cos.assert_called_once_with("daily")
