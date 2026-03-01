@@ -1,4 +1,5 @@
 import base64
+import logging
 import math
 import uuid
 from datetime import datetime, timezone
@@ -86,6 +87,33 @@ async def _validate_csv_file(file: UploadFile) -> bytes:
     return raw_bytes
 
 
+@router.get("/uploads/latest")
+async def get_latest_upload(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Get user's most recent CSV upload status."""
+    result = await db.execute(
+        select(CsvUpload)
+        .where(CsvUpload.user_id == current_user.id)
+        .order_by(CsvUpload.created_at.desc())
+        .limit(1)
+    )
+    upload = result.scalar_one_or_none()
+    if upload is None:
+        return {"data": None, "meta": {}}
+    return {
+        "data": {
+            "id": str(upload.id),
+            "status": upload.status,
+            "row_count": upload.row_count,
+            "error_message": upload.error_message,
+            "created_at": str(upload.created_at),
+        },
+        "meta": {},
+    }
+
+
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 @timed("csv_upload_endpoint")
 async def upload_csv(
@@ -109,6 +137,14 @@ async def upload_csv(
 
     raw_bytes = await _validate_csv_file(file)
 
+    # Warn ops about large uploads before dispatching
+    _log = logging.getLogger(__name__)
+    row_count = raw_bytes.count(b"\n")
+    if row_count > 5000:
+        _log.warning(
+            "Large CSV upload: %d rows from user %s", row_count, current_user.id
+        )
+
     # Base64-encode for safe serialization
     content_b64 = base64.b64encode(raw_bytes).decode("ascii")
 
@@ -127,9 +163,6 @@ async def upload_csv(
         await db.commit()
         from app.tasks.csv_processing import process_csv_upload
 
-        import logging
-
-        _log = logging.getLogger(__name__)
         result = process_csv_upload.delay(
             str(csv_upload.id), str(current_user.id), content_b64
         )

@@ -579,8 +579,9 @@ async def test_weekly_digest_for_active_user(
     db.add(user)
     await db.flush()
 
-    # Add recent activity
+    # Add recent activity and contacts (required by _user_has_contacts guard)
     db.add(UsageLog(user_id=user.id, action="search"))
+    db.add(_make_contact(user.id))
     await db.flush()
 
     count = await send_weekly_digest(db)
@@ -884,3 +885,89 @@ async def test_intro_relay_email_dedup_prevents_duplicate_send(
     eid2 = await send_intro_relay_email(**kwargs)
     assert eid2 is None
     assert mock_send.call_count == 1  # not called again
+
+
+# ---------------------------------------------------------------------------
+# G1: Per-user email circuit breaker tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@patch("app.services.email_engagement._send_email")
+async def test_email_circuit_breaker_caps_at_3_per_week(
+    mock_send: object, db: AsyncSession
+) -> None:
+    """User who already received 3 marketing emails this week is skipped by campaigns."""
+    user = _make_user(created_at=datetime.now(timezone.utc) - timedelta(hours=24))
+    db.add(user)
+    await db.flush()
+
+    # Add 3 marketing email logs in the last 7 days
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    for email_type in ["welcome_js", "csv_reminder_d1", "weekly_digest"]:
+        db.add(
+            EmailCampaignLog(
+                user_id=user.id,
+                email_type=email_type,
+                sent_date=today,
+            )
+        )
+    await db.flush()
+
+    # csv_reminder_d1 should skip this user because budget is exhausted
+    count = await send_csv_reminder_d1(db)
+    assert count == 0
+    mock_send.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch("app.services.email_engagement._send_email")
+async def test_email_circuit_breaker_excludes_transactional(
+    mock_send: object, db: AsyncSession
+) -> None:
+    """Transactional emails (upload_failed) don't count toward the weekly budget."""
+    user = _make_user(created_at=datetime.now(timezone.utc) - timedelta(hours=24))
+    db.add(user)
+    await db.flush()
+
+    # Add 3 transactional email logs — these should NOT count
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    for email_type in ["upload_failed", "intro_request_notification", "intro_relay"]:
+        db.add(
+            EmailCampaignLog(
+                user_id=user.id,
+                email_type=email_type,
+                sent_date=today,
+            )
+        )
+    await db.flush()
+
+    # csv_reminder_d1 should still send — transactional emails are excluded
+    count = await send_csv_reminder_d1(db)
+    assert count == 1
+    mock_send.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# G4: Email precondition assert tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@patch("app.services.email_engagement._send_email")
+async def test_weekly_digest_skips_user_with_zero_contacts(
+    mock_send: object, db: AsyncSession
+) -> None:
+    """User with usage logs but no contacts should not receive weekly digest."""
+    user = _make_user()
+    db.add(user)
+    await db.flush()
+
+    # Add recent activity so user qualifies for digest
+    db.add(UsageLog(user_id=user.id, action="search"))
+    await db.flush()
+
+    # No contacts added — _user_has_contacts should block sending
+    count = await send_weekly_digest(db)
+    assert count == 0
+    mock_send.assert_not_called()

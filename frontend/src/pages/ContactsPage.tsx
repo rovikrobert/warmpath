@@ -230,6 +230,10 @@ export default function ContactsPage() {
   // Batch processing banner state (set when upload completes in batch mode)
   const [batchUpload, setBatchUpload] = useState(null);
 
+  // Latest upload status banner
+  const [latestUpload, setLatestUpload] = useState(null);
+  const [latestUploadDismissed, setLatestUploadDismissed] = useState(false);
+
   // Enrichment prompt feed items
   const [enrichmentPrompts, setEnrichmentPrompts] = useState([]);
   const [enrichmentRefreshKey, setEnrichmentRefreshKey] = useState(0);
@@ -306,6 +310,13 @@ export default function ContactsPage() {
   useEffect(() => {
     companiesApi.list(1, 200).then((res) => {
       setCompanyNames((res.data || []).map((c) => c.name).filter(Boolean));
+    }).catch(() => {});
+  }, []);
+
+  // Check latest upload status on mount (for failure/processing banners)
+  useEffect(() => {
+    contactsApi.getLatestUpload().then((res) => {
+      if (res.data) setLatestUpload(res.data);
     }).catch(() => {});
   }, []);
 
@@ -537,6 +548,57 @@ export default function ContactsPage() {
       </div>
 
       <EnrichmentProgress key={enrichmentRefreshKey} />
+
+      {/* Upload failure banner */}
+      {latestUpload && !latestUploadDismissed && latestUpload.status === 'failed' && (
+        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3" role="alert">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <svg className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-amber-200">
+                  Your last upload didn't go through — it was a problem on our end, not yours.
+                </p>
+                {latestUpload.error_message && (
+                  <p className="mt-1 text-xs text-amber-300/70">{latestUpload.error_message}</p>
+                )}
+                <button
+                  onClick={() => { setLatestUploadDismissed(true); setShowBulkModal(true); }}
+                  className="mt-2 rounded-md bg-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-200 hover:bg-amber-500/30"
+                >
+                  Re-Upload CSV
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => setLatestUploadDismissed(true)}
+              aria-label="Dismiss upload failure banner"
+              className="shrink-0 text-amber-400/60 hover:text-amber-400"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Upload processing banner */}
+      {latestUpload && !latestUploadDismissed && (latestUpload.status === 'processing' || latestUpload.status === 'queued') && (
+        <div className="mb-4 rounded-lg border border-blue-500/20 bg-blue-500/10 px-4 py-3" role="status">
+          <div className="flex items-center gap-3">
+            <svg className="h-5 w-5 shrink-0 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <p className="text-sm text-blue-200">
+              Your upload is still processing...
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Batch processing banner */}
       {batchUpload && batchUpload.progress_phase?.startsWith('batch_') && (

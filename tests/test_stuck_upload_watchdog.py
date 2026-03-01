@@ -229,3 +229,43 @@ async def test_watchdog_batch_upload_longer_threshold(mock_send, db: AsyncSessio
     await db.refresh(upload)
     assert upload.status == "processing"  # Not failed — within 2hr threshold
     assert mock_send.call_count == 0
+
+
+# ---------------------------------------------------------------------------
+# Telegram alert tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@patch.dict(
+    "os.environ", {"TELEGRAM_BOT_TOKEN": "test-token", "TELEGRAM_CHAT_ID": "123"}
+)
+@patch("httpx.AsyncClient.post")
+async def test_watchdog_telegram_alert_sent_on_failure(mock_post):
+    """_send_watchdog_telegram_alert sends a Telegram message with counts."""
+    from unittest.mock import AsyncMock
+
+    from app.tasks.infra_tasks import _send_watchdog_telegram_alert
+
+    mock_post.return_value = AsyncMock()
+
+    await _send_watchdog_telegram_alert(2, 1)
+
+    mock_post.assert_called_once()
+    call_kwargs = mock_post.call_args
+    payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
+    assert "2 stuck upload(s)" in payload["text"]
+    assert "1 user(s) emailed" in payload["text"]
+    assert payload["chat_id"] == "123"
+
+
+@pytest.mark.asyncio
+@patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "", "TELEGRAM_CHAT_ID": ""})
+@patch("httpx.AsyncClient.post")
+async def test_watchdog_telegram_alert_skipped_when_not_configured(mock_post):
+    """_send_watchdog_telegram_alert is a no-op when Telegram env vars are empty."""
+    from app.tasks.infra_tasks import _send_watchdog_telegram_alert
+
+    await _send_watchdog_telegram_alert(1, 1)
+
+    mock_post.assert_not_called()

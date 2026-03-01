@@ -370,3 +370,59 @@ async def import_resume(
     await db.commit()
 
     return {"data": parsed, "meta": {}}
+
+
+# ---------------------------------------------------------------------------
+# Admin: email campaign logs
+# ---------------------------------------------------------------------------
+
+
+def _require_admin(current_user: User) -> None:
+    """Raise 403 if user is not an admin."""
+    if not getattr(current_user, "is_admin", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+
+
+@router.get("/admin/emails/{user_id}")
+async def get_user_email_log(
+    user_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Admin endpoint: view email campaign logs for a user."""
+    import uuid as _uuid
+
+    _require_admin(current_user)
+
+    try:
+        target_user_id = _uuid.UUID(user_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Invalid user_id format",
+        ) from exc
+
+    from app.models.email_campaign import EmailCampaignLog
+
+    result = await db.execute(
+        select(EmailCampaignLog)
+        .where(EmailCampaignLog.user_id == target_user_id)
+        .order_by(EmailCampaignLog.created_at.desc())
+        .limit(50)
+    )
+    logs = result.scalars().all()
+    return {
+        "data": [
+            {
+                "email_type": log.email_type,
+                "sent_date": log.sent_date,
+                "external_id": log.external_id,
+                "created_at": str(log.created_at),
+            }
+            for log in logs
+        ],
+        "meta": {"count": len(logs)},
+    }
