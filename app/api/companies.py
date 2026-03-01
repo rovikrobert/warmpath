@@ -16,6 +16,7 @@ from app.services.board_registry import (
     lookup_careers_url,
     lookup_or_discover_boards,
 )
+from app.services.company_normalizer import normalize_company_name
 from app.services.job_fetcher import JobFetcher
 from app.services.job_recommendations import set_cached_jobs
 from app.utils.security import get_current_user
@@ -127,33 +128,31 @@ async def suggest_companies(
                 }
             )
 
-    # Also check unlinked contacts (company_id IS NULL)
-    unlinked_query = (
-        select(
-            Contact.current_company,
-            func.count(Contact.id).label("contact_count"),
-        )
-        .where(
-            Contact.user_id == current_user.id,
-            Contact.deleted_at.is_(None),
-            Contact.company_id.is_(None),
-            Contact.current_company.ilike(f"{q}%"),
-        )
-        .group_by(Contact.current_company)
-        .order_by(func.count(Contact.id).desc())
-        .limit(limit)
+    # Also check unlinked contacts (company_id IS NULL).
+    # NOTE: current_company is EncryptedString — SQL-level ILIKE operates on
+    # ciphertext and never matches.  Load rows and filter in Python.
+    unlinked_query = select(Contact.current_company).where(
+        Contact.user_id == current_user.id,
+        Contact.deleted_at.is_(None),
+        Contact.company_id.is_(None),
+        Contact.current_company.isnot(None),
     )
     unlinked_rows = (await db.execute(unlinked_query)).all()
-    for row in unlinked_rows:
-        if not row.current_company:
+    company_counts: dict[str, int] = {}
+    for (company_name,) in unlinked_rows:
+        if not company_name or not company_name.strip():
             continue
-        key = row.current_company.lower()
+        normalized = normalize_company_name(company_name) or company_name
+        if normalized.lower().startswith(q_lower):
+            key = normalized.lower()
+            company_counts[key] = company_counts.get(key, 0) + 1
+    for key, count in sorted(company_counts.items(), key=lambda x: x[1], reverse=True):
         if key not in seen:
             seen.add(key)
             results.append(
                 {
-                    "name": row.current_company,
-                    "contact_count": row.contact_count,
+                    "name": key.title() if key.islower() else key,
+                    "contact_count": count,
                     "source": "own_contacts",
                 }
             )
@@ -264,45 +263,56 @@ async def list_companies(
 
     # --- 2. Unlinked contacts (company_id IS NULL, matched by current_company)
     # These are contacts imported from CSV before company normalisation ran.
+    # NOTE: current_company is EncryptedString — SQL-level ILIKE operates on
+    # ciphertext and never matches.  We must load rows and filter in Python
+    # where the ORM decrypts the value transparently.
     if search:
-        unlinked_query = (
-            select(
-                Contact.current_company,
-                func.count(Contact.id).label("contact_count"),
-            )
-            .where(
-                Contact.user_id == current_user.id,
-                Contact.deleted_at.is_(None),
-                Contact.company_id.is_(None),
-                Contact.current_company.ilike(f"%{search}%"),
-            )
-            .group_by(Contact.current_company)
+        unlinked_query = select(Contact.current_company).where(
+            Contact.user_id == current_user.id,
+            Contact.deleted_at.is_(None),
+            Contact.company_id.is_(None),
+            Contact.current_company.isnot(None),
         )
         unlinked_result = await db.execute(unlinked_query)
-        unlinked_rows = unlinked_result.all()
+
+        # Decrypt in Python, normalize, and filter by search term.
+        # Normalization maps "Google LLC" → "Google" so unlinked counts
+        # merge correctly with FK-based Stage 1 results.
+        search_lower = search.lower()
+        unlinked_counts: dict[str, int] = {}
+        for (raw_name,) in unlinked_result:
+            if not raw_name or not raw_name.strip():
+                continue
+            normalized = normalize_company_name(raw_name) or raw_name
+            if search_lower in normalized.lower():
+                key = normalized.lower()
+                unlinked_counts[key] = unlinked_counts.get(key, 0) + 1
 
         # Merge: add unlinked counts to existing entries or create new ones
         existing_names = {d["name"].lower() for d in data}
-        for row in unlinked_rows:
-            name_lower = (row.current_company or "").lower()
+        for norm_lower, count in unlinked_counts.items():
             # Check if this company already appeared in the FK results
             merged = False
             for d in data:
-                if d["name"].lower() == name_lower:
-                    d["contact_count"] += row.contact_count
+                if d["name"].lower() == norm_lower:
+                    d["contact_count"] += count
                     merged = True
                     break
-            if not merged and name_lower not in existing_names:
-                existing_names.add(name_lower)
+            if not merged and norm_lower not in existing_names:
+                existing_names.add(norm_lower)
+                # Title-case the normalized name for display
+                display = (
+                    norm_lower.upper() if len(norm_lower) <= 4 else norm_lower.title()
+                )
                 data.append(
                     {
                         "id": None,
-                        "name": row.current_company,
+                        "name": display,
                         "domain": None,
                         "industry": None,
                         "company_size": None,
                         "headquarters": None,
-                        "contact_count": row.contact_count,
+                        "contact_count": count,
                         "created_at": None,
                     }
                 )
