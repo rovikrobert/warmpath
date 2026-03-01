@@ -21,6 +21,30 @@ from unittest.mock import patch
 
 import pytest
 
+from agents.shared.web_tools import SearchResult
+
+# ---------------------------------------------------------------------------
+# Shared mock helpers — avoid real HTTP calls in scan() tests
+# ---------------------------------------------------------------------------
+
+_FAKE_SEARCH_RESULTS = [
+    SearchResult(
+        title="Competitor pricing update",
+        url="https://example.com/pricing",
+        snippet="Plans start at $19/month for individual users",
+    ),
+]
+
+
+def _mock_web_search(query: str, max_results: int = 5) -> list[SearchResult]:
+    """Return canned search results instead of hitting DuckDuckGo."""
+    return _FAKE_SEARCH_RESULTS[:max_results]
+
+
+def _mock_web_fetch(url: str, max_chars: int = 10000) -> str:
+    """Return canned HTML instead of fetching a real URL."""
+    return "<html><body>Mock competitor page content</body></html>"
+
 
 # ---------------------------------------------------------------------------
 # TestGTMPrivacyGuard
@@ -312,10 +336,11 @@ class TestStrategyContext:
 # ---------------------------------------------------------------------------
 
 
+@patch("gtm_team.stratops.scanner.web_search", side_effect=_mock_web_search)
 class TestStratOpsScan:
     """StratOps scanner produces competitive and positioning findings."""
 
-    def test_scan_returns_report(self):
+    def test_scan_returns_report(self, _ws):
         from gtm_team.stratops.scanner import scan
 
         report = scan()
@@ -323,19 +348,19 @@ class TestStratOpsScan:
         assert isinstance(report.scan_duration_seconds, float)
         assert "strategic_readiness_score" in report.metrics
 
-    def test_scan_finds_strategy_docs(self):
+    def test_scan_finds_strategy_docs(self, _ws):
         from gtm_team.stratops.scanner import scan
 
         report = scan()
         assert report.metrics.get("strategy_docs_loaded", 0) > 0
 
-    def test_scan_has_market_insights(self):
+    def test_scan_has_market_insights(self, _ws):
         from gtm_team.stratops.scanner import scan
 
         report = scan()
         assert len(report.market_insights) > 0
 
-    def test_scan_readiness_score_in_range(self):
+    def test_scan_readiness_score_in_range(self, _ws):
         from gtm_team.stratops.scanner import scan
 
         report = scan()
@@ -348,23 +373,24 @@ class TestStratOpsScan:
 # ---------------------------------------------------------------------------
 
 
+@patch("gtm_team.monetization.scanner.web_search", side_effect=_mock_web_search)
 class TestMonetizationScan:
     """Monetization scanner validates pricing and credit economy."""
 
-    def test_scan_returns_report(self):
+    def test_scan_returns_report(self, _ws):
         from gtm_team.monetization.scanner import scan
 
         report = scan()
         assert report.agent == "monetization"
         assert isinstance(report.scan_duration_seconds, float)
 
-    def test_scan_has_metrics(self):
+    def test_scan_has_metrics(self, _ws):
         from gtm_team.monetization.scanner import scan
 
         report = scan()
         assert "monetization_readiness_score" in report.metrics
 
-    def test_scan_checks_credit_economy(self):
+    def test_scan_checks_credit_economy(self, _ws):
         from gtm_team.monetization.scanner import scan
 
         report = scan()
@@ -379,7 +405,7 @@ class TestMonetizationScan:
             or report.metrics.get("monetization_readiness_score", 0) >= 0
         )
 
-    def test_scan_readiness_in_range(self):
+    def test_scan_readiness_in_range(self, _ws):
         from gtm_team.monetization.scanner import scan
 
         report = scan()
@@ -392,23 +418,25 @@ class TestMonetizationScan:
 # ---------------------------------------------------------------------------
 
 
+@patch("gtm_team.marketing.scanner.web_fetch", side_effect=_mock_web_fetch)
+@patch("gtm_team.marketing.scanner.web_search", side_effect=_mock_web_search)
 class TestMarketingScan:
     """Marketing scanner checks SEO, landing pages, brand messaging."""
 
-    def test_scan_returns_report(self):
+    def test_scan_returns_report(self, _ws, _wf):
         from gtm_team.marketing.scanner import scan
 
         report = scan()
         assert report.agent == "marketing"
         assert isinstance(report.scan_duration_seconds, float)
 
-    def test_scan_counts_jsx_pages(self):
+    def test_scan_counts_jsx_pages(self, _ws, _wf):
         from gtm_team.marketing.scanner import scan
 
         report = scan()
         assert "total_jsx_pages" in report.metrics
 
-    def test_scan_checks_seo(self):
+    def test_scan_checks_seo(self, _ws, _wf):
         from gtm_team.marketing.scanner import scan
 
         report = scan()
@@ -416,7 +444,7 @@ class TestMarketingScan:
         if report.metrics.get("total_jsx_pages", 0) > 0:
             assert "seo_index_score" in report.metrics
 
-    def test_scan_readiness_in_range(self):
+    def test_scan_readiness_in_range(self, _ws, _wf):
         from gtm_team.marketing.scanner import scan
 
         report = scan()
