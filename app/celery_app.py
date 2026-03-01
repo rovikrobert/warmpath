@@ -106,6 +106,22 @@ celery_app.conf.update(
             "task": "app.tasks.agent_runtime_tasks.poll_[RAILWAY_TOKEN_REDACTED]",
             "schedule": crontab(minute="*/15"),  # Every 15 minutes
         },
+        # --- Agent runtime: Scheduled scans ---
+        "agent-runtime-daily-scan": {
+            "task": "app.tasks.agent_runtime_tasks.dispatch_scheduled_scan",
+            "schedule": crontab(hour=4, minute=0),  # 4 AM UTC daily
+            "kwargs": {"cadence": "daily"},
+        },
+        "agent-runtime-weekly-scan": {
+            "task": "app.tasks.agent_runtime_tasks.dispatch_scheduled_scan",
+            "schedule": crontab(day_of_week=0, hour=2, minute=0),  # Sunday 2 AM
+            "kwargs": {"cadence": "weekly"},
+        },
+        # --- Agent runtime: KPI anomaly detection ---
+        "agent-runtime-kpi-check": {
+            "task": "app.tasks.agent_runtime_tasks.dispatch_kpi_check",
+            "schedule": crontab(hour=6, minute=0),  # 6 AM UTC daily
+        },
     },
 )
 celery_app.conf.include = [
