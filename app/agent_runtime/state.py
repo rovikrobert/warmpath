@@ -28,6 +28,7 @@ class WarmPathState(TypedDict):
     event: dict[str, Any]
     routed_teams: list[str]
     priority: str
+    trust_level: int
     findings: list[dict[str, Any]]
     actions: list[dict[str, Any]]
     needs_human: bool

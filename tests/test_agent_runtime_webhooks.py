@@ -12,8 +12,10 @@ from app.main import app
 
 @pytest.fixture(autouse=True)
 def _set_webhook_secret(monkeypatch):
-    monkeypatch.setattr("app.api.agent_webhooks._GITHUB_WEBHOOK_SECRET", "test-secret")
-    monkeypatch.setattr("app.api.agent_webhooks._runtime_enabled", True)
+    monkeypatch.setattr(
+        "app.config.settings.GITHUB_AGENT_WEBHOOK_SECRET", "test-secret"
+    )
+    monkeypatch.setattr("app.config.settings.AGENT_RUNTIME_ENABLED", True)
 
 
 @pytest.fixture
@@ -110,7 +112,7 @@ async def test_github_webhook_returns_503_when_runtime_disabled(github_push_payl
     secret = "test-secret"
     sig = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
-    with patch("app.api.agent_webhooks._runtime_enabled", False):
+    with patch("app.config.settings.AGENT_RUNTIME_ENABLED", False):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
