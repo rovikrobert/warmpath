@@ -1,8 +1,10 @@
 """Email engagement service — triggered lifecycle emails.
 
 Handles welcome emails, activation nudges, operational reminders,
-weekly digests, and re-engagement campaigns. Emails are deduped via
-the email_campaign_logs table (one send per user per email_type per day).
+weekly digests, and re-engagement campaigns. One-time nudges
+(csv_reminder_d1, csv_reminder_d3, nh_sharing_d2, first_search_d2)
+are deduped as "ever sent" — not per-day. Daily-safe emails
+(welcome, digests) use per-day dedup via email_campaign_logs.
 
 Respects marketing_opt_out on the User model.
 """
@@ -242,15 +244,17 @@ async def send_welcome_email_nh(user: User, db: AsyncSession) -> bool:
 
 
 async def send_csv_reminder_d1(db: AsyncSession) -> int:
-    """Nudge users who signed up 24h ago but haven't uploaded CSV."""
-    cutoff_start = datetime.now(timezone.utc) - timedelta(hours=30)
-    cutoff_end = datetime.now(timezone.utc) - timedelta(hours=18)
+    """Nudge users who signed up 24h+ ago but haven't uploaded CSV.
 
-    # Users created 18-30h ago with no CSV upload
+    One-time nudge — never re-sent once delivered.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+
+    # Users created 24h+ ago with no CSV upload
     uploaded_subq = select(CsvUpload.user_id).distinct().scalar_subquery()
     result = await db.execute(
         select(User).where(
-            User.created_at.between(cutoff_start, cutoff_end),
+            User.created_at < cutoff,
             User.deleted_at.is_(None),
             User.marketing_opt_out.is_(False),
             User.id.not_in(uploaded_subq),
@@ -258,16 +262,14 @@ async def send_csv_reminder_d1(db: AsyncSession) -> int:
     )
     users = result.scalars().all()
 
-    # Batch-load already-sent set for today (avoids N+1)
+    # Batch-load already-sent set (one-time nudge — never re-send)
     user_ids = [u.id for u in users]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     already_sent_ids: set[uuid.UUID] = set()
     if user_ids:
         sent_result = await db.execute(
             select(EmailCampaignLog.user_id).where(
                 EmailCampaignLog.user_id.in_(user_ids),
                 EmailCampaignLog.email_type == "csv_reminder_d1",
-                EmailCampaignLog.sent_date == today,
             )
         )
         already_sent_ids = {row[0] for row in sent_result.all()}
@@ -301,31 +303,40 @@ async def send_csv_reminder_d1(db: AsyncSession) -> int:
 
 
 async def send_csv_reminder_d3(db: AsyncSession) -> int:
-    """More urgent nudge — 3 days without CSV upload."""
-    cutoff_start = datetime.now(timezone.utc) - timedelta(hours=78)
-    cutoff_end = datetime.now(timezone.utc) - timedelta(hours=66)
+    """More urgent nudge — 3+ days without CSV upload.
+
+    One-time nudge. Only sent to users who already received csv_reminder_d1
+    at least 48h ago but still haven't uploaded.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=72)
 
     uploaded_subq = select(CsvUpload.user_id).distinct().scalar_subquery()
+    # Only target users who already got D1 (ensures proper sequence)
+    got_d1_subq = (
+        select(EmailCampaignLog.user_id)
+        .where(EmailCampaignLog.email_type == "csv_reminder_d1")
+        .distinct()
+        .scalar_subquery()
+    )
     result = await db.execute(
         select(User).where(
-            User.created_at.between(cutoff_start, cutoff_end),
+            User.created_at < cutoff,
             User.deleted_at.is_(None),
             User.marketing_opt_out.is_(False),
             User.id.not_in(uploaded_subq),
+            User.id.in_(got_d1_subq),
         )
     )
     users = result.scalars().all()
 
-    # Batch-load already-sent set for today (avoids N+1)
+    # Batch-load already-sent set (one-time nudge — never re-send)
     user_ids = [u.id for u in users]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     already_sent_ids: set[uuid.UUID] = set()
     if user_ids:
         sent_result = await db.execute(
             select(EmailCampaignLog.user_id).where(
                 EmailCampaignLog.user_id.in_(user_ids),
                 EmailCampaignLog.email_type == "csv_reminder_d3",
-                EmailCampaignLog.sent_date == today,
             )
         )
         already_sent_ids = {row[0] for row in sent_result.all()}
@@ -377,16 +388,14 @@ async def send_nh_sharing_reminder_d2(db: AsyncSession) -> int:
     )
     users = result.scalars().all()
 
-    # Batch-load already-sent set for today (avoids N+1)
+    # Batch-load already-sent set (one-time nudge — never re-send)
     user_ids = [u.id for u in users]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     already_sent_ids: set[uuid.UUID] = set()
     if user_ids:
         sent_result = await db.execute(
             select(EmailCampaignLog.user_id).where(
                 EmailCampaignLog.user_id.in_(user_ids),
                 EmailCampaignLog.email_type == "nh_sharing_d2",
-                EmailCampaignLog.sent_date == today,
             )
         )
         already_sent_ids = {row[0] for row in sent_result.all()}
@@ -440,16 +449,14 @@ async def send_first_search_nudge_d2(db: AsyncSession) -> int:
     )
     users = result.scalars().all()
 
-    # Batch-load already-sent set for today (avoids N+1)
+    # Batch-load already-sent set (one-time nudge — never re-send)
     user_ids = [u.id for u in users]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     already_sent_ids: set[uuid.UUID] = set()
     if user_ids:
         sent_result = await db.execute(
             select(EmailCampaignLog.user_id).where(
                 EmailCampaignLog.user_id.in_(user_ids),
                 EmailCampaignLog.email_type == "first_search_d2",
-                EmailCampaignLog.sent_date == today,
             )
         )
         already_sent_ids = {row[0] for row in sent_result.all()}
