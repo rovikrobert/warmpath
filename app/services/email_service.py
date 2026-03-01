@@ -2,13 +2,22 @@
 
 Uses Resend SDK when RESEND_API_KEY is configured.
 Falls back to console logging when no API key is set (local dev).
+
+Rate-limited to stay within Resend's 2 req/sec cap.
 """
 
 import logging
+import threading
+import time
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Resend allows 2 requests/sec. We enforce a minimum gap of 0.55s between
+# sends to stay safely under the limit across all threads/workers.
+_send_lock = threading.Lock()
+_last_send_time: float = 0.0
 
 
 def _send_email(
@@ -41,6 +50,15 @@ def _send_email(
         }
         if reply_to:
             payload["reply_to"] = reply_to
+
+        # Throttle: enforce minimum gap between Resend API calls
+        global _last_send_time  # noqa: PLW0603
+        with _send_lock:
+            elapsed = time.monotonic() - _last_send_time
+            if elapsed < 0.55:
+                time.sleep(0.55 - elapsed)
+            _last_send_time = time.monotonic()
+
         try:
             result = resend.Emails.send(payload)
         except Exception:
