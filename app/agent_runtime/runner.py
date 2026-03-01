@@ -16,6 +16,7 @@ from app.agent_runtime.cost_guard import BudgetStatus, check_budget
 from app.agent_runtime.graph import build_graph
 from app.agent_runtime.redis_store import AgentRuntimeRedis
 from app.agent_runtime.state import WarmPathState
+from app.agent_runtime.trust import TrustLevel
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ async def process_event(event: dict[str, Any]) -> dict[str, Any]:
         "event": event,
         "routed_teams": [],
         "priority": "",
+        "trust_level": TrustLevel.RECOMMENDER,
         "findings": [],
         "actions": [],
         "needs_human": False,
@@ -80,6 +82,7 @@ async def process_event(event: dict[str, Any]) -> dict[str, Any]:
         "configurable": {
             "thread_id": event.get("dedup_key", "default"),
             "budget_status": budget_status.value,
+            "trust_level": TrustLevel.RECOMMENDER,
         },
         "recursion_limit": 30,
     }
@@ -123,6 +126,17 @@ async def run_consumer_loop() -> None:
                 for msg_id, data in entries:
                     event = json.loads(data.get("event", "{}"))
                     logger.info("Processing event: %s", event.get("type"))
+
+                    dedup_key = event.get("dedup_key", "")
+                    if dedup_key:
+                        store = AgentRuntimeRedis(redis_url=settings.REDIS_URL)
+                        if await store.is_duplicate(
+                            dedup_key,
+                            settings.AGENT_RUNTIME_EVENT_COOLDOWN_SECONDS,
+                        ):
+                            logger.info("Duplicate event %s, skipping", dedup_key)
+                            await r.xack(stream_key, "agent-runtime", msg_id)
+                            continue
 
                     try:
                         result = await process_event(event)

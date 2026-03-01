@@ -11,6 +11,7 @@ def _make_state(**overrides) -> WarmPathState:
         "event": {"type": "incident", "source": "railway", "payload": {}},
         "routed_teams": ["engineering"],
         "priority": "medium",
+        "trust_level": 1,
         "findings": [],
         "actions": [],
         "needs_human": False,
@@ -81,3 +82,18 @@ def test_should_escalate_on_critical_with_no_contributor():
 
 def test_should_not_escalate_on_low_priority():
     assert should_escalate(priority="low", max_trust_level=0) is False
+
+
+def test_synthesize_uses_trust_level_from_state():
+    """Higher trust level suppresses escalation for high-priority events."""
+    # CONTRIBUTOR (2) should not escalate on high priority (needs < 1)
+    state = _make_state(priority="high", trust_level=2)
+    result = synthesize_findings(state)
+    assert result["needs_human"] is False
+
+
+def test_synthesize_critical_no_escalation_at_contributor_trust():
+    """Critical priority does not escalate at CONTRIBUTOR (2) or above."""
+    state = _make_state(priority="critical", trust_level=2)
+    result = synthesize_findings(state)
+    assert result["needs_human"] is False

@@ -14,7 +14,7 @@ class EngineeringTeam(TeamRunner):
         "test_engineer": "agents.test_engineer.test_engineer",
         "perf_monitor": "agents.perf_monitor.perf_monitor",
         "deps_manager": "agents.deps_manager.deps_manager",
-        "security": "agents.security_scan.security_scan",
+        "security": "agents.security.security",
         "privy": "agents.privy.privy",
     }
 

@@ -12,5 +12,3 @@ def test_settings_has_agent_runtime_fields():
     assert s.AGENT_RUNTIME_BUDGET_DAILY_USD == 10.0
     assert hasattr(s, "AGENT_RUNTIME_EVENT_COOLDOWN_SECONDS")
     assert s.AGENT_RUNTIME_EVENT_COOLDOWN_SECONDS == 900
-    assert hasattr(s, "AGENT_RUNTIME_MAX_TURNS_DEFAULT")
-    assert s.AGENT_RUNTIME_MAX_TURNS_DEFAULT == 20

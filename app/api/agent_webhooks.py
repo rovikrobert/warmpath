@@ -19,18 +19,13 @@ from app.utils.redis_streams import stream_add
 
 router = APIRouter()
 
-_GITHUB_WEBHOOK_SECRET = settings.GITHUB_AGENT_WEBHOOK_SECRET
-_runtime_enabled = settings.AGENT_RUNTIME_ENABLED
-
 
 def _verify_github_signature(body: bytes, signature: str | None) -> bool:
     """Verify GitHub webhook HMAC-SHA256 signature."""
-    if not _GITHUB_WEBHOOK_SECRET or not signature:
+    secret = settings.GITHUB_AGENT_WEBHOOK_SECRET
+    if not secret or not signature:
         return False
-    expected = (
-        "sha256="
-        + hmac.new(_GITHUB_WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
-    )
+    expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
 
@@ -41,7 +36,7 @@ async def github_webhook(
     x_github_event: str | None = Header(None),
 ) -> dict[str, Any]:
     """Receive GitHub webhooks and convert to agent runtime events."""
-    if not _runtime_enabled:
+    if not settings.AGENT_RUNTIME_ENABLED:
         raise HTTPException(status_code=503, detail="Agent runtime disabled")
 
     body = await request.body()
