@@ -42,4 +42,7 @@ def _classify_priority(event_type: str, payload: dict) -> str:
     if event_type == "external_signal":
         return "low"
 
+    if event_type == "scheduled_scan":
+        return "low"
+
     return "medium"

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from app.agent_runtime.nodes.escalate import should_escalate
 from app.agent_runtime.state import WarmPathState
+
+logger = logging.getLogger(__name__)
 
 
 def synthesize_findings(state: WarmPathState) -> dict[str, Any]:
@@ -19,7 +22,9 @@ def synthesize_findings(state: WarmPathState) -> dict[str, Any]:
     escalation via Telegram.
     """
     handoffs: list[dict[str, Any]] = list(state.get("handoffs", []))
-    for finding in state.get("findings", []):
+    findings = list(state.get("findings", []))
+
+    for finding in findings:
         req = finding.get("cross_team_request")
         if req:
             handoffs.append(
@@ -36,4 +41,4 @@ def synthesize_findings(state: WarmPathState) -> dict[str, Any]:
     trust_level = state.get("trust_level", 1)
     needs_human = should_escalate(priority, max_trust_level=trust_level)
 
-    return {"handoffs": handoffs, "needs_human": needs_human}
+    return {"findings": findings, "handoffs": handoffs, "needs_human": needs_human}

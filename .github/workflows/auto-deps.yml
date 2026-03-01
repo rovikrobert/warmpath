@@ -1,0 +1,92 @@
+name: Auto-deps security
+
+on:
+  schedule:
+    - cron: "0 5 * * 1" # Weekly Monday 5 AM UTC
+  workflow_dispatch: # Manual trigger
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pip-audit
+
+      - name: Run pip-audit
+        id: audit
+        continue-on-error: true
+        run: |
+          pip-audit --output audit-report.json --format json 2>/dev/null || true
+          if [ -f audit-report.json ] && python3 -c "import json,sys; d=json.load(open('audit-report.json')); sys.exit(0 if d.get('dependencies') else 1)" 2>/dev/null; then
+            echo "has_vulns=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_vulns=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Attempt auto-fix
+        if: steps.audit.outputs.has_vulns == 'true'
+        run: pip-audit --fix 2>/dev/null || true
+
+      - name: Freeze updated requirements
+        if: steps.audit.outputs.has_vulns == 'true'
+        run: |
+          pip freeze > requirements.txt.new
+          # Only update lines that changed (preserve comments/structure)
+          python3 -c "
+          import re
+          old = open('requirements.txt').readlines()
+          new_pkgs = {}
+          for line in open('requirements.txt.new'):
+              m = re.match(r'^([a-zA-Z0-9_-]+)==(.+)', line.strip())
+              if m:
+                  new_pkgs[m.group(1).lower()] = m.group(2)
+          result = []
+          for line in old:
+              m = re.match(r'^([a-zA-Z0-9_-]+)[=<>~!]', line.strip())
+              if m and m.group(1).lower() in new_pkgs:
+                  result.append(f'{m.group(1)}=={new_pkgs[m.group(1).lower()]}\n')
+              else:
+                  result.append(line)
+          open('requirements.txt', 'w').writelines(result)
+          "
+          rm -f requirements.txt.new
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if [ -n "$(git diff --name-only)" ]; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create PR with security patches
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="auto/deps-security-$(date +%Y%m%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add requirements.txt
+          git commit -m "chore(deps): auto-fix security vulnerabilities
+
+          Automated weekly dependency security scan via pip-audit.
+
+          Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "chore(deps): security patches $(date +%Y-%m-%d)" \
+            --body "Automated dependency security fixes applied by \`pip-audit --fix\`. Review changed package versions before merging." \
+            --label "automated,security"

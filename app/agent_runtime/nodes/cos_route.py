@@ -27,7 +27,13 @@ _EVENT_ROUTING: dict[str, dict[str, list[str]]] = {
         "ux": ["product"],
         "marketplace": ["ops"],
         "cost": ["finance"],
+        "kpi_anomaly": ["engineering", "data"],
         "default": ["engineering"],
+    },
+    "scheduled_scan": {
+        "daily": ["engineering", "data", "product", "ops", "gtm", "finance"],
+        "weekly": ["engineering", "data", "product", "ops", "gtm", "finance"],
+        "default": ["engineering", "data", "product", "ops", "gtm", "finance"],
     },
 }
 
