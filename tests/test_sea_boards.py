@@ -268,7 +268,15 @@ class TestFallbackChain:
                 return_value=[{"title": "SWE", "source": "greenhouse"}],
             ) as gh_mock,
             patch("app.services.career_page_fetcher.fetch_career_page") as cp_mock,
+            patch(
+                "app.services.jobspy_fetcher.search_jobs_via_jobspy",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch("app.services.job_fetcher.settings") as mock_settings,
         ):
+            mock_settings.AI_MOCK_MODE = True
+            mock_settings.ADZUNA_APP_ID = ""
             jobs = await fetcher.fetch_jobs_for_company(
                 "stripe", {"greenhouse": "stripe"}
             )
@@ -290,7 +298,15 @@ class TestFallbackChain:
                 "app.services.career_page_fetcher.fetch_career_page",
                 return_value=[{"title": "Dev", "source": "career_page"}],
             ) as cp_mock,
+            patch(
+                "app.services.jobspy_fetcher.search_jobs_via_jobspy",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch("app.services.job_fetcher.settings") as mock_settings,
         ):
+            mock_settings.AI_MOCK_MODE = True
+            mock_settings.ADZUNA_APP_ID = ""
             jobs = await fetcher.fetch_jobs_for_company("grab", {"greenhouse": "grab"})
             cp_mock.assert_called_once_with("https://example.com/careers")
             assert len(jobs) == 1
@@ -308,16 +324,35 @@ class TestFallbackChain:
                 "app.services.career_page_fetcher.fetch_career_page",
                 return_value=[{"title": "PM", "source": "career_page"}],
             ),
+            patch(
+                "app.services.jobspy_fetcher.search_jobs_via_jobspy",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch("app.services.job_fetcher.settings") as mock_settings,
         ):
+            mock_settings.AI_MOCK_MODE = True
+            mock_settings.ADZUNA_APP_ID = ""
             jobs = await fetcher.fetch_jobs_for_company("newco", None)
             assert len(jobs) == 1
 
     async def test_no_boards_no_career_page_returns_empty(self):
         """When nothing is available, return empty list."""
         fetcher = JobFetcher()
-        with patch(
-            "app.services.career_page_fetcher.lookup_career_page", return_value=None
+        with (
+            patch(
+                "app.services.career_page_fetcher.lookup_career_page",
+                return_value=None,
+            ),
+            patch(
+                "app.services.jobspy_fetcher.search_jobs_via_jobspy",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch("app.services.job_fetcher.settings") as mock_settings,
         ):
+            mock_settings.AI_MOCK_MODE = True
+            mock_settings.ADZUNA_APP_ID = ""
             jobs = await fetcher.fetch_jobs_for_company("unknown_co", None)
             assert jobs == []
 

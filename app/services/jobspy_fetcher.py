@@ -14,17 +14,16 @@ import re
 from datetime import datetime, timezone
 
 from app.config import settings
-from app.services.job_fetcher import _clean_job_title
+from app.services.job_fetcher import (
+    _clean_job_title,
+    _normalize_company_name,
+    company_matches,
+)
 
 logger = logging.getLogger(__name__)
 
 _REMOTE_PATTERNS = re.compile(
     r"\b(remote|anywhere|distributed|work from home|wfh)\b", re.IGNORECASE
-)
-
-# Domain suffixes to strip from company names before searching
-_DOMAIN_SUFFIXES = re.compile(
-    r"\.(ai|io|com|co|dev|app|tech|xyz|org|net)$", re.IGNORECASE
 )
 
 # Map JobSpy site_name values to our source identifiers
@@ -104,42 +103,6 @@ def _parse_date(value: object) -> datetime | None:
     return None
 
 
-def _normalize_company_name(name: str) -> str:
-    """Strip domain suffixes and normalize for search/matching.
-
-    'Cantina.ai' → 'cantina', 'Stripe' → 'stripe'
-    """
-    clean = name.strip().lower()
-    clean = _DOMAIN_SUFFIXES.sub("", clean)
-    return clean
-
-
-def _company_matches(query: str, candidate: str) -> bool:
-    """Check if the candidate company name matches the query.
-
-    Requires the query to appear at the START of the candidate name so
-    'cantina' matches 'Cantina AI' and 'Cantina, Inc.' but NOT
-    'Muertos Cantina' or 'On the Border Mexican Grill and Cantina'.
-    """
-    query_norm = _normalize_company_name(query)
-    candidate_norm = _normalize_company_name(candidate)
-
-    if not query_norm or not candidate_norm:
-        return False
-
-    # Exact match
-    if query_norm == candidate_norm:
-        return True
-
-    # Query must appear at the start of candidate name
-    # e.g. 'cantina' matches 'cantina ai', 'cantina, inc.' but not 'muertos cantina'
-    if candidate_norm.startswith(query_norm):
-        return True
-
-    # Candidate starts with query (handles 'stripe' matching 'stripe payments')
-    return query_norm.startswith(candidate_norm)
-
-
 def _scrape_sync(
     company_name: str,
     max_results: int = 30,
@@ -188,7 +151,7 @@ def _scrape_sync(
     for _, row in df.iterrows():
         # Filter: only include results where the company field matches
         row_company = str(row.get("company", "") or "")
-        if not _company_matches(company_name, row_company):
+        if not company_matches(company_name, row_company):
             continue
 
         title = str(row.get("title", "") or "")

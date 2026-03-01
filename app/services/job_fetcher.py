@@ -26,6 +26,134 @@ _LEADING_ID_PATTERN = re.compile(r"^\d{6,}\s+")
 
 HTTPX_TIMEOUT = 3.0
 
+# Career-page scrapers often get very few results from SPA sites (React/Angular)
+# because httpx can't execute JavaScript.  When a career-page scrape returns
+# fewer jobs than this threshold we still try JobSpy / Adzuna as supplements.
+_CAREER_PAGE_MIN_JOBS = 5
+
+# Domain suffixes to strip from company names before matching
+_DOMAIN_SUFFIXES = re.compile(
+    r"\.(ai|io|com|co|dev|app|tech|xyz|org|net)$", re.IGNORECASE
+)
+
+
+def _normalize_company_name(name: str) -> str:
+    """Strip domain suffixes and normalize for matching.
+
+    'Cantina.ai' → 'cantina', 'Stripe' → 'stripe'
+    """
+    clean = name.strip().lower()
+    clean = _DOMAIN_SUFFIXES.sub("", clean)
+    return clean
+
+
+# Tokens that are corporate entity/structure markers, not substantive
+# company identity words.  Used by _is_legal_suffix to decide whether
+# "Shopify Inc." is the same entity as "Shopify".
+_LEGAL_SUFFIX_TOKENS: frozenset[str] = frozenset(
+    {
+        # Corporate entity markers
+        "inc",
+        "incorporated",
+        "ltd",
+        "limited",
+        "llc",
+        "corp",
+        "corporation",
+        "co",
+        "company",
+        "pte",
+        "pvt",
+        "private",
+        "plc",
+        "ag",
+        "gmbh",
+        "sa",
+        "sas",
+        "bv",
+        "nv",
+        # Corporate structure words
+        "holdings",
+        "group",
+        "global",
+        "international",
+        "technologies",
+        "technology",
+        "tech",
+        "platforms",
+        "platform",
+        "labs",
+        "studio",
+        "studios",
+        "services",
+        "software",
+        "systems",
+        "payments",
+        "financial",
+        "bank",
+        "banking",
+        "media",
+        "digital",
+        "networks",
+        # Regional / HQ markers
+        "hq",
+        "southeast",
+        "asia",
+        "apac",
+    }
+)
+
+# Punctuation to strip from individual tokens (trailing periods, commas, etc.)
+_TOKEN_PUNCT = str.maketrans("", "", ".,;:!?")
+
+
+def _is_legal_suffix(remainder: str) -> bool:
+    """Check if what follows the company name is a legal/corporate suffix.
+
+    After stripping the query from the candidate, the leftover should be
+    empty or consist only of corporate entity markers like 'Inc.', 'Ltd.',
+    'Holdings', etc.  If the leftover contains substantive words (e.g.
+    'Administrator', 'Solutions'), the candidate is a different company.
+    """
+    if not remainder:
+        return True
+    # Strip leading separators
+    remainder = remainder.lstrip(" ,.-")
+    if not remainder:
+        return True
+    tokens = remainder.lower().split()
+    return all(t.translate(_TOKEN_PUNCT) in _LEGAL_SUFFIX_TOKENS for t in tokens)
+
+
+def company_matches(query: str, candidate: str) -> bool:
+    """Check if the candidate company name is the same entity as the query.
+
+    'shopify' matches 'Shopify Inc.' and 'Shopify Pte Ltd' but NOT
+    'Shopify Administrator LLC' or 'Hire a Shopify Admin'.
+    Used by all fallback fetchers (JobSpy, Adzuna) for post-fetch filtering.
+    """
+    query_norm = _normalize_company_name(query)
+    candidate_norm = _normalize_company_name(candidate)
+
+    if not query_norm or not candidate_norm:
+        return False
+
+    # Exact match
+    if query_norm == candidate_norm:
+        return True
+
+    # Candidate starts with query — but the remainder must be a legal suffix
+    if candidate_norm.startswith(query_norm):
+        remainder = candidate_norm[len(query_norm) :]
+        return _is_legal_suffix(remainder)
+
+    # Query starts with candidate (e.g. 'stripe payments' vs 'Stripe')
+    if query_norm.startswith(candidate_norm):
+        remainder = query_norm[len(candidate_norm) :]
+        return _is_legal_suffix(remainder)
+
+    return False
+
 
 def _clean_job_title(title: str) -> str:
     """Strip leading numeric IDs and normalize whitespace in job titles."""
@@ -271,7 +399,8 @@ class JobFetcher:
                 all_jobs.extend(jobs)
 
             if "career_page" in board_ids:
-                all_jobs = await fetch_career_page(board_ids["career_page"])
+                career_jobs = await fetch_career_page(board_ids["career_page"])
+                all_jobs.extend(career_jobs)
 
         # 2. If ATS boards returned nothing, try career page scraper
         if not all_jobs:
@@ -284,34 +413,52 @@ class JobFetcher:
                 )
                 all_jobs = await fetch_career_page(career_url)
 
-        # 3. If still nothing, try JobSpy (Indeed + LinkedIn + optionally other boards)
-        if not all_jobs:
+        # 3. Try JobSpy if we have no results, OR if career-page scraping
+        #    returned suspiciously few (SPA sites often yield only a handful
+        #    of links from static HTML).
+        if len(all_jobs) < _CAREER_PAGE_MIN_JOBS:
             from app.services.jobspy_fetcher import search_jobs_via_jobspy
 
             logger.info(
-                "No ATS/career-page results for '%s', trying JobSpy",
+                "Insufficient results (%d) for '%s', supplementing with JobSpy",
+                len(all_jobs),
                 company_name,
             )
-            all_jobs = await search_jobs_via_jobspy(
+            spy_jobs = await search_jobs_via_jobspy(
                 company_name, location_hint=location_hint
             )
+            all_jobs.extend(spy_jobs)
 
-        # 4. If still nothing and aggregator configured, try Adzuna
-        if not all_jobs and settings.ADZUNA_APP_ID:
+        # 4. If still insufficient and aggregator configured, try Adzuna
+        if len(all_jobs) < _CAREER_PAGE_MIN_JOBS and settings.ADZUNA_APP_ID:
             from app.services.job_aggregator import search_jobs_by_company
 
             logger.info(
-                "No ATS/career-page/JobSpy results for '%s', trying Adzuna aggregator",
+                "Still insufficient results (%d) for '%s', trying Adzuna aggregator",
+                len(all_jobs),
                 company_name,
             )
-            all_jobs = await search_jobs_by_company(
+            adzuna_jobs = await search_jobs_by_company(
                 company_name, location_hint=location_hint
             )
+            all_jobs.extend(adzuna_jobs)
+
+        # Deduplicate across sources by (title, url)
+        seen: set[tuple[str, str]] = set()
+        unique_jobs: list[dict] = []
+        for job in all_jobs:
+            key = (job.get("title", "").lower().strip(), job.get("url", ""))
+            if key not in seen:
+                seen.add(key)
+                unique_jobs.append(job)
 
         logger.info(
-            "Fetched %d total jobs for company '%s'", len(all_jobs), company_name
+            "Fetched %d unique jobs for company '%s' (%d before dedup)",
+            len(unique_jobs),
+            company_name,
+            len(all_jobs),
         )
-        return all_jobs
+        return unique_jobs
 
     async def match_jobs_to_role(
         self,
