@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.conftest import TestSessionLocal
 
-from app.models.contact import CsvUpload
+from app.models.contact import Contact, CsvUpload
 from app.models.email_campaign import EmailCampaignLog
 from app.models.enrichment import UsageLog
 from app.models.marketplace import (
@@ -63,6 +63,16 @@ def _make_csv_upload(user_id: uuid.UUID) -> CsvUpload:
         filename="test.csv",
         row_count=10,
         status="completed",
+    )
+
+
+def _make_contact(user_id: uuid.UUID) -> Contact:
+    return Contact(
+        user_id=user_id,
+        first_name="Jane",
+        last_name="Doe",
+        full_name="Jane Doe",
+        current_company="Acme Corp",
     )
 
 
@@ -286,8 +296,9 @@ async def test_nh_sharing_reminder_finds_eligible(
     db.add(user)
     await db.flush()
 
-    # Has CSV but no sharing prefs
+    # Has contacts but no sharing prefs
     db.add(_make_csv_upload(user.id))
+    db.add(_make_contact(user.id))
     await db.flush()
 
     count = await send_nh_sharing_reminder_d2(db)
@@ -307,7 +318,29 @@ async def test_nh_sharing_reminder_skips_opted_in(
     await db.flush()
 
     db.add(_make_csv_upload(user.id))
+    db.add(_make_contact(user.id))
     db.add(NetworkSharingPreferences(user_id=user.id, opt_in_marketplace=True))
+    await db.flush()
+
+    count = await send_nh_sharing_reminder_d2(db)
+    assert count == 0
+
+
+@pytest.mark.asyncio
+@patch("app.services.email_engagement._send_email")
+async def test_nh_sharing_reminder_skips_zero_contacts(
+    mock_send: object, db: AsyncSession
+) -> None:
+    """User with a stuck csv_upload but 0 actual contacts should NOT be nudged."""
+    user = _make_user(
+        intent="share_network",
+        created_at=datetime.now(timezone.utc) - timedelta(hours=72),
+    )
+    db.add(user)
+    await db.flush()
+
+    # Has CSV upload record but no actual contacts (stuck upload)
+    db.add(_make_csv_upload(user.id))
     await db.flush()
 
     count = await send_nh_sharing_reminder_d2(db)
@@ -330,7 +363,9 @@ async def test_first_search_nudge_finds_eligible(
     db.add(user)
     await db.flush()
 
+    # Has contacts and no searches
     db.add(_make_csv_upload(user.id))
+    db.add(_make_contact(user.id))
     await db.flush()
 
     count = await send_first_search_nudge_d2(db)
@@ -349,7 +384,28 @@ async def test_first_search_nudge_skips_searched(
     await db.flush()
 
     db.add(_make_csv_upload(user.id))
+    db.add(_make_contact(user.id))
     db.add(SearchRequest(user_id=user.id, name="test search"))
+    await db.flush()
+
+    count = await send_first_search_nudge_d2(db)
+    assert count == 0
+
+
+@pytest.mark.asyncio
+@patch("app.services.email_engagement._send_email")
+async def test_first_search_nudge_skips_zero_contacts(
+    mock_send: object, db: AsyncSession
+) -> None:
+    """User with a stuck csv_upload but 0 actual contacts should NOT be nudged."""
+    user = _make_user(
+        created_at=datetime.now(timezone.utc) - timedelta(hours=72),
+    )
+    db.add(user)
+    await db.flush()
+
+    # Has CSV upload record but no actual contacts (stuck upload)
+    db.add(_make_csv_upload(user.id))
     await db.flush()
 
     count = await send_first_search_nudge_d2(db)
@@ -365,7 +421,6 @@ async def test_first_search_nudge_skips_searched(
 @patch("app.services.email_engagement._send_email")
 async def test_intro_pending_reminder(mock_send: object, db: AsyncSession) -> None:
     from app.models.company import Company
-    from app.models.contact import Contact
 
     nh = _make_user(intent="share_network")
     js = _make_user(intent="find_referrals")
@@ -426,7 +481,6 @@ async def test_intro_request_notification_sends_email_to_nh(
 ) -> None:
     """When a job seeker requests an intro, NH gets an immediate email with company name."""
     from app.models.company import Company
-    from app.models.contact import Contact
     from app.services.email_engagement import send_intro_request_notification
 
     nh = _make_user(intent="share_network")
