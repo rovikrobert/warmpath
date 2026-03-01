@@ -12,6 +12,11 @@ import TrebAvatar from './TrebAvatar';
 
 const CACHE_KEY = 'warmpath_referral_journey';
 const DISMISSED_KEY = 'warmpath_referral_journey_dismissed';
+const FIRST_SEEN_KEY = 'warmpath_referral_journey_first_seen';
+const COMPLETED_AT_KEY = 'warmpath_referral_journey_completed_at';
+
+const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 /* ------------------------------------------------------------------ */
 /* Stage definitions — seeker (Keevs) vs network holder (Treb)         */
@@ -266,6 +271,39 @@ export default function ReferralJourney({ variant = 'full' }: ReferralJourneyPro
   // Find current stage (first incomplete)
   const currentIndex = stages.findIndex((s) => !completed[s.key]);
   const allComplete = currentIndex === -1;
+
+  // Auto-dismiss: 14 days after first render, or 24h after all stages complete
+  useEffect(() => {
+    if (dismissed) return;
+
+    const now = Date.now();
+
+    // Record first-seen timestamp on initial render
+    if (!localStorage.getItem(FIRST_SEEN_KEY)) {
+      localStorage.setItem(FIRST_SEEN_KEY, String(now));
+    }
+
+    // Check 14-day expiry since first seen
+    const firstSeen = Number(localStorage.getItem(FIRST_SEEN_KEY));
+    if (firstSeen && now - firstSeen >= FOURTEEN_DAYS_MS) {
+      setDismissed(true);
+      localStorage.setItem(DISMISSED_KEY, 'true');
+      return;
+    }
+
+    // Track when all stages complete
+    if (allComplete) {
+      if (!localStorage.getItem(COMPLETED_AT_KEY)) {
+        localStorage.setItem(COMPLETED_AT_KEY, String(now));
+      }
+      // Check 24-hour expiry since completion
+      const completedAt = Number(localStorage.getItem(COMPLETED_AT_KEY));
+      if (completedAt && now - completedAt >= TWENTY_FOUR_HOURS_MS) {
+        setDismissed(true);
+        localStorage.setItem(DISMISSED_KEY, 'true');
+      }
+    }
+  }, [dismissed, allComplete]);
 
   if (loading || dismissed) return null;
   if (allComplete && variant === 'compact') return null;

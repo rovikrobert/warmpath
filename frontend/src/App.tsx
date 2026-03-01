@@ -23,6 +23,7 @@ const ReferralCodesPage = lazy(() => import('./pages/ReferralCodesPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const ScoreGlossary = lazy(() => import('./pages/ScoreGlossary'));
 const Join = lazy(() => import('./pages/Join'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const IntroReview = lazy(() => import('./pages/IntroReview'));
 
 interface ProtectedRouteProps {
@@ -101,6 +102,7 @@ export default function App() {
           <Route path="/onboarding" element={<ProtectedRoute allowIncomplete><OnboardingPage /></ProtectedRoute>} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/coach" element={<CoachPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/search/new" element={<FindReferrals />} />
             <Route path="/search/:id" element={<SearchResults />} />
