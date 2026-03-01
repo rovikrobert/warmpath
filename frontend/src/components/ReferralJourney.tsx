@@ -252,9 +252,13 @@ export default function ReferralJourney({ variant = 'full' }: ReferralJourneyPro
     checkStages();
   }, [checkStages, dismissed]);
 
-  // Listen for journey-updated events (dispatched by other pages)
+  // Listen for journey-updated events (dispatched after intro request, etc.)
   useEffect(() => {
-    const handler = () => checkStages();
+    const handler = () => {
+      // Clear stale cache so checkStages hits the API
+      localStorage.removeItem(CACHE_KEY);
+      checkStages();
+    };
     window.addEventListener('journey-updated', handler);
     return () => window.removeEventListener('journey-updated', handler);
   }, [checkStages]);
