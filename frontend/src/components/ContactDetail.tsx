@@ -40,6 +40,7 @@ interface Contact {
   location?: string;
   connected_on?: string;
   email?: string;
+  linkedin_url?: string;
   how_you_know?: string;
   source?: string;
   warm_score?: number | null;
@@ -61,6 +62,109 @@ function ScoreBar({ score }: { score: number }) {
       </div>
       <span className="text-2xl font-bold tabular-nums text-foreground">{score}</span>
     </div>
+  );
+}
+
+const STEP_LABELS: Record<string, string> = {
+  reconnect: 'Reconnect',
+  explore: 'Feel it out',
+  referral_ask: 'The Ask',
+};
+
+function ContactIntroModal({ intro, onClose, contactName, linkedinUrl }) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  if (!intro) return null;
+  const messages = intro.messages || [];
+  const totalSteps = messages.length;
+
+  const copyMessage = (msg: any) => {
+    navigator.clipboard.writeText(msg.message_body || '');
+    setCopiedId(msg.id);
+    setTimeout(() => setCopiedId(null), 2000);
+    window.dispatchEvent(new Event('journey-updated'));
+  };
+
+  const copyAndOpenLinkedIn = (msg: any) => {
+    copyMessage(msg);
+    if (linkedinUrl) {
+      window.open(linkedinUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  return (
+    <Modal open={!!intro} onClose={onClose} title="Your Intro Messages" maxWidth="max-w-xl">
+      <div className="space-y-4">
+        {contactName && (
+          <p className="text-sm text-muted-foreground">
+            Messages for <span className="font-medium text-foreground">{contactName}</span>
+          </p>
+        )}
+        {messages.map((msg: any, idx: number) => {
+          const isCopied = copiedId === msg.id;
+          const fallbackVariant = msg.variant_label === 'only' ? null : msg.variant_label;
+          const label = STEP_LABELS[msg.step_label] || msg.step_label || fallbackVariant || 'Message';
+          return (
+            <div key={msg.id} className="rounded-lg border border-border p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {totalSteps > 1 && (
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">
+                      Step {idx + 1}/{totalSteps}
+                    </span>
+                  )}
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                    {label}
+                  </span>
+                </div>
+                {msg.send_after_days > 0 && (
+                  <span className="text-xs text-muted-foreground">Come back in {msg.send_after_days} days</span>
+                )}
+              </div>
+              {msg.coaching_notes && (
+                <p className="mb-2 rounded bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
+                  <span className="font-medium">Keevs suggests:</span> {msg.coaching_notes}
+                </p>
+              )}
+              {msg.subject_line && (
+                <p className="mb-1 text-xs text-muted-foreground">
+                  Subject: <span className="font-medium text-secondary-foreground">{msg.subject_line}</span>
+                </p>
+              )}
+              <p className="mb-3 whitespace-pre-wrap text-sm text-secondary-foreground">{msg.message_body}</p>
+              <div className="flex gap-2">
+                {linkedinUrl ? (
+                  <button
+                    onClick={() => copyAndOpenLinkedIn(msg)}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 transition-colors"
+                    aria-label={`Copy message and open LinkedIn profile for ${contactName || 'contact'}`}
+                  >
+                    {isCopied ? 'Copied! Opening LinkedIn...' : 'Copy & Open LinkedIn'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => copyMessage(msg)}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 transition-colors"
+                    aria-label="Copy message to clipboard"
+                  >
+                    {isCopied ? 'Copied!' : 'Copy Message'}
+                  </button>
+                )}
+                {linkedinUrl && (
+                  <button
+                    onClick={() => copyMessage(msg)}
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+                    aria-label="Copy message to clipboard"
+                  >
+                    {isCopied ? 'Copied!' : 'Copy Only'}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Modal>
   );
 }
 
@@ -360,26 +464,12 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
       </div>
 
       {introModal && (
-        <Modal open={!!introModal} onClose={() => setIntroModal(null)} title="Intro Drafts" maxWidth="max-w-xl">
-          <div className="space-y-4">
-            {introModal.messages?.map((msg: any) => (
-              <div key={msg.id} className="rounded-lg border border-border p-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                    {msg.variant_label}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{msg.ai_model_version}</span>
-                </div>
-                {msg.subject_line && (
-                  <p className="mb-1 text-xs text-muted-foreground">
-                    Subject: <span className="font-medium text-secondary-foreground">{msg.subject_line}</span>
-                  </p>
-                )}
-                <p className="whitespace-pre-wrap text-sm text-secondary-foreground">{msg.message_body}</p>
-              </div>
-            ))}
-          </div>
-        </Modal>
+        <ContactIntroModal
+          intro={introModal}
+          onClose={() => setIntroModal(null)}
+          contactName={detail.full_name}
+          linkedinUrl={detail.linkedin_url}
+        />
       )}
     </div>
   );

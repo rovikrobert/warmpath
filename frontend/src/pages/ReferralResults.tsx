@@ -29,43 +29,103 @@ const REL_LABELS = {
 /* Intro Draft Modal                                                  */
 /* ------------------------------------------------------------------ */
 
-function IntroModal({ intro, onClose }) {
+const STEP_LABELS: Record<string, string> = {
+  reconnect: 'Reconnect',
+  explore: 'Feel it out',
+  referral_ask: 'The Ask',
+};
+
+function IntroModal({ intro, onClose, contactName, linkedinUrl }) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   if (!intro) return null;
   const messages = intro.messages || [];
   const totalSteps = messages.length;
+
+  const copyMessage = (msg: any) => {
+    navigator.clipboard.writeText(msg.message_body || '');
+    setCopiedId(msg.id);
+    setTimeout(() => setCopiedId(null), 2000);
+    window.dispatchEvent(new Event('journey-updated'));
+  };
+
+  const copyAndOpenLinkedIn = (msg: any) => {
+    copyMessage(msg);
+    if (linkedinUrl) {
+      window.open(linkedinUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   return (
-    <Modal open={!!intro} onClose={onClose} title="Intro Drafts" maxWidth="max-w-xl">
+    <Modal open={!!intro} onClose={onClose} title="Your Intro Messages" maxWidth="max-w-xl">
       <div className="space-y-4">
-        {messages.map((msg, idx) => (
-          <div key={msg.id} className="rounded-lg border border-border p-4">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {totalSteps > 1 && (
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">
-                    Step {idx + 1}/{totalSteps}
-                  </span>
+        {contactName && (
+          <p className="text-sm text-muted-foreground">
+            Messages for <span className="font-medium text-foreground">{contactName}</span>
+          </p>
+        )}
+        {messages.map((msg, idx) => {
+          const isCopied = copiedId === msg.id;
+          const fallbackVariant = msg.variant_label === 'only' ? null : msg.variant_label;
+          const label = STEP_LABELS[msg.step_label] || msg.step_label || fallbackVariant || 'Message';
+          return (
+            <div key={msg.id} className="rounded-lg border border-border p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {totalSteps > 1 && (
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">
+                      Step {idx + 1}/{totalSteps}
+                    </span>
+                  )}
+                  <Badge color="slate">{label}</Badge>
+                </div>
+                {msg.send_after_days > 0 && (
+                  <span className="text-xs text-muted-foreground">Come back in {msg.send_after_days} days</span>
                 )}
-                <Badge color="amber">
-                  {msg.step_label || msg.variant_label}
-                </Badge>
               </div>
-              {msg.send_after_days > 0 && (
-                <span className="text-xs text-muted-foreground">Send after {msg.send_after_days} days</span>
+              {msg.coaching_notes && (
+                <p className="mb-2 rounded bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
+                  <span className="font-medium">Keevs suggests:</span> {msg.coaching_notes}
+                </p>
               )}
+              {msg.subject_line && (
+                <p className="mb-1 text-xs text-muted-foreground">
+                  Subject: <span className="font-medium text-secondary-foreground">{msg.subject_line}</span>
+                </p>
+              )}
+              <p className="mb-3 whitespace-pre-wrap text-sm text-secondary-foreground">{msg.message_body}</p>
+              <div className="flex gap-2">
+                {linkedinUrl ? (
+                  <Button
+                    size="sm"
+                    onClick={() => copyAndOpenLinkedIn(msg)}
+                    aria-label={`Copy message and open LinkedIn profile for ${contactName || 'contact'}`}
+                  >
+                    {isCopied ? 'Copied! Opening LinkedIn...' : 'Copy & Open LinkedIn'}
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => copyMessage(msg)}
+                    aria-label="Copy message to clipboard"
+                  >
+                    {isCopied ? 'Copied!' : 'Copy Message'}
+                  </Button>
+                )}
+                {linkedinUrl && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => copyMessage(msg)}
+                    aria-label="Copy message to clipboard"
+                  >
+                    {isCopied ? 'Copied!' : 'Copy Only'}
+                  </Button>
+                )}
+              </div>
             </div>
-            {msg.coaching_notes && (
-              <p className="mb-2 rounded bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground italic">
-                {msg.coaching_notes}
-              </p>
-            )}
-            {msg.subject_line && (
-              <p className="mb-1 text-xs text-muted-foreground">
-                Subject: <span className="font-medium text-secondary-foreground">{msg.subject_line}</span>
-              </p>
-            )}
-            <p className="whitespace-pre-wrap text-sm text-secondary-foreground">{msg.message_body}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </Modal>
   );
@@ -230,7 +290,7 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading, sear
                     )}
                   </div>
                   <Button
-                    onClick={() => onDraftIntro(path.contact.id)}
+                    onClick={() => onDraftIntro(path.contact)}
                     loading={introLoading === path.contact.id}
                     size="sm"
                     className="shrink-0"
@@ -362,15 +422,19 @@ export default function ReferralResults() {
     return () => clearTimeout(timer);
   }, [data]);
 
-  const handleDraftIntro = async (contactId) => {
-    setIntroLoading(contactId);
+  const handleDraftIntro = async (contact) => {
+    setIntroLoading(contact.id);
     try {
       const res = await matchesApi.createIntro({
-        contact_id: contactId,
+        contact_id: contact.id,
         tone: 'professional',
         channel: 'linkedin',
       });
-      setDraftModal(res.data);
+      setDraftModal({
+        ...res.data,
+        contactName: contact.name,
+        linkedinUrl: contact.linkedin_url,
+      });
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -523,7 +587,14 @@ export default function ReferralResults() {
         />
       )}
 
-      {draftModal && <IntroModal intro={draftModal} onClose={() => setDraftModal(null)} />}
+      {draftModal && (
+        <IntroModal
+          intro={draftModal}
+          onClose={() => setDraftModal(null)}
+          contactName={draftModal.contactName}
+          linkedinUrl={draftModal.linkedinUrl}
+        />
+      )}
 
       {showFeedback && import.meta.env.VITE_BETA_MODE !== 'true' && (
         <FeedbackModal
