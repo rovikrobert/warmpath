@@ -639,17 +639,27 @@ class TestAggregatorFallback:
         assert jobs[0]["source"] == "adzuna"
         mock_adzuna.assert_called_once()
 
-    async def test_aggregator_skipped_when_ats_has_results(self):
-        """Adzuna should NOT be called if ATS boards return results."""
+    async def test_aggregator_skipped_when_ats_has_enough_results(self):
+        """Adzuna should NOT be called if ATS boards return >= threshold results."""
+        from app.services.job_fetcher import _CAREER_PAGE_MIN_JOBS
+
         fetcher = JobFetcher()
+        ats_jobs = [
+            {"title": f"Engineer {i}", "source": "greenhouse", "url": f"https://g/{i}"}
+            for i in range(_CAREER_PAGE_MIN_JOBS)
+        ]
         with (
             patch.object(
                 fetcher,
                 "fetch_greenhouse_jobs",
                 new_callable=AsyncMock,
-                return_value=[{"title": "Engineer", "source": "greenhouse"}],
+                return_value=ats_jobs,
             ),
             patch("app.services.job_fetcher.settings") as mock_settings,
+            patch(
+                "app.services.jobspy_fetcher.search_jobs_via_jobspy",
+                new_callable=AsyncMock,
+            ) as mock_jobspy,
         ):
             mock_settings.AI_MOCK_MODE = True
             mock_settings.ADZUNA_APP_ID = "test-id"
@@ -657,8 +667,9 @@ class TestAggregatorFallback:
                 "stripe", {"greenhouse": "stripe"}
             )
 
-        assert len(jobs) == 1
-        assert jobs[0]["source"] == "greenhouse"
+        assert len(jobs) == _CAREER_PAGE_MIN_JOBS
+        assert all(j["source"] == "greenhouse" for j in jobs)
+        mock_jobspy.assert_not_called()
 
     async def test_aggregator_skipped_when_not_configured(self):
         """No ADZUNA_APP_ID → aggregator fallback is skipped entirely."""
@@ -669,6 +680,84 @@ class TestAggregatorFallback:
             jobs = await fetcher.fetch_jobs_for_company("unknown-company-xyz")
 
         assert jobs == []
+
+
+# ---------------------------------------------------------------------------
+# Test company_matches — shared employer-name matching
+# ---------------------------------------------------------------------------
+
+
+class TestCompanyMatches:
+    """Unit tests for the company_matches function used by all fallback fetchers."""
+
+    @staticmethod
+    def _match(query: str, candidate: str) -> bool:
+        from app.services.job_fetcher import company_matches
+
+        return company_matches(query, candidate)
+
+    # --- Exact matches ---
+    def test_exact_match(self):
+        assert self._match("Stripe", "stripe") is True
+
+    def test_exact_with_domain_suffix(self):
+        assert self._match("Cantina.ai", "Cantina") is True
+
+    # --- Legal suffix matches (should pass) ---
+    def test_legal_suffix_inc(self):
+        assert self._match("Shopify", "Shopify Inc.") is True
+
+    def test_legal_suffix_pte_ltd(self):
+        assert self._match("Shopify", "Shopify Pte Ltd") is True
+
+    def test_legal_suffix_llc(self):
+        assert self._match("Google", "Google LLC") is True
+
+    def test_legal_suffix_holdings(self):
+        assert self._match("Grab", "Grab Holdings") is True
+
+    def test_legal_suffix_group_holdings(self):
+        assert self._match("DBS", "DBS Group Holdings") is True
+
+    def test_legal_suffix_platforms_inc(self):
+        assert self._match("Meta", "Meta Platforms Inc.") is True
+
+    def test_legal_suffix_payments_limited(self):
+        assert self._match("Wise", "Wise Payments Limited") is True
+
+    def test_legal_suffix_bank(self):
+        assert self._match("DBS", "DBS Bank") is True
+
+    def test_legal_suffix_with_comma(self):
+        """Trailing comma on suffix token (e.g. 'Inc,') should still match."""
+        assert self._match("Stripe", "Stripe, Inc.") is True
+
+    # --- Reverse direction (query longer than candidate) ---
+    def test_reverse_direction_match(self):
+        assert self._match("Stripe Payments", "Stripe") is True
+
+    # --- Rejects (should NOT match) ---
+    def test_rejects_different_company_with_prefix(self):
+        assert self._match("Shopify", "Shopify Administrator LLC") is False
+
+    def test_rejects_query_in_middle(self):
+        assert self._match("Shopify", "Hire a Shopify Admin") is False
+
+    def test_rejects_unrelated_compound(self):
+        assert self._match("Grab", "GrabFood") is False
+
+    def test_rejects_cloud_division(self):
+        assert self._match("Google", "Google Cloud") is False
+
+    # --- Empty / edge cases ---
+    def test_empty_query(self):
+        assert self._match("", "Stripe") is False
+
+    def test_empty_candidate(self):
+        assert self._match("Stripe", "") is False
+
+    def test_both_empty(self):
+        assert self._match("", "") is False
 
 
 # ---------------------------------------------------------------------------

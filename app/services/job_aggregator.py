@@ -15,7 +15,7 @@ from datetime import datetime
 import httpx
 
 from app.config import settings
-from app.services.job_fetcher import _clean_job_title
+from app.services.job_fetcher import _clean_job_title, company_matches
 
 logger = logging.getLogger(__name__)
 
@@ -97,12 +97,9 @@ async def search_jobs_by_company(
         if not title:
             continue
 
-        # Filter: only include results that mention the company
-        item_company = (item.get("company", {}).get("display_name", "") or "").lower()
-        if (
-            company_name.lower() not in item_company
-            and item_company not in company_name.lower()
-        ):
+        # Filter: only include results where the employer matches the target company
+        item_company = item.get("company", {}).get("display_name", "") or ""
+        if not company_matches(company_name, item_company):
             continue
 
         location_name = item.get("location", {}).get("display_name", "") or ""
