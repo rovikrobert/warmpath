@@ -6,14 +6,22 @@ sees plaintext; the database stores ciphertext.
 
 compute_blind_index() — HMAC-SHA256 deterministic hash for exact-match
 lookups on encrypted columns (suppression system, dedup).
+
+**IMPORTANT**: SQL-level operations (ILIKE, LIKE, ==, !=, etc.) on
+encrypted columns operate on ciphertext and produce wrong results.
+Always load rows first and filter in Python where the ORM decrypts.
+The Comparator subclass below logs warnings if SQL-level text
+comparisons are generated, to catch this mistake early.
 """
 
 import hashlib
 import hmac
 import logging
+import warnings
 
 from cryptography.fernet import Fernet
 from sqlalchemy import Text
+from sqlalchemy.sql.expression import ColumnElement
 from sqlalchemy.types import TypeDecorator
 
 from app.config import settings
@@ -43,6 +51,43 @@ def _get_fernet() -> Fernet | None:
     return _fernet
 
 
+class _EncryptedComparator(TypeDecorator.Comparator):  # type: ignore[type-arg]
+    """Warn when SQL-level text comparisons are used on encrypted columns.
+
+    SQL operators like ILIKE, LIKE, ==, != operate on ciphertext in the
+    database and will never match plaintext search terms.  Load rows first
+    and filter in Python where the ORM decrypts transparently.
+    """
+
+    def _warn(self, op: str) -> None:
+        col = getattr(self.expr, "key", self.expr)
+        warnings.warn(
+            f"SQL-level {op}() on encrypted column '{col}' operates on "
+            "ciphertext — results will be wrong. Filter in Python instead.",
+            stacklevel=4,
+        )
+
+    def ilike(self, other: object, **kw: object) -> ColumnElement[bool]:
+        self._warn("ilike")
+        return super().ilike(other, **kw)  # type: ignore[arg-type]
+
+    def like(self, other: object, **kw: object) -> ColumnElement[bool]:
+        self._warn("like")
+        return super().like(other, **kw)  # type: ignore[arg-type]
+
+    def contains(self, other: object, **kw: object) -> ColumnElement[bool]:
+        self._warn("contains")
+        return super().contains(other, **kw)  # type: ignore[arg-type]
+
+    def startswith(self, other: object, **kw: object) -> ColumnElement[bool]:
+        self._warn("startswith")
+        return super().startswith(other, **kw)  # type: ignore[arg-type]
+
+    def endswith(self, other: object, **kw: object) -> ColumnElement[bool]:
+        self._warn("endswith")
+        return super().endswith(other, **kw)  # type: ignore[arg-type]
+
+
 class EncryptedString(TypeDecorator):
     """VARCHAR replacement that Fernet-encrypts on bind and decrypts on load.
 
@@ -52,6 +97,7 @@ class EncryptedString(TypeDecorator):
 
     impl = Text
     cache_ok = True
+    comparator_factory = _EncryptedComparator
 
     def process_bind_param(self, value, dialect) -> str | None:
         if value is None:
@@ -81,6 +127,7 @@ class EncryptedText(TypeDecorator):
 
     impl = Text
     cache_ok = True
+    comparator_factory = _EncryptedComparator
 
     def process_bind_param(self, value, dialect) -> str | None:
         if value is None:
