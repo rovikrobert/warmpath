@@ -90,6 +90,24 @@ async def process_event(event: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+async def _run_cos_brief(cadence: str) -> None:
+    """Run the CoS daily or weekly brief pipeline in a thread.
+
+    The CoS functions are synchronous (file I/O, sync HTTP to Notion/Telegram),
+    so we offload to a thread to avoid blocking the async event loop.
+    """
+    try:
+        from agents.chief_of_staff.cos_agent import run_daily, run_weekly
+
+        if cadence == "weekly":
+            brief = await asyncio.to_thread(run_weekly)
+        else:
+            brief = await asyncio.to_thread(run_daily)
+        logger.info("CoS %s brief generated (%d chars)", cadence, len(brief or ""))
+    except Exception:
+        logger.exception("CoS %s brief failed", cadence)
+
+
 async def run_consumer_loop() -> None:
     """Main event consumer loop (entry point for agent-runtime service).
 
@@ -145,6 +163,14 @@ async def run_consumer_loop() -> None:
                             len(result.get("findings", [])),
                             len(result.get("actions", [])),
                         )
+
+                        # After scheduled scans, run the full CoS
+                        # daily/weekly brief (Notion + Telegram).
+                        # Reports were saved by TeamRunner._save_report()
+                        # during the graph dispatch.
+                        if event.get("type") == "scheduled_scan":
+                            cadence = event.get("payload", {}).get("cadence", "daily")
+                            await _run_cos_brief(cadence)
                     except Exception:
                         logger.exception("Failed to process event %s", msg_id)
 

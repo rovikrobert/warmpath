@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+from pathlib import Path
 from typing import Any
 
 from agents.shared.report import AgentReport
@@ -12,6 +13,32 @@ from app.agent_runtime.cost_guard import BudgetStatus, select_model
 from app.agent_runtime.trust import TrustLevel, get_allowed_tools, get_max_turns
 
 logger = logging.getLogger(__name__)
+
+# Map team_name → report directory so scanners can save *_latest.json
+# for the CoS _load_reports() pipeline.
+_TEAM_REPORTS_DIRS: dict[str, Path | None] = {}
+
+
+def _resolve_reports_dir(team_name: str) -> Path | None:
+    """Lazily resolve the report directory for a team."""
+    if team_name in _TEAM_REPORTS_DIRS:
+        return _TEAM_REPORTS_DIRS[team_name]
+
+    if team_name == "engineering":
+        from agents.shared.config import REPORTS_DIR
+
+        _TEAM_REPORTS_DIRS[team_name] = REPORTS_DIR
+        return REPORTS_DIR
+
+    config_module = f"{team_name}_team.shared.config"
+    try:
+        mod = importlib.import_module(config_module)
+        _TEAM_REPORTS_DIRS[team_name] = mod.REPORTS_DIR
+        return mod.REPORTS_DIR
+    except ImportError:
+        logger.warning("Cannot resolve reports dir for %s team", team_name)
+        _TEAM_REPORTS_DIRS[team_name] = None
+        return None
 
 
 class TeamRunner:
@@ -28,6 +55,23 @@ class TeamRunner:
         mod = importlib.import_module(module_path)
         return mod.scan()
 
+    def _save_report(self, report: AgentReport) -> None:
+        """Persist AgentReport as {agent}_latest.json for CoS daily brief."""
+        reports_dir = _resolve_reports_dir(self.team_name)
+        if reports_dir is None:
+            return
+        try:
+            reports_dir.mkdir(parents=True, exist_ok=True)
+            path = reports_dir / f"{report.agent}_latest.json"
+            path.write_text(report.serialize(), encoding="utf-8")
+        except Exception:
+            logger.debug(
+                "Failed to save report %s for %s",
+                report.agent,
+                self.team_name,
+                exc_info=True,
+            )
+
     def run_scanners(
         self, scanner_names: list[str] | None = None
     ) -> list[dict[str, Any]]:
@@ -43,6 +87,7 @@ class TeamRunner:
 
             try:
                 report = self._run_scanner(module_path)
+                self._save_report(report)
                 for finding in report.findings:
                     d = (
                         finding.__dict__.copy()

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { contacts as contactsApi } from '../api/client';
+import { contacts as contactsApi, matches as matchesApi } from '../api/client';
 import { getWarmTier, getLikelihood, WARM_TIERS } from '../utils/scores';
 import ScoreExplainer from './ScoreExplainer';
+import Modal from './ui/Modal';
 
 const RELATIONSHIP_TYPES = [
   { value: 'current_colleague', label: 'Current colleague' },
@@ -75,6 +76,26 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
   const [loading, setLoading] = useState(false);
   const [relType, setRelType] = useState(contact.relationship_type || '');
   const [relSaving, setRelSaving] = useState(false);
+  const [introLoading, setIntroLoading] = useState(false);
+  const [introModal, setIntroModal] = useState<any>(null);
+  const [introError, setIntroError] = useState('');
+
+  const handleDraftIntro = async () => {
+    setIntroLoading(true);
+    setIntroError('');
+    try {
+      const res = await matchesApi.createIntro({
+        contact_id: detail.id,
+        tone: 'professional',
+        channel: 'linkedin',
+      });
+      setIntroModal(res.data);
+    } catch (err: any) {
+      setIntroError(err.message || 'Failed to draft intro');
+    } finally {
+      setIntroLoading(false);
+    }
+  };
 
   // Fetch full detail on mount
   useEffect(() => {
@@ -317,9 +338,17 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
           )}
         </div>
 
+        {introError && (
+          <p className="text-sm text-red-400">{introError}</p>
+        )}
+
         <div className="flex gap-2">
-          <button className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors">
-            Draft Intro Message
+          <button
+            onClick={handleDraftIntro}
+            disabled={introLoading}
+            className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {introLoading ? 'Drafting...' : 'Draft Intro Message'}
           </button>
           <button
             onClick={onClose}
@@ -329,6 +358,29 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
           </button>
         </div>
       </div>
+
+      {introModal && (
+        <Modal open={!!introModal} onClose={() => setIntroModal(null)} title="Intro Drafts" maxWidth="max-w-xl">
+          <div className="space-y-4">
+            {introModal.messages?.map((msg: any) => (
+              <div key={msg.id} className="rounded-lg border border-border p-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                    {msg.variant_label}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{msg.ai_model_version}</span>
+                </div>
+                {msg.subject_line && (
+                  <p className="mb-1 text-xs text-muted-foreground">
+                    Subject: <span className="font-medium text-secondary-foreground">{msg.subject_line}</span>
+                  </p>
+                )}
+                <p className="whitespace-pre-wrap text-sm text-secondary-foreground">{msg.message_body}</p>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
