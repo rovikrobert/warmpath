@@ -91,6 +91,10 @@ celery_app.conf.update(
             "task": "app.tasks.infra_tasks.redis_stream_janitor",
             "schedule": crontab(minute="*/30"),  # Every 30 minutes
         },
+        "stuck-upload-watchdog": {
+            "task": "app.tasks.infra_tasks.stuck_upload_watchdog",
+            "schedule": crontab(minute="*/15"),  # Every 15 minutes
+        },
         # --- Job cache warming (recommendations data) ---
         "job-cache-warm": {
             "task": "app.tasks.job_scan_tasks.warm_job_cache_global",
