@@ -92,3 +92,30 @@ async def test_get_stats_counts_by_state(store):
     stats = await store.get_stats()
     assert stats["resolved"] == 1
     assert stats["new"] == 1  # f2 is still new
+
+
+@pytest.mark.asyncio
+async def test_classify_findings_graceful_on_redis_failure():
+    """FindingStore returns empty results if Redis is unavailable."""
+    store = FindingStore(redis_url="redis://nonexistent:6379")
+    new, known = await store.classify_findings(
+        [{"source_team": "eng", "category": "test", "title": "Issue"}]
+    )
+    assert new == []
+    assert known == []
+
+
+@pytest.mark.asyncio
+async def test_get_stats_graceful_on_redis_failure():
+    """get_stats returns zeroed dict if Redis is unavailable."""
+    store = FindingStore(redis_url="redis://nonexistent:6379")
+    stats = await store.get_stats()
+    assert stats == {"new": 0, "known": 0, "resolved": 0}
+
+
+@pytest.mark.asyncio
+async def test_mark_resolved_graceful_on_redis_failure():
+    """mark_resolved returns False if Redis is unavailable."""
+    store = FindingStore(redis_url="redis://nonexistent:6379")
+    result = await store.mark_resolved("some_hash")
+    assert result is False

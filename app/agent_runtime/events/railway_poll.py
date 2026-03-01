@@ -25,7 +25,7 @@ def _fetch_recent_logs() -> list[str]:
         )
         return result.stdout.strip().splitlines() if result.stdout else []
     except Exception:
-        logger.debug("Failed to fetch Railway logs", exc_info=True)
+        logger.warning("Failed to fetch Railway logs", exc_info=True)
         return []
 
 

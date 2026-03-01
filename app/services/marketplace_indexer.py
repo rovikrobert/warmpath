@@ -376,8 +376,12 @@ async def filter_vault_overlap(
         return listings
 
     contact_ids = [listing.contact_id for listing in listings]
+    nh_ids = {listing.network_holder_id for listing in listings}
     contact_result = await db.execute(
-        select(Contact).where(Contact.id.in_(contact_ids))
+        select(Contact).where(
+            Contact.id.in_(contact_ids),
+            Contact.user_id.in_(nh_ids),
+        )
     )
     contact_map: dict[uuid.UUID, Contact] = {c.id: c for c in contact_result.scalars()}
 
