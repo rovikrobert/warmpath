@@ -80,7 +80,7 @@ function FitBadge({ score }) {
   return <MatchBadge score={score} type="fit" />;
 }
 
-function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
+function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading, searchScope }) {
   const ownPaths = company.referral_paths?.filter((p) => p.source === 'own_network') || [];
   const marketPaths = company.referral_paths?.filter((p) => p.source === 'marketplace') || [];
   const [showAll, setShowAll] = useState(false);
@@ -286,6 +286,16 @@ function CompanyCard({ company, onRequestIntro, onDraftIntro, introLoading }) {
           </div>
         )}
 
+        {/* Empty marketplace state — searched marketplace but no results */}
+        {searchScope === 'marketplace' && marketPaths.length === 0 && (
+          <div className="py-4">
+            <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Via Marketplace</h4>
+            <p className="text-sm text-muted-foreground">
+              No additional connections at {company.name} in the marketplace yet. As more people share their networks, new referral paths will appear here.
+            </p>
+          </div>
+        )}
+
         {/* No paths */}
         {ownPaths.length === 0 && marketPaths.length === 0 && (
           <div className="py-4 text-center text-sm text-muted-foreground">
@@ -386,6 +396,7 @@ export default function ReferralResults() {
 
   const companies = data?.companies || data?.results_data?.companies || [];
   const summary = data?.summary || data?.results_data?.summary || {};
+  const searchScope = data?.scope || data?.results_data?.scope || 'own_network';
   const searchedNames = searchMeta?.target_companies || companies.map((c) => c.name);
 
   return (
@@ -450,6 +461,7 @@ export default function ReferralResults() {
             <CompanyCard
               key={i}
               company={company}
+              searchScope={searchScope}
               onDraftIntro={handleDraftIntro}
               introLoading={introLoading}
               onRequestIntro={(path) => setIntroModal(path)}

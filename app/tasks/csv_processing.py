@@ -367,6 +367,22 @@ async def process_csv_upload_core(
 
         await db.flush()
 
+        # Re-index marketplace listings if user has already opted in
+        from app.models.marketplace import NetworkSharingPreferences
+
+        nsp_result = await db.execute(
+            select(NetworkSharingPreferences).where(
+                NetworkSharingPreferences.user_id == user_uuid,
+                NetworkSharingPreferences.opt_in_marketplace.is_(True),
+                NetworkSharingPreferences.is_paused.is_(False),
+            )
+        )
+        if nsp_result.scalar_one_or_none():
+            from app.services.marketplace_indexer import generate_marketplace_listings
+
+            await generate_marketplace_listings(user_uuid, db)
+            await db.flush()
+
         # Trigger vector sync for this user's contacts
         if settings.VECTOR_SEARCH_ENABLED:
             from app.tasks.vector_tasks import sync_user_contacts

@@ -53,8 +53,11 @@ from app.services.credits import (
 )
 from app.services.audit_logger import log_event
 from app.services.friendship_service import get_friend_and_fof_ids, get_friend_ids
-from app.services.marketplace_indexer import generate_marketplace_listings
-from app.utils.hashing import hash_for_suppression
+from app.services.marketplace_indexer import (
+    build_seeker_hash_set,
+    filter_vault_overlap,
+    generate_marketplace_listings,
+)
 from app.utils.privacy_checks import requi[RESEND_KEY_REDACTED]
 from app.utils.security import get_current_user, requi[RESEND_KEY_REDACTED]
 
@@ -116,51 +119,9 @@ async def _check_contact_in_vault(
 
     Uses hash comparison only — never exposes the network holder's contact PII.
     """
-    contact_result = await db.execute(
-        select(Contact).where(
-            Contact.id == listing.contact_id,
-            Contact.user_id == listing.network_holder_id,
-        )
-    )
-    listed_contact = contact_result.scalar_one_or_none()
-    if listed_contact is None:
-        return False
-
-    hashes_to_check: list[str] = []
-    if listed_contact.email:
-        hashes_to_check.append(hash_for_suppression(listed_contact.email))
-    if (
-        listed_contact.first_name
-        and listed_contact.last_name
-        and listed_contact.current_company
-    ):
-        name_company = (
-            f"{listed_contact.first_name}"
-            f"{listed_contact.last_name}"
-            f"{listed_contact.current_company}"
-        )
-        hashes_to_check.append(hash_for_suppression(name_company))
-
-    if not hashes_to_check:
-        return False
-
-    seeker_contacts_result = await db.execute(
-        select(Contact).where(
-            Contact.user_id == seeker_user_id,
-            Contact.deleted_at.is_(None),
-        )
-    )
-    for sc in seeker_contacts_result.scalars():
-        if sc.email and hash_for_suppression(sc.email) in hashes_to_check:
-            return True
-        if sc.first_name and sc.last_name and sc.current_company:
-            sc_hash = hash_for_suppression(
-                f"{sc.first_name}{sc.last_name}{sc.current_company}"
-            )
-            if sc_hash in hashes_to_check:
-                return True
-
-    return False
+    seeker_hashes = await build_seeker_hash_set(seeker_user_id, db)
+    remaining = await filter_vault_overlap([listing], seeker_hashes, db)
+    return len(remaining) == 0
 
 
 def _summarize_work_history(work_history: list) -> list[str]:
@@ -292,6 +253,12 @@ async def _run_vector_marketplace_search(
     if not vlistings:
         return None
 
+    # Exclude listings for contacts already in the seeker's vault
+    seeker_hashes = await build_seeker_hash_set(current_user_id, db)
+    vlistings = await filter_vault_overlap(vlistings, seeker_hashes, db)
+    if not vlistings:
+        return None
+
     vcompany_ids = {vl.company_id for vl in vlistings}
     cresult = await db.execute(select(Company).where(Company.id.in_(vcompany_ids)))
     vcompany_map = {c.id: c.name for c in cresult.scalars()}
@@ -406,6 +373,10 @@ async def marketplace_search(
 
     result = await db.execute(query)
     listings = list(result.scalars())
+
+    # Exclude listings for contacts already in the seeker's vault
+    seeker_hashes = await build_seeker_hash_set(current_user.id, db)
+    listings = await filter_vault_overlap(listings, seeker_hashes, db)
 
     # Load reputations for unique holder IDs
     holder_ids = {listing.network_holder_id for listing in listings}
