@@ -49,6 +49,29 @@ function renderWithLinks(text) {
   });
 }
 
+function chunkCoachLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed) return [];
+  if (/^(?:[-*]\s|\d+\.\s)/.test(trimmed)) return [trimmed];
+
+  const sentences = trimmed.match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g);
+  if (!sentences || sentences.length <= 2) return [trimmed];
+
+  const chunks = [];
+  for (let i = 0; i < sentences.length; i += 2) {
+    chunks.push(sentences.slice(i, i + 2).join(' ').trim());
+  }
+  return chunks.filter(Boolean);
+}
+
+function chunkCoachMessage(text) {
+  if (!text) return [];
+  return text
+    .split('\n')
+    .flatMap((line) => chunkCoachLine(line))
+    .filter(Boolean);
+}
+
 const KEEVS_QUICK_ACTIONS = [
   { label: 'Find referrals', prompt: 'Help me find referral paths at my target companies' },
   { label: 'Draft an intro', prompt: 'Help me draft a referral intro message' },
@@ -276,7 +299,7 @@ export default function CoachPage() {
                 }`}
               >
                 {(msg.role === 'keevs' || msg.role === 'treb')
-                  ? msg.content.split('\n').map((line, j) => (
+                  ? chunkCoachMessage(msg.content).map((line, j) => (
                       <p key={j} className={j > 0 ? 'mt-2' : ''}>
                         {renderWithLinks(line)}
                       </p>
