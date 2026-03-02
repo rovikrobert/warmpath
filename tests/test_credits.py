@@ -7,6 +7,7 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
+from app.config import settings
 from app.models.credits import CreditTransaction
 from app.services.credits import (
     earn_credits,
@@ -478,6 +479,50 @@ class TestPurchaseEndpoint:
         )
         assert resp.status_code == 200
         assert resp.json()["data"]["amount"] == 1000
+
+    async def test_purchase_blocked_for_non_admin_in_production(
+        self, client: AsyncClient, auth_headers
+    ):
+        """In production, non-admin users cannot mint credits via purchase."""
+        old_env = settings.APP_ENV
+        try:
+            settings.APP_ENV = "production"
+            resp = await client.post(
+                "/api/v1/credits/purchase",
+                json={"amount": 100},
+                headers=auth_headers,
+            )
+            assert resp.status_code == 403
+        finally:
+            settings.APP_ENV = old_env
+
+    async def test_purchase_allowed_for_admin_in_production(
+        self, client: AsyncClient, auth_headers, user_id
+    ):
+        """In production, admins can still use purchase endpoint."""
+        uid = uuid_mod.UUID(user_id)
+        old_env = settings.APP_ENV
+        try:
+            settings.APP_ENV = "production"
+            async with TestSessionLocal() as db:
+                from app.models.user import User
+                from sqlalchemy import select
+
+                user = (
+                    await db.execute(select(User).where(User.id == uid))
+                ).scalar_one()
+                user.is_admin = True
+                await db.commit()
+
+            resp = await client.post(
+                "/api/v1/credits/purchase",
+                json={"amount": 100},
+                headers=auth_headers,
+            )
+            assert resp.status_code == 200
+            assert resp.json()["data"]["amount"] == 100
+        finally:
+            settings.APP_ENV = old_env
 
 
 class TestExpireEndpoint:
