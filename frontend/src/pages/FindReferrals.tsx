@@ -193,6 +193,10 @@ export default function FindReferrals() {
 
   const handleSearch = async () => {
     if (companies.length === 0) return;
+    if (hasPrefs === false) {
+      setError('Set your target role first so we can match you to the right referrals.');
+      return;
+    }
     setSearching(true);
     setError('');
     try {
@@ -200,7 +204,12 @@ export default function FindReferrals() {
       trackEvent('search_performed');
       navigate(`/referrals/${res.data.id}`);
     } catch (err) {
-      setError(err.message);
+      const msg = err?.message || 'Search failed';
+      if (msg.toLowerCase().includes('set job preferences first')) {
+        setError('Set your target role first so we can match you to the right referrals.');
+      } else {
+        setError(msg);
+      }
       setSearching(false);
     }
   };
@@ -375,7 +384,7 @@ export default function FindReferrals() {
 
         <Button
           onClick={handleSearch}
-          disabled={companies.length === 0}
+          disabled={companies.length === 0 || hasPrefs === false}
           loading={searching}
           className="w-full"
           size="lg"
