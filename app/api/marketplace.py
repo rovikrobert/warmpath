@@ -25,6 +25,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_db
+from app.middleware.rate_limit import check_rate_limit
 from app.models.company import Company
 from app.models.contact import Contact
 from app.models.marketplace import (
@@ -58,6 +59,7 @@ from app.services.marketplace_indexer import (
     filter_vault_overlap,
     generate_marketplace_listings,
 )
+from app.utils.exceptions import RateLimitError
 from app.utils.privacy_checks import requi[RESEND_KEY_REDACTED]
 from app.utils.security import get_current_user, requi[RESEND_KEY_REDACTED]
 
@@ -462,6 +464,29 @@ async def request_intro(
         )
 
     # Check and deduct credits (20 per intro request)
+    allowed, current_count = await check_rate_limit(
+        current_user.id,
+        "intro_request",
+        settings.RATE_LIMIT_INTRO_REQUESTS_PER_DAY,
+        db,
+        is_admin=current_user.is_admin,
+    )
+    if not allowed:
+        await log_event(
+            db,
+            "velocity_limit_hit",
+            user_id=current_user.id,
+            metadata={
+                "action": "intro_request",
+                "count": current_count,
+                "max_per_day": settings.RATE_LIMIT_INTRO_REQUESTS_PER_DAY,
+            },
+        )
+        await db.commit()
+        raise RateLimitError(
+            f"Daily intro request limit reached ({settings.RATE_LIMIT_INTRO_REQUESTS_PER_DAY}/day)"
+        )
+
     if not await check_and_spend(current_user.id, 20, "intro_request", db):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
@@ -735,6 +760,30 @@ async def update_facilitation(
     now = datetime.now(timezone.utc)
 
     if body.action == "approve":
+        allowed, current_count = await check_rate_limit(
+            current_user.id,
+            "intro_approve",
+            settings.RATE_LIMIT_INTRO_APPROVALS_PER_DAY,
+            db,
+            is_admin=current_user.is_admin,
+        )
+        if not allowed:
+            await log_event(
+                db,
+                "velocity_limit_hit",
+                user_id=current_user.id,
+                metadata={
+                    "action": "intro_approve",
+                    "count": current_count,
+                    "max_per_day": settings.RATE_LIMIT_INTRO_APPROVALS_PER_DAY,
+                    "facilitation_id": str(facilitation.id),
+                },
+            )
+            await db.commit()
+            raise RateLimitError(
+                f"Daily intro approval limit reached ({settings.RATE_LIMIT_INTRO_APPROVALS_PER_DAY}/day)"
+            )
+
         facilitation.status = "approved"
         facilitation.reviewed_at = now
         if body.notes:
@@ -746,8 +795,6 @@ async def update_facilitation(
 
         if contact and contact.email:
             # Email relay path — send intro via email, defer credits to delivery
-
-            from app.config import settings
             from app.services.email_engagement import send_intro_relay_email
             from app.services.referral_service import create_referral_code
 
@@ -922,6 +969,30 @@ async def confirm_manual_send(
             detail="Credits already awarded",
         )
 
+    allowed, current_count = await check_rate_limit(
+        current_user.id,
+        "manual_intro_confirm",
+        settings.RATE_LIMIT_MANUAL_INTRO_CONFIRMS_PER_DAY,
+        db,
+        is_admin=current_user.is_admin,
+    )
+    if not allowed:
+        await log_event(
+            db,
+            "velocity_limit_hit",
+            user_id=current_user.id,
+            metadata={
+                "action": "manual_intro_confirm",
+                "count": current_count,
+                "max_per_day": settings.RATE_LIMIT_MANUAL_INTRO_CONFIRMS_PER_DAY,
+                "facilitation_id": str(facilitation.id),
+            },
+        )
+        await db.commit()
+        raise RateLimitError(
+            f"Daily manual intro confirmation limit reached ({settings.RATE_LIMIT_MANUAL_INTRO_CONFIRMS_PER_DAY}/day)"
+        )
+
     now = datetime.now(timezone.utc)
     facilitation.delivery_method = "linkedin_manual"
     facilitation.delivery_status = "delivered"
@@ -943,6 +1014,15 @@ async def confirm_manual_send(
             user_id=current_user.id,
             metadata={"facilitation_id": str(facilitation.id)},
         )
+
+    from app.utils.tracking import track_action
+
+    await track_action(
+        db,
+        current_user.id,
+        "manual_intro_confirm",
+        metadata_={"facilitation_id": str(facilitation.id)},
+    )
     await db.commit()
 
     return {
