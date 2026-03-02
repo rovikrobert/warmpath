@@ -6,6 +6,17 @@ import { trackEvent } from '../utils/analytics';
 import Button from '../components/ui/Button';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
+const SEARCH_SCOPE_EXPERIMENT_KEY = 'warmpath_search_scope_v1';
+
+function getExperimentVariant(): 'control' | 'treatment' {
+  if (typeof window === 'undefined') return 'control';
+  const saved = window.localStorage.getItem(SEARCH_SCOPE_EXPERIMENT_KEY);
+  if (saved === 'control' || saved === 'treatment') return saved;
+  const assigned = Math.random() < 0.5 ? 'control' : 'treatment';
+  window.localStorage.setItem(SEARCH_SCOPE_EXPERIMENT_KEY, assigned);
+  return assigned;
+}
+
 function ShimmerCard() {
   return (
     <div className="animate-pulse rounded-lg border border-border bg-muted p-4" aria-hidden="true">
@@ -84,6 +95,8 @@ export default function FindReferrals() {
   const location = useLocation();
   const [companies, setCompanies] = useState(() => location.state?.prefillCompanies ?? []);
   const [scope, setScope] = useState('own_network');
+  const [scopeTouched, setScopeTouched] = useState(false);
+  const [experimentVariant] = useState<'control' | 'treatment'>(() => getExperimentVariant());
   const [balance, setBalance] = useState(null);
   const [hasPrefs, setHasPrefs] = useState(null);
   const [targetRole, setTargetRole] = useState(null);
@@ -93,6 +106,7 @@ export default function FindReferrals() {
   const [loadingRecs, setLoadingRecs] = useState(false);
   const [companyCounts, setCompanyCounts] = useState({});
   const [discoveryStatus, setDiscoveryStatus] = useState({});
+  const [shownNudgeKey, setShownNudgeKey] = useState<string | null>(null);
 
   useEffect(() => {
     creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
@@ -103,6 +117,10 @@ export default function FindReferrals() {
       setHasPrefs(e.status === 404 ? false : null);
     });
   }, []);
+
+  useEffect(() => {
+    trackEvent('search_scope_experiment_assigned', { experiment_variant: experimentVariant });
+  }, [experimentVariant]);
 
   useEffect(() => {
     if (hasPrefs !== true) return;
@@ -184,10 +202,76 @@ export default function FindReferrals() {
   // Computed values for scope toggle UI
   const companiesLoaded = companies.length > 0 && companies.every((c) => c in companyCounts);
   const totalOwnConnections = companies.reduce((sum, c) => sum + (companyCounts[c] ?? 0), 0);
+  const targetsWithCoverage = companies.reduce((sum, c) => sum + ((companyCounts[c] ?? 0) > 0 ? 1 : 0), 0);
+  const coverageRate = companies.length > 0 ? targetsWithCoverage / companies.length : 0;
+  const recommendedScope = coverageRate < 0.2 ? 'marketplace' : 'own_network';
+  const shouldShowLowCoverageNudge = (
+    experimentVariant === 'treatment' &&
+    scope === 'own_network' &&
+    companies.length > 0 &&
+    companiesLoaded &&
+    recommendedScope === 'marketplace'
+  );
+
+  useEffect(() => {
+    if (experimentVariant !== 'treatment') return;
+    if (companies.length === 0 || !companiesLoaded) return;
+    if (scopeTouched) return;
+    if (recommendedScope !== 'marketplace') return;
+    if (scope === 'marketplace') return;
+
+    setScope('marketplace');
+    trackEvent('search_scope_auto_selected', {
+      experiment_variant: experimentVariant,
+      selected_scope: 'marketplace',
+      reason: coverageRate === 0 ? 'zero_coverage' : 'low_coverage',
+      coverage_rate: coverageRate,
+      total_targets: companies.length,
+      targets_with_coverage: targetsWithCoverage,
+    });
+  }, [experimentVariant, companies.length, companiesLoaded, scopeTouched, recommendedScope, scope, coverageRate, targetsWithCoverage]);
+
+  useEffect(() => {
+    if (!shouldShowLowCoverageNudge) return;
+    const nudgeKey = `${companies.slice().sort().join('|')}::${targetsWithCoverage}`;
+    if (shownNudgeKey === nudgeKey) return;
+    trackEvent('marketplace_nudge_shown', {
+      experiment_variant: experimentVariant,
+      nudge_type: coverageRate === 0 ? 'zero_coverage' : 'low_coverage',
+      coverage_rate: coverageRate,
+      total_targets: companies.length,
+      targets_with_coverage: targetsWithCoverage,
+      selected_scope: scope,
+    });
+    setShownNudgeKey(nudgeKey);
+  }, [shouldShowLowCoverageNudge, companies, targetsWithCoverage, shownNudgeKey, experimentVariant, coverageRate, scope]);
 
   const handleAddRec = (name) => {
     if (!companies.includes(name)) {
       setCompanies((prev) => [...prev, name]);
+    }
+  };
+
+  const selectScope = (nextScope: 'own_network' | 'marketplace', source: 'manual' | 'nudge' = 'manual') => {
+    setScope(nextScope);
+    setScopeTouched(true);
+    trackEvent('search_scope_selected', {
+      experiment_variant: experimentVariant,
+      selected_scope: nextScope,
+      source,
+      coverage_rate: coverageRate,
+      total_targets: companies.length,
+      targets_with_coverage: targetsWithCoverage,
+    });
+    if (source === 'nudge' && nextScope === 'marketplace') {
+      trackEvent('marketplace_nudge_accepted', {
+        experiment_variant: experimentVariant,
+        previous_scope: scope,
+        new_scope: 'marketplace',
+        coverage_rate: coverageRate,
+        total_targets: companies.length,
+        targets_with_coverage: targetsWithCoverage,
+      });
     }
   };
 
@@ -201,7 +285,19 @@ export default function FindReferrals() {
     setError('');
     try {
       const res = await searchApi.smart({ company_names: companies, scope });
-      trackEvent('search_performed');
+      trackEvent('search_scope_decision', {
+        experiment_variant: experimentVariant,
+        selected_scope: scope,
+        recommended_scope: recommendedScope,
+        followed_recommendation: scope === recommendedScope,
+        coverage_rate: coverageRate,
+        total_targets: companies.length,
+        targets_with_coverage: targetsWithCoverage,
+      });
+      trackEvent('search_performed', {
+        scope,
+        experiment_variant: experimentVariant,
+      });
       navigate(`/referrals/${res.data.id}`);
     } catch (err) {
       const msg = err?.message || 'Search failed';
@@ -305,7 +401,7 @@ export default function FindReferrals() {
               type="button"
               role="radio"
               aria-checked={scope === 'own_network'}
-              onClick={() => setScope('own_network')}
+              onClick={() => selectScope('own_network')}
               className={`rounded-lg border-2 p-4 text-left transition ${
                 scope === 'own_network' ? 'border-primary bg-primary/10' : 'border-border hover:border-border'
               }`}
@@ -325,7 +421,7 @@ export default function FindReferrals() {
               type="button"
               role="radio"
               aria-checked={scope === 'marketplace'}
-              onClick={() => setScope('marketplace')}
+              onClick={() => selectScope('marketplace')}
               className={`relative rounded-lg border-2 p-4 text-left transition ${
                 scope === 'marketplace'
                   ? 'border-primary bg-primary/10'
@@ -362,16 +458,17 @@ export default function FindReferrals() {
           )}
 
           {/* Nudge to switch to marketplace when few/no connections */}
-          {scope === 'own_network' && companies.length > 0 && companiesLoaded && totalOwnConnections <= 2 && (
+          {shouldShowLowCoverageNudge && (
             <div className="mt-2 flex items-center gap-2 text-sm text-primary">
               <span>
-                Only {totalOwnConnections} {totalOwnConnections === 1 ? 'connection' : 'connections'} at{' '}
-                {companies.length === 1 ? companies[0] : `${companies.length} companies`}.
+                {coverageRate === 0
+                  ? `No direct connections found at ${companies.length === 1 ? companies[0] : `${companies.length} target companies`}.`
+                  : `Only ${targetsWithCoverage} of ${companies.length} target companies have direct connections.`}{' '}
                 Switch to All Networks to find 200+ more paths.
               </span>
               <button
                 type="button"
-                onClick={() => setScope('marketplace')}
+                onClick={() => selectScope('marketplace', 'nudge')}
                 className="shrink-0 font-medium hover:text-primary"
               >
                 Switch &rarr;
