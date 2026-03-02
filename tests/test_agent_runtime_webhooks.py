@@ -50,7 +50,7 @@ async def test_github_webhook_returns_202_on_valid_push(github_push_payload):
                 },
             )
     assert resp.status_code == 202
-    assert resp.json()["status"] == "accepted"
+    assert resp.json()["data"]["status"] == "accepted"
 
 
 @pytest.mark.asyncio

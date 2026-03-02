@@ -149,19 +149,22 @@ def warm_job_cache_global():
         companies = list(BOARD_REGISTRY.items())
 
         async with _get_session_factory()() as db:
-            # Check which companies need refreshing
-            to_fetch: list[tuple[str, dict[str, str]]] = []
-            for company_key, boards in companies:
-                cache_key = f"job_scan:{company_key}"
-                result = await db.execute(
-                    select(EnrichmentCache).where(
-                        EnrichmentCache.cache_key == cache_key
-                    )
+            # Batch-check which companies need refreshing (single query)
+            all_cache_keys = [f"job_scan:{key}" for key, _ in companies]
+            cache_result = await db.execute(
+                select(EnrichmentCache).where(
+                    EnrichmentCache.cache_key.in_(all_cache_keys)
                 )
-                cached = result.scalar_one_or_none()
-                if cached is not None and cached.expires_at > now:
-                    continue  # Still fresh
-                to_fetch.append((company_key, boards))
+            )
+            fresh_keys = {
+                c.cache_key for c in cache_result.scalars() if c.expires_at > now
+            }
+
+            to_fetch: list[tuple[str, dict[str, str]]] = [
+                (key, boards)
+                for key, boards in companies
+                if f"job_scan:{key}" not in fresh_keys
+            ]
 
             logger.info(
                 "Job cache warming: %d/%d companies need refresh",

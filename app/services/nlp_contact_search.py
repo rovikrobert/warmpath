@@ -912,7 +912,7 @@ async def _try_vector_contact_search(
         result = await db.execute(
             sa_select(Contact).where(
                 Contact.id.in_(contact_ids),
-                Contact.user_id == user_id,
+                Contact.user_id == user_id,  # defense-in-depth: vault isolation
             )
         )
         contacts_map = {str(c.id): c for c in result.scalars().all()}

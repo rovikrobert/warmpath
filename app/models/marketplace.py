@@ -171,7 +171,7 @@ class IntroFacilitation(Base):
         DateTime(timezone=True), nullable=True
     )
     relay_message_id: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, comment="Resend email ID for tracking"
+        String(255), nullable=True, index=True, comment="Resend email ID for tracking"
     )
     credits_awarded_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
@@ -221,6 +221,7 @@ class ConnectorReputation(Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
     intros_facilitated: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="0"
@@ -310,4 +311,9 @@ class RecommendationDemandSignal(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )

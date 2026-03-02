@@ -61,11 +61,11 @@ class UpdatePartnershipRequest(BaseModel):
 
 
 class AdvancePartnershipRequest(BaseModel):
-    note: str | None = None
+    note: str | None = Field(None, max_length=500)
 
 
 class LosePartnershipRequest(BaseModel):
-    reason: str = Field(..., min_length=1)
+    reason: str = Field(..., min_length=1, max_length=500)
 
 
 # ---------------------------------------------------------------------------
