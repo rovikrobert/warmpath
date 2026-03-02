@@ -123,7 +123,7 @@ class FindingStore:
         stats: dict[str, int] = {"new": 0, "known": 0, "resolved": 0}
         try:
             r = await self._get_redis()
-            cursor = "0"
+            cursor = 0
             while True:
                 cursor, keys = await r.scan(
                     cursor=cursor, match=f"{PREFIX}:*", count=100
@@ -134,7 +134,7 @@ class FindingStore:
                         record = json.loads(val)
                         state = record.get("state", "new")
                         stats[state] = stats.get(state, 0) + 1
-                if cursor == 0 or cursor == "0":
+                if cursor == 0:
                     break
         except Exception:
             logger.warning("FindingStore Redis unavailable for stats")
