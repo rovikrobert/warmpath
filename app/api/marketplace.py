@@ -126,6 +126,156 @@ async def _check_contact_in_vault(
     return len(remaining) == 0
 
 
+async def _apply_intro_approve(
+    facilitation: IntroFacilitation,
+    body: IntroFacilitationActionBody,
+    current_user: User,
+    now: datetime,
+    db: AsyncSession,
+) -> Contact | None:
+    """Apply approve flow and return contact used for potential fallback response."""
+    allowed, current_count = await check_rate_limit(
+        current_user.id,
+        "intro_approve",
+        settings.RATE_LIMIT_INTRO_APPROVALS_PER_DAY,
+        db,
+        is_admin=current_user.is_admin,
+    )
+    if not allowed:
+        await log_event(
+            db,
+            "velocity_limit_hit",
+            user_id=current_user.id,
+            metadata={
+                "action": "intro_approve",
+                "count": current_count,
+                "max_per_day": settings.RATE_LIMIT_INTRO_APPROVALS_PER_DAY,
+                "facilitation_id": str(facilitation.id),
+            },
+        )
+        await db.commit()
+        raise RateLimitError(
+            f"Daily intro approval limit reached ({settings.RATE_LIMIT_INTRO_APPROVALS_PER_DAY}/day)"
+        )
+
+    facilitation.status = "approved"
+    facilitation.reviewed_at = now
+    if body.notes:
+        facilitation.network_holder_notes = body.notes
+
+    listing = await db.get(MarketplaceListing, facilitation.marketplace_listing_id)
+    contact = await db.get(Contact, listing.contact_id) if listing else None
+
+    if contact and contact.email:
+        # Email relay path — send intro via email, defer credits to delivery.
+        from app.services.email_engagement import send_intro_relay_email
+        from app.services.referral_service import create_referral_code
+
+        nh_ref_code = await create_referral_code(current_user.id, db)
+        nh_referral_code = nh_ref_code.code if nh_ref_code else ""
+
+        js_snapshot = facilitation.job_seeker_profile_snapshot or {}
+        contact_first = contact.first_name or "there"
+        js_name = js_snapshot.get("full_name", "a professional")
+        js_role = js_snapshot.get("headline", "")
+        js_message = js_snapshot.get("message", "")
+        js_blurb = js_snapshot.get("candidate_blurb", "")
+
+        intro_body = f"Hey {contact_first},\n\nI'd like to introduce you to {js_name}"
+        if js_role:
+            intro_body += f", {js_role}"
+        intro_body += "."
+        if js_blurb:
+            intro_body += f"\n\n{js_blurb}"
+        if js_message:
+            intro_body += f"\n\n{js_message}"
+        intro_body += "\n\nI think you two should connect — happy to share more context."
+
+        review_token = secrets.token_urlsafe(32)
+        facilitation.review_token = review_token
+        facilitation.review_token_expires_at = now + timedelta(days=90)
+        view_intro_url = f"{settings.FRONTEND_URL}/intro/{review_token}"
+
+        message_id = await send_intro_relay_email(
+            to_email=contact.email,
+            nh_name=current_user.full_name or current_user.email,
+            nh_email=current_user.email,
+            job_seeker_name=js_name,
+            job_seeker_role=js_role,
+            target_company=contact.current_company or "",
+            intro_message=intro_body,
+            nh_referral_code=nh_referral_code,
+            db=db,
+            facilitation_id=facilitation.id,
+            view_intro_url=view_intro_url,
+        )
+
+        facilitation.delivery_method = "email_relay"
+        facilitation.delivery_status = "sent" if message_id else "failed"
+        facilitation.relay_message_id = message_id
+
+    await log_event(
+        db,
+        "marketplace_approved",
+        user_id=current_user.id,
+        metadata={"facilitation_id": str(facilitation.id)},
+    )
+    return contact
+
+
+async def _apply_intro_decline(
+    facilitation: IntroFacilitation,
+    body: IntroFacilitationActionBody,
+    current_user: User,
+    now: datetime,
+    db: AsyncSession,
+) -> None:
+    """Apply decline flow."""
+    facilitation.status = "declined"
+    facilitation.reviewed_at = now
+    if body.notes:
+        facilitation.network_holder_notes = body.notes
+
+    # Refund 15 of 20 credits to job seeker (5 credit fee).
+    await refund_credits(
+        facilitation.job_seeker_id,
+        15,
+        "intro_declined_refund",
+        db,
+        reference_id=facilitation.id,
+    )
+    await log_event(
+        db,
+        "marketplace_declined",
+        user_id=current_user.id,
+        metadata={"facilitation_id": str(facilitation.id)},
+    )
+
+
+def _apply_linkedin_fallback_response(
+    facilitation: IntroFacilitation,
+    contact: Contact | None,
+    resp_data: dict,
+) -> None:
+    """Attach fallback fields when approval uses manual LinkedIn flow."""
+    if contact and contact.linkedin_url:
+        resp_data["linkedin_url"] = contact.linkedin_url
+
+    js_snapshot = facilitation.job_seeker_profile_snapshot or {}
+    js_name = js_snapshot.get("full_name", "a professional")
+    js_role = js_snapshot.get("headline", "")
+    contact_first = contact.first_name if contact and contact.first_name else "there"
+
+    drafted = f"Hey {contact_first}, I'd like to introduce you to {js_name}"
+    if js_role:
+        drafted += f", {js_role}"
+    drafted += "."
+    js_blurb = js_snapshot.get("candidate_blurb", "")
+    if js_blurb:
+        drafted += f" {js_blurb}"
+    resp_data["drafted_message"] = drafted
+
+
 def _summarize_work_history(work_history: list) -> list[str]:
     """Summarize work history entries as 'Company — Title (Start–End)' strings."""
     lines = []
@@ -758,127 +908,24 @@ async def update_facilitation(
         )
 
     now = datetime.now(timezone.utc)
+    contact: Contact | None = None
 
     if body.action == "approve":
-        allowed, current_count = await check_rate_limit(
-            current_user.id,
-            "intro_approve",
-            settings.RATE_LIMIT_INTRO_APPROVALS_PER_DAY,
-            db,
-            is_admin=current_user.is_admin,
+        contact = await _apply_intro_approve(
+            facilitation=facilitation,
+            body=body,
+            current_user=current_user,
+            now=now,
+            db=db,
         )
-        if not allowed:
-            await log_event(
-                db,
-                "velocity_limit_hit",
-                user_id=current_user.id,
-                metadata={
-                    "action": "intro_approve",
-                    "count": current_count,
-                    "max_per_day": settings.RATE_LIMIT_INTRO_APPROVALS_PER_DAY,
-                    "facilitation_id": str(facilitation.id),
-                },
-            )
-            await db.commit()
-            raise RateLimitError(
-                f"Daily intro approval limit reached ({settings.RATE_LIMIT_INTRO_APPROVALS_PER_DAY}/day)"
-            )
-
-        facilitation.status = "approved"
-        facilitation.reviewed_at = now
-        if body.notes:
-            facilitation.network_holder_notes = body.notes
-
-        # Look up the contact to check for email (relay vs LinkedIn fallback)
-        listing = await db.get(MarketplaceListing, facilitation.marketplace_listing_id)
-        contact = await db.get(Contact, listing.contact_id) if listing else None
-
-        if contact and contact.email:
-            # Email relay path — send intro via email, defer credits to delivery
-            from app.services.email_engagement import send_intro_relay_email
-            from app.services.referral_service import create_referral_code
-
-            nh_ref_code = await create_referral_code(current_user.id, db)
-            nh_referral_code = nh_ref_code.code if nh_ref_code else ""
-
-            js_snapshot = facilitation.job_seeker_profile_snapshot or {}
-            contact_first = contact.first_name or "there"
-            js_name = js_snapshot.get("full_name", "a professional")
-            js_role = js_snapshot.get("headline", "")
-            js_message = js_snapshot.get("message", "")
-            js_blurb = js_snapshot.get("candidate_blurb", "")
-
-            intro_body = (
-                f"Hey {contact_first},\n\nI'd like to introduce you to {js_name}"
-            )
-            if js_role:
-                intro_body += f", {js_role}"
-            intro_body += "."
-            if js_blurb:
-                intro_body += f"\n\n{js_blurb}"
-            if js_message:
-                intro_body += f"\n\n{js_message}"
-            intro_body += (
-                "\n\nI think you two should connect — happy to share more context."
-            )
-
-            # Generate review token for public intro page (90-day TTL)
-            review_token = secrets.token_urlsafe(32)
-            facilitation.review_token = review_token
-            facilitation.review_token_expires_at = now + timedelta(days=90)
-            view_intro_url = f"{settings.FRONTEND_URL}/intro/{review_token}"
-
-            message_id = await send_intro_relay_email(
-                to_email=contact.email,
-                nh_name=current_user.full_name or current_user.email,
-                nh_email=current_user.email,
-                job_seeker_name=js_name,
-                job_seeker_role=js_role,
-                target_company=contact.current_company or "",
-                intro_message=intro_body,
-                nh_referral_code=nh_referral_code,
-                db=db,
-                facilitation_id=facilitation.id,
-                view_intro_url=view_intro_url,
-            )
-
-            facilitation.delivery_method = "email_relay"
-            facilitation.delivery_status = "sent" if message_id else "failed"
-            facilitation.relay_message_id = message_id
-            # Credits NOT awarded here — awarded on delivery webhook
-        else:
-            # LinkedIn fallback — no email relay available
-            # Credits deferred until NH confirms manual send via confirm-sent endpoint
-            pass
-
-        await log_event(
-            db,
-            "marketplace_approved",
-            user_id=current_user.id,
-            metadata={"facilitation_id": str(facilitation.id)},
-        )
-
     elif body.action == "decline":
-        facilitation.status = "declined"
-        facilitation.reviewed_at = now
-        if body.notes:
-            facilitation.network_holder_notes = body.notes
-
-        # Refund 15 of 20 credits to job seeker (5 credit fee)
-        await refund_credits(
-            facilitation.job_seeker_id,
-            15,
-            "intro_declined_refund",
-            db,
-            reference_id=facilitation.id,
+        await _apply_intro_decline(
+            facilitation=facilitation,
+            body=body,
+            current_user=current_user,
+            now=now,
+            db=db,
         )
-        await log_event(
-            db,
-            "marketplace_declined",
-            user_id=current_user.id,
-            metadata={"facilitation_id": str(facilitation.id)},
-        )
-
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -908,23 +955,7 @@ async def update_facilitation(
         mode="json"
     )
     if body.action == "approve" and not facilitation.delivery_method:
-        # LinkedIn fallback: include contact's LinkedIn URL and a drafted message
-        if contact and contact.linkedin_url:
-            resp_data["linkedin_url"] = contact.linkedin_url
-        js_snapshot = facilitation.job_seeker_profile_snapshot or {}
-        js_name = js_snapshot.get("full_name", "a professional")
-        js_role = js_snapshot.get("headline", "")
-        contact_first = (
-            contact.first_name if contact and contact.first_name else "there"
-        )
-        drafted = f"Hey {contact_first}, I'd like to introduce you to {js_name}"
-        if js_role:
-            drafted += f", {js_role}"
-        drafted += "."
-        js_blurb = js_snapshot.get("candidate_blurb", "")
-        if js_blurb:
-            drafted += f" {js_blurb}"
-        resp_data["drafted_message"] = drafted
+        _apply_linkedin_fallback_response(facilitation, contact, resp_data)
 
     return {
         "data": resp_data,
