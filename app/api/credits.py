@@ -9,7 +9,7 @@ Endpoints:
 
 import math
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -119,6 +119,21 @@ async def purchase_credits(
     In production, this would integrate with Stripe. For now, it directly
     creates a credit transaction. Useful for testing and admin grants.
     """
+    # Phase 0 guardrail: block non-admin credit minting in production.
+    if settings.is_production and not current_user.is_admin:
+        await log_event(
+            db,
+            "credit_purchase_blocked",
+            user_id=current_user.id,
+            metadata={"amount": body.amount, "reason": "non_admin_prod_block"},
+        )
+        await db.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Credit purchase is unavailable right now.",
+        )
+
     allowed, _count = await check_rate_limit(
         current_user.id,
         "credit_purchase",
