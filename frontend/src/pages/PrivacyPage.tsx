@@ -254,10 +254,10 @@ export default function PrivacyPage() {
           </div>
         </div>
         <div>
-          <h4 className="mb-2 font-semibold text-foreground">Consent-Gated Disclosure Flow</h4>
+          <h4 id="marketplace-visibility" className="mb-2 font-semibold text-foreground">Consent-Gated Disclosure Flow</h4>
           <ol className="space-y-2 pl-5">
             {[
-              'The person seeking a referral sees an anonymous listing ("1 senior engineer at Stripe, strong connection").',
+              'The person seeking a referral sees an anonymized listing ("1 senior engineer at Stripe, strong connection").',
               'They request an introduction (spends credits).',
               'The connection owner reviews the request and the specific contact involved.',
               'The connection owner actively approves or declines.',
