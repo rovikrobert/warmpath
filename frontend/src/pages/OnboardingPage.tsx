@@ -6,6 +6,7 @@ import TagInput from '../components/TagInput';
 import KeevsAvatar from '../components/KeevsAvatar';
 import TrebAvatar from '../components/TrebAvatar';
 import KeevsTrivia from '../components/KeevsTrivia';
+import MarketplaceVisibilityExplainer from '../components/MarketplaceVisibilityExplainer';
 import { trackEvent } from '../utils/analytics';
 import { SOURCES } from '../utils/sources';
 import { KEEVS_TRIVIA, shuffleArray } from '../utils/keevs-trivia';
@@ -78,7 +79,7 @@ const PRIVACY_STEPS = [
   },
   {
     title: 'Contacts Are Protected',
-    text: 'If you share contacts on the marketplace, only anonymised info is shown (company + role level). Names and emails are never revealed without your explicit approval.',
+    text: 'If you share contacts on the marketplace, only anonymized listing fields are shown (company, role level, department, strength). Names, emails, and LinkedIn profiles are never revealed without your explicit approval.',
     icon: (
       <svg className="h-10 w-10 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
@@ -954,9 +955,13 @@ export default function OnboardingPage() {
                   />
                   <div>
                     <p className="text-sm font-medium text-secondary-foreground">Share my network on the marketplace</p>
-                    <p className="text-xs text-muted-foreground">Candidates see anonymized listings only (company + role level). You approve every intro request before any identity is revealed.</p>
+                    <p className="text-xs text-muted-foreground">Candidates see anonymized listing fields only (company, role level, department, and connection strength). You approve every intro request before any identity is revealed.</p>
                   </div>
                 </label>
+              )}
+
+              {isHolder && (
+                <MarketplaceVisibilityExplainer compact className="text-xs text-muted-foreground" />
               )}
 
               <p className="text-xs text-muted-foreground">

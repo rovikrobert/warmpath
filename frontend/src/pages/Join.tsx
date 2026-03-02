@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import SourceTag from "../components/ui/SourceTag";
+import MarketplaceVisibilityExplainer from "../components/MarketplaceVisibilityExplainer";
 import { SOURCES } from "../utils/sources";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 
@@ -69,9 +70,10 @@ const CONTENT = {
         body: (
           <>
             Upload your LinkedIn connections and choose who gets introduced.
-            Your contacts appear anonymously on the marketplace — no names, no
-            emails. When someone requests an intro, you review their profile and
-            decide. Nothing happens without your explicit approval.
+            Your contacts appear in anonymized listings (company, role level,
+            department, strength) with no names or emails. When someone requests
+            an intro, you review their profile and decide. Nothing happens
+            without your explicit approval.
           </>
         ),
       },
@@ -120,7 +122,7 @@ const CONTENT = {
       {
         step: "2",
         title: "Review intro requests",
-        desc: "Job seekers find anonymous matches. You see who they are before deciding.",
+        desc: "Job seekers see anonymized company + role listings. You decide if identity is revealed.",
       },
       {
         step: "3",
@@ -376,6 +378,7 @@ export default function Join() {
           <h2 className="mb-3 text-base font-semibold text-foreground">
             Privacy is our foundation
           </h2>
+          <MarketplaceVisibilityExplainer compact className="mb-3 text-sm text-secondary-foreground" />
           <ul className="space-y-2 text-sm text-secondary-foreground">
             <li className="flex items-start gap-2">
               <svg
@@ -393,24 +396,6 @@ export default function Join() {
                 />
               </svg>
               Your contacts are stored in a private vault visible only to you
-            </li>
-            <li className="flex items-start gap-2">
-              <svg
-                className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth="2"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m4.5 12.75 6 6 9-13.5"
-                />
-              </svg>
-              Marketplace listings show only role level and department — never
-              names or emails
             </li>
             <li className="flex items-start gap-2">
               <svg
