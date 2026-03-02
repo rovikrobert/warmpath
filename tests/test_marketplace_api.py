@@ -5,8 +5,10 @@ from datetime import date, timedelta
 
 import pytest_asyncio
 from httpx import AsyncClient
+from sqlalchemy import select
 
 from app.config import settings
+from app.models.audit import AuditLog
 from app.models.company import Company
 from app.models.contact import Contact
 from app.models.job import UserJobPreferences
@@ -439,6 +441,18 @@ class TestIntroRequestFlow:
             )
             assert second.status_code == 429
             assert "intro request limit" in second.json()["error"]["message"].lower()
+            async with TestSessionLocal() as db:
+                log = (
+                    await db.execute(
+                        select(AuditLog)
+                        .where(AuditLog.action == "velocity_limit_hit")
+                        .order_by(AuditLog.created_at.desc())
+                        .limit(1)
+                    )
+                ).scalar_one_or_none()
+                assert log is not None
+                assert log.metadata_["action"] == "intro_request"
+                assert log.metadata_["max_per_day"] == 1
         finally:
             settings.RATE_LIMIT_INTRO_REQUESTS_PER_DAY = old_limit
 
@@ -1046,6 +1060,18 @@ class TestApproveDecline:
                 "intro approval limit"
                 in second_approve.json()["error"]["message"].lower()
             )
+            async with TestSessionLocal() as db:
+                log = (
+                    await db.execute(
+                        select(AuditLog)
+                        .where(AuditLog.action == "velocity_limit_hit")
+                        .order_by(AuditLog.created_at.desc())
+                        .limit(1)
+                    )
+                ).scalar_one_or_none()
+                assert log is not None
+                assert log.metadata_["action"] == "intro_approve"
+                assert log.metadata_["max_per_day"] == 1
         finally:
             settings.RATE_LIMIT_INTRO_APPROVALS_PER_DAY = old_limit
 
@@ -1468,6 +1494,18 @@ class TestConfirmManualSend:
                 "manual intro confirmation limit"
                 in second.json()["error"]["message"].lower()
             )
+            async with TestSessionLocal() as db:
+                log = (
+                    await db.execute(
+                        select(AuditLog)
+                        .where(AuditLog.action == "velocity_limit_hit")
+                        .order_by(AuditLog.created_at.desc())
+                        .limit(1)
+                    )
+                ).scalar_one_or_none()
+                assert log is not None
+                assert log.metadata_["action"] == "manual_intro_confirm"
+                assert log.metadata_["max_per_day"] == 1
         finally:
             settings.RATE_LIMIT_MANUAL_INTRO_CONFIRMS_PER_DAY = old_limit
 

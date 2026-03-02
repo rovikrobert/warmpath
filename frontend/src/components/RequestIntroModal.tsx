@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { marketplace, auth as authApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { trackEvent } from '../utils/analytics';
+import { getRateLimitMessage } from '../utils/errorCopy';
 import { MarketplaceBadge } from '../utils/marketplace';
 import ScoreExplainer from './ScoreExplainer';
 import Modal from './ui/Modal';
@@ -58,7 +59,7 @@ export default function RequestIntroModal({ listing, creditBalance, onClose, onS
       trackEvent('intro_requested');
       onSuccess();
     } catch (err) {
-      setError(err.message);
+      setError(getRateLimitMessage(err, err.message || 'Request failed. Please try again.'));
     } finally {
       setSending(false);
     }

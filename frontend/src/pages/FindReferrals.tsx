@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { search as searchApi, credits as creditsApi, preferences as prefsApi, companies as companiesApi } from '../api/client';
 import CompanyAutocomplete from '../components/CompanyAutocomplete';
 import { trackEvent } from '../utils/analytics';
+import { getRateLimitMessage } from '../utils/errorCopy';
 import Button from '../components/ui/Button';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
@@ -305,6 +306,8 @@ export default function FindReferrals() {
       const msg = err?.message || 'Search failed';
       if (msg.toLowerCase().includes('set job preferences first')) {
         setError('Set your target role first so we can match you to the right referrals.');
+      } else if (err?.status === 429 || msg.toLowerCase().includes('limit')) {
+        setError(getRateLimitMessage(err, 'Search failed'));
       } else {
         setError(msg);
       }

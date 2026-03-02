@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getRateLimitMessage } from '../utils/errorCopy';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 
@@ -39,7 +40,7 @@ export default function IntroRelayModal({ isOpen, onClose, contactName, linkedin
       await onConfirmSent();
       setConfirmed(true);
     } catch (err) {
-      setError(err.message || 'Failed to confirm. Please try again.');
+      setError(getRateLimitMessage(err, err.message || 'Failed to confirm. Please try again.'));
     } finally {
       setConfirming(false);
     }
