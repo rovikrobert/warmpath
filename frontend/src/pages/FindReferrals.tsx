@@ -3,7 +3,11 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { search as searchApi, credits as creditsApi, preferences as prefsApi, companies as companiesApi } from '../api/client';
 import CompanyAutocomplete from '../components/CompanyAutocomplete';
 import { trackEvent } from '../utils/analytics';
-import { getRateLimitMessage } from '../utils/errorCopy';
+import {
+  getCreditInsufficientMessage,
+  getRateLimitMessage,
+  isCreditInsufficientError,
+} from '../utils/errorCopy';
 import Button from '../components/ui/Button';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
@@ -103,6 +107,7 @@ export default function FindReferrals() {
   const [targetRole, setTargetRole] = useState(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
+  const [showCreditsCta, setShowCreditsCta] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
   const [loadingRecs, setLoadingRecs] = useState(false);
   const [companyCounts, setCompanyCounts] = useState({});
@@ -282,10 +287,12 @@ export default function FindReferrals() {
     if (companies.length === 0) return;
     if (hasPrefs === false) {
       setError('Set your target role first so we can match you to the right referrals.');
+      setShowCreditsCta(false);
       return;
     }
     setSearching(true);
     setError('');
+    setShowCreditsCta(false);
     try {
       const res = await searchApi.smart({ company_names: companies, scope });
       trackEvent('search_scope_decision', {
@@ -306,6 +313,9 @@ export default function FindReferrals() {
       const msg = err?.message || 'Search failed';
       if (msg.toLowerCase().includes('set job preferences first')) {
         setError('Set your target role first so we can match you to the right referrals.');
+      } else if (isCreditInsufficientError(err)) {
+        setError(getCreditInsufficientMessage(err, msg));
+        setShowCreditsCta(true);
       } else if (err?.status === 429 || msg.toLowerCase().includes('limit')) {
         setError(getRateLimitMessage(err, 'Search failed'));
       } else {
@@ -491,7 +501,16 @@ export default function FindReferrals() {
           )}
         </div>
 
-        {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
+        {error && (
+          <div role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">
+            <p>{error}</p>
+            {showCreditsCta && (
+              <Link to="/credits" className="mt-1 inline-block font-medium text-red-300 hover:text-red-200">
+                Go to Credits &rarr;
+              </Link>
+            )}
+          </div>
+        )}
 
         <Button
           onClick={handleSearch}

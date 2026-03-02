@@ -24,3 +24,21 @@ export function getRateLimitMessage(err: any, fallback: string): string {
 
   return "You've hit a daily limit for this action. Please try again tomorrow.";
 }
+
+export function isCreditInsufficientError(err: any): boolean {
+  const status = err?.status;
+  const msg = String(err?.message || "").toLowerCase();
+  return (
+    status === 402
+    || msg.includes("insufficient credits")
+    || msg.includes("need 5 credits")
+    || msg.includes("need 20 credits")
+  );
+}
+
+export function getCreditInsufficientMessage(err: any, fallback: string): string {
+  if (isCreditInsufficientError(err)) {
+    return "You don't have enough credits for this action yet.";
+  }
+  return fallback;
+}

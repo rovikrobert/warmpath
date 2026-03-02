@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { marketplace, auth as authApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { trackEvent } from '../utils/analytics';
-import { getRateLimitMessage } from '../utils/errorCopy';
+import {
+  getCreditInsufficientMessage,
+  getRateLimitMessage,
+  isCreditInsufficientError,
+} from '../utils/errorCopy';
 import { MarketplaceBadge } from '../utils/marketplace';
 import ScoreExplainer from './ScoreExplainer';
 import Modal from './ui/Modal';
@@ -28,6 +33,7 @@ export default function RequestIntroModal({ listing, creditBalance, onClose, onS
   const [visibility, setVisibility] = useState('summary');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [showCreditsCta, setShowCreditsCta] = useState(false);
 
   const canAfford = creditBalance >= 20;
   const completeness = user?.profile_completeness ?? 100;
@@ -42,6 +48,7 @@ export default function RequestIntroModal({ listing, creditBalance, onClose, onS
   const handleSubmit = async () => {
     setSending(true);
     setError('');
+    setShowCreditsCta(false);
     try {
       await marketplace.requestIntro({
         marketplace_listing_id: listing.listing.id,
@@ -59,7 +66,13 @@ export default function RequestIntroModal({ listing, creditBalance, onClose, onS
       trackEvent('intro_requested');
       onSuccess();
     } catch (err) {
-      setError(getRateLimitMessage(err, err.message || 'Request failed. Please try again.'));
+      const fallback = err.message || 'Request failed. Please try again.';
+      if (isCreditInsufficientError(err)) {
+        setError(getCreditInsufficientMessage(err, fallback));
+        setShowCreditsCta(true);
+      } else {
+        setError(getRateLimitMessage(err, fallback));
+      }
     } finally {
       setSending(false);
     }
@@ -260,7 +273,16 @@ export default function RequestIntroModal({ listing, creditBalance, onClose, onS
           </p>
         )}
 
-        {error && <p className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
+        {error && (
+          <div className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">
+            <p>{error}</p>
+            {showCreditsCta && (
+              <Link to="/credits" className="mt-1 inline-block font-medium text-red-300 hover:text-red-200">
+                Go to Credits &rarr;
+              </Link>
+            )}
+          </div>
+        )}
 
         <Button
           onClick={handleSubmit}

@@ -25,6 +25,8 @@ const ScoreGlossary = lazy(() => import('./pages/ScoreGlossary'));
 const Join = lazy(() => import('./pages/Join'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const IntroReview = lazy(() => import('./pages/IntroReview'));
+const ENABLE_SMOKE_ROUTE = import.meta.env.VITE_E2E_SMOKE_ROUTE === 'true';
+const AUTH_BYPASS = import.meta.env.VITE_E2E_BYPASS_AUTH === 'true';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -38,6 +40,13 @@ function ProtectedRoute({ children, allowIncomplete = false }: ProtectedRoutePro
       <div className="flex h-screen items-center justify-center bg-background">
         <Spinner size="lg" />
       </div>
+    );
+  }
+  if (AUTH_BYPASS) {
+    return !allowIncomplete && user && !user.onboarding_complete ? (
+      <Navigate to="/onboarding" replace />
+    ) : (
+      <>{children}</>
     );
   }
   return (
@@ -61,6 +70,20 @@ function RootRedirect() {
       <div className="flex h-screen items-center justify-center bg-background">
         <Spinner size="lg" />
       </div>
+    );
+  }
+  if (AUTH_BYPASS) {
+    return (
+      <Navigate
+        to={
+          !user?.onboarding_complete
+            ? '/onboarding'
+            : user?.intent === 'share_network'
+              ? '/contacts'
+              : '/coach'
+        }
+        replace
+      />
     );
   }
   return (
@@ -99,6 +122,9 @@ export default function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/join" element={<Join />} />
           <Route path="/intro/:token" element={<IntroReview />} />
+          {ENABLE_SMOKE_ROUTE && (
+            <Route path="/qa/find-referrals-smoke" element={<FindReferrals />} />
+          )}
           <Route path="/onboarding" element={<ProtectedRoute allowIncomplete><OnboardingPage /></ProtectedRoute>} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/coach" element={<CoachPage />} />

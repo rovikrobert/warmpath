@@ -405,6 +405,7 @@ class TestIntroRequestFlow:
         self, client: AsyncClient, seeker_with_credits, marketplace_data, monkeypatch
     ):
         """Daily intro-request velocity cap blocks excess requests."""
+
         async def _noop_notify(*args, **kwargs):
             return None
 
@@ -1015,6 +1016,7 @@ class TestApproveDecline:
         monkeypatch,
     ):
         """Daily intro-approval velocity cap blocks excess approvals."""
+
         async def _noop_notify(*args, **kwargs):
             return None
 
@@ -1460,6 +1462,7 @@ class TestConfirmManualSend:
         monkeypatch,
     ):
         """Daily manual-confirm velocity cap blocks excess confirms."""
+
         async def _noop_notify(*args, **kwargs):
             return None
 

@@ -79,3 +79,28 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
+
+export function BypassAuthProvider({ children }: { children: ReactNode }) {
+  const [user] = useState<any>({
+    id: 'e2e-user',
+    full_name: 'E2E User',
+    email: 'e2e@example.com',
+    onboarding_complete: true,
+    intent: 'find_referrals',
+  });
+
+  return (
+    <AuthContext.Provider
+      value={{
+        token: null,
+        user,
+        clerkUser: null,
+        loading: false,
+        logout: async () => {},
+        refreshUser: async () => user,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
