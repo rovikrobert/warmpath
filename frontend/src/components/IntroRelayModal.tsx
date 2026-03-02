@@ -1,7 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getRateLimitMessage } from '../utils/errorCopy';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
+
+interface ConfirmSentResult {
+  status: string;
+  credits_awarded: number;
+  credits_deferred?: boolean;
+}
 
 interface IntroRelayModalProps {
   isOpen: boolean;
@@ -9,14 +15,25 @@ interface IntroRelayModalProps {
   contactName?: string;
   linkedinUrl?: string;
   draftedMessage?: string;
-  onConfirmSent: () => Promise<void>;
+  onConfirmSent: () => Promise<ConfirmSentResult>;
 }
 
 export default function IntroRelayModal({ isOpen, onClose, contactName, linkedinUrl, draftedMessage, onConfirmSent }: IntroRelayModalProps) {
   const [copied, setCopied] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [confirmResult, setConfirmResult] = useState<ConfirmSentResult | null>(null);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setCopied(false);
+      setConfirming(false);
+      setConfirmed(false);
+      setConfirmResult(null);
+      setError('');
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -37,7 +54,8 @@ export default function IntroRelayModal({ isOpen, onClose, contactName, linkedin
     setConfirming(true);
     setError('');
     try {
-      await onConfirmSent();
+      const result = await onConfirmSent();
+      setConfirmResult(result);
       setConfirmed(true);
     } catch (err) {
       setError(getRateLimitMessage(err, err.message || 'Failed to confirm. Please try again.'));
@@ -54,8 +72,16 @@ export default function IntroRelayModal({ isOpen, onClose, contactName, linkedin
             <svg className="mx-auto mb-2 h-8 w-8 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
-            <p className="text-sm font-semibold text-emerald-400">Confirmed! 50 credits earned.</p>
-            <p className="mt-1 text-xs text-emerald-400/70">Thank you for facilitating this introduction.</p>
+            <p className="text-sm font-semibold text-emerald-400">
+              {confirmResult?.credits_awarded
+                ? `Confirmed! ${confirmResult.credits_awarded} credits earned.`
+                : 'Confirmed. Credits are pending review.'}
+            </p>
+            <p className="mt-1 text-xs text-emerald-400/70">
+              {confirmResult?.credits_awarded
+                ? 'Thank you for facilitating this introduction.'
+                : 'Thanks for confirming the send. We will update your credit status after verification.'}
+            </p>
             <Button variant="secondary" size="sm" onClick={onClose} className="mt-3">
               Close
             </Button>
@@ -101,7 +127,7 @@ export default function IntroRelayModal({ isOpen, onClose, contactName, linkedin
             {/* Confirm sent */}
             <div className="text-center">
               <p className="mb-2 text-xs text-muted-foreground">
-                After you've sent the introduction, confirm below to earn your credits.
+                After you've sent the introduction, confirm below.
               </p>
               {error && (
                 <p className="mb-2 rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>
@@ -114,7 +140,7 @@ export default function IntroRelayModal({ isOpen, onClose, contactName, linkedin
                 className="w-full"
                 aria-label="Confirm that you have sent the introduction"
               >
-                I've Sent It — Earn 50 Credits
+                I've Sent It
               </Button>
             </div>
           </>
