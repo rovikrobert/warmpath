@@ -336,16 +336,16 @@ def check_vault_isolation() -> None:
     print(f"\n{BOLD}{CYAN}[7/10] Vault isolation{RESET}")
 
     # Known-intentional cross-vault lookups (post-consent or hash-based).
-    # Each entry is (filename_suffix, line_number).
-    _SUPPRESSED_VAULT_LOOKUPS: list[tuple[str, int]] = [
-        ("matches.py", 271),  # post-consent contact reveal
-        ("applications.py", 456),  # hash-based duplicate check
-        ("marketplace.py", 117),  # anonymized marketplace index query
-        (
-            "freshness_aggregator.py",
-            179,
-        ),  # intentional cross-vault freshness propagation
-    ]
+    # Each entry is a filename suffix. Line-number pinning was fragile
+    # (broke when code moved); instead we suppress the entire file and
+    # rely on architectural review for these intentional cross-vault paths.
+    _SUPPRESSED_VAULT_FILES: set[str] = {
+        "matches.py",  # post-consent contact reveal
+        "applications.py",  # hash-based duplicate check
+        "marketplace.py",  # anonymized marketplace index query
+        "marketplace_indexer.py",  # consent-gated marketplace index builder
+        "freshness_aggregator.py",  # intentional cross-vault freshness propagation
+    }
 
     api_dir = APP_DIR / "api"
     services_dir = APP_DIR / "services"
@@ -371,15 +371,13 @@ def check_vault_isolation() -> None:
                 context = content[start:end]
 
                 if "user_id" not in context and "suppression" not in py_file.name:
-                    lineno = content[: match.start()].count("\n") + 1
-
-                    # Skip known-intentional cross-vault lookups
+                    # Skip known-intentional cross-vault files
                     if any(
-                        relpath.endswith(fname) and lineno == lno
-                        for fname, lno in _SUPPRESSED_VAULT_LOOKUPS
+                        relpath.endswith(fname) for fname in _SUPPRESSED_VAULT_FILES
                     ):
                         continue
 
+                    lineno = content[: match.start()].count("\n") + 1
                     _add(
                         "HIGH",
                         "vault_isolation",

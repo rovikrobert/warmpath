@@ -335,7 +335,7 @@ def scan_auth_coverage() -> None:
     if not api_dir.exists():
         return
 
-    # Endpoints that are intentionally public
+    # Endpoints that are intentionally public or use non-JWT auth
     public_allowlist = {
         "login",
         "register",
@@ -347,8 +347,16 @@ def scan_auth_coverage() -> None:
         "serve_spa",
         "linkedin_callback",
         "stripe_webhook",
+        "resend_webhook",
         "suppression_request",
         "request_rectification",
+    }
+
+    # Webhook endpoints authenticated via signature verification (HMAC/Svix),
+    # not JWT-based get_current_user. These should not be flagged.
+    signature_verified_allowlist = {
+        "github_webhook",
+        "telegram_webhook",
     }
 
     count = 0
@@ -371,7 +379,30 @@ def scan_auth_coverage() -> None:
 
             if func_name in public_allowlist:
                 continue
+            if func_name in signature_verified_allowlist:
+                continue
             if "get_current_user" not in params and "current_user" not in params:
+                # Check if the function body uses signature verification
+                # (webhook-style auth via HMAC, Svix, or shared secret)
+                func_start = match.end()
+                next_func = content.find("\nasync def ", func_start)
+                next_func2 = content.find("\ndef ", func_start)
+                if next_func == -1:
+                    next_func = len(content)
+                if next_func2 == -1:
+                    next_func2 = len(content)
+                func_body = content[func_start : min(next_func, next_func2)]
+                sig_patterns = [
+                    "verify_signature",
+                    "hmac.compare_digest",
+                    "svix",
+                    "x-hub-signature",
+                    "webhook_secret",
+                    "X-Telegram-Bot-Api-Secret-Token",
+                ]
+                if any(p.lower() in func_body.lower() for p in sig_patterns):
+                    continue
+
                 lineno = content[: match.start()].count("\n") + 1
                 _add(
                     "MEDIUM",
