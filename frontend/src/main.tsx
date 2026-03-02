@@ -7,6 +7,7 @@ import { AuthProvider, BypassAuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { TooltipProvider } from '@/components/ui/Tooltip';
 import { Toaster } from '@/components/ui/Toast';
+import MissingClerkKey from '@/components/MissingClerkKey';
 import App from './App';
 import './index.css';
 
@@ -37,6 +38,10 @@ createRoot(document.getElementById('root')!).render(
             </BypassAuthProvider>
             <Toaster />
           </TooltipProvider>
+        </ThemeProvider>
+      ) : !CLERK_KEY ? (
+        <ThemeProvider>
+          <MissingClerkKey />
         </ThemeProvider>
       ) : (
         <ClerkProvider publishableKey={CLERK_KEY}>
