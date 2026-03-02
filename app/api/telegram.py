@@ -202,7 +202,7 @@ async def telegram_webhook(
     chat_id = message.get("chat", {}).get("id")
 
     if not text or not chat_id:
-        return {"ok": True, "action": "ignored"}
+        return {"data": {"ok": True, "action": "ignored"}, "meta": {}}
 
     expected_chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
     is_founder = str(chat_id) == expected_chat_id
@@ -214,4 +214,4 @@ async def telegram_webhook(
 
     background_tasks.add_task(_handle_command, command, parsed, chat_id, is_founder)
 
-    return {"ok": True, "command": command}
+    return {"data": {"ok": True, "command": command}, "meta": {}}

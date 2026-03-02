@@ -22,7 +22,7 @@ from datetime import date, datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -72,7 +72,7 @@ class FeedCountResponse(BaseModel):
 
 
 class EnrichmentResponseRequest(BaseModel):
-    feed_item_id: str
+    feed_item_id: str = Field(..., max_length=100)
     signal_type: Literal["relationship_type", "would_refer", "recency"]
     signal_value: str  # e.g. "colleague", "definitely", "2026-01-15"  # {"type": "colleague"} or {"likelihood": "definitely"}
 

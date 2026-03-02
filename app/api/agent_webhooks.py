@@ -60,4 +60,4 @@ async def github_webhook(
     )
 
     await stream_add("warmpath:agent_events", {"event": json.dumps(event)})
-    return {"status": "accepted", "dedup_key": event["dedup_key"]}
+    return {"data": {"status": "accepted", "dedup_key": event["dedup_key"]}, "meta": {}}

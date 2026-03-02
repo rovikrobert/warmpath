@@ -27,7 +27,7 @@ class TestTelegramWebhook:
             headers={"X-Telegram-Bot-Api-Secret-Token": "test-secret-token"},
         )
         assert response.status_code == 200
-        data = response.json()
+        data = response.json()["data"]
         assert data["ok"] is True
         assert data["command"] == "status"
 
@@ -59,7 +59,7 @@ class TestTelegramWebhook:
             headers={"X-Telegram-Bot-Api-Secret-Token": "test-secret-token"},
         )
         assert response.status_code == 200
-        assert response.json()["ok"] is True
+        assert response.json()["data"]["ok"] is True
 
     @pytest.mark.asyncio
     async def test_approve_command(self, client: AsyncClient, monkeypatch):
@@ -79,6 +79,6 @@ class TestTelegramWebhook:
             headers={"X-Telegram-Bot-Api-Secret-Token": "test-secret-token"},
         )
         assert response.status_code == 200
-        data = response.json()
+        data = response.json()["data"]
         assert data["ok"] is True
         assert data["command"] == "approve_item"
