@@ -6,6 +6,7 @@ from datetime import date, timedelta
 import pytest_asyncio
 from httpx import AsyncClient
 
+from app.config import settings
 from app.models.company import Company
 from app.models.contact import Contact
 from app.models.job import UserJobPreferences
@@ -1207,6 +1208,41 @@ class TestConfirmManualSend:
             after = await get_balance(holder_uid, db)
         assert after - before == 50
 
+    async def test_confirm_sent_deferred_when_manual_awards_disabled(
+        self,
+        client: AsyncClient,
+        seeker_with_credits,
+        holder_auth,
+        marketplace_no_email,
+    ):
+        """Kill switch: manual confirm records delivery but does not award credits."""
+        fac_id = await self._create_and_approve(
+            client, seeker_with_credits, holder_auth, marketplace_no_email
+        )
+
+        holder_uid = uuid_mod.UUID(holder_auth["user_id"])
+        old_flag = settings.MANUAL_INTRO_CREDIT_AWARD_ENABLED
+        try:
+            settings.MANUAL_INTRO_CREDIT_AWARD_ENABLED = False
+            async with TestSessionLocal() as db:
+                before = await get_balance(holder_uid, db)
+
+            resp = await client.post(
+                f"/api/v1/marketplace/requests/{fac_id}/confirm-sent",
+                headers=holder_auth["headers"],
+            )
+            assert resp.status_code == 200
+            data = resp.json()["data"]
+            assert data["status"] == "confirmed"
+            assert data["credits_awarded"] == 0
+            assert data["credits_deferred"] is True
+
+            async with TestSessionLocal() as db:
+                after = await get_balance(holder_uid, db)
+            assert after == before
+        finally:
+            settings.MANUAL_INTRO_CREDIT_AWARD_ENABLED = old_flag
+
     async def test_confirm_sent_404_for_wrong_user(
         self,
         client: AsyncClient,
@@ -1276,7 +1312,10 @@ class TestConfirmManualSend:
             headers=holder_auth["headers"],
         )
         assert resp2.status_code == 400
-        assert "already awarded" in resp2.json()["detail"].lower()
+        assert (
+            "already awarded" in resp2.json()["detail"].lower()
+            or "already confirmed" in resp2.json()["detail"].lower()
+        )
 
     async def test_confirm_sent_404_nonexistent(self, client: AsyncClient, holder_auth):
         """Nonexistent facilitation returns 404."""

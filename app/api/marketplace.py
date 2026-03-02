@@ -908,6 +908,14 @@ async def confirm_manual_send(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Facilitation not in approved state",
         )
+    if (
+        facilitation.delivery_method == "linkedin_manual"
+        and facilitation.delivery_status == "delivered"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Manual send already confirmed",
+        )
     if facilitation.credits_awarded_at:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -919,14 +927,31 @@ async def confirm_manual_send(
     facilitation.delivery_status = "delivered"
     facilitation.delivered_at = now
 
-    # Award credits for manual send (trust-based)
-    await earn_credits(
-        current_user.id, 50, "intro_facilitation", db, reference_id=facilitation.id
-    )
-    facilitation.credits_awarded_at = now
+    credits_awarded = 0
+    if settings.manual_intro_credit_award_enabled:
+        # Trust-based reward path (enabled for non-production by default).
+        await earn_credits(
+            current_user.id, 50, "intro_facilitation", db, reference_id=facilitation.id
+        )
+        facilitation.credits_awarded_at = now
+        credits_awarded = 50
+    else:
+        # Phase 0 guardrail: keep delivery confirmation but defer reward.
+        await log_event(
+            db,
+            "manual_intro_credit_deferred",
+            user_id=current_user.id,
+            metadata={"facilitation_id": str(facilitation.id)},
+        )
     await db.commit()
 
-    return {"data": {"status": "confirmed", "credits_awarded": 50}}
+    return {
+        "data": {
+            "status": "confirmed",
+            "credits_awarded": credits_awarded,
+            "credits_deferred": credits_awarded == 0,
+        }
+    }
 
 
 # ---------------------------------------------------------------------------

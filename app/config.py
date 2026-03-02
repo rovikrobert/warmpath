@@ -2,11 +2,14 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    APP_ENV: str = "development"  # development | test | production
     DATABASE_URL: str = "[DATABASE_URL_REDACTED]"
     SECURE_HEADERS: bool = False  # True in production — enables HSTS
     ANTHROPIC_API_KEY: str = ""
     AI_MOCK_MODE: bool = True
     BETA_SANDBOX_MODE: bool = True  # Relaxed limits for early beta users
+    # None = auto (disabled in production, enabled elsewhere)
+    MANUAL_INTRO_CREDIT_AWARD_ENABLED: bool | None = None
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
@@ -97,6 +100,16 @@ class Settings(BaseSettings):
     GITHUB_AGENT_WEBHOOK_SECRET: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
+
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV.lower() == "production"
+
+    @property
+    def manual_intro_credit_award_enabled(self) -> bool:
+        if self.MANUAL_INTRO_CREDIT_AWARD_ENABLED is not None:
+            return self.MANUAL_INTRO_CREDIT_AWARD_ENABLED
+        return not self.is_production
 
 
 settings = Settings()
