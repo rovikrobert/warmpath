@@ -315,21 +315,24 @@ export default function OnboardingPage() {
 
   // Step 2 -> 3 (bonus pitch for explore) or 4 (privacy for find_referrals)
   const handlePrefs = async () => {
+    const requiredRole = prefs.target_role.trim();
+    if (!requiredRole) {
+      setError('Target role is required to continue.');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
-      if (prefs.target_role.trim()) {
-        await preferences.upsertJob({
-          target_role: prefs.target_role,
-          target_seniority: prefs.target_seniority || null,
-          career_level: prefs.career_level || null,
-          target_industries: prefs.target_industries.length ? prefs.target_industries : null,
-          target_locations: prefs.target_locations.length ? prefs.target_locations : null,
-          target_companies: prefs.target_companies.length ? prefs.target_companies : null,
-          key_skills: prefs.key_skills.length ? prefs.key_skills : null,
-          open_to_remote: prefs.open_to_remote,
-        });
-      }
+      await preferences.upsertJob({
+        target_role: requiredRole,
+        target_seniority: prefs.target_seniority || null,
+        career_level: prefs.career_level || null,
+        target_industries: prefs.target_industries.length ? prefs.target_industries : null,
+        target_locations: prefs.target_locations.length ? prefs.target_locations : null,
+        target_companies: prefs.target_companies.length ? prefs.target_companies : null,
+        key_skills: prefs.key_skills.length ? prefs.key_skills : null,
+        open_to_remote: prefs.open_to_remote,
+      });
       // find_referrals skips bonus pitch; explore sees it
       setStep(intent === 'find_referrals' ? 4 : 3);
     } catch (err) {
@@ -465,28 +468,6 @@ export default function OnboardingPage() {
   };
 
   const postWizardRoute = intent === 'share_network' ? '/contacts' : '/coach';
-
-  const skipToFinish = async () => {
-    setSaving(true);
-    setError('');
-    try {
-      // Redeem referral code if provided (non-blocking)
-      if (referralCode) {
-        try {
-          await referralsApi.redeem({ code: referralCode });
-        } catch { /* invalid/expired — silently continue */ }
-        localStorage.removeItem('referral_code');
-      }
-      await authApi.completeOnboarding();
-      trackEvent('signup_completed', { intent, skipped_work_history: true });
-      await refreshUser();
-      navigate(postWizardRoute);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const isHolder = intent === 'share_network' || intent === 'explore';
 
@@ -675,7 +656,7 @@ export default function OnboardingPage() {
                 <Button variant="secondary" onClick={() => { setError(''); setStep(1); }} className="flex-1" size="lg">
                   Back
                 </Button>
-                <Button onClick={handlePrefs} loading={saving} className="flex-1" size="lg">
+                <Button onClick={handlePrefs} disabled={!prefs.target_role.trim()} loading={saving} className="flex-1" size="lg">
                   Continue
                 </Button>
               </div>
@@ -1014,14 +995,9 @@ export default function OnboardingPage() {
                 </Button>
               </div>
               {!uploading && (
-                <button
-                  type="button"
-                  onClick={skipToFinish}
-                  disabled={saving}
-                  className="block w-full text-center text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50"
-                >
-                  Skip for now — I'll upload later
-                </button>
+                <p className="text-center text-xs text-muted-foreground">
+                  Upload is required to finish setup.
+                </p>
               )}
             </div>
           )}
@@ -1202,6 +1178,10 @@ export default function OnboardingPage() {
                           start_date: e.start_date || undefined,
                           end_date: e.is_current ? undefined : (e.end_date || undefined),
                         }));
+                      if (entries.length === 0) {
+                        setError('Add at least one work history entry to finish setup.');
+                        return;
+                      }
                       const profilePayload = { work_history: entries.length > 0 ? entries : undefined };
                       if (resumeProfileData) {
                         Object.entries(resumeProfileData).forEach(([k, v]) => {
@@ -1233,6 +1213,7 @@ export default function OnboardingPage() {
                       setSaving(false);
                     }
                   }}
+                  disabled={workHistory.filter((e) => e.company.trim()).length === 0}
                   loading={saving}
                   className="flex-1"
                   size="lg"
@@ -1240,14 +1221,10 @@ export default function OnboardingPage() {
                   Save & Continue
                 </Button>
               </div>
-              {workHistory.length === 0 && !saving && (
-                <button
-                  type="button"
-                  onClick={skipToFinish}
-                  className="block w-full text-center text-xs text-muted-foreground hover:text-muted-foreground transition-colors"
-                >
-                  Skip for now
-                </button>
+              {!saving && (
+                <p className="text-center text-xs text-muted-foreground">
+                  Work history is required to finish setup.
+                </p>
               )}
             </div>
           )}
