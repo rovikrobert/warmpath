@@ -5,6 +5,7 @@ import { trackEvent } from '../utils/analytics';
 import { SOURCES } from '../utils/sources';
 import { MarketplaceBadge } from '../utils/marketplace';
 import ScoreExplainer from '../components/ScoreExplainer';
+import MarketplaceVisibilityExplainer from '../components/MarketplaceVisibilityExplainer';
 import EmptyState from '../components/ui/EmptyState';
 import SourceTag from '../components/ui/SourceTag';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
@@ -499,12 +500,7 @@ export default function MarketplaceOverview() {
           </h2>
 
           {/* Privacy explainer */}
-          <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
-            <p className="text-sm text-blue-400">
-              Job seekers searching the marketplace see anonymized listings only — role level, department, and connection strength.
-              They never see names, titles, emails, or companies. When someone requests an intro, you review their profile and decide whether to connect them.
-            </p>
-          </div>
+          <MarketplaceVisibilityExplainer />
 
           {/* Active filter summary */}
           {sharingPrefs?.category_filters?.include_departments?.length > 0 && (
