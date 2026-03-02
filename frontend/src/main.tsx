@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ClerkProvider } from '@clerk/clerk-react';
 import posthog from 'posthog-js';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, BypassAuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { TooltipProvider } from '@/components/ui/Tooltip';
 import { Toaster } from '@/components/ui/Toast';
@@ -11,6 +11,7 @@ import App from './App';
 import './index.css';
 
 const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const E2E_BYPASS_AUTH = import.meta.env.VITE_E2E_BYPASS_AUTH === 'true';
 
 // Initialize PostHog (no-op when VITE_POSTHOG_KEY is not set)
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY;
@@ -28,16 +29,27 @@ if (POSTHOG_KEY) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <ClerkProvider publishableKey={CLERK_KEY}>
+      {E2E_BYPASS_AUTH ? (
         <ThemeProvider>
           <TooltipProvider>
-            <AuthProvider>
+            <BypassAuthProvider>
               <App />
-            </AuthProvider>
+            </BypassAuthProvider>
             <Toaster />
           </TooltipProvider>
         </ThemeProvider>
-      </ClerkProvider>
+      ) : (
+        <ClerkProvider publishableKey={CLERK_KEY}>
+          <ThemeProvider>
+            <TooltipProvider>
+              <AuthProvider>
+                <App />
+              </AuthProvider>
+              <Toaster />
+            </TooltipProvider>
+          </ThemeProvider>
+        </ClerkProvider>
+      )}
     </BrowserRouter>
   </StrictMode>,
 );
