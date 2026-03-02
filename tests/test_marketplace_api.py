@@ -399,6 +399,49 @@ class TestIntroRequestFlow:
         )
         assert resp.status_code == 409
 
+    async def test_request_intro_rate_limited_by_velocity_cap(
+        self, client: AsyncClient, seeker_with_credits, marketplace_data, monkeypatch
+    ):
+        """Daily intro-request velocity cap blocks excess requests."""
+        async def _noop_notify(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            "app.services.email_engagement.send_intro_request_notification",
+            _noop_notify,
+        )
+        monkeypatch.setattr(
+            "app.services.email_engagement.send_intro_relay_email",
+            _noop_notify,
+        )
+        monkeypatch.setattr(
+            "app.services.email_engagement.send_intro_relay_email",
+            _noop_notify,
+        )
+
+        old_limit = settings.RATE_LIMIT_INTRO_REQUESTS_PER_DAY
+        try:
+            settings.RATE_LIMIT_INTRO_REQUESTS_PER_DAY = 1
+            listing_a = str(marketplace_data["listing_ids"][0])
+            listing_b = str(marketplace_data["listing_ids"][1])
+
+            first = await client.post(
+                "/api/v1/marketplace/request-intro",
+                json={"marketplace_listing_id": listing_a},
+                headers=seeker_with_credits["headers"],
+            )
+            assert first.status_code == 201
+
+            second = await client.post(
+                "/api/v1/marketplace/request-intro",
+                json={"marketplace_listing_id": listing_b},
+                headers=seeker_with_credits["headers"],
+            )
+            assert second.status_code == 429
+            assert "intro request limit" in second.json()["error"]["message"].lower()
+        finally:
+            settings.RATE_LIMIT_INTRO_REQUESTS_PER_DAY = old_limit
+
     async def test_cannot_request_own_listing(
         self, client: AsyncClient, holder_auth, marketplace_data
     ):
@@ -949,6 +992,63 @@ class TestApproveDecline:
         )
         assert resp.status_code == 404
 
+    async def test_approve_rate_limited_by_velocity_cap(
+        self,
+        client: AsyncClient,
+        seeker_with_credits,
+        holder_auth,
+        marketplace_data,
+        monkeypatch,
+    ):
+        """Daily intro-approval velocity cap blocks excess approvals."""
+        async def _noop_notify(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            "app.services.email_engagement.send_intro_request_notification",
+            _noop_notify,
+        )
+
+        old_limit = settings.RATE_LIMIT_INTRO_APPROVALS_PER_DAY
+        try:
+            settings.RATE_LIMIT_INTRO_APPROVALS_PER_DAY = 1
+
+            listing_a = str(marketplace_data["listing_ids"][0])
+            listing_b = str(marketplace_data["listing_ids"][1])
+
+            first_req = await client.post(
+                "/api/v1/marketplace/request-intro",
+                json={"marketplace_listing_id": listing_a},
+                headers=seeker_with_credits["headers"],
+            )
+            second_req = await client.post(
+                "/api/v1/marketplace/request-intro",
+                json={"marketplace_listing_id": listing_b},
+                headers=seeker_with_credits["headers"],
+            )
+            fac1 = first_req.json()["data"]["id"]
+            fac2 = second_req.json()["data"]["id"]
+
+            first_approve = await client.patch(
+                f"/api/v1/marketplace/requests/{fac1}",
+                json={"action": "approve"},
+                headers=holder_auth["headers"],
+            )
+            assert first_approve.status_code == 200
+
+            second_approve = await client.patch(
+                f"/api/v1/marketplace/requests/{fac2}",
+                json={"action": "approve"},
+                headers=holder_auth["headers"],
+            )
+            assert second_approve.status_code == 429
+            assert (
+                "intro approval limit"
+                in second_approve.json()["error"]["message"].lower()
+            )
+        finally:
+            settings.RATE_LIMIT_INTRO_APPROVALS_PER_DAY = old_limit
+
 
 # ---------------------------------------------------------------------------
 # Test LinkedIn Fallback (contact without email)
@@ -1324,6 +1424,52 @@ class TestConfirmManualSend:
             headers=holder_auth["headers"],
         )
         assert resp.status_code == 404
+
+    async def test_confirm_sent_rate_limited_by_velocity_cap(
+        self,
+        client: AsyncClient,
+        seeker_with_credits,
+        holder_auth,
+        marketplace_no_email,
+        monkeypatch,
+    ):
+        """Daily manual-confirm velocity cap blocks excess confirms."""
+        async def _noop_notify(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            "app.services.email_engagement.send_intro_request_notification",
+            _noop_notify,
+        )
+
+        old_limit = settings.RATE_LIMIT_MANUAL_INTRO_CONFIRMS_PER_DAY
+        try:
+            settings.RATE_LIMIT_MANUAL_INTRO_CONFIRMS_PER_DAY = 1
+
+            fac1 = await self._create_and_approve(
+                client, seeker_with_credits, holder_auth, marketplace_no_email
+            )
+            fac2 = await self._create_and_approve(
+                client, seeker_with_credits, holder_auth, marketplace_no_email
+            )
+
+            first = await client.post(
+                f"/api/v1/marketplace/requests/{fac1}/confirm-sent",
+                headers=holder_auth["headers"],
+            )
+            assert first.status_code == 200
+
+            second = await client.post(
+                f"/api/v1/marketplace/requests/{fac2}/confirm-sent",
+                headers=holder_auth["headers"],
+            )
+            assert second.status_code == 429
+            assert (
+                "manual intro confirmation limit"
+                in second.json()["error"]["message"].lower()
+            )
+        finally:
+            settings.RATE_LIMIT_MANUAL_INTRO_CONFIRMS_PER_DAY = old_limit
 
 
 # ---------------------------------------------------------------------------
