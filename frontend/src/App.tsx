@@ -25,8 +25,8 @@ const ScoreGlossary = lazy(() => import('./pages/ScoreGlossary'));
 const Join = lazy(() => import('./pages/Join'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const IntroReview = lazy(() => import('./pages/IntroReview'));
-const ENABLE_SMOKE_ROUTE = import.meta.env.VITE_E2E_SMOKE_ROUTE === 'true';
-const AUTH_BYPASS = import.meta.env.VITE_E2E_BYPASS_AUTH === 'true';
+const ENABLE_SMOKE_ROUTE = import.meta.env.DEV && import.meta.env.VITE_E2E_SMOKE_ROUTE === 'true';
+const AUTH_BYPASS = import.meta.env.DEV && import.meta.env.VITE_E2E_BYPASS_AUTH === 'true';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;

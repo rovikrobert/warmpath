@@ -11,12 +11,7 @@ import SourceTag from '../components/ui/SourceTag';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
 import IntroRelayModal from '../components/IntroRelayModal';
 import useDocumentTitle from '../hooks/useDocumentTitle';
-
-interface ConfirmSentResult {
-  status: string;
-  credits_awarded: number;
-  credits_deferred?: boolean;
-}
+import type { ConfirmSentResult } from '../types/marketplace';
 
 function StatusBadge({ status }) {
   const labels = { requested: 'Pending', reviewing: 'Reviewing', approved: 'Approved', declined: 'Declined', completed: 'Completed' };
@@ -126,10 +121,7 @@ export default function MarketplaceOverview() {
     }
   };
 
-  const handleConfirmSent = async (facilitationId?: string): Promise<ConfirmSentResult> => {
-    if (!facilitationId) {
-      throw new Error('Missing facilitation ID');
-    }
+  const handleConfirmSent = async (facilitationId: string): Promise<ConfirmSentResult> => {
     const res = await mpApi.confirmSent(facilitationId);
     const confirmData = res.data as ConfirmSentResult;
     const nowIso = new Date().toISOString();
@@ -636,7 +628,7 @@ export default function MarketplaceOverview() {
         contactName={relayModal?.contactName}
         linkedinUrl={relayModal?.linkedinUrl}
         draftedMessage={relayModal?.draftedMessage}
-        onConfirmSent={() => handleConfirmSent(relayModal?.id)}
+        onConfirmSent={() => handleConfirmSent(relayModal!.id)}
       />
     </div>
   );

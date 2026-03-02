@@ -2,12 +2,7 @@ import { useEffect, useState } from 'react';
 import { getRateLimitMessage } from '../utils/errorCopy';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
-
-interface ConfirmSentResult {
-  status: string;
-  credits_awarded: number;
-  credits_deferred?: boolean;
-}
+import type { ConfirmSentResult } from '../types/marketplace';
 
 interface IntroRelayModalProps {
   isOpen: boolean;

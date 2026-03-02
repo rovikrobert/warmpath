@@ -493,7 +493,7 @@ export default function FindReferrals() {
 
           {scope === 'own_network' && companies.length > 0 && companiesLoaded && lowCoverageWithoutCredits && (
             <div className="mt-2 text-sm text-amber-400">
-              Your own-network coverage is limited for these companies. You need 5 credits to search All Networks.
+              Your own-network coverage is limited for these companies. All Networks costs 5 credits per search. Upload contacts to earn free credits, or buy credits.
               <Link to="/credits" className="ml-1 font-medium text-amber-300 hover:text-amber-200">
                 Get credits &rarr;
               </Link>
