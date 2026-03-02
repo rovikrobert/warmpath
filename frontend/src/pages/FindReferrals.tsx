@@ -204,7 +204,9 @@ export default function FindReferrals() {
   const totalOwnConnections = companies.reduce((sum, c) => sum + (companyCounts[c] ?? 0), 0);
   const targetsWithCoverage = companies.reduce((sum, c) => sum + ((companyCounts[c] ?? 0) > 0 ? 1 : 0), 0);
   const coverageRate = companies.length > 0 ? targetsWithCoverage / companies.length : 0;
-  const recommendedScope = coverageRate < 0.2 ? 'marketplace' : 'own_network';
+  const canAffordMarketplace = balance !== null && balance >= 5;
+  const lowCoverageWithoutCredits = coverageRate < 0.2 && balance !== null && balance < 5;
+  const recommendedScope = coverageRate < 0.2 && canAffordMarketplace ? 'marketplace' : 'own_network';
   const shouldShowLowCoverageNudge = (
     experimentVariant === 'treatment' &&
     scope === 'own_network' &&
@@ -473,6 +475,15 @@ export default function FindReferrals() {
               >
                 Switch &rarr;
               </button>
+            </div>
+          )}
+
+          {scope === 'own_network' && companies.length > 0 && companiesLoaded && lowCoverageWithoutCredits && (
+            <div className="mt-2 text-sm text-amber-400">
+              Your own-network coverage is limited for these companies. You need 5 credits to search All Networks.
+              <Link to="/credits" className="ml-1 font-medium text-amber-300 hover:text-amber-200">
+                Get credits &rarr;
+              </Link>
             </div>
           )}
         </div>
