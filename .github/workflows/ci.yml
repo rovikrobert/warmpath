@@ -139,3 +139,27 @@ jobs:
         # GHSA-7mpr-5m44-h73r: markdownify memory DoS via large HTML headlines.
         #   Unfixable: python-jobspy pins markdownify<0.14.0. Low risk — internal job scraping only.
         run: pip-audit -r requirements.txt --ignore-vuln GHSA-w8v5-vhqr-4h9v --ignore-vuln GHSA-7mpr-5m44-h73r
+
+  telemetry-scan:
+    name: Scope Telemetry Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify Phase 3 scope telemetry sequence
+        env:
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
+          POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
+        run: |
+          if [ -z "${POSTHOG_API_KEY}" ] || [ -z "${POSTHOG_PROJECT_ID}" ]; then
+            echo "Skipping scope telemetry verification: POSTHOG_API_KEY/POSTHOG_PROJECT_ID not configured."
+            exit 0
+          fi
+          python3 scripts/verify_scope_telemetry.py --days 7 --limit 200
