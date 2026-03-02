@@ -49,7 +49,9 @@ def _posthog_query(query: str, host: str, project_id: str, api_key: str) -> dict
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--days", type=int, default=7, help="Lookback window in days")
-    parser.add_argument("--limit", type=int, default=200, help="Max distinct users to inspect")
+    parser.add_argument(
+        "--limit", type=int, default=200, help="Max distinct users to inspect"
+    )
     args = parser.parse_args()
 
     api_key = os.getenv("POSTHOG_API_KEY")
@@ -106,8 +108,8 @@ LIMIT {args.limit}
     result = _posthog_query(q, host, project_id, api_key)
     rows = result.get("results", [])
     if not rows:
-      print("No Phase 3 scope telemetry found in window.")
-      return 1
+        print("No Phase 3 scope telemetry found in window.")
+        return 1
 
     in_order = 0
     out_of_order = 0
