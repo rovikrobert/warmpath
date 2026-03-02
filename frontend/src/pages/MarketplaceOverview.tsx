@@ -12,6 +12,12 @@ import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
 import IntroRelayModal from '../components/IntroRelayModal';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
+interface ConfirmSentResult {
+  status: string;
+  credits_awarded: number;
+  credits_deferred?: boolean;
+}
+
 function StatusBadge({ status }) {
   const labels = { requested: 'Pending', reviewing: 'Reviewing', approved: 'Approved', declined: 'Declined', completed: 'Completed' };
   const colors = {
@@ -120,19 +126,38 @@ export default function MarketplaceOverview() {
     }
   };
 
-  const handleConfirmSent = async (facilitationId) => {
-    await mpApi.confirmSent(facilitationId);
+  const handleConfirmSent = async (facilitationId?: string): Promise<ConfirmSentResult> => {
+    if (!facilitationId) {
+      throw new Error('Missing facilitation ID');
+    }
+    const res = await mpApi.confirmSent(facilitationId);
+    const confirmData = res.data as ConfirmSentResult;
+    const nowIso = new Date().toISOString();
+
     // Update local state to reflect manual send confirmation
     setIncoming((prev) => prev.map((r) =>
-      r.id === facilitationId ? { ...r, delivery_method: 'linkedin_manual', delivery_status: 'delivered' } : r
+      r.id === facilitationId
+        ? {
+          ...r,
+          delivery_method: 'linkedin_manual',
+          delivery_status: 'delivered',
+          credits_awarded_at: confirmData.credits_awarded > 0 ? nowIso : r.credits_awarded_at,
+          credits_deferred: !!confirmData.credits_deferred,
+        }
+        : r
     ));
-    // Refresh balance since 50 credits were awarded
-    try {
-      const balRes = await creditsApi.balance();
-      setBalance(balRes.data?.balance ?? balance);
-    } catch (_err) {
-      // Non-critical — balance will refresh on next load
+
+    // Refresh balance only when credits are actually awarded.
+    if (confirmData.credits_awarded > 0) {
+      try {
+        const balRes = await creditsApi.balance();
+        setBalance(balRes.data?.balance ?? balance);
+      } catch (_err) {
+        // Non-critical — balance will refresh on next load
+      }
     }
+
+    return confirmData;
   };
 
   const toggleContactVisibility = async (contactId) => {
@@ -450,10 +475,14 @@ export default function MarketplaceOverview() {
                     ) : req.delivery_method === 'linkedin_manual' ? (
                       <>
                         <p className="text-sm font-semibold text-emerald-400">
-                          You confirmed sending the intro. 50 credits earned!
+                          {req.credits_awarded_at
+                            ? 'You confirmed sending the intro. Credits awarded!'
+                            : 'You confirmed sending the intro. Credits pending review.'}
                         </p>
                         <p className="mt-1 text-xs text-emerald-400/70">
-                          Thank you for connecting {req.job_seeker_profile_snapshot?.full_name || 'the candidate'} with {req.contact_name || 'your contact'}.
+                          {req.credits_awarded_at
+                            ? `Thank you for connecting ${req.job_seeker_profile_snapshot?.full_name || 'the candidate'} with ${req.contact_name || 'your contact'}.`
+                            : 'Thanks for confirming the send. We will update your credit status after verification.'}
                         </p>
                       </>
                     ) : (
