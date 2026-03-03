@@ -103,11 +103,7 @@ export default function App() {
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <Spinner size="lg" />
-      </div>
-    );
+    return <RouteLoadingFallback />;
   }
 
   return (
