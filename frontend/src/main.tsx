@@ -12,7 +12,11 @@ import App from './App';
 import './index.css';
 
 const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-const E2E_BYPASS_AUTH = import.meta.env.VITE_E2E_BYPASS_AUTH === 'true';
+const E2E_BYPASS_AUTH = import.meta.env.DEV && import.meta.env.VITE_E2E_BYPASS_AUTH === 'true';
+
+if (!import.meta.env.DEV && import.meta.env.VITE_E2E_BYPASS_AUTH === 'true') {
+  throw new Error('VITE_E2E_BYPASS_AUTH is only allowed in development.');
+}
 
 // Initialize PostHog (no-op when VITE_POSTHOG_KEY is not set)
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY;
