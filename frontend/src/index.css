@@ -131,8 +131,8 @@
   to { opacity: 1; transform: translateX(0); }
 }
 @keyframes page-enter {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(6px); filter: blur(2px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 @keyframes slide-over-in {
   from { transform: translateX(100%); }
@@ -164,7 +164,7 @@
   to { height: 0; }
 }
 
-.page-enter { animation: page-enter 0.2s ease-out; }
+.page-enter { animation: page-enter 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
 .animate-slide-over-in { animation: slide-over-in 0.25s ease-out; }
 .animate-fade-out-up { animation: fade-out-up 0.3s ease-out forwards; }
 .animate-scale-in { animation: scale-in 0.2s ease-out; }
@@ -191,6 +191,27 @@
   @apply text-muted-foreground;
 }
 [cmdk-group] + [cmdk-group] { margin-top: 0.25rem; }
+
+/* Focus-visible ring for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Smooth scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
 
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
