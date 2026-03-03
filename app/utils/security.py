@@ -179,7 +179,7 @@ async def _jit_provision_user(clerk_user_id: str, db: AsyncSession) -> User | No
     )
     if suppression_result.scalars().first() is None:
         bonus = 500 if settings.BETA_SANDBOX_MODE else 50
-        await earn_credits(user.id, bonus, "welcome_bonus", db)
+        await earn_credits(user.id, bonus, "welcome_bonus", db, skip_daily_cap=True)
 
     await db.commit()
     logger.info("JIT-provisioned user %s (clerk_user_id=%s)", user.id, clerk_user_id)
