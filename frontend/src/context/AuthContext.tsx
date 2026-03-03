@@ -19,14 +19,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { user: clerkUser, isLoaded: userLoaded } = useClerkUser();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [clerkTimedOut, setClerkTimedOut] = useState(false);
 
   // Wire up the API client to use Clerk tokens
   useEffect(() => {
     setTokenGetter(() => getToken());
   }, [getToken]);
 
+  // If Clerk doesn't initialize within 10 seconds, stop blocking the app.
+  // This handles cases like production keys on localhost, network failures, etc.
+  useEffect(() => {
+    if (authLoaded && userLoaded) return;
+    const timer = setTimeout(() => {
+      if (!authLoaded || !userLoaded) {
+        console.warn('Clerk failed to initialize within 10s — continuing without auth');
+        setClerkTimedOut(true);
+        setLoading(false);
+      }
+    }, 10_000);
+    return () => clearTimeout(timer);
+  }, [authLoaded, userLoaded]);
+
   // Fetch backend user profile when Clerk auth state changes
   useEffect(() => {
+    if (clerkTimedOut) return;
     if (!authLoaded || !userLoaded) return;
 
     if (isSignedIn && clerkUser) {
@@ -51,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resetAnalytics();
       setLoading(false);
     }
-  }, [isSignedIn, clerkUser, authLoaded, userLoaded, signOut]);
+  }, [isSignedIn, clerkUser, authLoaded, userLoaded, signOut, clerkTimedOut]);
 
   const refreshUser = useCallback(async () => {
     const res = await authApi.me();

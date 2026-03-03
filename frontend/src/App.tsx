@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 import { useAuth } from './context/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import RouteLoadingFallback from './components/RouteLoadingFallback';
 import Layout from './components/Layout';
 import Spinner from './components/ui/Spinner';
 
@@ -25,6 +26,7 @@ const ScoreGlossary = lazy(() => import('./pages/ScoreGlossary'));
 const Join = lazy(() => import('./pages/Join'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const IntroReview = lazy(() => import('./pages/IntroReview'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const ENABLE_SMOKE_ROUTE = import.meta.env.DEV && import.meta.env.VITE_E2E_SMOKE_ROUTE === 'true';
 const AUTH_BYPASS = import.meta.env.DEV && import.meta.env.VITE_E2E_BYPASS_AUTH === 'true';
 
@@ -101,22 +103,12 @@ export default function App() {
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <Spinner size="lg" />
-      </div>
-    );
+    return <RouteLoadingFallback />;
   }
-
-  const fallback = (
-    <div className="flex h-screen items-center justify-center bg-background">
-      <Spinner size="lg" />
-    </div>
-  );
 
   return (
     <ErrorBoundary resetKey={location.pathname}>
-      <Suspense fallback={fallback}>
+      <Suspense fallback={<RouteLoadingFallback />}>
         <Routes>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/privacy" element={<PrivacyPage />} />
@@ -150,7 +142,7 @@ export default function App() {
             <Route path="/marketplace/dashboard" element={<Navigate to="/marketplace" replace />} />
             <Route path="/my-requests" element={<Navigate to="/marketplace/requests" replace />} />
           </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>
