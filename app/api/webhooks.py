@@ -439,29 +439,36 @@ async def _handle_intro_facilitation_event(
     if event_type == "email.delivered":
         facilitation.delivery_status = "delivered"
         facilitation.delivered_at = now
-        # Award credits if not already awarded
+        # Award credits if not already awarded (non-blocking — delivery
+        # status is the primary event, credit failure must not lose it)
         if not facilitation.credits_awarded_at:
-            await earn_credits(
-                facilitation.network_holder_id,
-                50,
-                "intro_facilitation",
-                db,
-                reference_id=facilitation.id,
-            )
-            facilitation.credits_awarded_at = now
+            try:
+                await earn_credits(
+                    facilitation.network_holder_id,
+                    50,
+                    "intro_facilitation",
+                    db,
+                    reference_id=facilitation.id,
+                )
+                facilitation.credits_awarded_at = now
+            except ValueError:
+                pass  # daily cap; delivery still tracked
     elif event_type == "email.bounced":
         facilitation.delivery_status = "bounced"
         facilitation.delivered_at = now
         # Partial credits for bounce (NH tried)
         if not facilitation.credits_awarded_at:
-            await earn_credits(
-                facilitation.network_holder_id,
-                25,
-                "intro_facilitation_bounced",
-                db,
-                reference_id=facilitation.id,
-            )
-            facilitation.credits_awarded_at = now
+            try:
+                await earn_credits(
+                    facilitation.network_holder_id,
+                    25,
+                    "intro_facilitation_bounced",
+                    db,
+                    reference_id=facilitation.id,
+                )
+                facilitation.credits_awarded_at = now
+            except ValueError:
+                pass  # daily cap; bounce still tracked
     elif event_type == "email.opened":
         facilitation.delivery_status = "opened"
 

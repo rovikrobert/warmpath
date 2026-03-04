@@ -958,3 +958,58 @@ async def test_search_results_have_warm_and_relevance_scores(client: AsyncClient
         warm = r["warm_score"] or 0
         expected = round(r["relevance_score"] * 0.5 + warm * 0.5, 2)
         assert abs(r["combined_score"] - expected) < 0.02  # floating-point tolerance
+
+
+# ===========================================================================
+# Section 6 — Onboarding funnel regression (beta sandbox mode)
+# ===========================================================================
+
+
+async def test_beta_signup_then_upload_succeeds(client: AsyncClient, monkeypatch):
+    """Regression: welcome bonus (500 in beta) must not block same-day CSV upload.
+
+    Previously the 500-credit welcome bonus filled the daily earn cap (500),
+    causing every new user who uploaded on signup day to fail with
+    "Daily earn cap exceeded". Contacts were rolled back.
+
+    This test reproduces the exact production failure path:
+    signup → 500 welcome bonus → CSV upload → contacts must exist.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "BETA_SANDBOX_MODE", True)
+
+    # Step 1: Signup with 500-credit beta welcome bonus
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db,
+            email="louisa@beta-test.com",
+            full_name="Beta User",
+            email_verified=True,
+        )
+        await earn_credits(user.id, 500, "welcome_bonus", db, skip_daily_cap=True)
+        await db.commit()
+
+    # Verify 500 balance before upload
+    balance_resp = await client.get("/api/v1/credits/balance", headers=headers)
+    assert balance_resp.json()["data"]["balance"] == 500
+
+    # Step 2: Upload CSV — this is the step that used to fail
+    upload_resp = await client.post(
+        "/api/v1/contacts/upload", headers=headers, files=_csv_file()
+    )
+    assert upload_resp.status_code == 201
+    upload_data = upload_resp.json()["data"]
+    assert upload_data["status"] == "completed"
+    assert upload_data["contacts_created"] == 19
+
+    # Step 3: Verify contacts actually exist (not rolled back)
+    contacts_resp = await client.get(
+        "/api/v1/contacts", headers=headers, params={"per_page": 100}
+    )
+    assert contacts_resp.status_code == 200
+    assert len(contacts_resp.json()["data"]) == 19
+
+    # Step 4: Verify upload credits awarded (500 welcome + 100 upload = 600)
+    after_resp = await client.get("/api/v1/credits/balance", headers=headers)
+    assert after_resp.json()["data"]["balance"] == 600

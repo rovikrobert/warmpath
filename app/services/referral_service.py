@@ -206,14 +206,18 @@ async def record_conversion(
     )
     db.add(conversion)
 
-    # Award credits to the referrer
-    await earn_credits(
-        user_id=ref_code.owner_id,
-        amount=credits,
-        reason=f"referral_{event}",
-        db=db,
-        reference_id=conversion.id,
-    )
+    # Award credits to the referrer (non-blocking — conversion record
+    # is the primary operation, credit failure must not lose it)
+    try:
+        await earn_credits(
+            user_id=ref_code.owner_id,
+            amount=credits,
+            reason=f"referral_{event}",
+            db=db,
+            reference_id=conversion.id,
+        )
+    except ValueError:
+        conversion.credits_awarded = 0  # record that credits were not granted
 
     await db.flush()
     return conversion
