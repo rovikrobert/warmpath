@@ -95,6 +95,7 @@ class UserBlock(Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
     blocked_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

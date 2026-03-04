@@ -156,9 +156,8 @@ def warm_job_cache_global():
                     EnrichmentCache.cache_key.in_(all_cache_keys)
                 )
             )
-            fresh_keys = {
-                c.cache_key for c in cache_result.scalars() if c.expires_at > now
-            }
+            existing_cache = {c.cache_key: c for c in cache_result.scalars()}
+            fresh_keys = {k for k, c in existing_cache.items() if c.expires_at > now}
 
             to_fetch: list[tuple[str, dict[str, str]]] = [
                 (key, boards)
@@ -185,13 +184,8 @@ def warm_job_cache_global():
                         cache_key = f"job_scan:{company_key}"
 
                         # --- Anomaly detection ---
-                        # Read previous cache for major-drop comparison
-                        prev_result = await db.execute(
-                            select(EnrichmentCache).where(
-                                EnrichmentCache.cache_key == cache_key
-                            )
-                        )
-                        prev_cached = prev_result.scalar_one_or_none()
+                        # Use pre-loaded cache (eliminates N+1 query)
+                        prev_cached = existing_cache.get(cache_key)
                         prev_count = (
                             prev_cached.data.get("job_count", 0)
                             if prev_cached is not None and prev_cached.data
