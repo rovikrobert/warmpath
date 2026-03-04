@@ -452,7 +452,7 @@ export default function ReferralResults() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-2xl rounded-xl bg-red-500/10 p-6 text-center text-sm text-red-400" role="alert" aria-live="polite">
+      <div className="mx-auto max-w-2xl rounded-xl bg-destructive/10 p-6 text-center text-sm text-destructive" role="alert" aria-live="polite">
         {error}
       </div>
     );

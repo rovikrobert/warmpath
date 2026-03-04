@@ -3,9 +3,9 @@ import { useLocation } from 'react-router-dom';
 import { feedback as feedbackApi } from '../api/client';
 
 const ACTIONS = [
-  { value: 1, label: 'This works well', icon: '\u{1F44D}', color: 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' },
-  { value: -1, label: 'Something is broken', icon: '\u{1F41B}', color: 'bg-red-500/10 text-red-400 hover:bg-red-500/20' },
-  { value: 0, label: 'Suggestion', icon: '\u{1F4A1}', color: 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' },
+  { value: 1, label: 'This works well', icon: '\u{1F44D}', color: 'bg-success/10 text-success hover:bg-success/20' },
+  { value: -1, label: 'Something is broken', icon: '\u{1F41B}', color: 'bg-destructive/10 text-destructive hover:bg-destructive/20' },
+  { value: 0, label: 'Suggestion', icon: '\u{1F4A1}', color: 'bg-info/10 text-info hover:bg-info/20' },
 ];
 
 export default function BetaFeedbackButton() {
