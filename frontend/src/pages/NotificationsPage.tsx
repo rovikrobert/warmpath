@@ -66,7 +66,7 @@ export default function NotificationsPage() {
                   window.dispatchEvent(new Event('feed-updated'));
                 } catch { /* silent */ }
               }}
-              className="text-sm text-muted-foreground hover:text-secondary-foreground transition-colors"
+              className="cursor-pointer text-sm text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground"
             >
               Mark all read
             </button>
@@ -81,7 +81,7 @@ export default function NotificationsPage() {
                   window.dispatchEvent(new Event('feed-updated'));
                 } catch { /* silent */ }
               }}
-              className="text-sm text-muted-foreground hover:text-secondary-foreground transition-colors"
+              className="cursor-pointer text-sm text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground"
             >
               Clear all
             </button>
