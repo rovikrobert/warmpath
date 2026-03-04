@@ -36,6 +36,7 @@ class ReferralCode(Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
     code: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
     referral_type: Mapped[str | None] = mapped_column(
