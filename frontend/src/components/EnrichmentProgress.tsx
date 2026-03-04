@@ -109,7 +109,7 @@ export default function EnrichmentProgress({ compact = false }: EnrichmentProgre
                 claimedValues.has(m.pct)
                   ? 'bg-primary/20 text-primary'
                   : percentage >= m.pct
-                    ? 'bg-emerald-500/20 text-emerald-400'
+                    ? 'bg-success/20 text-success'
                     : 'bg-muted/50 text-muted-foreground'
               }`}
             >
@@ -127,7 +127,7 @@ export default function EnrichmentProgress({ compact = false }: EnrichmentProgre
         </p>
       )}
       {percentage >= 100 && (
-        <p className="text-xs text-emerald-400">
+        <p className="text-xs text-success">
           All contacts enriched! Your referral matches are at maximum accuracy.
         </p>
       )}

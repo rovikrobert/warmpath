@@ -99,15 +99,15 @@ export default function SharingSettings() {
     <div className="mx-auto max-w-2xl space-y-6" role="main">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-foreground">Sharing Settings</h1>
-        <Link to="/marketplace" className="text-sm text-primary hover:text-primary">
+        <Link to="/marketplace" className="text-sm text-primary transition-colors duration-200 hover:text-primary/80">
           &larr; Back to Marketplace
         </Link>
       </div>
 
       {/* Privacy explainer */}
-      <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
-        <h3 className="mb-1 text-sm font-semibold text-blue-400">How marketplace sharing works</h3>
-        <p className="text-sm text-blue-400">
+      <div className="rounded-lg border border-info/30 bg-info/10 p-4">
+        <h3 className="mb-1 text-sm font-semibold text-info">How marketplace sharing works</h3>
+        <p className="text-sm text-info">
           Candidates see <strong>role level and department only</strong> &mdash; never names or contact details.
           When someone requests an intro, you see their profile and choose whether to introduce them to your contact.
           Names and details are never revealed without your explicit approval.
@@ -130,7 +130,7 @@ export default function SharingSettings() {
             role="switch"
             aria-checked={!!prefs?.opt_in_marketplace}
             aria-label="Share my network on the marketplace"
-            className={`relative h-6 w-11 rounded-full transition ${
+            className={`relative h-6 w-11 cursor-pointer rounded-full transition-colors duration-200 ${
               prefs?.opt_in_marketplace ? 'bg-primary' : 'bg-muted-foreground'
             }`}
           >
@@ -155,7 +155,7 @@ export default function SharingSettings() {
             role="switch"
             aria-checked={!!prefs?.is_paused}
             aria-label="Temporarily hide all my listings"
-            className={`relative h-6 w-11 rounded-full transition ${
+            className={`relative h-6 w-11 cursor-pointer rounded-full transition-colors duration-200 ${
               prefs?.is_paused ? 'bg-primary' : 'bg-muted-foreground'
             }`}
           >
@@ -173,7 +173,7 @@ export default function SharingSettings() {
         </p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {DEPARTMENT_OPTIONS.map((dept) => (
-            <label key={dept} className="flex items-center gap-2 rounded-lg border border-border p-2 text-sm hover:bg-muted">
+            <label key={dept} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border p-2 text-sm transition-colors duration-200 hover:bg-muted">
               <input
                 type="checkbox"
                 checked={categoryFilters.includes(dept)}
@@ -208,12 +208,12 @@ export default function SharingSettings() {
         {filteredContacts.length > 0 && (
           <div className="mb-3 max-h-48 overflow-y-auto rounded-lg border border-border">
             {filteredContacts.slice(0, 20).map((c) => (
-              <label key={c.id} className="flex items-center gap-2 border-b border-border px-3 py-2 text-sm last:border-0 hover:bg-muted">
+              <label key={c.id} className="flex cursor-pointer items-center gap-2 border-b border-border px-3 py-2 text-sm transition-colors duration-200 last:border-0 hover:bg-muted">
                 <input
                   type="checkbox"
                   checked={excludedIds.includes(c.id)}
                   onChange={() => toggleExclude(c.id)}
-                  className="h-4 w-4 rounded border-border bg-muted text-red-500 focus:ring-red-500"
+                  className="h-4 w-4 rounded border-border bg-muted text-destructive focus:ring-destructive"
                 />
                 <span className="text-foreground">{c.full_name}</span>
                 {c.current_title && <span className="text-muted-foreground">— {c.current_title}</span>}
@@ -236,12 +236,12 @@ export default function SharingSettings() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
+          className="cursor-pointer rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-primary/90 disabled:opacity-50"
         >
           {saving ? 'Saving...' : 'Save Settings'}
         </button>
         {saved && (
-          <span className="text-sm text-emerald-400" role="status" aria-live="polite">Settings saved!</span>
+          <span className="text-sm text-success" role="status" aria-live="polite">Settings saved!</span>
         )}
       </div>
     </div>

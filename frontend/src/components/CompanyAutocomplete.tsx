@@ -3,7 +3,7 @@ import { companies as companiesApi } from '../api/client';
 
 const SOURCE_BADGES = {
   own_contacts: { label: 'Your network', style: 'text-primary font-medium' },
-  registry: { label: 'Known board', style: 'text-emerald-400' },
+  registry: { label: 'Known board', style: 'text-success' },
   discovered: { label: 'Discovered', style: 'text-sky-400' },
 };
 

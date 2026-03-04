@@ -7,6 +7,7 @@ import EnrichmentProgress from '../components/EnrichmentProgress';
 import { EnrichmentActions } from '../components/FeedCard';
 import KeevsAvatar from '../components/KeevsAvatar';
 import EmptyState from '../components/ui/EmptyState';
+import noContactsIllustration from '../assets/illustrations/no-contacts.webp';
 import ContactsPageSkeleton from '../components/skeletons/ContactsPageSkeleton';
 import SlideOver from '../components/SlideOver';
 import ContactDetailPanel from '../components/ContactDetail';
@@ -32,7 +33,7 @@ const RELATIONSHIP_TYPES = [
 const REL_BADGE_COLORS = {
   current_colleague: 'bg-blue-500/10 text-blue-400',
   former_colleague: 'bg-indigo-500/10 text-indigo-400',
-  manager: 'bg-emerald-500/10 text-emerald-400',
+  manager: 'bg-success/10 text-success',
   alumni: 'bg-purple-500/10 text-purple-400',
   industry_peer: 'bg-cyan-500/10 text-cyan-400',
   friend: 'bg-primary/10 text-primary',
@@ -189,7 +190,7 @@ function AddContactModal({ onClose, onSuccess, companies: companyList }) {
             <input id="add-last-interaction" type="date" value={form.last_interaction_date} onChange={set('last_interaction_date')} className={inputClass} />
           </div>
 
-          {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
+          {error && <p role="alert" aria-live="polite" className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">{error}</p>}
 
           <button
             type="submit"
@@ -649,12 +650,12 @@ export default function ContactsPage() {
       )}
 
       {exportError && (
-        <p role="alert" className="mb-4 rounded-md bg-red-500/10 p-2 text-sm text-red-400">{exportError}</p>
+        <p role="alert" className="mb-4 rounded-md bg-destructive/10 p-2 text-sm text-destructive">{exportError}</p>
       )}
 
       {/* Search + Filter bar */}
       <div className="mb-4 space-y-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <label htmlFor="contacts-search" className="sr-only">Search contacts with natural language</label>
             {nlpResults !== null && !nlpFadingOut && (
@@ -669,7 +670,7 @@ export default function ContactsPage() {
               onKeyDown={(e) => { if (e.key === 'Enter' && searchInput.trim()) handleNlpSearch(); }}
               placeholder='Search contacts or try "CTOs at big tech in Singapore"...'
               aria-label="Search contacts using natural language"
-              className={`w-full rounded-lg border border-border bg-muted py-2 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring ${nlpResults !== null && !nlpFadingOut ? 'pl-11' : 'pl-3'}`}
+              className={`w-full rounded-lg border border-border bg-muted py-2 pr-10 text-sm text-foreground placeholder:text-muted-foreground transition-colors duration-200 focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring ${nlpResults !== null && !nlpFadingOut ? 'pl-11' : 'pl-3'}`}
             />
             {searchInput.trim() && (
               <button
@@ -691,7 +692,7 @@ export default function ContactsPage() {
             value={filter}
             onChange={(e) => { setFilter(e.target.value); setPage(1); }}
             aria-label="Filter contacts by relationship type"
-            className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+            className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground transition-colors duration-200 focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
           >
             {RELATIONSHIP_TYPES.map((r) => (
               <option key={r.value} value={r.value}>{r.label}</option>
@@ -706,7 +707,7 @@ export default function ContactsPage() {
 
       {/* Bulk update bar */}
       {bulkTotal > 0 && !loading && !nlpLoading && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-2.5">
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface-raised px-4 py-2.5">
           <span className="text-sm text-secondary-foreground">
             {isFiltered
               ? `${bulkTotal} contact${bulkTotal !== 1 ? 's' : ''} matched`
@@ -785,8 +786,8 @@ export default function ContactsPage() {
 
       {/* NLP error display */}
       {nlpError && (
-        <div className="mb-4 rounded-lg bg-red-500/10 p-3" role="alert" aria-live="polite">
-          <p className="text-sm text-red-400">{nlpError}</p>
+        <div className="mb-4 rounded-lg bg-destructive/10 p-3" role="alert" aria-live="polite">
+          <p className="text-sm text-destructive">{nlpError}</p>
           <button
             onClick={clearNlpSearch}
             className="mt-1 text-xs text-muted-foreground hover:text-muted-foreground"
@@ -798,13 +799,13 @@ export default function ContactsPage() {
 
       {/* Post-add prompt */}
       {addedCompanies.length > 0 && (
-        <div className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
-          <p className="text-sm text-emerald-400">
+        <div className="mb-4 rounded-lg border border-success/30 bg-success/10 p-3">
+          <p className="text-sm text-success">
             Contacts added! Want to search for referral paths at{' '}
             <strong>{addedCompanies.slice(0, 3).join(', ')}</strong>
             {addedCompanies.length > 3 && ` and ${addedCompanies.length - 3} more`}?
           </p>
-          <a href="/referrals" className="mt-1 inline-block text-sm font-medium text-emerald-400 hover:text-emerald-300">
+          <a href="/referrals" className="mt-1 inline-block text-sm font-medium text-success hover:opacity-80">
             Search now &rarr;
           </a>
         </div>
@@ -863,7 +864,7 @@ export default function ContactsPage() {
                           role="button"
                           tabIndex={0}
                           aria-label={`${c.full_name}, ${nlpTier.label}${c.warm_score != null ? `, ${c.warm_score >= 70 ? 'Strong' : c.warm_score >= 40 ? 'Moderate' : 'Weak'} connection` : ''}, click to view details`}
-                          className={`surface-interactive ${selectedContact?.id === c.id ? 'ring-1 ring-primary/50 bg-muted/50' : ''}`}
+                          className={`surface-interactive hover-lift cursor-pointer ${selectedContact?.id === c.id ? 'ring-1 ring-primary/50 bg-surface-raised' : ''}`}
                         >
                           <div className="flex items-center justify-between px-4 py-3">
                             <div className="flex items-center gap-3">
@@ -915,46 +916,51 @@ export default function ContactsPage() {
             <p className="text-sm text-muted-foreground">No contacts match this filter.</p>
           </div>
         ) : (
-          <EmptyState
-            icon={
-              <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
-              </svg>
-            }
-            title="Import your professional network"
-            description="Upload your LinkedIn connections CSV to see who can refer you. We'll score every contact by referral potential."
-            stats={[
-              { value: '4,000+', label: 'avg contacts per user' },
-              { value: '< 30s', label: 'to upload' },
-            ]}
-            preview={
-              <div className="flex items-center justify-between rounded-lg bg-muted/80 px-4 py-3">
-                <div className="text-left">
-                  <p className="text-sm font-medium text-secondary-foreground">Sarah Chen</p>
-                  <p className="text-xs text-muted-foreground">Senior PM at Stripe</p>
+          <div
+            className="border-2 border-dashed border-border hover:border-primary/50 hover:shadow-[0_0_20px_var(--primary-glow)] transition-all duration-200 rounded-xl cursor-pointer"
+            onClick={() => setShowBulkModal(true)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setShowBulkModal(true); }}
+            aria-label="Upload LinkedIn CSV to import contacts"
+          >
+            <EmptyState
+              illustration={noContactsIllustration}
+              title="Import your professional network"
+              description="Upload your LinkedIn connections CSV to see who can refer you. We'll score every contact by referral potential."
+              stats={[
+                { value: '4,000+', label: 'avg contacts per user' },
+                { value: '< 30s', label: 'to upload' },
+              ]}
+              preview={
+                <div className="flex items-center justify-between rounded-lg bg-muted/80 px-4 py-3">
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-secondary-foreground">Sarah Chen</p>
+                    <p className="text-xs text-muted-foreground">Senior PM at Stripe</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">Strong</span>
+                    <span className="text-sm font-semibold text-primary">82</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">Strong</span>
-                  <span className="text-sm font-semibold text-primary">82</span>
-                </div>
-              </div>
-            }
-            primaryAction={{ label: 'Upload LinkedIn CSV', onClick: () => setShowBulkModal(true) }}
-            secondaryAction={{
-              label: 'How to export from LinkedIn \u2192',
-              onClick: () => window.open('https://www.linkedin.com/help/linkedin/answer/a1339364', '_blank'),
-            }}
-          />
+              }
+              primaryAction={{ label: 'Upload LinkedIn CSV', onClick: (e) => { e?.stopPropagation(); setShowBulkModal(true); } }}
+              secondaryAction={{
+                label: 'How to export from LinkedIn \u2192',
+                onClick: (e) => { e?.stopPropagation(); window.open('https://www.linkedin.com/help/linkedin/answer/a1339364', '_blank'); },
+              }}
+            />
+          </div>
         )
       ) : (
         <div className="space-y-2">
           {contactsList.map((c, i) => {
             const score = c.warm_score ?? 0;
-            const borderCls = score >= 70 ? 'border-l-2 border-l-emerald-500'
+            const borderCls = score >= 70 ? 'border-l-2 border-l-success'
               : score >= 40 ? 'border-l-2 border-l-primary'
               : '';
             const opacityCls = score < 20 ? 'opacity-70' : '';
-            const focusedCls = (focusedIndex === i || selectedContact?.id === c.id) ? 'ring-1 ring-primary/50 bg-muted/50' : '';
+            const focusedCls = (focusedIndex === i || selectedContact?.id === c.id) ? 'ring-1 ring-primary/50 bg-surface-raised' : '';
             return (
               <div
                 key={c.id}
@@ -964,7 +970,7 @@ export default function ContactsPage() {
                 role="button"
                 tabIndex={0}
                 aria-label={`${c.full_name}, click to view details`}
-                className={`surface-interactive ${borderCls} ${opacityCls} ${focusedCls}`}
+                className={`surface-interactive hover-lift cursor-pointer ${borderCls} ${opacityCls} ${focusedCls}`}
               >
                 <div className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -981,12 +987,12 @@ export default function ContactsPage() {
                       animate={recentlyUpdatedId === c.id}
                     />
                     {c.relationship_type && score >= 40 && (
-                      <span className={`h-2 w-2 shrink-0 rounded-full ${score >= 70 ? 'bg-emerald-500' : 'bg-primary'}`} aria-hidden="true" />
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${score >= 70 ? 'bg-success' : 'bg-primary'}`} aria-hidden="true" />
                     )}
                   </div>
                   <div className="flex items-center gap-3">
                     {score >= 70 && (
-                      <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">Strong</span>
+                      <span className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">Strong</span>
                     )}
                     {score >= 40 && score < 70 && (
                       <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Warm</span>
@@ -1068,7 +1074,7 @@ export default function ContactsPage() {
       </SlideOver>
 
       {toast && (
-        <div className={`fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-lg lg:bottom-8 ${toast.startsWith('Updated') ? 'bg-emerald-500/90' : 'bg-red-500/90'}`} role="alert" aria-live="polite">
+        <div className={`fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-lg lg:bottom-8 ${toast.startsWith('Updated') ? 'bg-success/90' : 'bg-destructive/90'}`} role="alert" aria-live="polite">
           {toast}
         </div>
       )}

@@ -11,11 +11,11 @@ function ThemeToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
+        <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-muted/50">
           {resolvedTheme === "dark" ? (
-            <Moon className="h-4 w-4" />
+            <Moon className="h-4 w-4 transition-transform duration-200 rotate-0" />
           ) : (
-            <Sun className="h-4 w-4" />
+            <Sun className="h-4 w-4 transition-transform duration-200 rotate-0" />
           )}
           <span className="sr-only">Toggle theme</span>
         </Button>

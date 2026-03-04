@@ -70,8 +70,8 @@ function ResumePreviewModal({ data, onApply, onClose }) {
           )}
         </div>
         <div className="mt-5 flex gap-3">
-          <button onClick={onClose} className="flex-1 rounded-lg border border-border py-2 text-sm font-medium text-secondary-foreground hover:bg-muted">Cancel</button>
-          <button onClick={() => onApply(data)} className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-white hover:bg-primary/90">Apply to Profile</button>
+          <button onClick={onClose} className="flex-1 rounded-lg border border-border py-2 text-sm font-medium text-secondary-foreground hover:bg-muted cursor-pointer transition-colors duration-200">Cancel</button>
+          <button onClick={() => onApply(data)} className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-white hover:bg-primary/90 cursor-pointer transition-colors duration-200">Apply to Profile</button>
         </div>
       </div>
     </div>
@@ -150,8 +150,8 @@ function SearchFocusCard() {
           />
         </div>
       </div>
-      {error && <p className="mt-2 rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert">{error}</p>}
-      {saved && <p className="mt-2 rounded-md bg-emerald-500/10 p-2 text-sm text-emerald-400" role="status" aria-live="polite">Search focus saved!</p>}
+      {error && <p className="mt-2 rounded-md bg-destructive/10 p-2 text-sm text-destructive" role="alert">{error}</p>}
+      {saved && <p className="mt-2 rounded-md bg-success/10 p-2 text-sm text-success" role="status" aria-live="polite">Search focus saved!</p>}
       <button type="submit" disabled={saving || !targetRole.trim()} className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50">
         {saving ? 'Saving...' : 'Save'}
       </button>
@@ -313,7 +313,7 @@ function ProfileTab() {
               {importLoading === 'resume' ? 'Parsing...' : 'Import from Resume (PDF)'}
             </button>
           </div>
-          <button type="button" onClick={handleLinkedInImport} disabled={importLoading === 'linkedin'} className="w-full sm:w-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
+          <button type="button" onClick={handleLinkedInImport} disabled={importLoading === 'linkedin'} className="w-full sm:w-auto rounded-lg bg-info px-4 py-2 text-sm font-medium text-white hover:bg-info/90 cursor-pointer transition-colors duration-200 disabled:opacity-50">
             {importLoading === 'linkedin' ? 'Redirecting...' : 'Import from LinkedIn'}
           </button>
         </div>
@@ -425,16 +425,16 @@ function ProfileTab() {
                     <input type="checkbox" checked={entry.is_current} onChange={(e) => updateWorkEntry(i, 'is_current', e.target.checked)} className="h-3.5 w-3.5 rounded border-border bg-muted text-primary focus:ring-ring" />
                     I currently work here
                   </label>
-                  <button type="button" onClick={() => removeWorkEntry(i)} className="text-xs text-red-400 hover:text-red-300" aria-label={`Remove work history entry ${i + 1}`}>Remove</button>
+                  <button type="button" onClick={() => removeWorkEntry(i)} className="text-xs text-destructive hover:text-destructive/80 cursor-pointer transition-colors duration-200" aria-label={`Remove work history entry ${i + 1}`}>Remove</button>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {error && <p className="rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert" aria-live="assertive">{error}</p>}
-        {saved && <p className="rounded-md bg-emerald-500/10 p-2 text-sm text-emerald-400" role="status" aria-live="polite">Profile saved!</p>}
-        {matchFeedback && <p className="rounded-md bg-blue-500/10 p-2 text-sm text-blue-400" role="status" aria-live="polite">{matchFeedback}</p>}
+        {error && <p className="rounded-md bg-destructive/10 p-2 text-sm text-destructive" role="alert" aria-live="assertive">{error}</p>}
+        {saved && <p className="rounded-md bg-success/10 p-2 text-sm text-success" role="status" aria-live="polite">Profile saved!</p>}
+        {matchFeedback && <p className="rounded-md bg-info/10 p-2 text-sm text-info" role="status" aria-live="polite">{matchFeedback}</p>}
 
         <button type="submit" disabled={loading} className="w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50">
           {loading ? 'Saving...' : 'Save Profile'}
@@ -528,7 +528,7 @@ function PrivacyTab() {
 
   return (
     <div className="space-y-6">
-      {error && <div role="alert" aria-live="polite" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-400">{error}</div>}
+      {error && <div role="alert" aria-live="polite" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
       {/* Data Export */}
       <section className="surface-raised p-5" aria-label="Data export">
@@ -537,7 +537,7 @@ function PrivacyTab() {
         <button onClick={handleExport} disabled={exporting} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50">
           {exporting ? 'Preparing...' : exportDone ? 'Download Again' : 'Download My Data'}
         </button>
-        {exportDone && <p className="mt-2 text-xs text-emerald-400" role="status">Download started.</p>}
+        {exportDone && <p className="mt-2 text-xs text-success" role="status">Download started.</p>}
       </section>
 
       {/* Processing Restriction */}
@@ -584,7 +584,7 @@ function PrivacyTab() {
                     {record.created_at && ` — ${new Date(record.created_at).toLocaleDateString()}`}
                   </p>
                 </div>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${record.consented || record.status === 'granted' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-muted/50 text-muted-foreground'}`}>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${record.consented || record.status === 'granted' ? 'bg-success/10 text-success' : 'bg-muted/50 text-muted-foreground'}`}>
                   {record.consented || record.status === 'granted' ? 'Active' : 'Withdrawn'}
                 </span>
               </div>
@@ -614,7 +614,7 @@ function PrivacyTab() {
               {REGULATION_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
-          {requestSuccess && <p role="status" className="rounded-md bg-emerald-500/10 p-2 text-sm text-emerald-400">{requestSuccess}</p>}
+          {requestSuccess && <p role="status" className="rounded-md bg-success/10 p-2 text-sm text-success">{requestSuccess}</p>}
           <button type="submit" disabled={submittingRequest} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50">
             {submittingRequest ? 'Submitting...' : 'Submit Request'}
           </button>
@@ -692,12 +692,12 @@ function SharingTab() {
 
   return (
     <div className="space-y-6">
-      {error && <div role="alert" aria-live="assertive" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-400">{error}</div>}
+      {error && <div role="alert" aria-live="assertive" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
       {/* Privacy explainer */}
-      <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
-        <h3 className="mb-1 text-sm font-semibold text-blue-400">How marketplace sharing works</h3>
-        <p className="text-sm text-blue-400">
+      <div className="rounded-lg border border-info/30 bg-info/10 p-4">
+        <h3 className="mb-1 text-sm font-semibold text-info">How marketplace sharing works</h3>
+        <p className="text-sm text-info">
           Candidates see <strong>role level and department only</strong> — never names or contact details.
           When someone requests an intro, you see their profile and choose whether to introduce them.
         </p>
@@ -758,7 +758,7 @@ function SharingTab() {
           <div className="mb-3 max-h-48 overflow-y-auto rounded-lg border border-border">
             {filteredContacts.slice(0, 20).map((c) => (
               <label key={c.id} className="flex items-center gap-2 border-b border-border px-3 py-2 text-sm last:border-0 hover:bg-muted">
-                <input type="checkbox" checked={excludedIds.includes(c.id)} onChange={() => toggleExclude(c.id)} className="h-4 w-4 rounded border-border bg-muted text-red-500 focus:ring-red-500" />
+                <input type="checkbox" checked={excludedIds.includes(c.id)} onChange={() => toggleExclude(c.id)} className="h-4 w-4 rounded border-border bg-muted text-destructive focus:ring-destructive" />
                 <span className="text-foreground">{c.full_name}</span>
                 {c.current_title && <span className="text-muted-foreground">— {c.current_title}</span>}
                 {c.current_company && <span className="text-xs text-muted-foreground">at {c.current_company}</span>}
@@ -774,7 +774,7 @@ function SharingTab() {
         <button onClick={handleSave} disabled={saving} className="rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50">
           {saving ? 'Saving...' : 'Save Settings'}
         </button>
-        {saved && <span className="text-sm text-emerald-400" role="status" aria-live="polite">Settings saved!</span>}
+        {saved && <span className="text-sm text-success" role="status" aria-live="polite">Settings saved!</span>}
       </div>
     </div>
   );
@@ -837,10 +837,10 @@ function PasswordSection({ clerkUser }) {
           <label htmlFor="confirm-pw" className="mb-1 block text-xs font-medium text-muted-foreground">Confirm new password</label>
           <input id="confirm-pw" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
             className={inputClass} autoComplete="new-password" />
-          {mismatch && <p className="mt-1 text-xs text-red-400">Passwords do not match</p>}
+          {mismatch && <p className="mt-1 text-xs text-destructive">Passwords do not match</p>}
         </div>
-        {error && <p className="rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert">{error}</p>}
-        {success && <p className="rounded-md bg-emerald-500/10 p-2 text-sm text-emerald-400" role="status">{success}</p>}
+        {error && <p className="rounded-md bg-destructive/10 p-2 text-sm text-destructive" role="alert">{error}</p>}
+        {success && <p className="rounded-md bg-success/10 p-2 text-sm text-success" role="status">{success}</p>}
         <button type="submit" disabled={saving || mismatch || tooShort || !currentPassword || !newPassword || !confirmPassword}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50">
           {saving ? 'Updating...' : 'Update Password'}
@@ -915,13 +915,13 @@ function TwoFactorSection({ clerkUser }) {
       <div className="mb-3 flex items-center gap-3">
         <h2 className="text-base font-semibold text-foreground">Two-Factor Authentication</h2>
         {isEnabled ? (
-          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">Enabled</span>
+          <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">Enabled</span>
         ) : (
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Not set up</span>
         )}
       </div>
 
-      {error && <p className="mb-3 rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert">{error}</p>}
+      {error && <p className="mb-3 rounded-md bg-destructive/10 p-2 text-sm text-destructive" role="alert">{error}</p>}
 
       {step === 'idle' && !isEnabled && (
         <div>
@@ -937,7 +937,7 @@ function TwoFactorSection({ clerkUser }) {
         <div>
           <p className="mb-3 text-sm text-muted-foreground">Your account is protected with an authenticator app.</p>
           <button onClick={disable2FA}
-            className="rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20">
+            className="rounded-lg border border-destructive/30 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/20 cursor-pointer transition-colors duration-200">
             Disable 2FA
           </button>
         </div>
@@ -980,7 +980,7 @@ function TwoFactorSection({ clerkUser }) {
 
       {step === 'backup' && backupCodes && (
         <div className="space-y-3">
-          <p className="text-sm text-emerald-400 font-medium">2FA enabled successfully!</p>
+          <p className="text-sm text-success font-medium">2FA enabled successfully!</p>
           <p className="text-sm text-muted-foreground">Save these backup codes somewhere safe. Each code can only be used once.</p>
           <div className="rounded-lg bg-muted p-3">
             <ul className="grid grid-cols-2 gap-1 text-sm font-mono text-secondary-foreground">
@@ -1053,7 +1053,7 @@ function ConnectedAccountsSection({ clerkUser }) {
     <section className="surface-raised p-5" aria-label="Connected accounts">
       <h2 className="mb-3 text-base font-semibold text-foreground">Connected Accounts</h2>
 
-      {error && <p className="mb-3 rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert">{error}</p>}
+      {error && <p className="mb-3 rounded-md bg-destructive/10 p-2 text-sm text-destructive" role="alert">{error}</p>}
 
       <div className="space-y-3">
         {connected.map((account) => (
@@ -1068,7 +1068,7 @@ function ConnectedAccountsSection({ clerkUser }) {
               </div>
             </div>
             <button onClick={() => handleDisconnect(account)}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:border-red-500/30 hover:text-red-400">
+              className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:border-destructive/30 hover:text-destructive cursor-pointer transition-colors duration-200">
               Disconnect
             </button>
           </div>
@@ -1143,7 +1143,7 @@ function AccountTab() {
               <span className="font-medium text-secondary-foreground">Email:</span>
               <span className="text-muted-foreground">{primaryEmail?.emailAddress || '—'}</span>
               {primaryEmail?.verification?.status === 'verified' ? (
-                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-400">Verified</span>
+                <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs text-success">Verified</span>
               ) : (
                 <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">Unverified</span>
               )}
@@ -1166,8 +1166,8 @@ function AccountTab() {
       <ConnectedAccountsSection clerkUser={clerkUser} />
 
       {/* Delete Account — Danger Zone */}
-      <section className="rounded-xl border-2 border-red-500/30 bg-red-500/10 p-5" aria-label="Delete account">
-        <h2 className="mb-1 text-base font-semibold text-red-400">Delete Account</h2>
+      <section className="rounded-xl border-2 border-destructive/30 bg-destructive/10 p-5" aria-label="Delete account">
+        <h2 className="mb-1 text-base font-semibold text-destructive">Delete Account</h2>
         <p className="mb-2 text-sm text-muted-foreground">Permanently delete your account, contacts, search history, and all associated data. This action cannot be undone.</p>
         <ul className="mb-3 space-y-1 text-xs text-muted-foreground">
           <li>All data permanently deleted (contacts, searches, applications, messages)</li>
@@ -1177,20 +1177,20 @@ function AccountTab() {
 
         {!showDelete ? (
           <button onClick={() => { setShowDelete(true); setDeleteConfirmed(false); setDeleteError(''); }}
-            className="rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20">
+            className="rounded-lg border border-destructive/30 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/20 cursor-pointer transition-colors duration-200">
             Delete My Account
           </button>
         ) : (
           <div className="space-y-3">
             <label className="flex items-start gap-2 text-sm text-secondary-foreground">
               <input type="checkbox" checked={deleteConfirmed} onChange={(e) => setDeleteConfirmed(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-border bg-muted text-red-500 focus:ring-red-500" />
+                className="mt-0.5 h-4 w-4 rounded border-border bg-muted text-destructive focus:ring-destructive" />
               I understand this action is permanent and my data cannot be recovered
             </label>
-            {deleteError && <p className="rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert">{deleteError}</p>}
+            {deleteError && <p className="rounded-md bg-destructive/10 p-2 text-sm text-destructive" role="alert">{deleteError}</p>}
             <div className="flex gap-2">
               <button onClick={handleDeleteAccount} disabled={!deleteConfirmed || deleteLoading}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+                className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-white hover:bg-destructive/90 cursor-pointer transition-colors duration-200 disabled:opacity-50">
                 {deleteLoading ? 'Deleting...' : 'Permanently Delete'}
               </button>
               <button onClick={() => setShowDelete(false)}

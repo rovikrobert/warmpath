@@ -11,9 +11,9 @@
 export const ROLE_LEVEL_MAP = {
   c_suite:  { label: 'C-Suite',   color: 'bg-purple-500/10 text-purple-400' },
   vp:       { label: 'VP',        color: 'bg-purple-500/10 text-purple-400' },
-  director: { label: 'Director',  color: 'bg-blue-500/10 text-blue-400' },
-  lead:     { label: 'Lead',      color: 'bg-blue-500/10 text-blue-400' },
-  senior:   { label: 'Senior',    color: 'bg-emerald-500/10 text-emerald-400' },
+  director: { label: 'Director',  color: 'bg-info/10 text-info' },
+  lead:     { label: 'Lead',      color: 'bg-info/10 text-info' },
+  senior:   { label: 'Senior',    color: 'bg-success/10 text-success' },
   mid:      { label: 'Mid-Level', color: 'bg-primary/10 text-primary' },
   junior:   { label: 'Junior',    color: 'bg-muted/50 text-muted-foreground' },
 };
@@ -25,7 +25,7 @@ export function getRoleLevelDisplay(raw: string) {
 // -- Connection Strength (warm_score_range) ------------------------------------
 
 export const WARM_RANGE_MAP = {
-  high:   { label: 'Strong',   color: 'bg-emerald-500/10 text-emerald-400' },
+  high:   { label: 'Strong',   color: 'bg-success/10 text-success' },
   medium: { label: 'Moderate', color: 'bg-primary/10 text-primary' },
   low:    { label: 'Weak',     color: 'bg-muted/50 text-muted-foreground' },
 };
@@ -37,11 +37,11 @@ export function getWarmRangeDisplay(raw: string) {
 // -- Department ---------------------------------------------------------------
 
 export const DEPARTMENT_MAP = {
-  Engineering: { label: 'Engineering', color: 'bg-blue-500/10 text-blue-400' },
+  Engineering: { label: 'Engineering', color: 'bg-info/10 text-info' },
   Product: { label: 'Product', color: 'bg-purple-500/10 text-purple-400' },
   Design: { label: 'Design', color: 'bg-pink-500/10 text-pink-400' },
   Marketing: { label: 'Marketing', color: 'bg-primary/10 text-primary' },
-  Sales: { label: 'Sales', color: 'bg-emerald-500/10 text-emerald-400' },
+  Sales: { label: 'Sales', color: 'bg-success/10 text-success' },
   Finance: { label: 'Finance', color: 'bg-muted/50 text-muted-foreground' },
   Operations: { label: 'Operations', color: 'bg-muted/50 text-muted-foreground' },
   'HR / People': { label: 'HR', color: 'bg-muted/50 text-muted-foreground' },

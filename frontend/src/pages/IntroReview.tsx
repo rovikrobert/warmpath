@@ -44,7 +44,7 @@ export default function IntroReview() {
           </Link>
           <Link
             to="/#sign-up"
-            className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-white hover:bg-primary/90"
+            className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors duration-200"
           >
             Sign up free
           </Link>
@@ -90,7 +90,7 @@ export default function IntroReview() {
             </p>
             <Link
               to="/join?intent=seeker"
-              className="inline-block rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white hover:bg-primary/90"
+              className="inline-block rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors duration-200"
             >
               Join WarmPath
             </Link>
@@ -168,7 +168,7 @@ export default function IntroReview() {
               </p>
               <Link
                 to="/join?intent=network"
-                className="flex w-full items-center justify-center rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-secondary-foreground hover:border-border hover:text-foreground"
+                className="flex w-full items-center justify-center rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-secondary-foreground hover:border-border hover:text-foreground transition-colors duration-200"
               >
                 Join WarmPath
               </Link>

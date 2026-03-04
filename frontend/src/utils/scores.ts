@@ -8,8 +8,8 @@
 // -- Match Strength (combined_score from search results) --------------------
 
 export const MATCH_TIERS = [
-  { min: 80, label: 'Excellent', color: 'bg-emerald-500/10 text-emerald-400', dot: 'bg-emerald-500' },
-  { min: 60, label: 'Strong',    color: 'bg-emerald-500/10 text-emerald-400', dot: 'bg-emerald-500' },
+  { min: 80, label: 'Excellent', color: 'bg-success/10 text-success', dot: 'bg-success' },
+  { min: 60, label: 'Strong',    color: 'bg-success/10 text-success', dot: 'bg-success' },
   { min: 40, label: 'Good',      color: 'bg-primary/10 text-primary', dot: 'bg-primary' },
   { min: 0,  label: 'Fair',      color: 'bg-muted/50 text-muted-foreground', dot: 'bg-muted-foreground' },
 ];
@@ -17,7 +17,7 @@ export const MATCH_TIERS = [
 // -- Connection Score (contact relationship warmth) ---------------------------
 
 export const WARM_TIERS = [
-  { min: 70, label: 'Strong',   color: 'bg-emerald-500/10 text-emerald-400', desc: 'Recent contact, strong relationship — ideal referral path' },
+  { min: 70, label: 'Strong',   color: 'bg-success/10 text-success', desc: 'Recent contact, strong relationship — ideal referral path' },
   { min: 40, label: 'Moderate', color: 'bg-primary/10 text-primary', desc: 'Some connection — may need a warm-up message first' },
   { min: 0,  label: 'Weak',     color: 'bg-muted/50 text-muted-foreground', desc: 'Distant or old connection — consider building rapport before asking' },
 ];
@@ -25,7 +25,7 @@ export const WARM_TIERS = [
 // -- Fit Score (job opening relevance to your profile) -----------------------
 
 export const FIT_TIERS = [
-  { min: 80, label: 'Great fit', color: 'bg-emerald-500/10 text-emerald-400' },
+  { min: 80, label: 'Great fit', color: 'bg-success/10 text-success' },
   { min: 50, label: 'Good fit',  color: 'bg-primary/10 text-primary' },
   { min: 0,  label: 'Possible',  color: 'bg-muted/50 text-muted-foreground' },
 ];
@@ -33,7 +33,7 @@ export const FIT_TIERS = [
 // -- Referral Likelihood (high / medium / low) -------------------------------
 
 export const LIKELIHOOD_MAP = {
-  high:   { label: 'Likely to refer', color: 'bg-emerald-500/10 text-emerald-400' },
+  high:   { label: 'Likely to refer', color: 'bg-success/10 text-success' },
   medium: { label: 'May refer',       color: 'bg-primary/10 text-primary' },
   low:    { label: 'Unlikely',        color: 'bg-muted/50 text-muted-foreground' },
 };
@@ -41,7 +41,7 @@ export const LIKELIHOOD_MAP = {
 // -- NLP Match Quality (search result relevance) ----------------------------
 
 export const NLP_MATCH_TIERS = [
-  { min: 65, label: 'Best match',    color: 'bg-emerald-500/10 text-emerald-400' },
+  { min: 65, label: 'Best match',    color: 'bg-success/10 text-success' },
   { min: 35, label: 'Possible match', color: 'bg-primary/10 text-primary' },
   { min: 0,  label: 'Partial match',  color: 'bg-muted/50 text-muted-foreground' },
 ];
