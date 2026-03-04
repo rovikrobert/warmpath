@@ -1,7 +1,8 @@
 """Job openings API — scan company career pages and list stored openings."""
 
+import json
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, or_, select
@@ -18,6 +19,22 @@ from app.utils.security import get_current_user
 
 router = APIRouter()
 fetcher = JobFetcher()
+
+
+def _sanitize_raw_data(data: dict | None) -> dict | None:
+    """Convert non-JSON-serializable types (date, datetime, UUID) in raw_data."""
+    if data is None:
+        return None
+
+    def _default(obj: object) -> str:
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        if isinstance(obj, uuid.UUID):
+            return str(obj)
+        raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+    # Round-trip through JSON to coerce all values to JSON-safe types
+    return json.loads(json.dumps(data, default=_default))
 
 
 async def _upsert_openings(
@@ -57,7 +74,7 @@ async def _upsert_openings(
             existing.is_remote = job_data.get("is_remote", False)
             existing.posted_at = job_data.get("posted_at")
             existing.is_active = True
-            existing.raw_data = job_data.get("raw_data")
+            existing.raw_data = _sanitize_raw_data(job_data.get("raw_data"))
             existing.updated_at = datetime.now(timezone.utc)
             results.append(existing)
         else:
@@ -72,7 +89,7 @@ async def _upsert_openings(
                 is_remote=job_data.get("is_remote", False),
                 posted_at=job_data.get("posted_at"),
                 is_active=True,
-                raw_data=job_data.get("raw_data"),
+                raw_data=_sanitize_raw_data(job_data.get("raw_data")),
             )
             db.add(opening)
             results.append(opening)

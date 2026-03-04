@@ -649,9 +649,13 @@ async def smart_search(
 
     except Exception as exc:
         logger.exception("Smart search failed for %s", body.company_names)
-        search_req.status = "failed"
-        search_req.error_message = str(exc)
-        await db.commit()
+        try:
+            await db.rollback()
+            search_req.status = "failed"
+            search_req.error_message = str(exc)[:500]
+            await db.commit()
+        except Exception:
+            logger.warning("Could not persist search failure status for %s", search_id)
 
         return {
             "data": {
