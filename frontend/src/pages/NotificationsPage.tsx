@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { feed as feedApi } from '../api/client';
 import FeedCard from '../components/FeedCard';
+import noNotificationsIllustration from '../assets/illustrations/no-notifications.png';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 export default function NotificationsPage() {
@@ -91,9 +92,12 @@ export default function NotificationsPage() {
 
       {feedItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <svg className="h-12 w-12 text-muted-foreground mb-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-          </svg>
+          <img
+            src={noNotificationsIllustration}
+            alt=""
+            className="mb-6 h-40 w-auto object-contain"
+            draggable={false}
+          />
           <p className="text-lg font-medium text-foreground">You're all caught up</p>
           <p className="mt-1 text-sm text-muted-foreground">No new notifications right now.</p>
         </div>

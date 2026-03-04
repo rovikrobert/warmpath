@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { feed as feedApi } from '../api/client';
-import KeevsAvatar from './KeevsAvatar';
-
 /**
  * Feed item icons mapped to item_type.
  * Each returns an SVG element matching the design system.
