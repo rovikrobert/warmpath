@@ -154,56 +154,59 @@ export default function FindReferrals() {
 
   // Fetch connection counts for newly added companies
   useEffect(() => {
-    const missing = companies.filter((c) => !(c in companyCounts));
-    if (missing.length === 0) return;
+    setCompanyCounts((prev) => {
+      const missing = companies.filter((c) => !(c in prev));
+      if (missing.length === 0) return prev;
 
-    missing.forEach((name) => {
-      companiesApi
-        .search({ query: name, limit: 5 })
-        .then((res) => {
-          const results = res.data ?? [];
-          // Sum contact counts across all name variants (e.g. "Meta" matches
-          // "Meta", "Meta Platforms", "Meta Platforms Inc" in the Company table)
-          const count = results.reduce((sum, c) => sum + (c.contact_count ?? 0), 0);
-          setCompanyCounts((prev) => ({
-            ...prev,
-            [name]: count,
-          }));
-        })
-        .catch(() => {
-          setCompanyCounts((prev) => ({ ...prev, [name]: 0 }));
-        });
+      missing.forEach((name) => {
+        companiesApi
+          .search({ query: name, limit: 5 })
+          .then((res) => {
+            const results = res.data ?? [];
+            // Sum contact counts across all name variants (e.g. "Meta" matches
+            // "Meta", "Meta Platforms", "Meta Platforms Inc" in the Company table)
+            const count = results.reduce((sum, c) => sum + (c.contact_count ?? 0), 0);
+            setCompanyCounts((p) => ({ ...p, [name]: count }));
+          })
+          .catch(() => {
+            setCompanyCounts((p) => ({ ...p, [name]: 0 }));
+          });
+      });
+      return prev;
     });
-  }, [companies, companyCounts]);
+  }, [companies]);
 
   // Discover jobs at newly added companies
   useEffect(() => {
-    const undiscovered = companies.filter((c) => !(c in discoveryStatus));
-    if (undiscovered.length === 0) return;
+    setDiscoveryStatus((prev) => {
+      const undiscovered = companies.filter((c) => !(c in prev));
+      if (undiscovered.length === 0) return prev;
 
-    undiscovered.forEach((name) => {
-      setDiscoveryStatus((prev) => ({ ...prev, [name]: { status: 'discovering' } }));
-      companiesApi
-        .discover(name)
-        .then((res) => {
-          const d = res.data ?? {};
-          setDiscoveryStatus((prev) => ({
-            ...prev,
-            [name]: {
-              status: d.jobs_found > 0 ? 'found' : 'not_found',
-              jobsCount: d.jobs_found ?? 0,
-              careersUrl: d.careers_url,
-            },
-          }));
-        })
-        .catch(() => {
-          setDiscoveryStatus((prev) => ({
-            ...prev,
-            [name]: { status: 'not_found', jobsCount: 0 },
-          }));
-        });
+      undiscovered.forEach((name) => {
+        setDiscoveryStatus((p) => ({ ...p, [name]: { status: 'discovering' } }));
+        companiesApi
+          .discover(name)
+          .then((res) => {
+            const d = res.data ?? {};
+            setDiscoveryStatus((p) => ({
+              ...p,
+              [name]: {
+                status: d.jobs_found > 0 ? 'found' : 'not_found',
+                jobsCount: d.jobs_found ?? 0,
+                careersUrl: d.careers_url,
+              },
+            }));
+          })
+          .catch(() => {
+            setDiscoveryStatus((p) => ({
+              ...p,
+              [name]: { status: 'not_found', jobsCount: 0 },
+            }));
+          });
+      });
+      return prev;
     });
-  }, [companies, discoveryStatus]);
+  }, [companies]);
 
   // Computed values for scope toggle UI
   const companiesLoaded = companies.length > 0 && companies.every((c) => c in companyCounts);
@@ -321,6 +324,7 @@ export default function FindReferrals() {
       } else {
         setError(msg);
       }
+    } finally {
       setSearching(false);
     }
   };
@@ -543,7 +547,7 @@ export default function FindReferrals() {
               ? Array.from({ length: 4 }).map((_, i) => <ShimmerCard key={i} />)
               : recommendations.map((rec) => (
                   <RecommendationCard
-                    key={rec.company}
+                    key={rec.display_name || rec.company}
                     rec={rec}
                     onAdd={handleAddRec}
                     isAdded={companies.includes(rec.display_name)}
