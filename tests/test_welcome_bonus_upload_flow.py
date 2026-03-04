@@ -61,8 +61,9 @@ class TestCsvUploadSucceedsWhenDailyCapReached:
             )
             user_id = user.id
 
-            # Fill daily cap (simulating welcome bonus already earned)
-            await earn_credits(user_id, MAX_EARN_PER_DAY, "welcome_bonus", db)
+            # Fill daily cap with a non-exempt reason so csv_upload credit
+            # actually hits the cap (welcome_bonus is exempt from cap counting)
+            await earn_credits(user_id, MAX_EARN_PER_DAY, "csv_upload", db)
 
             upload = CsvUpload(
                 user_id=user_id,
