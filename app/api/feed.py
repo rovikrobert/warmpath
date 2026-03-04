@@ -16,6 +16,7 @@ Endpoints:
   POST /feed/generate  — manual trigger for feed generation (dev/admin)
 """
 
+import contextlib
 import hashlib
 import uuid
 from datetime import date, datetime, timezone
@@ -534,14 +535,16 @@ async def submit_enrichment_response(
     # autoflush can fail on CHECK constraints mid-query.
     await db.flush()
 
-    # Award 5 credits for enrichment response
-    await earn_credits(
-        current_user.id,
-        5,
-        "enrichment_response",
-        db,
-        reference_id=contact_id,
-    )
+    # Award 5 credits for enrichment response (non-blocking — enrichment
+    # signal is the primary operation, credit failure must not lose it)
+    with contextlib.suppress(ValueError):
+        await earn_credits(
+            current_user.id,
+            5,
+            "enrichment_response",
+            db,
+            reference_id=contact_id,
+        )
 
     await track_action(
         db,
