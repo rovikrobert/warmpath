@@ -700,13 +700,19 @@ async def _import_async(csv_upload_id: str, user_id: str) -> None:
             await batch_compute_scores(user_uuid, session)
 
             if created > 0:
-                await earn_credits(
-                    user_uuid,
-                    100,
-                    "csv_upload",
-                    session,
-                    reference_id=upload_uuid,
-                )
+                try:
+                    await earn_credits(
+                        user_uuid,
+                        100,
+                        "csv_upload",
+                        session,
+                        reference_id=upload_uuid,
+                    )
+                except ValueError:
+                    logger.warning(
+                        "Could not award upload credits for %s (daily cap likely reached)",
+                        upload_uuid,
+                    )
 
             # Strip raw CSV data
             await session.execute(

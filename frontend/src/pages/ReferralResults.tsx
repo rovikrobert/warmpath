@@ -458,6 +458,30 @@ export default function ReferralResults() {
     );
   }
 
+  const searchStatus = data?.status || data?.results_data?.status;
+  const searchError = data?.error || data?.results_data?.error;
+
+  if (searchStatus === 'failed') {
+    return (
+      <div className="mx-auto max-w-2xl" role="main">
+        <div className="rounded-xl bg-card border border-border p-12 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10" aria-hidden="true">
+            <svg className="h-7 w-7 text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+            </svg>
+          </div>
+          <h2 className="mb-2 text-base font-semibold text-foreground">Search Failed</h2>
+          <p className="mx-auto mb-4 max-w-sm text-sm text-muted-foreground">
+            {searchError || 'Something went wrong while searching. Please try again.'}
+          </p>
+          <Button onClick={() => navigate('/referrals')}>
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const companies = data?.companies || data?.results_data?.companies || [];
   const summary = data?.summary || data?.results_data?.summary || {};
   const searchScope = data?.scope || data?.results_data?.scope || 'own_network';
@@ -543,7 +567,7 @@ export default function ReferralResults() {
             {alsoHiring.map((rec) => (
               <button
                 key={rec.company}
-                onClick={() => navigate('/referrals')}
+                onClick={() => navigate('/referrals', { state: { prefillCompanies: [rec.display_name] } })}
                 className="group flex flex-col gap-1 rounded-lg border border-border bg-card p-3 text-left hover:border-primary/30 hover:bg-primary/5 transition-colors"
                 aria-label={`Search referrals at ${rec.display_name}`}
               >
