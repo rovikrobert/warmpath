@@ -9,9 +9,9 @@ function StatusBadge({ status }) {
   const labels = { requested: 'Pending', reviewing: 'Reviewing', approved: 'Approved', declined: 'Declined', completed: 'Completed', expired: 'Expired' };
   const colors = {
     requested: 'bg-primary/10 text-primary',
-    reviewing: 'bg-blue-500/10 text-blue-400',
-    approved: 'bg-emerald-500/10 text-emerald-400',
-    declined: 'bg-red-500/10 text-red-400',
+    reviewing: 'bg-info/10 text-info',
+    approved: 'bg-success/10 text-success',
+    declined: 'bg-destructive/10 text-destructive',
     completed: 'bg-muted/50 text-muted-foreground',
     expired: 'bg-muted/50 text-muted-foreground',
   };
@@ -71,7 +71,7 @@ export default function MyRequests() {
     <div role="main">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-bold text-foreground">Marketplace Requests</h1>
-        <Link to="/referrals" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90">
+        <Link to="/referrals" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors duration-200">
           Find Referrals
         </Link>
       </div>
@@ -89,7 +89,7 @@ export default function MyRequests() {
               key={tab.key}
               onClick={() => setFilter(tab.key)}
               aria-pressed={filter === tab.key}
-              className={`rounded-full px-3 py-1 text-sm font-medium transition ${
+              className={`rounded-full px-3 py-1 text-sm font-medium cursor-pointer transition-colors duration-200 ${
                 filter === tab.key
                   ? 'bg-primary text-white'
                   : 'bg-muted text-muted-foreground border border-border hover:bg-muted'
@@ -112,7 +112,7 @@ export default function MyRequests() {
           </p>
           <Link
             to="/referrals"
-            className="inline-block rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white hover:bg-primary/90"
+            className="inline-block rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors duration-200"
           >
             Find Referrals
           </Link>
@@ -163,14 +163,14 @@ export default function MyRequests() {
 
                 {/* Approved: show holder's message and next steps */}
                 {req.status === 'approved' && (
-                  <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4" aria-live="polite">
-                    <h4 className="mb-1 text-sm font-semibold text-emerald-400">Intro Approved!</h4>
+                  <div className="mt-4 rounded-lg border border-success/30 bg-success/10 p-4" aria-live="polite">
+                    <h4 className="mb-1 text-sm font-semibold text-success">Intro Approved!</h4>
                     {req.network_holder_notes && (
-                      <p className="mb-3 text-sm text-emerald-400/80">
+                      <p className="mb-3 text-sm text-success/80">
                         Their message: "{req.network_holder_notes}"
                       </p>
                     )}
-                    <div className="space-y-2 text-sm text-emerald-400/80">
+                    <div className="space-y-2 text-sm text-success/80">
                       <p className="font-medium">Next steps:</p>
                       <ol className="ml-4 list-decimal space-y-1">
                         <li>They'll introduce you to their contact via LinkedIn or email.</li>
@@ -178,16 +178,16 @@ export default function MyRequests() {
                         <li>When you hear from the contact, send a warm follow-up thanking them for their time.</li>
                         <li>Mention the specific role you're interested in and keep the conversation natural.</li>
                       </ol>
-                    <div className="mt-3 border-t border-emerald-500/20 pt-3">
+                    <div className="mt-3 border-t border-success/20 pt-3">
                       {trackedIds.has(req.id) ? (
-                        <p className="text-sm text-emerald-400/80">
-                          Application tracked — <Link to="/applications" className="underline hover:text-emerald-300">view pipeline</Link>
+                        <p className="text-sm text-success/80">
+                          Application tracked — <Link to="/applications" className="underline hover:text-success/60 transition-colors duration-200">view pipeline</Link>
                         </p>
                       ) : (
                         <button
                           onClick={() => handleTrackApp(req.id)}
                           disabled={trackingId === req.id}
-                          className="rounded-md bg-emerald-500/20 px-3 py-1.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50"
+                          className="rounded-md bg-success/20 px-3 py-1.5 text-sm font-medium text-success hover:bg-success/30 cursor-pointer transition-colors duration-200 disabled:opacity-50"
                         >
                           {trackingId === req.id ? 'Tracking...' : 'Track this application'}
                         </button>
@@ -199,8 +199,8 @@ export default function MyRequests() {
 
                 {/* Declined: show reason if available */}
                 {req.status === 'declined' && (
-                  <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3" aria-live="polite">
-                    <p className="text-sm text-red-400">
+                  <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3" aria-live="polite">
+                    <p className="text-sm text-destructive">
                       This request was declined.
                       {req.network_holder_notes && <> Reason: "{req.network_holder_notes}"</>}
                       {' '}15 of 20 credits have been refunded.
