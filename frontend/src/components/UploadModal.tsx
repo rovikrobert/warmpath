@@ -162,7 +162,7 @@ export default function UploadModal({ onClose, onComplete, hasContacts }: Upload
           return s;
         }
       } catch (err: any) {
-        if (err.message?.includes('failed')) throw err;
+        throw err;
       }
     }
     throw new Error('Upload timed out — please refresh and check your contacts');
