@@ -20,7 +20,7 @@ function CompanyCard({ rec, onSearch }) {
   const hasOwn = (rec.own_contacts ?? 0) > 0;
 
   return (
-    <div className="surface-raised p-5">
+    <div className="surface-raised hover-lift p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-lg font-medium text-foreground">{rec.display_name}</p>
@@ -58,7 +58,7 @@ function CompanyCard({ rec, onSearch }) {
 
       {/* Job openings */}
       {rec.matching_count > 0 && (
-        <p className="mt-1 text-xs text-emerald-400">
+        <p className="mt-1 text-xs text-success">
           {rec.matching_count} open {rec.matching_count === 1 ? 'role' : 'roles'} matching your criteria
         </p>
       )}
@@ -74,7 +74,7 @@ function CompanyCard({ rec, onSearch }) {
 
       <button
         onClick={() => onSearch(rec.display_name)}
-        className="mt-3 rounded-md bg-primary/10 px-3 py-2.5 text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
+        className="mt-3 cursor-pointer rounded-md bg-primary/10 px-3 py-2.5 text-sm font-medium text-primary transition-colors duration-200 hover:bg-primary/20"
         aria-label={`Search referral paths at ${rec.display_name}`}
       >
         Search
@@ -133,9 +133,9 @@ export default function MarketplaceBrowse() {
       </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-3 text-sm">
-        <Link to="/referrals" className="text-muted-foreground hover:text-secondary-foreground">Find Referrals</Link>
+        <Link to="/referrals" className="text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground">Find Referrals</Link>
         <span className="text-muted-foreground">&middot;</span>
-        <Link to="/marketplace" className="text-muted-foreground hover:text-secondary-foreground">Marketplace Overview</Link>
+        <Link to="/marketplace" className="text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground">Marketplace Overview</Link>
       </div>
 
       {hasPrefs === false ? (

@@ -65,7 +65,7 @@ export default function PrivacyPage() {
             <span className="text-primary">~</span>
             <span>WarmPath</span>
           </Link>
-          <Link to="/" className="text-sm text-primary hover:text-primary">
+          <Link to="/" className="text-sm text-primary transition-colors duration-200 hover:text-primary/80">
             Back to app
           </Link>
         </nav>
@@ -91,7 +91,7 @@ export default function PrivacyPage() {
             <li key={s.id}>
               <a
                 href={`#${s.id}`}
-                className="text-sm text-primary hover:text-primary hover:underline"
+                className="text-sm text-primary transition-colors duration-200 hover:text-primary/80 hover:underline"
               >
                 {i + 1}. {s.label}
               </a>
@@ -114,16 +114,16 @@ export default function PrivacyPage() {
           safeguards even though they have not created accounts.
         </Paragraph>
         <div className="grid gap-3 sm:grid-cols-2">
-          <InfoCard icon={<svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>} title="Private Vault">
+          <InfoCard icon={<svg className="h-5 w-5 text-success" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>} title="Private Vault">
             Your full contact data is visible only to you. We never share it without your explicit consent.
           </InfoCard>
-          <InfoCard icon={<svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>} title="Consent Gates">
+          <InfoCard icon={<svg className="h-5 w-5 text-success" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>} title="Consent Gates">
             Contact identity is revealed only through the connection owner's explicit, active approval.
           </InfoCard>
-          <InfoCard icon={<svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" /></svg>} title="Never Sell Data">
+          <InfoCard icon={<svg className="h-5 w-5 text-success" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" /></svg>} title="Never Sell Data">
             We never sell, rent, or trade your personal data or contact data to third parties.
           </InfoCard>
-          <InfoCard icon={<svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>} title="Data Minimisation">
+          <InfoCard icon={<svg className="h-5 w-5 text-success" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>} title="Data Minimisation">
             We collect only what is necessary to deliver the service. CSV files are deleted after processing.
           </InfoCard>
         </div>
@@ -141,12 +141,12 @@ export default function PrivacyPage() {
           simultaneously occupy multiple roles.
         </Paragraph>
         <div className="space-y-3">
-          <InfoCard icon={<svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>} title="People Seeking Referrals">
+          <InfoCard icon={<svg className="h-5 w-5 text-info" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>} title="People Seeking Referrals">
             Your account, search activity, target companies, and application pipeline are private.
             You remain anonymous in the marketplace until you choose to request an introduction.
             No employer &mdash; including yours &mdash; can discover you're looking.
           </InfoCard>
-          <InfoCard icon={<svg className="h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" /></svg>} title="Connection Owners">
+          <InfoCard icon={<svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" /></svg>} title="Connection Owners">
             Marketplace participation is entirely opt-in. Your identity as a facilitator is not
             disclosed to third parties. You retain granular controls over which contacts are
             shared and can pause or withdraw at any time.
@@ -244,7 +244,7 @@ export default function PrivacyPage() {
               between users' vaults.
             </p>
           </div>
-          <div className="rounded-lg border-l-4 border-emerald-400 bg-emerald-500/10 p-4">
+          <div className="rounded-lg border-l-4 border-success bg-success/10 p-4">
             <h4 className="mb-1 font-semibold text-foreground">Marketplace Index</h4>
             <p className="text-sm text-secondary-foreground">
               If you opt in, an anonymised index is generated: company name, role level,
@@ -288,8 +288,8 @@ export default function PrivacyPage() {
           'Marketplace participants \u2014 only when a connection owner explicitly approves an introduction request.',
           'Legal authorities when required by law to comply with legal obligations or protect rights and safety.',
         ]} />
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-          <h4 className="mb-1 font-semibold text-red-400">What We Will Never Do</h4>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+          <h4 className="mb-1 font-semibold text-destructive">What We Will Never Do</h4>
           <BulletList items={[
             'Sell your contact data to recruiters, advertisers, or data brokers.',
             'Share your referral-seeking activity with your current employer.',
@@ -352,7 +352,7 @@ export default function PrivacyPage() {
               aria-controls={`tabpanel-${tab.key}`}
               id={`tab-${tab.key}`}
               onClick={() => setRightsTab(tab.key)}
-              className={`flex-1 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition ${
+              className={`flex-1 cursor-pointer whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ${
                 rightsTab === tab.key
                   ? 'bg-card text-primary shadow-sm'
                   : 'text-muted-foreground hover:text-secondary-foreground'
@@ -509,15 +509,15 @@ export default function PrivacyPage() {
           </table>
         </div>
 
-        <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 p-4">
-          <p className="text-sm font-medium text-sky-400">
+        <div className="rounded-lg border border-info/30 bg-info/10 p-4">
+          <p className="text-sm font-medium text-info">
             Contact names and email addresses are never sent to any AI provider for bulk processing.
             Names are cleaned deterministically on our own servers. None of our AI providers retain
             or train on data submitted via their APIs.
           </p>
         </div>
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
-          <p className="text-sm font-medium text-emerald-400">
+        <div className="rounded-lg border border-success/30 bg-success/10 p-4">
+          <p className="text-sm font-medium text-success">
             WarmPath does not make automated decisions that produce legal effects or similarly
             significant effects concerning you. All AI outputs are advisory &mdash; you retain
             full control over all actions.
@@ -595,7 +595,7 @@ export default function PrivacyPage() {
 
       {/* Back to top */}
       <div className="text-center">
-        <a href="#" className="text-sm text-primary hover:text-primary" aria-label="Back to top of page">
+        <a href="#" className="text-sm text-primary transition-colors duration-200 hover:text-primary/80" aria-label="Back to top of page">
           Back to top
         </a>
       </div>

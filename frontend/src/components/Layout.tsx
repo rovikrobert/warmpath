@@ -203,8 +203,8 @@ export default function Layout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
                   isActive
-                    ? 'border-l-2 border-primary bg-primary/10 text-primary'
-                    : 'border-l-2 border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
+                    ? 'border-l-2 border-primary bg-primary/10 text-primary glow-primary'
+                    : 'border-l-2 border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors duration-200'
                 } ${collapsed ? 'justify-center px-0' : ''}`
               }
               title={collapsed ? item.label : undefined}
@@ -229,8 +229,8 @@ export default function Layout() {
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
                 isActive
-                  ? 'border-l-2 border-primary bg-primary/10 text-primary'
-                  : 'border-l-2 border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
+                  ? 'border-l-2 border-primary bg-primary/10 text-primary glow-primary'
+                  : 'border-l-2 border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors duration-200'
               } ${collapsed ? 'justify-center px-0' : ''}`
             }
             title={collapsed ? 'Settings' : undefined}
@@ -323,8 +323,8 @@ export default function Layout() {
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
                       isActive
-                        ? 'border-l-2 border-primary bg-primary/10 text-primary'
-                        : 'border-l-2 border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
+                        ? 'border-l-2 border-primary bg-primary/10 text-primary glow-primary'
+                        : 'border-l-2 border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors duration-200'
                     }`
                   }
                 >
@@ -339,8 +339,8 @@ export default function Layout() {
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
                     isActive
-                      ? 'border-l-2 border-primary bg-primary/10 text-primary'
-                      : 'border-l-2 border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
+                      ? 'border-l-2 border-primary bg-primary/10 text-primary glow-primary'
+                      : 'border-l-2 border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors duration-200'
                   }`
                 }
               >

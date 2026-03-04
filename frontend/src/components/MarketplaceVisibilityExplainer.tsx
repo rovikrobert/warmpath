@@ -22,14 +22,14 @@ export default function MarketplaceVisibilityExplainer({
   }
 
   return (
-    <div className={`rounded-lg border border-blue-500/30 bg-blue-500/10 p-4 ${className}`}>
-      <p className="text-sm text-blue-400">
+    <div className={`rounded-lg border border-info/30 bg-info/10 p-4 ${className}`}>
+      <p className="text-sm text-info">
         Job seekers see anonymized listing fields only: company, role level, department, and connection strength.
         They never see names, emails, or LinkedIn profiles unless you approve the intro request.
       </p>
       <Link
         to="/privacy#marketplace-visibility"
-        className="mt-2 inline-block text-xs font-medium text-blue-300 hover:text-blue-200 hover:underline"
+        className="mt-2 inline-block text-xs font-medium text-info/80 hover:text-info/70 hover:underline"
       >
         What is visible and when identity is disclosed
       </Link>

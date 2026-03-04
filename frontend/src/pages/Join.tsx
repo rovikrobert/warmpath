@@ -15,10 +15,10 @@ const CONTENT = {
     cards: [
       {
         title: "Referral bonuses you\u2019re missing",
-        color: "emerald",
+        color: "success",
         icon: (
           <svg
-            className="h-5 w-5 text-emerald-400"
+            className="h-5 w-5 text-success"
             fill="none"
             viewBox="0 0 24 24"
             strokeWidth="1.5"
@@ -35,7 +35,7 @@ const CONTENT = {
         body: (
           <>
             Your employer probably offers{" "}
-            <span className="font-medium text-emerald-400">
+            <span className="font-medium text-success">
               {SOURCES.REFERRAL_BONUS_RANGE.claim}
             </span>{" "}
             per successful referral hire. Most go unclaimed because finding
@@ -50,10 +50,10 @@ const CONTENT = {
       },
       {
         title: "You stay in control",
-        color: "blue",
+        color: "info",
         icon: (
           <svg
-            className="h-5 w-5 text-blue-400"
+            className="h-5 w-5 text-info"
             fill="none"
             viewBox="0 0 24 24"
             strokeWidth="1.5"
@@ -144,10 +144,10 @@ const CONTENT = {
     cards: [
       {
         title: "Access networks you don\u2019t have",
-        color: "emerald",
+        color: "success",
         icon: (
           <svg
-            className="h-5 w-5 text-emerald-400"
+            className="h-5 w-5 text-success"
             fill="none"
             viewBox="0 0 24 24"
             strokeWidth="1.5"
@@ -170,10 +170,10 @@ const CONTENT = {
       },
       {
         title: "AI-powered matching",
-        color: "blue",
+        color: "info",
         icon: (
           <svg
-            className="h-5 w-5 text-blue-400"
+            className="h-5 w-5 text-info"
             fill="none"
             viewBox="0 0 24 24"
             strokeWidth="1.5"
@@ -246,8 +246,8 @@ const CONTENT = {
 };
 
 const ICON_BG = {
-  emerald: "bg-emerald-500/10",
-  blue: "bg-blue-500/10",
+  success: "bg-success/10",
+  info: "bg-info/10",
   amber: "bg-primary/10",
 };
 
@@ -292,7 +292,7 @@ export default function Join() {
           </Link>
           <Link
             to="/#sign-up"
-            className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-white hover:bg-primary/90"
+            className="cursor-pointer rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-primary/90"
           >
             Sign up free
           </Link>
@@ -382,7 +382,7 @@ export default function Join() {
           <ul className="space-y-2 text-sm text-secondary-foreground">
             <li className="flex items-start gap-2">
               <svg
-                className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400"
+                className="mt-0.5 h-4 w-4 shrink-0 text-success"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth="2"
@@ -399,7 +399,7 @@ export default function Join() {
             </li>
             <li className="flex items-start gap-2">
               <svg
-                className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400"
+                className="mt-0.5 h-4 w-4 shrink-0 text-success"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth="2"
@@ -416,7 +416,7 @@ export default function Join() {
             </li>
             <li className="flex items-start gap-2">
               <svg
-                className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400"
+                className="mt-0.5 h-4 w-4 shrink-0 text-success"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth="2"
@@ -435,7 +435,7 @@ export default function Join() {
           <div className="mt-3">
             <Link
               to="/privacy"
-              className="text-xs text-primary hover:text-primary"
+              className="text-xs text-primary transition-colors duration-200 hover:text-primary/80"
             >
               Read our full privacy policy
             </Link>
@@ -450,7 +450,7 @@ export default function Join() {
           <button
             onClick={() => setShowExplainer(!showExplainer)}
             aria-expanded={showExplainer}
-            className="flex w-full items-center justify-between p-6 text-left"
+            className="flex w-full cursor-pointer items-center justify-between p-6 text-left transition-colors duration-200 hover:bg-muted/50"
           >
             <h2 className="text-base font-semibold text-foreground">
               What is WarmPath?
@@ -490,7 +490,7 @@ export default function Join() {
         <section className="text-center" aria-label="Sign up">
           <Link
             to="/#sign-up"
-            className="inline-block rounded-lg bg-primary px-8 py-3 text-base font-semibold text-white shadow-lg shadow-primary/20 hover:bg-primary/90"
+            className="inline-block cursor-pointer rounded-lg bg-primary px-8 py-3 text-base font-semibold text-white shadow-lg shadow-primary/20 transition-colors duration-200 hover:bg-primary/90"
           >
             {content.ctaLabel}
           </Link>
@@ -506,7 +506,7 @@ export default function Join() {
           </p>
           <Link
             to="/privacy"
-            className="text-xs text-muted-foreground hover:text-secondary-foreground"
+            className="text-xs text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground"
           >
             Privacy
           </Link>
