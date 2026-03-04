@@ -43,14 +43,14 @@ export default function PrivacySettingsPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const consentRes = await privacyApi.listConsent().catch(() => ({ data: [] }));
+        const consentRes = await privacyApi.listConsent().catch((err) => { console.error('PrivacySettingsPage: failed to load consent records', err); return { data: [] }; });
         setConsentRecords(consentRes.data || []);
 
         // Derive toggle states from user or consent records
         setRestricted(user?.processing_restricted || false);
         setMarketingOptedOut(user?.marketing_opt_out || false);
-      } catch {
-        // non-critical
+      } catch (err) {
+        console.error('PrivacySettingsPage: failed to load privacy settings', err);
       } finally {
         setLoading(false);
       }

@@ -99,7 +99,7 @@ export default function EditProfile() {
           ...prev,
           headline: prev.headline || li.name || '',
         }));
-      } catch { /* ignore */ }
+      } catch (err) { console.error('EditProfile: failed to parse linkedin_profile from sessionStorage', err); }
       sessionStorage.removeItem('linkedin_profile');
     }
   }, []);
@@ -185,7 +185,7 @@ export default function EditProfile() {
           is_current: !e.end_date,
         })));
       }
-    }).catch(() => {});
+    }).catch((err) => { console.error('EditProfile: failed to load profile', err); });
   }, []);
 
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -239,7 +239,7 @@ export default function EditProfile() {
               `Work history saved! Contacts at your former companies now have boosted referral scores.`
             );
           }
-        } catch { /* ignore */ }
+        } catch (err2) { console.error('EditProfile: failed to check contacts count after profile save', err2); }
       }
     } catch (err) {
       setError(err.message);

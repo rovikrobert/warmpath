@@ -52,7 +52,8 @@ export default function CompanyAutocomplete({ value = [], onChange, placeholder 
           setOpen(items.length > 0);
           setSearchedEmpty(items.length === 0);
           setActiveIndex(-1);
-        } catch {
+        } catch (err) {
+          console.error('CompanyAutocomplete: failed to fetch suggestions', err);
           // Fallback to legacy search endpoint
           try {
             const res = await companiesApi.search({ query, limit: 8 });
@@ -63,7 +64,8 @@ export default function CompanyAutocomplete({ value = [], onChange, placeholder 
             setOpen(items.length > 0);
             setSearchedEmpty(items.length === 0);
             setActiveIndex(-1);
-          } catch {
+          } catch (err2) {
+            console.error('CompanyAutocomplete: fallback search also failed', err2);
             setSuggestions([]);
             setOpen(false);
             setSearchedEmpty(true);
@@ -163,7 +165,8 @@ export default function CompanyAutocomplete({ value = [], onChange, placeholder 
     setVerifying(true);
     try {
       await companiesApi.discover(name);
-    } catch {
+    } catch (err) {
+      console.error('CompanyAutocomplete: failed to verify company', err);
       // Still add the company even if discovery fails
     } finally {
       setVerifying(false);

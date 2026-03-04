@@ -29,7 +29,8 @@ export default function FeedbackModal({ feature, resourceId, onClose }: Feedback
         rating,
         comment: comment.trim() || undefined,
       });
-    } catch {
+    } catch (err) {
+      console.error('FeedbackModal: submit failed', err);
       // Non-critical — don't block user
     } finally {
       setSending(false);

@@ -103,7 +103,8 @@ const NH_STAGES = [
 function getCache(): CompletedState {
   try {
     return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-  } catch {
+  } catch (err) {
+    console.error('ReferralJourney: cache parse failed', err);
     return {};
   }
 }
@@ -239,7 +240,8 @@ export default function ReferralJourney({ variant = 'full' }: ReferralJourneyPro
           done.request = requests.length > 0;
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('ReferralJourney: stage check failed', err);
       // Don't block UI on API failure
     }
 

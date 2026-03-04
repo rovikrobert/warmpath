@@ -42,7 +42,7 @@ export default function RequestIntroModal({ listing, creditBalance, onClose, onS
   useEffect(() => {
     authApi.upsertProfile({}).then((res) => {
       setProfile(res.data);
-    }).catch(() => {});
+    }).catch((err) => { console.error('RequestIntroModal: failed to load profile', err); });
   }, []);
 
   const handleSubmit = async () => {

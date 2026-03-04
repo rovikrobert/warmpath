@@ -121,16 +121,16 @@ export default function Layout() {
   ], [location.pathname]);
 
   useEffect(() => {
-    creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
-    feedApi.count().then((r) => setFeedUnseen(r.data?.unseen ?? 0)).catch(() => {});
+    creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch((err) => { console.error('Layout: balance fetch failed', err); });
+    feedApi.count().then((r) => setFeedUnseen(r.data?.unseen ?? 0)).catch((err) => { console.error('Layout: feed count failed', err); });
     onUsageWarning((msg) => setUsageWarning(msg));
     // Refresh feed count every 2 minutes
     const interval = setInterval(() => {
-      feedApi.count().then((r) => setFeedUnseen(r.data?.unseen ?? 0)).catch(() => {});
+      feedApi.count().then((r) => setFeedUnseen(r.data?.unseen ?? 0)).catch((err) => { console.error('Layout: feed count failed', err); });
     }, 120_000);
     // Also refresh immediately when feed items are seen/dismissed
     const refreshOnUpdate = () => {
-      feedApi.count().then((r) => setFeedUnseen(r.data?.unseen ?? 0)).catch(() => {});
+      feedApi.count().then((r) => setFeedUnseen(r.data?.unseen ?? 0)).catch((err) => { console.error('Layout: feed count failed', err); });
     };
     window.addEventListener('feed-updated', refreshOnUpdate);
     return () => {
@@ -145,7 +145,7 @@ export default function Layout() {
     const now = Date.now();
     if (now - lastBalanceFetchRef.current > 10000) {
       lastBalanceFetchRef.current = now;
-      creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch(() => {});
+      creditsApi.balance().then((r) => setBalance(r.data?.balance ?? 0)).catch((err) => { console.error('Layout: balance fetch failed', err); });
     }
   }, [location.pathname]);
 

@@ -392,7 +392,7 @@ export default function ReferralResults() {
       try {
         const [searchRes, balRes] = await Promise.all([
           searchApi.get(id),
-          creditsApi.balance().catch(() => ({ data: { balance: 0 } })),
+          creditsApi.balance().catch((err) => { console.error('ReferralResults: failed to load credit balance', err); return { data: { balance: 0 } }; }),
         ]);
         setData(searchRes.data);
         // The search object itself contains target_companies, name, etc.
@@ -417,7 +417,7 @@ export default function ReferralResults() {
     if (searched.length === 0) return;
     searchApi.recommendations({ exclude: searched.join(','), limit: 6 })
       .then((r) => setAlsoHiring(r.data?.recommendations ?? []))
-      .catch(() => {});
+      .catch((err) => { console.error('ReferralResults: failed to load also-hiring recommendations', err); });
     const timer = setTimeout(() => setShowFeedback(true), 5000);
     return () => clearTimeout(timer);
   }, [data]);

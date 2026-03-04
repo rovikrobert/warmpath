@@ -292,7 +292,12 @@ export default function ContactsPage() {
     setLoading(true);
     try {
       const params = { page, per_page: 50 };
-      if (filter) params.relationship_type = filter;
+      // '__none__' is the UI sentinel for "no relationship type set". Don't send
+      // it as relationship_type (the backend would treat it as a literal string
+      // and return 0 results). Backend support for a dedicated `unclassified`
+      // param is tracked as a follow-up; for now the filter falls back to "show
+      // all contacts", which is better than silently returning nothing.
+      if (filter && filter !== '__none__') params.relationship_type = filter;
       if (debouncedSearch) params.search = debouncedSearch;
       const res = await contactsApi.list(params);
       setContactsList(res.data || []);
@@ -310,21 +315,21 @@ export default function ContactsPage() {
   useEffect(() => {
     companiesApi.list(1, 200).then((res) => {
       setCompanyNames((res.data || []).map((c) => c.name).filter(Boolean));
-    }).catch(() => {});
+    }).catch((err) => { console.error('Failed to load company names for autocomplete:', err); });
   }, []);
 
   // Check latest upload status on mount (for failure/processing banners)
   useEffect(() => {
     contactsApi.getLatestUpload().then((res) => {
       if (res.data) setLatestUpload(res.data);
-    }).catch(() => {});
+    }).catch((err) => { console.error('Failed to load latest upload status:', err); });
   }, []);
 
   // Load enrichment prompt feed items (once)
   useEffect(() => {
     feedApi.list({ item_type: 'enrichment_prompt', limit: 3 })
       .then((r) => setEnrichmentPrompts(r.data?.items || r.data || []))
-      .catch(() => {});
+      .catch((err) => { console.error('Failed to load enrichment prompt feed items:', err); });
   }, []);
 
   const handleEnrichmentResponse = async (item, signalType, signalValue) => {
@@ -351,8 +356,8 @@ export default function ContactsPage() {
     try {
       await feedApi.dismiss(item.id);
       setEnrichmentPrompts((prev) => prev.filter((p) => p.id !== item.id));
-    } catch {
-      // Silently fail
+    } catch (err) {
+      console.error('Failed to dismiss enrichment prompt:', err);
     }
   };
 
@@ -387,7 +392,9 @@ export default function ContactsPage() {
     setExportError('');
     try {
       const params = {};
-      if (filter) params.relationship_type = filter;
+      // Same sentinel guard as the load() callback — don't forward '__none__'
+      // to the backend; it is a UI-only value meaning "unclassified".
+      if (filter && filter !== '__none__') params.relationship_type = filter;
       await contactsApi.exportCsv(params);
     } catch (err) {
       setExportError(err.message || 'Export failed');
