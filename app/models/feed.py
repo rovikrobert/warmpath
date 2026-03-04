@@ -66,6 +66,8 @@ class FeedItem(Base):
         ),
         # Cleanup: expired items
         Index("idx_feed_items_expires", "expires_at"),
+        # Standalone created_at for time-range queries (feed_ranker)
+        Index("idx_feed_items_created_at", "created_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -149,6 +151,8 @@ class FeedItemInteraction(Base):
             "interaction_type",
             "created_at",
         ),
+        # Standalone created_at for time-range queries (feed_ranker)
+        Index("idx_feed_interactions_created_at", "created_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

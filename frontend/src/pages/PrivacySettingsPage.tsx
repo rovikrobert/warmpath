@@ -165,7 +165,7 @@ export default function PrivacySettingsPage() {
       <h1 className="mb-6 text-xl font-bold text-foreground">Privacy Settings</h1>
 
       {error && (
-        <div role="alert" aria-live="polite" className="mb-4 rounded-lg bg-red-500/10 p-3 text-sm text-red-400">
+        <div role="alert" aria-live="polite" className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
           {error}
         </div>
       )}
@@ -184,7 +184,7 @@ export default function PrivacySettingsPage() {
           {exporting ? 'Preparing...' : exportDone ? 'Download Again' : 'Download My Data'}
         </button>
         {exportDone && (
-          <p className="mt-2 text-xs text-emerald-400" role="status">Download started.</p>
+          <p className="mt-2 text-xs text-success" role="status">Download started.</p>
         )}
       </section>
 
@@ -264,7 +264,7 @@ export default function PrivacySettingsPage() {
                 </div>
                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                   record.consented || record.status === 'granted'
-                    ? 'bg-emerald-500/10 text-emerald-400'
+                    ? 'bg-success/10 text-success'
                     : 'bg-muted/50 text-muted-foreground'
                 }`}>
                   {record.consented || record.status === 'granted' ? 'Active' : 'Withdrawn'}
@@ -326,7 +326,7 @@ export default function PrivacySettingsPage() {
           </div>
 
           {requestSuccess && (
-            <p role="status" className="rounded-md bg-emerald-500/10 p-2 text-sm text-emerald-400">{requestSuccess}</p>
+            <p role="status" className="rounded-md bg-success/10 p-2 text-sm text-success">{requestSuccess}</p>
           )}
 
           <button
@@ -340,8 +340,8 @@ export default function PrivacySettingsPage() {
       </section>
 
       {/* Delete Account — Danger Zone */}
-      <section className="rounded-xl border-2 border-red-500/30 bg-red-500/10 p-5" aria-label="Delete account">
-        <h2 className="mb-1 text-base font-semibold text-red-400">Delete Account</h2>
+      <section className="rounded-xl border-2 border-destructive/30 bg-destructive/10 p-5" aria-label="Delete account">
+        <h2 className="mb-1 text-base font-semibold text-destructive">Delete Account</h2>
         <p className="mb-3 text-sm text-muted-foreground">
           Permanently delete your account, contacts, search history, and all associated data. This action cannot be undone.
         </p>
@@ -349,13 +349,13 @@ export default function PrivacySettingsPage() {
         {!showDelete ? (
           <button
             onClick={() => setShowDelete(true)}
-            className="rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20"
+            className="rounded-lg border border-destructive/30 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/20"
           >
             Delete My Account
           </button>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-red-400">
+            <p className="text-sm text-destructive">
               Type <strong>DELETE</strong> to confirm permanent deletion:
             </p>
             <input
@@ -364,13 +364,13 @@ export default function PrivacySettingsPage() {
               onChange={(e) => setDeleteConfirm(e.target.value)}
               placeholder="Type DELETE"
               aria-label="Type DELETE to confirm"
-              className="w-full rounded-lg border border-red-500/30 bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+              className="w-full rounded-lg border border-destructive/30 bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:border-destructive focus:outline-none focus:ring-1 focus:ring-destructive"
             />
             <div className="flex gap-2">
               <button
                 onClick={handleDeleteAccount}
                 disabled={deleting || deleteConfirm !== 'DELETE'}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-white hover:bg-destructive/90 disabled:opacity-50"
               >
                 {deleting ? 'Deleting...' : 'Permanently Delete'}
               </button>

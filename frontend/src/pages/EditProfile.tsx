@@ -50,10 +50,10 @@ function ResumePreviewModal({ data, onApply, onClose }: ResumePreviewModalProps)
           )}
         </div>
         <div className="mt-5 flex gap-3">
-          <button onClick={onClose} className="flex-1 rounded-lg border border-border py-2 text-sm font-medium text-secondary-foreground hover:bg-muted">
+          <button onClick={onClose} className="flex-1 rounded-lg border border-border py-2 text-sm font-medium text-secondary-foreground hover:bg-muted cursor-pointer transition-colors duration-200">
             Cancel
           </button>
-          <button onClick={() => onApply(data)} className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-white hover:bg-primary/90">
+          <button onClick={() => onApply(data)} className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-white hover:bg-primary/90 cursor-pointer transition-colors duration-200">
             Apply to Profile
           </button>
         </div>
@@ -296,8 +296,7 @@ export default function EditProfile() {
             type="button"
             onClick={handleLinkedInImport}
             disabled={importLoading === 'linkedin'}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-            style={{ backgroundColor: '#0A66C2' }}
+            className="rounded-lg bg-info px-4 py-2 text-sm font-medium text-white hover:bg-info/90 cursor-pointer transition-colors duration-200 disabled:opacity-50"
           >
             {importLoading === 'linkedin' ? 'Redirecting...' : 'Import from LinkedIn'}
           </button>
@@ -454,7 +453,7 @@ export default function EditProfile() {
                   <button
                     type="button"
                     onClick={() => removeWorkEntry(i)}
-                    className="text-xs text-red-400 hover:text-red-300"
+                    className="text-xs text-destructive hover:text-destructive/80 cursor-pointer transition-colors duration-200"
                     aria-label={`Remove work history entry ${i + 1}`}
                   >
                     Remove
@@ -465,22 +464,22 @@ export default function EditProfile() {
           </div>
         </div>
 
-        {error && <p className="rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert" aria-live="assertive">{error}</p>}
-        {saved && <p className="rounded-md bg-emerald-500/10 p-2 text-sm text-emerald-400" role="status" aria-live="polite">Profile saved!</p>}
-        {matchFeedback && <p className="rounded-md bg-blue-500/10 p-2 text-sm text-blue-400" role="status" aria-live="polite">{matchFeedback}</p>}
+        {error && <p className="rounded-md bg-destructive/10 p-2 text-sm text-destructive" role="alert" aria-live="assertive">{error}</p>}
+        {saved && <p className="rounded-md bg-success/10 p-2 text-sm text-success" role="status" aria-live="polite">Profile saved!</p>}
+        {matchFeedback && <p className="rounded-md bg-info/10 p-2 text-sm text-info" role="status" aria-live="polite">{matchFeedback}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
+          className="w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-white hover:bg-primary/90 cursor-pointer transition-colors duration-200 disabled:opacity-50"
         >
           {loading ? 'Saving...' : 'Save Profile'}
         </button>
       </form>
 
       {/* Danger Zone */}
-      <div className="mt-8 rounded-xl border-2 border-red-500/30 bg-red-500/10 p-6">
-        <h2 className="text-lg font-bold text-red-400">Danger Zone</h2>
+      <div className="mt-8 rounded-xl border-2 border-destructive/30 bg-destructive/10 p-6">
+        <h2 className="text-lg font-bold text-destructive">Danger Zone</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Permanently delete your account and all associated data. This action cannot be undone.
         </p>
@@ -493,7 +492,7 @@ export default function EditProfile() {
         <button
           type="button"
           onClick={() => { setShowDeleteModal(true); setDeletePassword(''); setDeleteConfirmed(false); setDeleteError(''); }}
-          className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20"
+          className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/20 cursor-pointer transition-colors duration-200"
         >
           Delete my account
         </button>
@@ -503,7 +502,7 @@ export default function EditProfile() {
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
           <div className="mx-4 w-full max-w-md rounded-xl bg-card p-6 shadow-xl border border-border">
-            <h3 id="delete-modal-title" className="text-lg font-bold text-red-400">Delete Account</h3>
+            <h3 id="delete-modal-title" className="text-lg font-bold text-destructive">Delete Account</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               This will permanently delete your account, all contacts, search history, applications,
               and credits. This cannot be undone.
@@ -514,7 +513,7 @@ export default function EditProfile() {
                 type="checkbox"
                 checked={deleteConfirmed}
                 onChange={(e) => setDeleteConfirmed(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-border bg-muted text-red-500 focus:ring-red-500"
+                className="mt-0.5 h-4 w-4 rounded border-border bg-muted text-destructive focus:ring-destructive"
               />
               I understand this action is permanent and my data cannot be recovered
             </label>
@@ -535,14 +534,14 @@ export default function EditProfile() {
             </div>
 
             {deleteError && (
-              <p className="mt-3 rounded-md bg-red-500/10 p-2 text-sm text-red-400" role="alert" aria-live="assertive">{deleteError}</p>
+              <p className="mt-3 rounded-md bg-destructive/10 p-2 text-sm text-destructive" role="alert" aria-live="assertive">{deleteError}</p>
             )}
 
             <div className="mt-5 flex gap-3">
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
-                className="flex-1 rounded-lg border border-border py-2 text-sm font-medium text-secondary-foreground hover:bg-muted"
+                className="flex-1 rounded-lg border border-border py-2 text-sm font-medium text-secondary-foreground hover:bg-muted cursor-pointer transition-colors duration-200"
               >
                 Cancel
               </button>
@@ -550,7 +549,7 @@ export default function EditProfile() {
                 type="button"
                 onClick={handleDeleteAccount}
                 disabled={!deleteConfirmed || !deletePassword || deleteLoading}
-                className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                className="flex-1 rounded-lg bg-destructive py-2 text-sm font-medium text-white hover:bg-destructive/90 cursor-pointer transition-colors duration-200 disabled:opacity-50"
               >
                 {deleteLoading ? 'Deleting...' : 'Delete Account'}
               </button>

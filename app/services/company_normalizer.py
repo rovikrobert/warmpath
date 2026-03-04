@@ -74,6 +74,8 @@ _ALIASES: dict[str, str] = {
     "ibm corporation": "IBM",
     "ibm": "IBM",
     "international business machines": "IBM",
+    "one": "ONE Championship",
+    "one championship": "ONE Championship",
 }
 
 
@@ -113,6 +115,9 @@ def normalize_company_name(name: str | None) -> str | None:
             if lower in _ALIASES:
                 return _ALIASES[lower]
             break
+
+    # Strip trailing parenthetical abbreviations e.g. "(EDB)", "(SEA)"
+    cleaned = re.sub(r"\s*\([A-Za-z]{1,10}\)\s*$", "", cleaned).strip()
 
     # Remove trailing punctuation
     cleaned = cleaned.rstrip(".,;")

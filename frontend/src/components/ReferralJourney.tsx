@@ -348,11 +348,11 @@ function FullJourney({ stages, completed, currentIndex, allComplete, persona, on
 
   if (allComplete) {
     return (
-      <div className="mb-4 rounded-xl border border-emerald-500/20 bg-card p-5">
+      <div className="mb-4 rounded-xl border border-success/20 bg-card p-5">
         <div className="flex items-start gap-4">
           <Avatar size="lg" />
           <div className="flex-1">
-            <h2 className="text-sm font-semibold text-emerald-400">
+            <h2 className="text-sm font-semibold text-success">
               {isTreb
                 ? 'You facilitated your first intro!'
                 : 'You sent your first referral request!'}
@@ -417,7 +417,7 @@ function FullJourney({ stages, completed, currentIndex, allComplete, persona, on
                   <div
                     className={`h-1.5 w-full rounded-full transition-all ${
                       isDone
-                        ? 'bg-emerald-500'
+                        ? 'bg-success'
                         : isCurrent
                           ? isTreb ? 'bg-teal-500' : 'bg-primary'
                           : 'bg-muted'
@@ -426,7 +426,7 @@ function FullJourney({ stages, completed, currentIndex, allComplete, persona, on
                   <span
                     className={`mt-1 text-[10px] ${
                       isDone
-                        ? 'text-emerald-400'
+                        ? 'text-success'
                         : isCurrent
                           ? isTreb ? 'text-teal-400 font-medium' : 'text-primary font-medium'
                           : 'text-muted-foreground'
@@ -493,7 +493,7 @@ function CompactBreadcrumb({ stages, completed, currentIndex, persona }: Compact
             <div key={stage.key} className="flex items-center gap-1.5">
               {i > 0 && (
                 <svg
-                  className={`h-3 w-3 shrink-0 ${isDone ? 'text-emerald-500' : 'text-muted-foreground'}`}
+                  className={`h-3 w-3 shrink-0 ${isDone ? 'text-success' : 'text-muted-foreground'}`}
                   fill="none"
                   viewBox="0 0 24 24"
                   strokeWidth="2"
@@ -509,7 +509,7 @@ function CompactBreadcrumb({ stages, completed, currentIndex, persona }: Compact
               <span
                 className={`text-xs whitespace-nowrap ${
                   isDone
-                    ? 'text-emerald-400 line-through'
+                    ? 'text-success line-through'
                     : isCurrent
                       ? isTreb ? 'text-teal-400 font-medium' : 'text-primary font-medium'
                       : 'text-muted-foreground'

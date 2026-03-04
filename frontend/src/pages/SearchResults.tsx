@@ -133,7 +133,7 @@ export default function SearchResults() {
           </div>
           <div className="rounded-lg bg-card p-3 border border-border">
             <p className="text-xs text-muted-foreground">Strong+ Matches</p>
-            <p className="text-lg font-bold text-emerald-400">
+            <p className="text-lg font-bold text-success">
               {(dist['90-100'] || 0) + (dist['70-89'] || 0)}
             </p>
           </div>
@@ -193,7 +193,7 @@ export default function SearchResults() {
           <Spinner size="md" />
         </div>
       ) : results.length === 0 ? (
-        <div className="rounded-xl bg-card p-12 text-center border border-border" aria-live="polite">
+        <div className="rounded-xl bg-card p-12 text-center py-16 border border-border" aria-live="polite">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted" aria-hidden="true">
             <svg className="h-7 w-7 text-muted-foreground" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -226,8 +226,8 @@ export default function SearchResults() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {results.map((r) => (
-                <tr key={r.id} className="hover:bg-muted/50">
+              {results.map((r, index) => (
+                <tr key={r.id} className="hover-lift cursor-pointer transition-all duration-200 hover:bg-muted/50 animate-slide-up-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
                   <td className="px-4 py-3">
                     <p className="font-medium text-foreground">{r.contact_name}</p>
                     <p className="text-xs text-muted-foreground">{r.contact_title}</p>
@@ -239,8 +239,8 @@ export default function SearchResults() {
                   </td>
                   <td className="hidden px-3 py-3 text-center sm:table-cell">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      r.match_type === 'direct' ? 'bg-emerald-500/10 text-emerald-400' :
-                      r.match_type === 'indirect' ? 'bg-primary/10 text-primary' :
+                      r.match_type === 'direct' ? 'bg-success/10 text-success' :
+                      r.match_type === 'indirect' ? 'bg-warning/10 text-warning' :
                       'bg-muted/50 text-muted-foreground'
                     }`}>
                       {r.match_type}
@@ -251,6 +251,7 @@ export default function SearchResults() {
                       onClick={() => handleDraftIntro(r.contact_id)}
                       loading={introLoading === r.contact_id}
                       size="sm"
+                      className="hover:shadow-[0_0_20px_var(--primary-glow)]"
                     >
                       Draft Intro
                     </Button>

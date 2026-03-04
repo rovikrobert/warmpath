@@ -19,9 +19,9 @@ const RELATIONSHIP_TYPES = [
 ];
 
 const REL_BADGE_COLORS = {
-  current_colleague: 'bg-blue-500/10 text-blue-400',
+  current_colleague: 'bg-info/10 text-info',
   former_colleague: 'bg-indigo-500/10 text-indigo-400',
-  manager: 'bg-emerald-500/10 text-emerald-400',
+  manager: 'bg-success/10 text-success',
   alumni: 'bg-purple-500/10 text-purple-400',
   industry_peer: 'bg-cyan-500/10 text-cyan-400',
   friend: 'bg-primary/10 text-primary',
@@ -51,7 +51,7 @@ interface Contact {
 }
 
 function ScoreBar({ score }: { score: number }) {
-  const fillColor = score >= 70 ? 'bg-emerald-500' : score >= 40 ? 'bg-primary' : 'bg-muted-foreground';
+  const fillColor = score >= 70 ? 'bg-success' : score >= 40 ? 'bg-primary' : 'bg-muted-foreground';
   return (
     <div className="flex items-center gap-3">
       <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
@@ -418,10 +418,10 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
           <div className="grid grid-cols-3 gap-1.5">
             {[
               { label: 'Cold', value: 10, color: 'text-muted-foreground border-border' },
-              { label: 'Lukewarm', value: 30, color: 'text-blue-400 border-blue-500/30' },
+              { label: 'Lukewarm', value: 30, color: 'text-info border-info/30' },
               { label: 'Warm', value: 55, color: 'text-primary border-primary/30' },
-              { label: 'Strong', value: 75, color: 'text-emerald-400 border-emerald-500/30' },
-              { label: 'Very Strong', value: 90, color: 'text-emerald-300 border-emerald-400/30' },
+              { label: 'Strong', value: 75, color: 'text-success border-success/30' },
+              { label: 'Very Strong', value: 90, color: 'text-success border-success/30' },
               { label: 'Auto', value: null, color: 'text-muted-foreground border-border' },
             ].map((opt) => (
               <button
@@ -446,7 +446,7 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
         </div>
 
         {introError && (
-          <p className="text-sm text-red-400">{introError}</p>
+          <p className="text-sm text-destructive">{introError}</p>
         )}
 
         <div className="flex gap-2">

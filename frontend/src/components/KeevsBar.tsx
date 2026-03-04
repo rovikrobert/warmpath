@@ -91,6 +91,7 @@ function getBarPersona(intent: string | undefined, pathname: string): 'keevs' | 
 export default function KeevsBar() {
   const [item, setItem] = useState<FeedItemCompact | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [dismissing, setDismissing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const location = useLocation();
   const { user } = useAuth();
@@ -151,15 +152,22 @@ export default function KeevsBar() {
   if (!item || dismissed) return null;
 
   const handleDismiss = async () => {
-    if (item.id === '__seed') {
-      setDismissed(true);
-      return;
-    }
-    try {
-      await feedApi.dismiss(item.id);
-      setDismissed(true);
-      window.dispatchEvent(new Event('feed-updated'));
-    } catch (err) { console.error('KeevsBar: dismiss failed', err); }
+    setDismissing(true);
+    // Wait for fade-out animation before hiding
+    setTimeout(async () => {
+      if (item.id === '__seed') {
+        setDismissed(true);
+        return;
+      }
+      try {
+        await feedApi.dismiss(item.id);
+        setDismissed(true);
+        window.dispatchEvent(new Event('feed-updated'));
+      } catch (err) {
+        console.error('KeevsBar: dismiss failed', err);
+        setDismissing(false);
+      }
+    }, 300);
   };
 
   if (!expanded) {
@@ -179,7 +187,7 @@ export default function KeevsBar() {
   }
 
   return (
-    <div className={`fixed ${bottomClass} right-4 z-40 w-80 rounded-lg border border-border bg-card p-3 shadow-xl`}>
+    <div className={`fixed ${bottomClass} right-4 z-40 w-80 rounded-lg glass border border-border/50 border-l-2 border-l-primary glow-primary px-3 py-2 shadow-xl${dismissing ? ' animate-fade-out-up' : ''}`}>
       <div className="flex items-start gap-2">
         <Avatar size="sm" />
         <div className="min-w-0 flex-1">

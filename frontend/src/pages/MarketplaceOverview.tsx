@@ -7,6 +7,7 @@ import { MarketplaceBadge } from '../utils/marketplace';
 import ScoreExplainer from '../components/ScoreExplainer';
 import MarketplaceVisibilityExplainer from '../components/MarketplaceVisibilityExplainer';
 import EmptyState from '../components/ui/EmptyState';
+import noResultsIllustration from '../assets/illustrations/no-results.webp';
 import SourceTag from '../components/ui/SourceTag';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
 import IntroRelayModal from '../components/IntroRelayModal';
@@ -17,9 +18,9 @@ function StatusBadge({ status }) {
   const labels = { requested: 'Pending', reviewing: 'Reviewing', approved: 'Approved', declined: 'Declined', completed: 'Completed' };
   const colors = {
     requested: 'bg-primary/10 text-primary',
-    reviewing: 'bg-blue-500/10 text-blue-400',
-    approved: 'bg-emerald-500/10 text-emerald-400',
-    declined: 'bg-red-500/10 text-red-400',
+    reviewing: 'bg-info/10 text-info',
+    approved: 'bg-success/10 text-success',
+    declined: 'bg-destructive/10 text-destructive',
     completed: 'bg-muted/50 text-muted-foreground',
   };
   return (
@@ -194,33 +195,33 @@ export default function MarketplaceOverview() {
     <div className="space-y-6" role="main">
       <div className="flex items-center justify-between">
         <h1 className="page-title">Marketplace Overview</h1>
-        <Link to="/settings?tab=sharing" className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted">
+        <Link to="/settings?tab=sharing" className="cursor-pointer rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors duration-200 hover:bg-muted">
           Sharing Settings
         </Link>
       </div>
 
       {/* Quick navigation */}
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <Link to="/referrals" className="rounded-lg border border-primary/30 px-3 py-1.5 text-primary hover:bg-primary/10">
+        <Link to="/referrals" className="rounded-lg border border-primary/30 px-3 py-1.5 text-primary transition-colors duration-200 hover:bg-primary/10">
           Find Referral Paths
         </Link>
-        <Link to="/marketplace/requests" className="rounded-lg border border-border px-3 py-1.5 text-muted-foreground hover:bg-muted">
+        <Link to="/marketplace/requests" className="rounded-lg border border-border px-3 py-1.5 text-muted-foreground transition-colors duration-200 hover:bg-muted">
           My Requests {pendingRequests.length > 0 && <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">{pendingRequests.length}</span>}
         </Link>
-        <Link to="/contacts" className="text-muted-foreground hover:text-secondary-foreground">Manage Contacts</Link>
-        <Link to="/credits" className="text-muted-foreground hover:text-secondary-foreground">View Credits</Link>
+        <Link to="/contacts" className="text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground">Manage Contacts</Link>
+        <Link to="/credits" className="text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground">View Credits</Link>
       </div>
 
       {/* Referral bonus callout */}
       {approvedCount === 0 && (
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
+        <div className="rounded-lg border border-success/30 bg-success/10 p-4">
           <div className="flex items-start gap-3">
-            <svg className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+            <svg className="mt-0.5 h-5 w-5 shrink-0 text-success" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
             <div>
-              <p className="text-sm font-semibold text-emerald-400">Your employer pays {SOURCES.REFERRAL_BONUS_RANGE.claim} per referral hire</p>
-              <p className="mt-0.5 text-sm text-emerald-400/80">
+              <p className="text-sm font-semibold text-success">Your employer pays {SOURCES.REFERRAL_BONUS_RANGE.claim} per referral hire</p>
+              <p className="mt-0.5 text-sm text-success/80">
                 When you approve an intro and your contact hires the candidate, the referral bonus goes to you.
                 WarmPath sends you pre-qualified candidates so you don't have to find them yourself.{' '}
                 <SourceTag source={SOURCES.REFERRAL_BONUS_RANGE.source} label={SOURCES.REFERRAL_BONUS_RANGE.label} />
@@ -269,11 +270,7 @@ export default function MarketplaceOverview() {
 
         {pendingRequests.length === 0 && pastRequests.length === 0 ? (
           <EmptyState
-            icon={
-              <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z" />
-              </svg>
-            }
+            illustration={noResultsIllustration}
             title="Requests will appear here"
             description="When job seekers find your contacts on the marketplace, you'll review their profile and decide whether to make an intro. You earn referral bonuses from your employer for successful hires."
             stats={[{ value: '$2-10K', label: 'avg referral bonus' }]}
@@ -285,11 +282,11 @@ export default function MarketplaceOverview() {
             {pendingRequests.map((req) => {
               const snapshot = req.job_seeker_profile_snapshot || {};
               const relType = req.relationship_type ? req.relationship_type.replace(/_/g, ' ') : null;
-              const wouldReferColor = req.would_refer === 'definitely' ? 'text-emerald-400' : req.would_refer === 'probably' ? 'text-primary' : 'text-muted-foreground';
+              const wouldReferColor = req.would_refer === 'definitely' ? 'text-success' : req.would_refer === 'probably' ? 'text-primary' : 'text-muted-foreground';
               const requestTypeBadge = snapshot.request_type === 'specific_role'
-                ? <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">Specific role</span>
+                ? <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">Specific role</span>
                 : snapshot.request_type === 'general_networking'
-                  ? <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-400">Networking</span>
+                  ? <span className="rounded-full bg-info/10 px-2 py-0.5 text-xs font-medium text-info">Networking</span>
                   : null;
 
               return (
@@ -305,8 +302,8 @@ export default function MarketplaceOverview() {
                       </div>
 
                       {/* Candidate panel (enriched snapshot) */}
-                      <div className="mt-2 rounded-lg bg-blue-500/10 p-3">
-                        <p className="text-xs font-medium uppercase tracking-wider text-blue-400">Candidate</p>
+                      <div className="mt-2 rounded-lg bg-info/10 p-3">
+                        <p className="text-xs font-medium uppercase tracking-wider text-info">Candidate</p>
                         <p className="mt-1 text-sm font-medium text-foreground">
                           {snapshot.full_name || 'Anonymous'}
                         </p>
@@ -409,7 +406,7 @@ export default function MarketplaceOverview() {
                         onClick={() => handleAction(req.id, 'approve')}
                         disabled={actionLoading === req.id}
                         aria-label={`Approve intro request from ${snapshot.full_name || 'candidate'}`}
-                        className="rounded-md bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-400 disabled:opacity-50"
+                        className="cursor-pointer rounded-md bg-success px-4 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-success/90 disabled:opacity-50"
                       >
                         Approve
                       </button>
@@ -417,7 +414,7 @@ export default function MarketplaceOverview() {
                         onClick={() => handleAction(req.id, 'decline')}
                         disabled={actionLoading === req.id}
                         aria-label={`Decline intro request from ${snapshot.full_name || 'candidate'}`}
-                        className="rounded-md border border-red-500/30 px-4 py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                        className="cursor-pointer rounded-md border border-destructive/30 px-4 py-2.5 text-sm font-medium text-destructive transition-colors duration-200 hover:bg-destructive/10 disabled:opacity-50"
                       >
                         Decline
                       </button>
@@ -446,33 +443,33 @@ export default function MarketplaceOverview() {
 
                 {/* Coaching text after approval — dynamic based on delivery status */}
                 {req.status === 'approved' && req.id === approvedCoaching && (
-                  <div className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4" aria-live="polite">
+                  <div className="mt-3 rounded-lg border border-success/30 bg-success/10 p-4" aria-live="polite">
                     {req.delivery_method === 'email_relay' && req.delivery_status === 'delivered' ? (
                       <>
-                        <p className="text-sm font-semibold text-emerald-400">
+                        <p className="text-sm font-semibold text-success">
                           Email delivered! 50 credits earned.
                         </p>
-                        <p className="mt-1 text-xs text-emerald-400/70">
+                        <p className="mt-1 text-xs text-success/70">
                           The intro to {req.contact_name || 'your contact'} for {req.job_seeker_profile_snapshot?.full_name || 'this candidate'} was delivered successfully.
                         </p>
                       </>
                     ) : req.delivery_method === 'email_relay' ? (
                       <>
-                        <p className="text-sm font-semibold text-emerald-400">
+                        <p className="text-sm font-semibold text-success">
                           Introduction sent to {req.contact_name || 'your contact'} via email!
                         </p>
-                        <p className="mt-1 text-xs text-emerald-400/70">
+                        <p className="mt-1 text-xs text-success/70">
                           You'll earn 50 credits when delivery is confirmed.
                         </p>
                       </>
                     ) : req.delivery_method === 'linkedin_manual' ? (
                       <>
-                        <p className="text-sm font-semibold text-emerald-400">
+                        <p className="text-sm font-semibold text-success">
                           {req.credits_awarded_at
                             ? 'You confirmed sending the intro. Credits awarded!'
                             : 'You confirmed sending the intro. Credits pending review.'}
                         </p>
-                        <p className="mt-1 text-xs text-emerald-400/70">
+                        <p className="mt-1 text-xs text-success/70">
                           {req.credits_awarded_at
                             ? `Thank you for connecting ${req.job_seeker_profile_snapshot?.full_name || 'the candidate'} with ${req.contact_name || 'your contact'}.`
                             : 'Thanks for confirming the send. We will update your credit status after verification.'}
@@ -481,10 +478,10 @@ export default function MarketplaceOverview() {
                     ) : (
                       /* No delivery method yet — approved but needs manual send */
                       <>
-                        <p className="mb-2 text-sm font-semibold text-emerald-400">
+                        <p className="mb-2 text-sm font-semibold text-success">
                           Now introduce {req.job_seeker_profile_snapshot?.full_name || 'this candidate'} to {req.contact_name || 'your contact'}
                         </p>
-                        <p className="text-sm text-emerald-400/80">
+                        <p className="text-sm text-success/80">
                           We don't have an email for {req.contact_name || 'your contact'}, so you'll need to send the intro yourself.
                         </p>
                         <button
@@ -495,7 +492,7 @@ export default function MarketplaceOverview() {
                             linkedinUrl: req.linkedin_url || null,
                             draftedMessage: req.drafted_message || `Hey ${req.contact_name?.split(' ')[0] || 'there'}, I'd like to introduce you to ${req.job_seeker_profile_snapshot?.full_name || 'someone'} who's interested in opportunities at ${req.contact_company || 'your company'}. They came through WarmPath and I thought you two should connect.`,
                           })}
-                          className="mt-2 rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-400"
+                          className="mt-2 cursor-pointer rounded-md bg-success px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-success/90"
                           aria-label="Send the introduction manually"
                         >
                           Send the Introduction
@@ -540,13 +537,13 @@ export default function MarketplaceOverview() {
               const contactId = l.contact_id || l.id;
               const isHidden = excludedIds.includes(contactId);
               return (
-                <div key={l.id} className={`surface-raised p-4 relative${isHidden ? ' opacity-50' : ''}`}>
+                <div key={l.id} className={`surface-raised hover-lift p-4 relative${isHidden ? ' opacity-50' : ''}`}>
                   {/* Eye toggle button */}
                   <button
                     type="button"
                     onClick={() => toggleContactVisibility(contactId)}
                     disabled={toggleLoading === contactId}
-                    className="absolute top-3 right-3 p-2 text-muted-foreground hover:text-secondary-foreground disabled:opacity-50"
+                    className="absolute top-3 right-3 cursor-pointer p-2 text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground disabled:opacity-50"
                     aria-label={isHidden ? 'Show contact on marketplace' : 'Hide contact from marketplace'}
                   >
                     {isHidden ? (
