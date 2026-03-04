@@ -34,10 +34,16 @@ function ShimmerCard() {
 }
 
 function RecommendationCard({ rec, onAdd, isAdded }) {
+  // Only show job badge when we actually have ATS data — network-only
+  // companies (source=network_signal, total_openings=0) never checked jobs,
+  // so "No matching jobs" would be misleading.
+  const hasAtsData = rec.source === 'board_registry' || rec.total_openings > 0;
   const jobLabel =
     rec.matching_count > 0
       ? `${rec.matching_count} job${rec.matching_count !== 1 ? 's' : ''} matching your criteria`
-      : 'No matching jobs found';
+      : hasAtsData
+        ? 'No matching jobs found'
+        : null;
   const jobBadgeStyle =
     rec.matching_count > 0
       ? 'bg-emerald-500/10 text-emerald-400'
@@ -58,9 +64,11 @@ function RecommendationCard({ rec, onAdd, isAdded }) {
                 {rec.network_label}
               </span>
             ) : null}
-            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${jobBadgeStyle}`}>
-              {jobLabel}
-            </span>
+            {jobLabel && (
+              <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${jobBadgeStyle}`}>
+                {jobLabel}
+              </span>
+            )}
             {rec.referral_ready && (
               <span className="inline-flex rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold text-primary">
                 Referral Ready
