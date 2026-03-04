@@ -88,6 +88,36 @@ class TestGetBalance:
             assert balance == 200
 
 
+class TestDailyEarnCap:
+    async def test_earn_cap_blocks_when_exceeded(self):
+        uid = uuid_mod.uuid4()
+        async with TestSessionLocal() as db:
+            await earn_credits(uid, 450, "csv_upload", db)
+            with pytest.raises(ValueError, match="Daily earn cap exceeded"):
+                await earn_credits(uid, 100, "csv_upload", db)
+
+    async def test_skip_daily_cap_bypasses_limit(self):
+        uid = uuid_mod.uuid4()
+        async with TestSessionLocal() as db:
+            await earn_credits(uid, 500, "csv_upload", db)
+            txn = await earn_credits(uid, 100, "welcome_bonus", db, skip_daily_cap=True)
+            assert txn.amount == 100
+            balance = await get_balance(uid, db)
+            assert balance == 600
+
+    async def test_welcome_bonus_does_not_block_subsequent_csv_upload(self):
+        """Regression: welcome bonus (500 in beta) must not prevent same-day CSV upload credits."""
+        uid = uuid_mod.uuid4()
+        async with TestSessionLocal() as db:
+            # Simulate beta welcome bonus (skip_daily_cap=True as fixed)
+            await earn_credits(uid, 500, "welcome_bonus", db, skip_daily_cap=True)
+            # CSV upload credits should still work
+            txn = await earn_credits(uid, 100, "csv_upload", db)
+            assert txn.amount == 100
+            balance = await get_balance(uid, db)
+            assert balance == 600
+
+
 class TestGetCreditSummary:
     async def test_full_summary(self):
         uid = uuid_mod.uuid4()

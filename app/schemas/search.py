@@ -1,6 +1,7 @@
 import json
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -50,8 +51,8 @@ class SearchRequestResponse(BaseModel):
 
 
 class SmartSearchCreate(BaseModel):
-    company_names: list[str]
-    scope: str = "own_network"  # "own_network" (default, free) or "marketplace"
+    company_names: list[str] = Field(..., min_length=1, max_length=10)
+    scope: Literal["own_network", "marketplace"] = "own_network"
 
 
 class SmartSearchResponse(BaseModel):

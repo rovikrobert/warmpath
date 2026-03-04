@@ -7,6 +7,7 @@ Provides:
 
 import asyncio
 import base64
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -27,6 +28,8 @@ from app.services.warm_scorer import batch_compute_scores
 from app.utils.encryption import compute_blind_index
 from app.utils.hashing import hash_for_suppression
 from app.utils.performance import timed
+
+logger = logging.getLogger(__name__)
 
 IMPORT_BATCH_SIZE = 500
 
@@ -328,19 +331,16 @@ async def process_csv_upload_core(
         # Auto-compute warm scores after upload
         await batch_compute_scores(user_uuid, db)
 
-        # Award credits for CSV upload (non-blocking: credit failure must not
-        # roll back imported contacts — contacts are the primary value)
+        # Award credits for CSV upload (non-blocking — credit failure must
+        # never roll back successfully imported contacts)
         if created > 0:
             try:
                 await earn_credits(
                     user_uuid, 100, "csv_upload", db, reference_id=upload_uuid
                 )
             except ValueError:
-                import logging
-
-                logging.getLogger(__name__).warning(
-                    "CSV upload credit skipped for user %s (daily cap): upload %s still succeeded",
-                    user_uuid,
+                logger.warning(
+                    "Could not award upload credits for %s (daily cap likely reached)",
                     upload_uuid,
                 )
 
@@ -359,11 +359,14 @@ async def process_csv_upload_core(
         )
         upload_count = upload_count_result.scalar() or 0
         if upload_count > 1 and created > 0:
-            import contextlib
-
-            with contextlib.suppress(ValueError):
+            try:
                 await earn_credits(
                     user_uuid, 10, "data_freshness", db, reference_id=upload_uuid
+                )
+            except ValueError:
+                logger.warning(
+                    "Could not award freshness credits for %s (daily cap likely reached)",
+                    upload_uuid,
                 )
 
         csv_upload.status = "completed"

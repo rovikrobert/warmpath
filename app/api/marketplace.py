@@ -1034,11 +1034,22 @@ async def confirm_manual_send(
     credits_awarded = 0
     if settings.manual_intro_credit_award_enabled:
         # Trust-based reward path (enabled for non-production by default).
-        await earn_credits(
-            current_user.id, 50, "intro_facilitation", db, reference_id=facilitation.id
-        )
-        facilitation.credits_awarded_at = now
-        credits_awarded = 50
+        # Non-blocking: delivery confirmation is the primary operation.
+        try:
+            await earn_credits(
+                current_user.id,
+                50,
+                "intro_facilitation",
+                db,
+                reference_id=facilitation.id,
+            )
+            facilitation.credits_awarded_at = now
+            credits_awarded = 50
+        except ValueError:
+            logger.warning(
+                "Could not award intro facilitation credits for user %s (daily cap)",
+                current_user.id,
+            )
     else:
         # Phase 0 guardrail: keep delivery confirmation but defer reward.
         await log_event(
