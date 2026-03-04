@@ -23,7 +23,7 @@ function CopyButton({ text, label = 'Copy', className }) {
     <button
       onClick={handleCopy}
       aria-label={copied ? 'Copied' : label}
-      className={className || 'rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted'}
+      className={className || 'cursor-pointer rounded border border-border px-2 py-1 text-xs text-muted-foreground transition-colors duration-200 hover:bg-muted'}
     >
       {copied ? 'Copied!' : label}
     </button>
@@ -104,13 +104,13 @@ export default function ReferralCodesPage() {
             <CopyButton
               text={buildInviteLink(myCode.code, user?.intent)}
               label="Copy invite link"
-              className="rounded bg-primary px-3 py-1 text-xs font-medium text-white hover:bg-primary/90"
+              className="cursor-pointer rounded bg-primary px-3 py-1 text-xs font-medium text-white transition-colors duration-200 hover:bg-primary/90"
             />
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:gap-4">
               <span>{myCode.uses_count ?? 0} uses</span>
               <span>{myCode.credits_per_conversion ?? 25} credits each</span>
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                myCode.is_active !== false ? 'bg-emerald-500/10 text-emerald-400' : 'bg-muted/50 text-muted-foreground'
+                myCode.is_active !== false ? 'bg-success/10 text-success' : 'bg-muted/50 text-muted-foreground'
               }`}>
                 {myCode.is_active !== false ? 'Active' : 'Inactive'}
               </span>
@@ -118,11 +118,11 @@ export default function ReferralCodesPage() {
           </div>
         ) : (
           <div>
-            {error && <p role="alert" className="mb-3 rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
+            {error && <p role="alert" className="mb-3 rounded-md bg-destructive/10 p-2 text-sm text-destructive">{error}</p>}
             <button
               onClick={handleCreate}
               disabled={creating}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-primary/90 disabled:opacity-50"
             >
               {creating ? 'Creating...' : 'Create My Referral Code'}
             </button>
@@ -176,11 +176,11 @@ export default function ReferralCodesPage() {
 
       {/* Quick links */}
       <div className="mt-6 flex flex-wrap items-center gap-3 text-sm">
-        <Link to="/credits" className="text-primary hover:text-primary">View credits &rarr;</Link>
+        <Link to="/credits" className="text-primary transition-colors duration-200 hover:text-primary/80">View credits &rarr;</Link>
         <span className="text-muted-foreground">&middot;</span>
-        <Link to="/coach" className="text-muted-foreground hover:text-secondary-foreground">Back to Coach</Link>
+        <Link to="/coach" className="text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground">Back to Coach</Link>
         <span className="text-muted-foreground">&middot;</span>
-        <Link to="/referrals" className="text-muted-foreground hover:text-secondary-foreground">Find referrals</Link>
+        <Link to="/referrals" className="text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground">Find referrals</Link>
       </div>
     </div>
   );
