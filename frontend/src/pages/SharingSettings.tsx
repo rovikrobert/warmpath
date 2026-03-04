@@ -27,8 +27,8 @@ export default function SharingSettings() {
     const load = async () => {
       try {
         const [prefsRes, contactsRes] = await Promise.all([
-          mpApi.getSharingPrefs().catch(() => ({ data: { opt_in_marketplace: false, is_paused: false } })),
-          contactsApi.list(1, 500).catch(() => ({ data: [] })),
+          mpApi.getSharingPrefs().catch((err) => { console.error('SharingSettings: failed to load sharing prefs', err); return { data: { opt_in_marketplace: false, is_paused: false } }; }),
+          contactsApi.list(1, 500).catch((err) => { console.error('SharingSettings: failed to load contacts', err); return { data: [] }; }),
         ]);
         const p = prefsRes.data;
         setPrefs(p);

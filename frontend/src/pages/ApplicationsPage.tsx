@@ -212,7 +212,7 @@ export default function ApplicationsPage() {
     try {
       const [appsRes, statsRes] = await Promise.all([
         appsApi.list({ per_page: 100 }),
-        appsApi.stats().catch(() => null),
+        appsApi.stats().catch((err) => { console.error('ApplicationsPage: stats load failed', err); return null; }),
       ]);
       setApps(appsRes.data || []);
       if (statsRes) setStats(statsRes.data);
@@ -238,7 +238,8 @@ export default function ApplicationsPage() {
           (c) => (c.current_company || '').toLowerCase().includes(newApp.company_name.trim().toLowerCase())
         );
         setWarmPaths(matches.length > 0 ? matches : null);
-      } catch {
+      } catch (err) {
+        console.error('ApplicationsPage: warm path search failed', err);
         setWarmPaths(null);
       } finally {
         setWarmLoading(false);

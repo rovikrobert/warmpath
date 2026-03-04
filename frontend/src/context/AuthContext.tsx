@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         })
         .catch((err) => {
+          console.error('AuthContext: failed to fetch user profile', err);
           setUser(null);
           // If backend returned 401 (user not found / deleted) while Clerk
           // thinks we're signed in, clear the stale Clerk session so the

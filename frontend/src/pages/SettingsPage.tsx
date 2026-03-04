@@ -97,7 +97,7 @@ function SearchFocusCard() {
         setTargetRole(p.target_role || '');
         setTargetSeniority(p.target_seniority || '');
       })
-      .catch(() => {})
+      .catch((err) => { console.error('[SearchFocusCard] Failed to load job preferences:', err); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -181,7 +181,7 @@ function ProfileTab() {
       try {
         const li = JSON.parse(stored);
         setForm((prev) => ({ ...prev, headline: prev.headline || li.name || '' }));
-      } catch { /* ignore */ }
+      } catch (err) { console.error('[ProfileTab] Failed to parse linkedin_profile from sessionStorage:', err); }
       sessionStorage.removeItem('linkedin_profile');
     }
   }, []);
@@ -204,7 +204,7 @@ function ProfileTab() {
           is_current: !e.end_date,
         })));
       }
-    }).catch(() => {});
+    }).catch((err) => { console.error('[ProfileTab] Failed to load profile:', err); });
   }, []);
 
   const handleResumeUpload = async (e) => {
@@ -247,16 +247,11 @@ function ProfileTab() {
     setSaved(false);
   };
 
-  const handleLinkedInImport = async () => {
-    setImportLoading('linkedin');
-    setError('');
-    try {
-      const res = await authApi.linkedinAuthorize();
-      window.location.href = res.data.url;
-    } catch (err) {
-      setError(err.message);
-      setImportLoading('');
-    }
+  // TODO: LinkedIn OAuth import is not yet implemented — authApi.linkedinAuthorize() does not exist.
+  // This handler is intentionally disabled to prevent a runtime crash.
+  // Re-enable once the backend LinkedIn authorize endpoint is wired up.
+  const handleLinkedInImport = () => {
+    // no-op: feature not yet implemented
   };
 
   const set = (key) => (e) => { setForm({ ...form, [key]: e.target.value }); setSaved(false); };
@@ -288,7 +283,7 @@ function ProfileTab() {
           const contactsRes = await contactsApi.list({ per_page: 1 });
           const total = contactsRes.meta?.total ?? 0;
           if (total > 0) setMatchFeedback('Work history saved! Contacts at your former companies now have boosted referral scores.');
-        } catch { /* ignore */ }
+        } catch (err) { console.error('[ProfileTab] Failed to check contacts count after profile save:', err); }
       }
     } catch (err) {
       setError(err.message);
@@ -313,8 +308,10 @@ function ProfileTab() {
               {importLoading === 'resume' ? 'Parsing...' : 'Import from Resume (PDF)'}
             </button>
           </div>
-          <button type="button" onClick={handleLinkedInImport} disabled={importLoading === 'linkedin'} className="w-full sm:w-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
-            {importLoading === 'linkedin' ? 'Redirecting...' : 'Import from LinkedIn'}
+          {/* TODO: LinkedIn import coming soon — authApi.linkedinAuthorize() not yet implemented */}
+          <button type="button" disabled title="Coming soon" className="w-full sm:w-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white opacity-50 cursor-not-allowed" aria-disabled="true">
+            Import from LinkedIn
+            <span className="ml-2 rounded-full bg-white/20 px-1.5 py-0.5 text-xs">Coming soon</span>
           </button>
         </div>
       </div>
@@ -470,11 +467,11 @@ function PrivacyTab() {
   useEffect(() => {
     (async () => {
       try {
-        const consentRes = await privacyApi.listConsent().catch(() => ({ data: [] }));
+        const consentRes = await privacyApi.listConsent().catch((err) => { console.error('[PrivacyTab] Failed to load consent records:', err); return { data: [] }; });
         setConsentRecords(consentRes.data || []);
         setRestricted(user?.processing_restricted || false);
         setMarketingOptedOut(user?.marketing_opt_out || false);
-      } catch { /* non-critical */ }
+      } catch (err) { console.error('[PrivacyTab] Failed to load privacy settings:', err); }
       finally { setLoading(false); }
     })();
   }, [user]);
@@ -498,7 +495,7 @@ function PrivacyTab() {
     try {
       if (restricted) { await privacyApi.unrestrictProcessing(); setRestricted(false); }
       else { await privacyApi.restrictProcessing(); setRestricted(true); }
-    } catch (err) { setError(err.message); }
+    } catch (err) { console.error('[PrivacyTab] Failed to toggle processing restriction:', err); setError(err.message); }
     finally { setTogglingRestrict(false); }
   };
 
@@ -507,7 +504,7 @@ function PrivacyTab() {
     try {
       if (marketingOptedOut) { await privacyApi.marketingOptIn(); setMarketingOptedOut(false); }
       else { await privacyApi.marketingOptOut(); setMarketingOptedOut(true); }
-    } catch (err) { setError(err.message); }
+    } catch (err) { console.error('[PrivacyTab] Failed to toggle marketing opt-out:', err); setError(err.message); }
     finally { setTogglingMarketing(false); }
   };
 
@@ -643,15 +640,15 @@ function SharingTab() {
     (async () => {
       try {
         const [prefsRes, contactsRes] = await Promise.all([
-          mpApi.getSharingPrefs().catch(() => ({ data: { opt_in_marketplace: false, is_paused: false } })),
-          contactsApi.list(1, 500).catch(() => ({ data: [] })),
+          mpApi.getSharingPrefs().catch((err) => { console.error('[SharingTab] Failed to load sharing prefs:', err); return { data: { opt_in_marketplace: false, is_paused: false } }; }),
+          contactsApi.list({ page: 1, per_page: 500 }).catch((err) => { console.error('[SharingTab] Failed to load contacts:', err); return { data: [] }; }),
         ]);
         const p = prefsRes.data;
         setPrefs(p);
         setCategoryFilters(p.category_filters?.include_departments || []);
         setExcludedIds(p.excluded_contact_ids || []);
         setContacts(contactsRes.data || []);
-      } catch { /* ignore */ }
+      } catch (err) { console.error('[SharingTab] Failed to load sharing tab data:', err); }
       finally { setLoading(false); }
     })();
   }, []);
@@ -669,7 +666,7 @@ function SharingTab() {
       setPrefs(res.data);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch (err) { setError(err.message || 'Failed to save settings'); }
+    } catch (err) { console.error('[SharingTab] Failed to save sharing settings:', err); setError(err.message || 'Failed to save settings'); }
     finally { setSaving(false); }
   };
 
@@ -1114,7 +1111,7 @@ function AccountTab() {
     setDeleteLoading(true); setDeleteError('');
     try {
       await authApi.deleteAccount({ confirm_deletion: true });
-      logout();
+      await logout();
       navigate('/');
     } catch (err) {
       setDeleteError(err.message);

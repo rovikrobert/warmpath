@@ -31,8 +31,8 @@ export default function BetaFeedbackButton() {
           `[ts: ${new Date().toISOString()}]`,
         ].filter(Boolean).join('\n'),
       });
-    } catch {
-      // Non-critical
+    } catch (err) {
+      console.error('BetaFeedbackButton: failed to submit feedback', err);
     } finally {
       setSending(false);
       setDone(true);

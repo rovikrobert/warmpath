@@ -21,7 +21,7 @@ export default function IntroReview() {
     introReview
       .get(token)
       .then((res) => setData(res.data))
-      .catch(() => setError(true))
+      .catch((err) => { console.error('IntroReview: failed to load intro review', err); setError(true); })
       .finally(() => setLoading(false));
   }, [token]);
 

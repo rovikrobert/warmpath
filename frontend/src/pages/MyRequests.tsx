@@ -33,7 +33,7 @@ export default function MyRequests() {
   useEffect(() => {
     mpApi.myRequests()
       .then((res) => setRequests(res.data || []))
-      .catch(() => {})
+      .catch((err) => { console.error('MyRequests: failed to load requests', err); })
       .finally(() => setLoading(false));
   }, []);
 
