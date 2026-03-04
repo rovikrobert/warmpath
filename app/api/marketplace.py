@@ -189,7 +189,9 @@ async def _apply_intro_approve(
             intro_body += f"\n\n{js_blurb}"
         if js_message:
             intro_body += f"\n\n{js_message}"
-        intro_body += "\n\nI think you two should connect — happy to share more context."
+        intro_body += (
+            "\n\nI think you two should connect — happy to share more context."
+        )
 
         review_token = secrets.token_urlsafe(32)
         facilitation.review_token = review_token
