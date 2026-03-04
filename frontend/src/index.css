@@ -181,6 +181,24 @@
 .stat-number { @apply text-2xl font-bold text-foreground tabular-nums; }
 .stat-label { @apply text-xs font-medium uppercase tracking-wider text-muted-foreground; }
 
+/* === Design System v2: Typography === */
+.text-display {
+  @apply text-4xl font-bold tracking-[-0.03em] text-foreground;
+  font-size: clamp(2.25rem, 4vw, 3rem);
+}
+.text-heading-lg {
+  @apply text-2xl font-semibold tracking-[-0.02em] text-foreground;
+}
+.text-heading {
+  @apply text-xl font-semibold tracking-[-0.02em] text-foreground;
+}
+.text-heading-sm {
+  @apply text-lg font-medium tracking-[-0.01em] text-foreground;
+}
+.label-micro {
+  @apply text-xs font-medium uppercase tracking-[0.05em] text-muted-foreground;
+}
+
 /* cmdk command palette */
 [cmdk-group-heading] {
   padding: 0.5rem 1rem;
