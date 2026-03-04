@@ -7,7 +7,7 @@ import EnrichmentProgress from '../components/EnrichmentProgress';
 import { EnrichmentActions } from '../components/FeedCard';
 import KeevsAvatar from '../components/KeevsAvatar';
 import EmptyState from '../components/ui/EmptyState';
-import noContactsIllustration from '../assets/illustrations/no-contacts.png';
+import noContactsIllustration from '../assets/illustrations/no-contacts.webp';
 import ContactsPageSkeleton from '../components/skeletons/ContactsPageSkeleton';
 import SlideOver from '../components/SlideOver';
 import ContactDetailPanel from '../components/ContactDetail';

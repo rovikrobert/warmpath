@@ -1,6 +1,6 @@
-import keevsBase from '../assets/avatars/keevs-base.png';
-import keevsThinking from '../assets/avatars/keevs-thinking.png';
-import keevsCelebrating from '../assets/avatars/keevs-celebrating.png';
+import keevsBase from '../assets/avatars/keevs-base.webp';
+import keevsThinking from '../assets/avatars/keevs-thinking.webp';
+import keevsCelebrating from '../assets/avatars/keevs-celebrating.webp';
 
 const moodAssets = {
   default: keevsBase,

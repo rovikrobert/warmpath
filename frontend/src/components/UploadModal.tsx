@@ -5,7 +5,7 @@ import Button from './ui/Button';
 import KeevsAvatar from './KeevsAvatar';
 import KeevsTrivia from './KeevsTrivia';
 import { KEEVS_TRIVIA, shuffleArray } from '../utils/keevs-trivia';
-import welcomeIllustration from '../assets/illustrations/welcome.png';
+import welcomeIllustration from '../assets/illustrations/welcome.webp';
 
 const LINKEDIN_EXPORT_URL = 'https://www.linkedin.com/mypreferences/d/download-my-data';
 

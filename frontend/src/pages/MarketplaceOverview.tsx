@@ -7,7 +7,7 @@ import { MarketplaceBadge } from '../utils/marketplace';
 import ScoreExplainer from '../components/ScoreExplainer';
 import MarketplaceVisibilityExplainer from '../components/MarketplaceVisibilityExplainer';
 import EmptyState from '../components/ui/EmptyState';
-import noResultsIllustration from '../assets/illustrations/no-results.png';
+import noResultsIllustration from '../assets/illustrations/no-results.webp';
 import SourceTag from '../components/ui/SourceTag';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
 import IntroRelayModal from '../components/IntroRelayModal';

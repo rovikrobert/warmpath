@@ -1,6 +1,6 @@
-import trebBase from '../assets/avatars/treb-base.png';
-import trebThinking from '../assets/avatars/treb-thinking.png';
-import trebCelebrating from '../assets/avatars/treb-celebrating.png';
+import trebBase from '../assets/avatars/treb-base.webp';
+import trebThinking from '../assets/avatars/treb-thinking.webp';
+import trebCelebrating from '../assets/avatars/treb-celebrating.webp';
 
 const moodAssets = {
   default: trebBase,
