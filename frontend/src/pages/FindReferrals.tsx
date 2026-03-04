@@ -24,11 +24,11 @@ function getExperimentVariant(): 'control' | 'treatment' {
 
 function ShimmerCard() {
   return (
-    <div className="animate-pulse rounded-lg border border-border bg-muted p-4" aria-hidden="true">
-      <div className="mb-2 h-4 w-2/3 rounded bg-muted" />
-      <div className="mb-3 h-3 w-1/3 rounded bg-muted" />
-      <div className="mb-1 h-3 w-full rounded bg-muted" />
-      <div className="h-3 w-3/4 rounded bg-muted" />
+    <div className="animate-pulse rounded-lg border border-border bg-card p-4" aria-hidden="true">
+      <div className="mb-2 h-4 w-2/3 rounded bg-card" />
+      <div className="mb-3 h-3 w-1/3 rounded bg-card" />
+      <div className="mb-1 h-3 w-full rounded bg-card" />
+      <div className="h-3 w-3/4 rounded bg-card" />
     </div>
   );
 }
@@ -40,10 +40,10 @@ function RecommendationCard({ rec, onAdd, isAdded }) {
       : 'No matching jobs found';
   const jobBadgeStyle =
     rec.matching_count > 0
-      ? 'bg-emerald-500/10 text-emerald-400'
+      ? 'bg-success/10 text-success'
       : 'bg-muted/50 text-muted-foreground';
   return (
-    <div className="surface-interactive p-4">
+    <div className="rounded-lg border border-border bg-card hover-lift cursor-pointer p-4">
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
           <p className="font-medium text-foreground">{rec.display_name}</p>
@@ -75,7 +75,7 @@ function RecommendationCard({ rec, onAdd, isAdded }) {
         </div>
         {isAdded ? (
           <span
-            className="ml-3 shrink-0 rounded-md border border-emerald-500 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400"
+            className="ml-3 shrink-0 rounded-md border border-success bg-success/10 px-2.5 py-1 text-xs font-medium text-success"
             aria-label={`${rec.display_name} added`}
           >
             Added
@@ -347,7 +347,7 @@ export default function FindReferrals() {
         </div>
       )}
 
-      <div className="space-y-5 surface-raised p-6 shadow-sm">
+      <div className="space-y-5 glass rounded-xl p-6 shadow-sm">
         <div data-search-input>
           <CompanyAutocomplete
             value={companies}
@@ -383,7 +383,7 @@ export default function FindReferrals() {
                         <span className="italic text-muted-foreground">Discovering jobs at {name}...</span>
                       )}
                       {discovery.status === 'found' && (
-                        <span className="text-emerald-400">{discovery.jobsCount} job{discovery.jobsCount !== 1 ? 's' : ''} found</span>
+                        <span className="text-success">{discovery.jobsCount} job{discovery.jobsCount !== 1 ? 's' : ''} found</span>
                       )}
                       {discovery.status === 'not_found' && (
                         <span className="text-muted-foreground">
@@ -424,10 +424,10 @@ export default function FindReferrals() {
               <p className="font-medium text-foreground">Your Network</p>
               <p className="mt-1 text-xs text-muted-foreground">Search your uploaded contacts</p>
               <div className="mt-2 flex items-center gap-2">
-                <span className="text-xs font-medium text-emerald-400">Free</span>
+                <span className="text-xs font-medium text-success">Free</span>
               </div>
               {companies.length > 0 && totalOwnConnections > 0 && (
-                <p className="mt-1.5 text-xs text-emerald-400">
+                <p className="mt-1.5 text-xs text-success">
                   {totalOwnConnections} {totalOwnConnections === 1 ? 'connection' : 'connections'} found
                 </p>
               )}
