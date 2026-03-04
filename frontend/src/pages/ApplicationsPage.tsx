@@ -4,6 +4,7 @@ import { applications as appsApi, contacts as contactsApi } from '../api/client'
 import FeedbackModal from '../components/FeedbackModal';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
+import noResultsIllustration from '../assets/illustrations/no-results.webp';
 import SourceTag, { UserDataTag } from '../components/ui/SourceTag';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
 import { SOURCES } from '../utils/sources';
@@ -11,13 +12,13 @@ import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const PIPELINE_STAGES = [
   { key: 'draft', label: 'Draft', color: 'bg-muted/50 text-muted-foreground' },
-  { key: 'message_sent', label: 'Sent', color: 'bg-blue-500/10 text-blue-400' },
+  { key: 'message_sent', label: 'Sent', color: 'bg-info/10 text-info' },
   { key: 'responded', label: 'Responded', color: 'bg-primary/10 text-primary' },
   { key: 'interview_scheduled', label: 'Interview', color: 'bg-purple-500/10 text-purple-400' },
   { key: 'interviewed', label: 'Interviewed', color: 'bg-purple-500/10 text-purple-400' },
-  { key: 'offer_received', label: 'Offer', color: 'bg-emerald-500/10 text-emerald-400' },
-  { key: 'offer_accepted', label: 'Accepted', color: 'bg-emerald-500/20 text-emerald-300' },
-  { key: 'rejected', label: 'Rejected', color: 'bg-red-500/10 text-red-400' },
+  { key: 'offer_received', label: 'Offer', color: 'bg-success/10 text-success' },
+  { key: 'offer_accepted', label: 'Accepted', color: 'bg-success/20 text-success' },
+  { key: 'rejected', label: 'Rejected', color: 'bg-destructive/10 text-destructive' },
   { key: 'withdrawn', label: 'Withdrawn', color: 'bg-muted/50 text-muted-foreground' },
   { key: 'no_response', label: 'No Response', color: 'bg-muted/50 text-muted-foreground' },
 ];
@@ -46,7 +47,7 @@ function AppCard({ app, onStatusChange, updating }) {
   const nextStatuses = getNextStatuses(app.status);
 
   return (
-    <div className="surface-raised p-3">
+    <div className="surface-raised hover-lift p-3">
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">{app.company_name}</p>
@@ -55,12 +56,12 @@ function AppCard({ app, onStatusChange, updating }) {
           )}
         </div>
         {isMarketplace && (
-          <span className="ml-2 shrink-0 rounded bg-purple-500/10 px-1.5 py-0.5 text-xs font-medium text-purple-400">
+          <span className="ml-2 shrink-0 rounded bg-accent/10 px-1.5 py-0.5 text-xs font-medium text-accent">
             Via Marketplace
           </span>
         )}
         {isReferral && (
-          <span className="ml-2 shrink-0 rounded bg-blue-500/10 px-1.5 py-0.5 text-xs font-medium text-blue-400">
+          <span className="ml-2 shrink-0 rounded bg-info/10 px-1.5 py-0.5 text-xs font-medium text-info">
             Via Referral
           </span>
         )}
@@ -92,7 +93,7 @@ function AppCard({ app, onStatusChange, updating }) {
             onChange={(e) => onStatusChange(app.id, e.target.value)}
             disabled={updating === app.id}
             aria-label={`Change status for ${app.company_name}`}
-            className="rounded border border-border bg-muted px-2 py-2 text-xs text-secondary-foreground focus:border-ring focus:outline-none"
+            className="cursor-pointer rounded border border-border bg-muted px-2 py-2 text-xs text-secondary-foreground transition-colors duration-200 focus:border-ring focus:outline-none"
           >
             <option value="" disabled>Move to...</option>
             {nextStatuses.map((s) => {
@@ -158,15 +159,15 @@ function ReferralAdvantage({ stats }) {
   const multiplier = coldRate > 0 ? (refRate / coldRate).toFixed(1) : null;
 
   return (
-    <div className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+    <div className="mb-6 rounded-xl border border-success/30 bg-success/5 p-4">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 text-lg" aria-hidden="true">&#x1F4CA;</span>
         <div className="flex-1">
-          <p className="text-sm font-semibold text-emerald-300">Referral Advantage</p>
+          <p className="text-sm font-semibold text-success">Referral Advantage</p>
           <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-muted-foreground">Via referral</p>
-              <p className="text-lg font-bold text-emerald-400">{Math.round(refRate * 100)}%</p>
+              <p className="text-lg font-bold text-success">{Math.round(refRate * 100)}%</p>
               <p className="text-xs text-muted-foreground">interview rate ({refInterviews} of {refSent})</p>
             </div>
             <div>
@@ -176,9 +177,9 @@ function ReferralAdvantage({ stats }) {
             </div>
           </div>
           {multiplier && parseFloat(multiplier) > 1 && (
-            <p className="mt-2 text-sm text-emerald-400/80">
+            <p className="mt-2 text-sm text-success/80">
               Your referrals convert <span className="font-bold">{multiplier}x</span> better <UserDataTag />.{' '}
-              <Link to="/search" className="underline hover:text-emerald-300">Find more referral paths</Link>
+              <Link to="/search" className="underline hover:text-success">Find more referral paths</Link>
             </p>
           )}
         </div>
@@ -424,11 +425,7 @@ export default function ApplicationsPage() {
       {/* Kanban board */}
       {apps.length === 0 ? (
         <EmptyState
-          icon={
-            <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.251 2.251 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z" />
-            </svg>
-          }
+          illustration={noResultsIllustration}
           title="Your application pipeline"
           description="Track every application from first message to offer. Applications from marketplace intros appear automatically."
           stats={[
@@ -544,11 +541,11 @@ export default function ApplicationsPage() {
 
       {/* Quick actions */}
       <div className="mt-6 flex flex-wrap items-center gap-3 text-sm">
-        <Link to="/referrals" className="text-primary hover:text-primary">Find referral paths &rarr;</Link>
+        <Link to="/referrals" className="text-primary transition-colors duration-200 hover:text-primary">Find referral paths &rarr;</Link>
         <span className="text-muted-foreground">&middot;</span>
-        <Link to="/credits" className="text-muted-foreground hover:text-secondary-foreground">View credits</Link>
+        <Link to="/credits" className="text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground">View credits</Link>
         <span className="text-muted-foreground">&middot;</span>
-        <Link to="/coach" className="text-muted-foreground hover:text-secondary-foreground">Back to Coach</Link>
+        <Link to="/coach" className="text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground">Back to Coach</Link>
       </div>
 
       {showFeedback && (

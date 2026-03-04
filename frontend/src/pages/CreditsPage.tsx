@@ -18,9 +18,9 @@ const REASON_LABELS = {
 
 function TypeBadge({ type }) {
   const colors = {
-    earned: 'bg-emerald-500/10 text-emerald-400',
-    purchased: 'bg-blue-500/10 text-blue-400',
-    spent: 'bg-red-500/10 text-red-400',
+    earned: 'bg-success/10 text-success',
+    purchased: 'bg-info/10 text-info',
+    spent: 'bg-destructive/10 text-destructive',
     expired: 'bg-muted/50 text-muted-foreground',
     refunded: 'bg-primary/10 text-primary',
   };
@@ -38,8 +38,8 @@ function UsageBar({ label, count, limit }) {
   const atLimit = !isUnlimited && typeof limit === 'number' && count >= limit;
   const nearLimit = !isUnlimited && typeof limit === 'number' && count >= limit * 0.8 && !atLimit;
 
-  const barColor = isBlocked ? 'bg-muted-foreground' : atLimit ? 'bg-red-500' : nearLimit ? 'bg-primary' : 'bg-green-500';
-  const textColor = isBlocked ? 'text-muted-foreground' : atLimit ? 'text-red-400' : nearLimit ? 'text-primary' : 'text-secondary-foreground';
+  const barColor = isBlocked ? 'bg-muted-foreground' : atLimit ? 'bg-destructive' : nearLimit ? 'bg-primary' : 'bg-success';
+  const textColor = isBlocked ? 'text-muted-foreground' : atLimit ? 'text-destructive' : nearLimit ? 'text-primary' : 'text-secondary-foreground';
 
   return (
     <div>
@@ -157,7 +157,7 @@ export default function CreditsPage() {
               }
               setShowActivity(!showActivity);
             }}
-            className="mt-4 text-sm font-medium text-primary hover:text-primary"
+            className="mt-4 cursor-pointer text-sm font-medium text-primary transition-colors duration-200 hover:text-primary"
           >
             {showActivity ? 'Hide activity' : 'View all activity'}
           </button>
@@ -194,7 +194,7 @@ export default function CreditsPage() {
                 <p className="text-sm font-medium text-foreground">{item.action}</p>
                 <p className="text-xs text-muted-foreground">{item.desc}</p>
               </div>
-              <span className="text-sm font-bold font-mono text-emerald-400">{item.amount}</span>
+              <span className="text-sm font-bold font-mono text-success">{item.amount}</span>
             </div>
           ))}
         </div>
@@ -213,7 +213,7 @@ export default function CreditsPage() {
                 <p className="text-sm font-medium text-foreground">{item.action}</p>
                 <p className="text-xs text-muted-foreground">{item.desc}</p>
               </div>
-              <span className="text-sm font-bold font-mono text-red-400">{item.amount}</span>
+              <span className="text-sm font-bold font-mono text-destructive">{item.amount}</span>
             </div>
           ))}
         </div>
@@ -265,7 +265,7 @@ export default function CreditsPage() {
                     </p>
                   </div>
                 </div>
-                <span className={`text-sm font-bold font-mono ${tx.amount > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <span className={`text-sm font-bold font-mono ${tx.amount > 0 ? 'text-success' : 'text-destructive'}`}>
                   {tx.amount > 0 ? '+' : ''}{tx.amount}
                 </span>
               </div>
@@ -280,7 +280,7 @@ export default function CreditsPage() {
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link
             to="/referrals"
-            className="flex flex-1 items-center gap-3 rounded-lg bg-muted/50 p-3 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
+            className="flex flex-1 items-center gap-3 rounded-lg bg-muted/50 p-3 text-sm font-medium text-foreground hover-lift cursor-pointer hover:bg-muted/50 transition-colors duration-200"
           >
             <svg className="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
@@ -292,7 +292,7 @@ export default function CreditsPage() {
           </Link>
           <Link
             to="/contacts"
-            className="flex flex-1 items-center gap-3 rounded-lg bg-muted/50 p-3 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
+            className="flex flex-1 items-center gap-3 rounded-lg bg-muted/50 p-3 text-sm font-medium text-foreground hover-lift cursor-pointer hover:bg-muted/50 transition-colors duration-200"
           >
             <svg className="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
@@ -304,7 +304,7 @@ export default function CreditsPage() {
           </Link>
           <Link
             to="/invite"
-            className="flex flex-1 items-center gap-3 rounded-lg bg-muted/50 p-3 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
+            className="flex flex-1 items-center gap-3 rounded-lg bg-muted/50 p-3 text-sm font-medium text-foreground hover-lift cursor-pointer hover:bg-muted/50 transition-colors duration-200"
           >
             <svg className="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />

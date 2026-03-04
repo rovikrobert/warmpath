@@ -20,7 +20,7 @@ export default function ScoreGlossary() {
       <div className="mb-6">
         <button
           onClick={() => navigate(-1)}
-          className="mb-1 inline-block text-sm text-primary hover:text-primary"
+          className="mb-1 inline-block cursor-pointer text-sm text-primary transition-colors duration-200 hover:text-primary/80"
         >
           &larr; Back
         </button>
@@ -34,7 +34,7 @@ export default function ScoreGlossary() {
       <div className="mb-6 space-y-2">
         <button
           onClick={() => setGuidanceOpen(guidanceOpen === 'seeker' ? null : 'seeker')}
-          className="w-full rounded-lg border border-border bg-muted/50 px-4 py-3 text-left text-sm font-medium text-foreground hover:bg-muted"
+          className="w-full cursor-pointer rounded-lg border border-border bg-muted/50 px-4 py-3 text-left text-sm font-medium text-foreground transition-colors duration-200 hover:bg-muted"
           aria-expanded={guidanceOpen === 'seeker'}
         >
           <span className="flex items-center justify-between">
@@ -54,7 +54,7 @@ export default function ScoreGlossary() {
 
         <button
           onClick={() => setGuidanceOpen(guidanceOpen === 'holder' ? null : 'holder')}
-          className="w-full rounded-lg border border-border bg-muted/50 px-4 py-3 text-left text-sm font-medium text-foreground hover:bg-muted"
+          className="w-full cursor-pointer rounded-lg border border-border bg-muted/50 px-4 py-3 text-left text-sm font-medium text-foreground transition-colors duration-200 hover:bg-muted"
           aria-expanded={guidanceOpen === 'holder'}
         >
           <span className="flex items-center justify-between">
@@ -128,9 +128,9 @@ export default function ScoreGlossary() {
 
         {/* Navigation */}
         <div className="flex flex-wrap items-center gap-3 pt-2 text-sm">
-          <Link to="/referrals" className="text-primary hover:text-primary">Find referral paths &rarr;</Link>
+          <Link to="/referrals" className="text-primary transition-colors duration-200 hover:text-primary/80">Find referral paths &rarr;</Link>
           <span className="text-muted-foreground">&middot;</span>
-          <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-secondary-foreground">
+          <button onClick={() => navigate(-1)} className="cursor-pointer text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground">
             &larr; Back
           </button>
         </div>

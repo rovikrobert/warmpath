@@ -261,7 +261,7 @@ export default function CoachPage() {
                 key={prompt}
                 onClick={() => sendMessage(prompt)}
                 disabled={sending}
-                className="flex-shrink-0 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-shrink-0 glass rounded-full border border-primary/30 px-4 py-2 text-sm font-medium text-primary hover:border-primary/30 transition-all duration-200 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {prompt}
               </button>
@@ -271,7 +271,7 @@ export default function CoachPage() {
                 key={action.label}
                 onClick={() => sendMessage(action.prompt)}
                 disabled={sending}
-                className="flex-shrink-0 bg-muted hover:bg-muted border border-border rounded-full px-4 py-2 text-sm text-secondary-foreground hover:text-foreground transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-shrink-0 glass rounded-full border border-border px-4 py-2 text-sm text-secondary-foreground hover:text-foreground hover:border-primary/30 transition-all duration-200 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {action.label}
               </button>
@@ -288,16 +288,16 @@ export default function CoachPage() {
           return (
           <div
             key={i}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex animate-slide-up-fade-in ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div>
               <div
-                className={`rounded-2xl text-sm leading-relaxed ${
+                className={`text-sm leading-relaxed ${
                   msg.role === 'user'
-                    ? 'max-w-[95%] sm:max-w-[85%] px-4 py-3 bg-primary text-white'
+                    ? 'max-w-[95%] sm:max-w-[85%] px-4 py-3 bg-primary/10 text-foreground rounded-2xl rounded-br-md'
                     : isBriefing
-                      ? 'max-w-[98%] sm:max-w-[90%] px-5 py-4 border-l-2 border-primary/30 bg-muted text-foreground'
-                      : 'max-w-[95%] sm:max-w-[85%] px-4 py-3 bg-muted text-foreground'
+                      ? 'max-w-[98%] sm:max-w-[90%] px-5 py-4 bg-card border border-border/50 rounded-2xl rounded-bl-md'
+                      : 'max-w-[95%] sm:max-w-[85%] px-4 py-3 bg-card border border-border/50 rounded-2xl rounded-bl-md text-foreground'
                 }`}
               >
                 {(msg.role === 'keevs' || msg.role === 'treb')
@@ -340,7 +340,7 @@ export default function CoachPage() {
       </div>
 
       {/* Input area */}
-      <div className="flex-none border-t border-border bg-background px-4 py-3">
+      <div className="flex-none glass border-t border-border/50 px-4 py-3">
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}

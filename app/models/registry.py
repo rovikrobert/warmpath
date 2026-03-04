@@ -45,9 +45,11 @@ class CompanyBoard(Base):
         String(1000), comment="Fallback career page URL"
     )
     region: Mapped[str | None] = mapped_column(
-        String(100), comment="Geographic region grouping"
+        String(100), index=True, comment="Geographic region grouping"
     )
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False, index=True
+    )
     verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), comment="Last successful ATS probe timestamp"
     )

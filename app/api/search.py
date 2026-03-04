@@ -199,9 +199,13 @@ async def get_search(
 
     resp = SearchRequestResponse.model_validate(search).model_dump(mode="json")
 
-    # Include smart search results if available
+    # Flatten smart search results into top-level response for consistent shape
+    # with POST /smart (which returns {id, status, companies, summary, scope})
     if search.results_data:
         resp["results_data"] = search.results_data
+        for key in ("companies", "summary", "scope"):
+            if key in search.results_data:
+                resp[key] = search.results_data[key]
     if search.error_message:
         resp["error"] = search.error_message
 
@@ -555,7 +559,7 @@ async def smart_search(
             detail="Set job preferences first (PUT /preferences/job with target_role)",
         )
 
-    scope = body.scope or "own_network"
+    scope = body.scope
 
     # Marketplace scope costs credits
     if scope == "marketplace" and not await check_and_spend(
@@ -606,15 +610,24 @@ async def smart_search(
             metadata_={"scope": scope, "companies": body.company_names[:5]},
         )
 
-        # Track first_search milestone (only fires once per user)
-        prior = await db.execute(
-            select(func.count()).where(
-                SearchRequest.user_id == current_user.id,
-                SearchRequest.status == "completed",
-                SearchRequest.id != search_id,
+        # Track first_search milestone (idempotent via unique constraint)
+        from app.models.milestone import UserMilestone
+
+        existing = await db.execute(
+            select(UserMilestone.id).where(
+                UserMilestone.user_id == current_user.id,
+                UserMilestone.milestone_type == "first_search",
             )
         )
-        if (prior.scalar() or 0) == 0:
+        if existing.scalar_one_or_none() is None:
+            db.add(
+                UserMilestone(
+                    user_id=current_user.id,
+                    milestone_type="first_search",
+                    milestone_value=1,
+                    credits_awarded=0,
+                )
+            )
             await track_action(
                 db,
                 current_user.id,

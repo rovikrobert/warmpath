@@ -24,26 +24,32 @@ function getExperimentVariant(): 'control' | 'treatment' {
 
 function ShimmerCard() {
   return (
-    <div className="animate-pulse rounded-lg border border-border bg-muted p-4" aria-hidden="true">
-      <div className="mb-2 h-4 w-2/3 rounded bg-muted" />
-      <div className="mb-3 h-3 w-1/3 rounded bg-muted" />
-      <div className="mb-1 h-3 w-full rounded bg-muted" />
-      <div className="h-3 w-3/4 rounded bg-muted" />
+    <div className="animate-pulse rounded-lg border border-border bg-card p-4" aria-hidden="true">
+      <div className="mb-2 h-4 w-2/3 rounded bg-card" />
+      <div className="mb-3 h-3 w-1/3 rounded bg-card" />
+      <div className="mb-1 h-3 w-full rounded bg-card" />
+      <div className="h-3 w-3/4 rounded bg-card" />
     </div>
   );
 }
 
 function RecommendationCard({ rec, onAdd, isAdded }) {
+  // Only show job badge when we actually have ATS data — network-only
+  // companies (source=network_signal, total_openings=0) never checked jobs,
+  // so "No matching jobs" would be misleading.
+  const hasAtsData = rec.source === 'board_registry' || rec.total_openings > 0;
   const jobLabel =
     rec.matching_count > 0
       ? `${rec.matching_count} job${rec.matching_count !== 1 ? 's' : ''} matching your criteria`
-      : 'No matching jobs found';
+      : hasAtsData
+        ? 'No matching jobs found'
+        : null;
   const jobBadgeStyle =
     rec.matching_count > 0
-      ? 'bg-emerald-500/10 text-emerald-400'
+      ? 'bg-success/10 text-success'
       : 'bg-muted/50 text-muted-foreground';
   return (
-    <div className="surface-interactive p-4">
+    <div className="rounded-lg border border-border bg-card hover-lift cursor-pointer p-4">
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
           <p className="font-medium text-foreground">{rec.display_name}</p>
@@ -58,9 +64,11 @@ function RecommendationCard({ rec, onAdd, isAdded }) {
                 {rec.network_label}
               </span>
             ) : null}
-            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${jobBadgeStyle}`}>
-              {jobLabel}
-            </span>
+            {jobLabel && (
+              <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${jobBadgeStyle}`}>
+                {jobLabel}
+              </span>
+            )}
             {rec.referral_ready && (
               <span className="inline-flex rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold text-primary">
                 Referral Ready
@@ -75,7 +83,7 @@ function RecommendationCard({ rec, onAdd, isAdded }) {
         </div>
         {isAdded ? (
           <span
-            className="ml-3 shrink-0 rounded-md border border-emerald-500 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400"
+            className="ml-3 shrink-0 rounded-md border border-success bg-success/10 px-2.5 py-1 text-xs font-medium text-success"
             aria-label={`${rec.display_name} added`}
           >
             Added
@@ -154,56 +162,59 @@ export default function FindReferrals() {
 
   // Fetch connection counts for newly added companies
   useEffect(() => {
-    const missing = companies.filter((c) => !(c in companyCounts));
-    if (missing.length === 0) return;
+    setCompanyCounts((prev) => {
+      const missing = companies.filter((c) => !(c in prev));
+      if (missing.length === 0) return prev;
 
-    missing.forEach((name) => {
-      companiesApi
-        .search({ query: name, limit: 5 })
-        .then((res) => {
-          const results = res.data ?? [];
-          // Sum contact counts across all name variants (e.g. "Meta" matches
-          // "Meta", "Meta Platforms", "Meta Platforms Inc" in the Company table)
-          const count = results.reduce((sum, c) => sum + (c.contact_count ?? 0), 0);
-          setCompanyCounts((prev) => ({
-            ...prev,
-            [name]: count,
-          }));
-        })
-        .catch(() => {
-          setCompanyCounts((prev) => ({ ...prev, [name]: 0 }));
-        });
+      missing.forEach((name) => {
+        companiesApi
+          .search({ query: name, limit: 5 })
+          .then((res) => {
+            const results = res.data ?? [];
+            // Sum contact counts across all name variants (e.g. "Meta" matches
+            // "Meta", "Meta Platforms", "Meta Platforms Inc" in the Company table)
+            const count = results.reduce((sum, c) => sum + (c.contact_count ?? 0), 0);
+            setCompanyCounts((p) => ({ ...p, [name]: count }));
+          })
+          .catch(() => {
+            setCompanyCounts((p) => ({ ...p, [name]: 0 }));
+          });
+      });
+      return prev;
     });
-  }, [companies, companyCounts]);
+  }, [companies]);
 
   // Discover jobs at newly added companies
   useEffect(() => {
-    const undiscovered = companies.filter((c) => !(c in discoveryStatus));
-    if (undiscovered.length === 0) return;
+    setDiscoveryStatus((prev) => {
+      const undiscovered = companies.filter((c) => !(c in prev));
+      if (undiscovered.length === 0) return prev;
 
-    undiscovered.forEach((name) => {
-      setDiscoveryStatus((prev) => ({ ...prev, [name]: { status: 'discovering' } }));
-      companiesApi
-        .discover(name)
-        .then((res) => {
-          const d = res.data ?? {};
-          setDiscoveryStatus((prev) => ({
-            ...prev,
-            [name]: {
-              status: d.jobs_found > 0 ? 'found' : 'not_found',
-              jobsCount: d.jobs_found ?? 0,
-              careersUrl: d.careers_url,
-            },
-          }));
-        })
-        .catch(() => {
-          setDiscoveryStatus((prev) => ({
-            ...prev,
-            [name]: { status: 'not_found', jobsCount: 0 },
-          }));
-        });
+      undiscovered.forEach((name) => {
+        setDiscoveryStatus((p) => ({ ...p, [name]: { status: 'discovering' } }));
+        companiesApi
+          .discover(name)
+          .then((res) => {
+            const d = res.data ?? {};
+            setDiscoveryStatus((p) => ({
+              ...p,
+              [name]: {
+                status: d.jobs_found > 0 ? 'found' : 'not_found',
+                jobsCount: d.jobs_found ?? 0,
+                careersUrl: d.careers_url,
+              },
+            }));
+          })
+          .catch(() => {
+            setDiscoveryStatus((p) => ({
+              ...p,
+              [name]: { status: 'not_found', jobsCount: 0 },
+            }));
+          });
+      });
+      return prev;
     });
-  }, [companies, discoveryStatus]);
+  }, [companies]);
 
   // Computed values for scope toggle UI
   const companiesLoaded = companies.length > 0 && companies.every((c) => c in companyCounts);
@@ -321,6 +332,7 @@ export default function FindReferrals() {
       } else {
         setError(msg);
       }
+    } finally {
       setSearching(false);
     }
   };
@@ -347,7 +359,7 @@ export default function FindReferrals() {
         </div>
       )}
 
-      <div className="space-y-5 surface-raised p-6 shadow-sm">
+      <div className="space-y-5 glass rounded-xl p-6 shadow-sm">
         <div data-search-input>
           <CompanyAutocomplete
             value={companies}
@@ -383,7 +395,7 @@ export default function FindReferrals() {
                         <span className="italic text-muted-foreground">Discovering jobs at {name}...</span>
                       )}
                       {discovery.status === 'found' && (
-                        <span className="text-emerald-400">{discovery.jobsCount} job{discovery.jobsCount !== 1 ? 's' : ''} found</span>
+                        <span className="text-success">{discovery.jobsCount} job{discovery.jobsCount !== 1 ? 's' : ''} found</span>
                       )}
                       {discovery.status === 'not_found' && (
                         <span className="text-muted-foreground">
@@ -424,10 +436,10 @@ export default function FindReferrals() {
               <p className="font-medium text-foreground">Your Network</p>
               <p className="mt-1 text-xs text-muted-foreground">Search your uploaded contacts</p>
               <div className="mt-2 flex items-center gap-2">
-                <span className="text-xs font-medium text-emerald-400">Free</span>
+                <span className="text-xs font-medium text-success">Free</span>
               </div>
               {companies.length > 0 && totalOwnConnections > 0 && (
-                <p className="mt-1.5 text-xs text-emerald-400">
+                <p className="mt-1.5 text-xs text-success">
                   {totalOwnConnections} {totalOwnConnections === 1 ? 'connection' : 'connections'} found
                 </p>
               )}
@@ -543,7 +555,7 @@ export default function FindReferrals() {
               ? Array.from({ length: 4 }).map((_, i) => <ShimmerCard key={i} />)
               : recommendations.map((rec) => (
                   <RecommendationCard
-                    key={rec.company}
+                    key={rec.display_name || rec.company}
                     rec={rec}
                     onAdd={handleAddRec}
                     isAdded={companies.includes(rec.display_name)}

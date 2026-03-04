@@ -16,6 +16,10 @@ from app.models.credits import CreditTransaction
 
 MAX_EARN_PER_DAY = 500
 
+# One-time awards exempt from daily earn cap (welcome bonus, milestones, purchases).
+# These are not repeatable actions, so they can't be farmed.
+_CAP_EXEMPT_REASONS = frozenset({"welcome_bonus", "purchase", "enrichment_milestone"})
+
 
 async def get_balance(user_id: uuid.UUID, db: AsyncSession) -> int:
     """Get user's current credit balance (sum of non-expired transactions).
@@ -110,6 +114,7 @@ async def earn_credits(
                 CreditTransaction.user_id == user_id,
                 CreditTransaction.type == "earned",
                 CreditTransaction.created_at >= today_start,
+                CreditTransaction.reason.notin_(_CAP_EXEMPT_REASONS),
             )
         )
         earned_today = int(earned_today_result.scalar())

@@ -268,16 +268,16 @@ export default function RequestIntroModal({ listing, creditBalance, onClose, onS
         </div>
 
         {!canAfford && (
-          <p className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">
+          <p className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">
             Insufficient credits. You need at least 20 credits to request an intro.
           </p>
         )}
 
         {error && (
-          <div className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">
+          <div className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">
             <p>{error}</p>
             {showCreditsCta && (
-              <Link to="/credits" className="mt-1 inline-block font-medium text-red-300 hover:text-red-200">
+              <Link to="/credits" className="mt-1 inline-block font-medium text-destructive/80 hover:text-destructive/70">
                 Go to Credits &rarr;
               </Link>
             )}

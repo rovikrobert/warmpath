@@ -105,13 +105,13 @@ export default function CommandPalette() {
     <div className="fixed inset-0 z-50">
       {/* Overlay */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 glass bg-black/60"
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
 
       {/* Dialog */}
-      <div className="relative mx-auto mt-[20vh] max-w-lg rounded-xl border border-border bg-card shadow-2xl">
+      <div className="relative mx-auto mt-[20vh] max-w-lg rounded-xl border border-border/50 bg-card shadow-2xl animate-scale-in">
         <Command label="Command palette" shouldFilter={true}>
           <Command.Input
             ref={inputRef}

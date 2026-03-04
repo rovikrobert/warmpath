@@ -139,7 +139,7 @@ async def _handle_user_created(
     )
     if suppression_result.scalars().first() is None:
         bonus = 500 if settings.BETA_SANDBOX_MODE else 50
-        await earn_credits(user.id, bonus, "welcome_bonus", db)
+        await earn_credits(user.id, bonus, "welcome_bonus", db, skip_daily_cap=True)
 
     # Send welcome email
     from app.services.email_engagement import send_welcome_email_js

@@ -81,12 +81,12 @@ const PRIVACY_STEPS = [
     title: 'Contacts Are Protected',
     text: 'If you share contacts on the marketplace, only anonymized listing fields are shown (company, role level, department, strength). Names, emails, and LinkedIn profiles are never revealed without your explicit approval.',
     icon: (
-      <svg className="h-10 w-10 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+      <svg className="h-10 w-10 text-success" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
       </svg>
     ),
-    bgColor: 'bg-emerald-500/10',
-    borderColor: 'border-emerald-500/30',
+    bgColor: 'bg-success/10',
+    borderColor: 'border-success/30',
   },
   {
     title: "Your Employer Can't See You",
@@ -103,12 +103,12 @@ const PRIVACY_STEPS = [
     title: 'Anyone Can Opt Out',
     text: 'Any person can request removal from WarmPath at any time, even if they don\'t have an account. We maintain a permanent suppression list.',
     icon: (
-      <svg className="h-10 w-10 text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+      <svg className="h-10 w-10 text-info" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
       </svg>
     ),
-    bgColor: 'bg-blue-500/10',
-    borderColor: 'border-blue-500/30',
+    bgColor: 'bg-info/10',
+    borderColor: 'border-info/30',
   },
   {
     title: 'How We Use AI',
@@ -563,7 +563,7 @@ export default function OnboardingPage() {
                 )}
               </div>
 
-              {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
+              {error && <p role="alert" aria-live="polite" className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">{error}</p>}
 
               <div className="flex gap-3">
                 <Button
@@ -653,7 +653,7 @@ export default function OnboardingPage() {
                 Open to remote roles
               </label>
 
-              {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
+              {error && <p role="alert" aria-live="polite" className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">{error}</p>}
 
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={() => { setError(''); setStep(1); }} className="flex-1" size="lg">
@@ -683,9 +683,9 @@ export default function OnboardingPage() {
               )}
 
               <div className="space-y-3">
-                <div className="flex items-start gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 sm:p-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10">
-                    <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+                <div className="flex items-start gap-3 rounded-xl border border-success/30 bg-success/10 p-3 sm:p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success/10">
+                    <svg className="h-5 w-5 text-success" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                     </svg>
                   </div>
@@ -753,11 +753,11 @@ export default function OnboardingPage() {
                 <span className="text-muted-foreground" aria-hidden="true">&rarr;</span>
                 <span className="text-primary">Your Private Vault</span>
                 <span className="text-muted-foreground" aria-hidden="true">&rarr;</span>
-                <span className="text-emerald-400">Anonymized Marketplace</span>
+                <span className="text-success">Anonymized Marketplace</span>
                 <span className="text-muted-foreground" aria-hidden="true">&rarr;</span>
                 <span className="text-purple-400">You Review</span>
                 <span className="text-muted-foreground" aria-hidden="true">&rarr;</span>
-                <span className="text-blue-400">You Approve</span>
+                <span className="text-info">You Approve</span>
               </div>
 
               {/* Privacy points — compact rows */}
@@ -971,7 +971,7 @@ export default function OnboardingPage() {
                 <span className="font-medium text-muted-foreground">Settings &gt; Sharing</span>.
               </p>
 
-              {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
+              {error && <p role="alert" aria-live="polite" className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">{error}</p>}
 
               {uploading && (
                 <div aria-live="polite">
@@ -1012,8 +1012,8 @@ export default function OnboardingPage() {
           {/* Step 6 done — prompt for work history */}
           {step === 6 && uploadResult && (
             <div className="space-y-4 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
-                <span className="text-xl text-emerald-400">&#10003;</span>
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success/10">
+                <span className="text-xl text-success">&#10003;</span>
               </div>
               <h2 className="text-lg font-semibold text-foreground">
                 {uploadResult.status === 'queued' || uploadResult.status === 'processing'
@@ -1147,7 +1147,7 @@ export default function OnboardingPage() {
                         type="button"
                         aria-label={`Remove work history entry ${i + 1}`}
                         onClick={() => setWorkHistory((wh) => wh.filter((_, j) => j !== i))}
-                        className="text-xs text-red-400 hover:text-red-300"
+                        className="text-xs text-destructive hover:text-destructive/80 cursor-pointer transition-colors duration-200"
                       >
                         Remove
                       </button>
@@ -1166,7 +1166,7 @@ export default function OnboardingPage() {
                 </button>
               )}
 
-              {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-500/10 p-2 text-sm text-red-400">{error}</p>}
+              {error && <p role="alert" aria-live="polite" className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">{error}</p>}
 
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={() => { setError(''); setStep(6); }} size="lg" className="px-4">

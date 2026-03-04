@@ -14,6 +14,7 @@ interface EmptyStateStat {
 
 interface EmptyStateProps {
   icon?: React.ReactNode;
+  illustration?: string;
   title?: string;
   description?: string;
   primaryAction?: EmptyStateAction;
@@ -25,6 +26,7 @@ interface EmptyStateProps {
 
 export default function EmptyState({
   icon,
+  illustration,
   title,
   description,
   primaryAction,
@@ -35,11 +37,24 @@ export default function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className="mx-auto max-w-md py-16 text-center">
-      {icon && (
+      {illustration ? (
+        <div className="mx-auto mb-6 flex justify-center">
+          <img
+            src={illustration}
+            alt=""
+            className="h-40 w-auto object-contain"
+            draggable={false}
+            onError={(e) => {
+              console.error('Failed to load illustration:', illustration);
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        </div>
+      ) : icon ? (
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center text-muted-foreground">
           {icon}
         </div>
-      )}
+      ) : null}
 
       {title && (
         <h2 className="mb-2 text-center text-lg font-medium text-secondary-foreground">

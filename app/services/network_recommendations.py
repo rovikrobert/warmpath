@@ -19,6 +19,7 @@ from app.models.company import Company
 from app.models.contact import Contact
 from app.models.marketplace import MarketplaceListing, NetworkSharingPreferences
 from app.services.board_registry import is_known_tech_company, lookup_careers_url
+from app.services.company_normalizer import normalize_company_name
 
 logger = logging.getLogger(__name__)
 
@@ -140,14 +141,29 @@ async def get_network_recommendations(
         lambda: {"display_name": "", "own": 0, "market": 0}
     )
 
+    # Helper: normalize a lowercased company key to merge variants like
+    # "singapore economic development board" and
+    # "singapore economic development board (edb)".
+    _norm_cache: dict[str, str] = {}
+
+    def _norm_key(raw_key: str) -> str:
+        if raw_key in _norm_cache:
+            return _norm_cache[raw_key]
+        normed = normalize_company_name(raw_key)
+        canonical = normed.lower() if normed else raw_key
+        _norm_cache[raw_key] = canonical
+        return canonical
+
     for row in own_rows:
-        key = row.company_key
-        merged[key]["display_name"] = row.display_name
+        key = _norm_key(row.company_key)
+        # Keep the longest display_name variant (more descriptive)
+        if len(row.display_name) > len(merged[key]["display_name"]):
+            merged[key]["display_name"] = row.display_name
         merged[key]["own"] += row.contact_count
 
     for row in market_rows:
-        key = row.company_key
-        if not merged[key]["display_name"]:
+        key = _norm_key(row.company_key)
+        if len(row.display_name) > len(merged[key]["display_name"]):
             merged[key]["display_name"] = row.display_name
         merged[key]["market"] += row.listing_count
 
@@ -158,7 +174,7 @@ async def get_network_recommendations(
 
     results: list[dict] = []
     for key, data in merged.items():
-        if key in excluded or key in _EXCLUDED_COMPANIES:
+        if key in excluded or key in _EXCLUDED_COMPANIES or len(key) < 2:
             continue
         # When user targets tech/SaaS, skip companies not in the board registry
         if tech_filter and not is_known_tech_company(key):
@@ -191,11 +207,10 @@ async def get_network_recommendations(
 
 def _build_network_label(own: int, market: int) -> str:
     """Generate a human-readable network label from contact counts."""
+    total = own + market
+    suffix = "connection" if total == 1 else "connections"
     if own and market:
-        return f"{own} direct + {market} extended connections"
+        return f"{total} {suffix} ({own} direct, {market} extended)"
     if own:
-        suffix = "connection" if own == 1 else "connections"
         return f"{own} {suffix} in your network"
-    # market only
-    suffix = "connection" if market == 1 else "connections"
     return f"{market} {suffix} in extended network"
