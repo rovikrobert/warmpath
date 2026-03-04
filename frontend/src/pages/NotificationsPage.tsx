@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { feed as feedApi } from '../api/client';
 import FeedCard from '../components/FeedCard';
-import noNotificationsIllustration from '../assets/illustrations/no-notifications.png';
+import noNotificationsIllustration from '../assets/illustrations/no-notifications.webp';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 export default function NotificationsPage() {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { referrals as referralsApi } from '../api/client';
 import EmptyState from '../components/ui/EmptyState';
-import noResultsIllustration from '../assets/illustrations/no-results.png';
+import noResultsIllustration from '../assets/illustrations/no-results.webp';
 import Spinner from '../components/ui/Spinner';
 import { useAuth } from '../context/AuthContext';
 import useDocumentTitle from '../hooks/useDocumentTitle';

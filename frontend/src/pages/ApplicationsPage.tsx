@@ -4,7 +4,7 @@ import { applications as appsApi, contacts as contactsApi } from '../api/client'
 import FeedbackModal from '../components/FeedbackModal';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
-import noResultsIllustration from '../assets/illustrations/no-results.png';
+import noResultsIllustration from '../assets/illustrations/no-results.webp';
 import SourceTag, { UserDataTag } from '../components/ui/SourceTag';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
 import { SOURCES } from '../utils/sources';
