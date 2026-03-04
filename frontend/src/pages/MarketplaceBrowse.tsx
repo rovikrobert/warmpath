@@ -105,7 +105,7 @@ export default function MarketplaceBrowse() {
     setLoading(true);
     searchApi.recommendations({ limit: 20 })
       .then((r) => setRecommendations(r.data?.recommendations ?? []))
-      .catch(() => {})
+      .catch((err) => { console.error('MarketplaceBrowse: failed to load recommendations', err); })
       .finally(() => setLoading(false));
   }, [hasPrefs]);
 

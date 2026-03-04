@@ -119,7 +119,8 @@ export default function CoachPage() {
         setMessages([{ role: p, content: data.briefing }]);
         setContextSnapshot(data.context_snapshot);
         setSuggestedPrompts(data.suggested_prompts || []);
-      } catch {
+      } catch (err) {
+        console.error('CoachPage: briefing load failed', err);
         if (cancelled) return;
         const firstName = user?.full_name?.split(' ')[0] || 'there';
         setMessages([{
@@ -196,12 +197,13 @@ export default function CoachPage() {
                 return updated;
               });
             }
-          } catch {
-            // skip malformed SSE lines
+          } catch (err) {
+            console.error('CoachPage: failed to parse SSE line', err);
           }
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('CoachPage: stream failed', err);
       setMessages((prev) => {
         const updated = [...prev];
         const last = updated[keevsIdx];

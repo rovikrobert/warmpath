@@ -80,7 +80,8 @@ export default function CommandPalette() {
       try {
         const res = await contactsApi.list({ search: query, per_page: 8 });
         setContactResults(res.data ?? []);
-      } catch {
+      } catch (err) {
+        console.error('CommandPalette: failed to search contacts', err);
         setContactResults([]);
       } finally {
         setLoadingContacts(false);

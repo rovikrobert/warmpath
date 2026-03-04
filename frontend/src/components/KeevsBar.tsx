@@ -104,15 +104,8 @@ export default function KeevsBar() {
 
   const relevantType = getRelevantType(location.pathname);
 
-  // Suppress on certain pages
-  if (relevantType === null) return null;
-
-  const persona = getBarPersona(user?.intent, location.pathname);
-  const Avatar = persona === 'treb' ? TrebAvatar : KeevsAvatar;
-  const personaName = persona === 'treb' ? 'Treb' : 'Keevs';
-  const accentClass = persona === 'treb' ? 'text-teal-400' : 'text-primary';
-
   useEffect(() => {
+    if (relevantType === null) return;
     let cancelled = false;
     async function load() {
       try {
@@ -123,8 +116,8 @@ export default function KeevsBar() {
           setItem(match);
           return;
         }
-      } catch {
-        // fall through to seed nudge
+      } catch (err) {
+        console.error('KeevsBar: feed load failed', err);
       }
       // No feed items — use seed nudge for first-session users
       if (!cancelled) {
@@ -148,6 +141,14 @@ export default function KeevsBar() {
     setExpanded(false);
   }, [location.pathname]);
 
+  // Suppress on certain pages — after all hooks
+  if (relevantType === null) return null;
+
+  const persona = getBarPersona(user?.intent, location.pathname);
+  const Avatar = persona === 'treb' ? TrebAvatar : KeevsAvatar;
+  const personaName = persona === 'treb' ? 'Treb' : 'Keevs';
+  const accentClass = persona === 'treb' ? 'text-teal-400' : 'text-primary';
+
   if (!item || dismissed) return null;
 
   const handleDismiss = async () => {
@@ -162,7 +163,8 @@ export default function KeevsBar() {
         await feedApi.dismiss(item.id);
         setDismissed(true);
         window.dispatchEvent(new Event('feed-updated'));
-      } catch {
+      } catch (err) {
+        console.error('KeevsBar: dismiss failed', err);
         setDismissing(false);
       }
     }, 300);
