@@ -168,8 +168,9 @@ export default function FeedCard({ item, onDismiss, onAct, compact = false }: Fe
       setDismissed(true);
       onDismiss?.(item.id);
       window.dispatchEvent(new Event('feed-updated'));
-    } catch {
-      // Silently fail — item remains visible
+    } catch (err) {
+      console.error('FeedCard: dismiss failed', err);
+      // Item remains visible
     }
   };
 
@@ -177,7 +178,8 @@ export default function FeedCard({ item, onDismiss, onAct, compact = false }: Fe
     try {
       await feedApi.act(item.id);
       onAct?.(item.id);
-    } catch {
+    } catch (err) {
+      console.error('FeedCard: action tracking failed', err);
       // Still navigate even if tracking fails
     }
   };
@@ -191,8 +193,8 @@ export default function FeedCard({ item, onDismiss, onAct, compact = false }: Fe
         signal_value: signalValue,
       });
       setResponded(true);
-    } catch {
-      // TODO: surface error
+    } catch (err) {
+      console.error('FeedCard: enrichment response failed', err);
     }
   };
 

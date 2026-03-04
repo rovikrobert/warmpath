@@ -48,10 +48,10 @@ export default function MarketplaceOverview() {
   const load = async () => {
     try {
       const [listingsRes, incomingRes, balRes, prefsRes] = await Promise.all([
-        mpApi.myListings().catch(() => ({ data: [] })),
-        mpApi.incomingRequests().catch(() => ({ data: [] })),
-        creditsApi.balance().catch(() => ({ data: { balance: 0 } })),
-        mpApi.getSharingPrefs().catch(() => ({ data: {} })),
+        mpApi.myListings().catch((err) => { console.error('MarketplaceOverview: failed to load listings', err); return { data: [] }; }),
+        mpApi.incomingRequests().catch((err) => { console.error('MarketplaceOverview: failed to load incoming requests', err); return { data: [] }; }),
+        creditsApi.balance().catch((err) => { console.error('MarketplaceOverview: failed to load balance', err); return { data: { balance: 0 } }; }),
+        mpApi.getSharingPrefs().catch((err) => { console.error('MarketplaceOverview: failed to load sharing prefs', err); return { data: {} }; }),
       ]);
       setListings(listingsRes.data || []);
       setIncoming(incomingRes.data || []);
@@ -147,6 +147,7 @@ export default function MarketplaceOverview() {
         setBalance(balRes.data?.balance ?? balance);
       } catch (_err) {
         // Non-critical — balance will refresh on next load
+        console.error('MarketplaceOverview: balance refresh failed', _err);
       }
     }
 
@@ -441,7 +442,7 @@ export default function MarketplaceOverview() {
                 </div>
 
                 {/* Coaching text after approval — dynamic based on delivery status */}
-                {req.status === 'approved' && (req.id === approvedCoaching || !approvedCoaching) && (
+                {req.status === 'approved' && req.id === approvedCoaching && (
                   <div className="mt-3 rounded-lg border border-success/30 bg-success/10 p-4" aria-live="polite">
                     {req.delivery_method === 'email_relay' && req.delivery_status === 'delivered' ? (
                       <>

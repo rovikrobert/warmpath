@@ -30,7 +30,7 @@ export default function EnrichmentProgress({ compact = false }: EnrichmentProgre
   useEffect(() => {
     contactsApi.enrichmentProgress()
       .then((res) => setData(res.data))
-      .catch(() => {})
+      .catch((err) => { console.error('EnrichmentProgress: failed to load enrichment progress', err); })
       .finally(() => setLoading(false));
   }, []);
 

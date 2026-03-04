@@ -205,7 +205,8 @@ export default function OnboardingPage() {
         if (!hasContacts) { setStep(6); return; }
         // Work history is the last step
         setStep(7);
-      } catch {
+      } catch (err) {
+        console.error('OnboardingPage: failed to determine onboarding step', err);
         // Default to step 1 on error
       }
     })();
@@ -447,7 +448,8 @@ export default function OnboardingPage() {
               setError('Import is taking longer than expected. Please wait a moment and try again.');
               return;
             }
-          } catch {
+          } catch (err) {
+            console.error('OnboardingPage: failed to check contacts after upload timeout', err);
             setError('Import is taking longer than expected. Please wait a moment and try again.');
             return;
           }
@@ -727,7 +729,7 @@ export default function OnboardingPage() {
                 </Button>
                 <Button onClick={async () => {
                   if (nhEmployer.trim()) {
-                    try { await authApi.upsertProfile({ current_company: nhEmployer.trim() }); } catch { /* best-effort */ }
+                    try { await authApi.upsertProfile({ current_company: nhEmployer.trim() }); } catch (err) { console.error('OnboardingPage: failed to save employer', err); }
                   }
                   setStep(4);
                 }} className="flex-1" size="lg">
@@ -1199,7 +1201,8 @@ export default function OnboardingPage() {
                         try {
                           await referralsApi.redeem({ code: referralCode });
                           localStorage.removeItem('referral_code');
-                        } catch {
+                        } catch (err) {
+                          console.error('OnboardingPage: failed to redeem referral code', err);
                           // Invalid/expired/already-redeemed — silently continue
                           localStorage.removeItem('referral_code');
                         }

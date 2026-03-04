@@ -210,7 +210,8 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
         setDetail(res.data || res);
         setRelType((res.data || res).relationship_type || '');
       }
-    }).catch(() => {
+    }).catch((err) => {
+      console.error('ContactDetail: failed to fetch contact detail', err);
       // Fall back to list data already in state
     }).finally(() => {
       if (!cancelled) setLoading(false);
@@ -227,7 +228,8 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
     try {
       await contactsApi.patch(contact.id, { relationship_type: val || null });
       setDetail((d) => ({ ...d, relationship_type: val || null }));
-    } catch {
+    } catch (err) {
+      console.error('ContactDetail: failed to update relationship type', err);
       setRelType(prevVal);
       onContactUpdate?.(contact.id, { relationship_type: prevVal || null }, false);
       onError?.('Failed to update relationship type');
@@ -242,7 +244,8 @@ export default function ContactDetail({ contact, onClose, onContactUpdate, onErr
     onContactUpdate?.(contact.id, { warm_sco[RESEND_KEY_REDACTED]: value, warm_score: value ?? detail.warm_score }, true);
     try {
       await contactsApi.patch(contact.id, { warm_sco[RESEND_KEY_REDACTED]: value });
-    } catch {
+    } catch (err) {
+      console.error('ContactDetail: failed to update warm score override', err);
       setDetail((d) => ({ ...d, warm_sco[RESEND_KEY_REDACTED]: prev }));
       onContactUpdate?.(contact.id, { warm_sco[RESEND_KEY_REDACTED]: prev }, false);
       onError?.('Failed to update connection strength');

@@ -24,7 +24,7 @@ export default function NotificationsPage() {
         });
         setFeedItems(deduped);
       })
-      .catch(() => {})
+      .catch((err) => { console.error('NotificationsPage: feed load failed', err); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -65,7 +65,7 @@ export default function NotificationsPage() {
                   await feedApi.batchSeen(unseenIds);
                   setFeedItems((prev) => prev.map((f) => ({ ...f, seen_at: new Date().toISOString() })));
                   window.dispatchEvent(new Event('feed-updated'));
-                } catch { /* silent */ }
+                } catch (err) { console.error('NotificationsPage: batch seen failed', err); }
               }}
               className="cursor-pointer text-sm text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground"
             >
@@ -80,7 +80,7 @@ export default function NotificationsPage() {
                   await feedApi.dismissAll();
                   setFeedItems([]);
                   window.dispatchEvent(new Event('feed-updated'));
-                } catch { /* silent */ }
+                } catch (err) { console.error('NotificationsPage: dismiss all failed', err); }
               }}
               className="cursor-pointer text-sm text-muted-foreground transition-colors duration-200 hover:text-secondary-foreground"
             >

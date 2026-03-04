@@ -15,7 +15,8 @@ function CopyButton({ text, label = 'Copy', className }) {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } catch (err) {
+      console.error('ReferralCodesPage: failed to copy to clipboard', err);
       // fallback — select the text
     }
   };
@@ -50,13 +51,13 @@ export default function ReferralCodesPage() {
   const load = async () => {
     try {
       const [codesRes, lbRes] = await Promise.all([
-        referralsApi.mine().catch(() => ({ data: [] })),
-        referralsApi.leaderboard().catch(() => ({ data: [] })),
+        referralsApi.mine().catch((err) => { console.error('ReferralCodesPage: failed to load referral codes', err); return { data: [] }; }),
+        referralsApi.leaderboard().catch((err) => { console.error('ReferralCodesPage: failed to load leaderboard', err); return { data: [] }; }),
       ]);
       setCodes(codesRes.data || []);
       setLeaderboard(lbRes.data || []);
-    } catch {
-      // non-critical
+    } catch (err) {
+      console.error('ReferralCodesPage: failed to load referral data', err);
     } finally {
       setLoading(false);
     }

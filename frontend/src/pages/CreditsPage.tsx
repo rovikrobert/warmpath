@@ -76,8 +76,8 @@ export default function CreditsPage() {
       try {
         const [balRes, histRes, usageRes] = await Promise.all([
           creditsApi.balance(),
-          creditsApi.history().catch(() => ({ data: [] })),
-          usageApi.summary().catch(() => null),
+          creditsApi.history().catch((err) => { console.error('CreditsPage: history load failed', err); return { data: [] }; }),
+          usageApi.summary().catch((err) => { console.error('CreditsPage: usage summary load failed', err); return null; }),
         ]);
         setBalance(balRes.data);
         setHistory(histRes.data || []);
@@ -152,7 +152,7 @@ export default function CreditsPage() {
           <button
             onClick={async () => {
               if (!showActivity) {
-                const res = await usageApi.history().catch(() => ({ data: [] }));
+                const res = await usageApi.history().catch((err) => { console.error('CreditsPage: activity log load failed', err); return { data: [] }; });
                 setActivityLog(res.data || []);
               }
               setShowActivity(!showActivity);
