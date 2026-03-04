@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { referrals as referralsApi } from '../api/client';
 import EmptyState from '../components/ui/EmptyState';
+import noResultsIllustration from '../assets/illustrations/no-results.png';
 import Spinner from '../components/ui/Spinner';
 import { useAuth } from '../context/AuthContext';
 import useDocumentTitle from '../hooks/useDocumentTitle';
@@ -135,11 +136,7 @@ export default function ReferralCodesPage() {
         <h2 className="section-title mb-3">Leaderboard</h2>
         {leaderboard.length === 0 ? (
           <EmptyState
-            icon={
-              <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1 1 14.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
-              </svg>
-            }
+            illustration={noResultsIllustration}
             title="Earn credits by inviting friends"
             description="Share your referral code. You earn 25 credits each time a friend uploads contacts, runs a search, or subscribes."
             stats={[
