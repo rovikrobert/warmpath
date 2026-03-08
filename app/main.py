@@ -53,6 +53,21 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="WarmPath", version="0.1.0")
 
 # ---------------------------------------------------------------------------
+# Sentry error tracking (optional — gated on SENTRY_DSN)
+# ---------------------------------------------------------------------------
+if settings.SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+        environment="production" if settings.is_production else "development",
+    )
+
+# ---------------------------------------------------------------------------
 # Startup configuration validation
 # ---------------------------------------------------------------------------
 if settings.SECURE_HEADERS:
