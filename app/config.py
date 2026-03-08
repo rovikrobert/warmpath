@@ -93,6 +93,10 @@ class Settings(BaseSettings):
     MEMORY_MMR_LAMBDA: float = 0.7
     MEMORY_CANDIDATE_POOL: int = 50
 
+    # Sentry error tracking
+    SENTRY_DSN: str | None = None
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+
     POSTHOG_API_KEY: str = ""
     POSTHOG_PROJECT_ID: str = ""
     POSTHOG_HOST: str = "https://app.posthog.com"

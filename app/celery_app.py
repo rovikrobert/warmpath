@@ -137,6 +137,11 @@ celery_app.conf.update(
                 hour=4, minute=30, day_of_month="1,4,7,10,13,16,19,22,25,28"
             ),
         },
+        # --- Production monitor health checks ---
+        "monitor-health-check": {
+            "task": "monitor.run_health_check",
+            "schedule": 300.0,  # Every 5 minutes
+        },
     },
 )
 celery_app.conf.include = [
@@ -148,4 +153,5 @@ celery_app.conf.include = [
     "app.tasks.job_scan_tasks",
     "app.tasks.vector_tasks",
     "app.tasks.agent_runtime_tasks",
+    "app.tasks.monitor_tasks",
 ]
