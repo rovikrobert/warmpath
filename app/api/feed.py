@@ -75,7 +75,9 @@ class FeedCountResponse(BaseModel):
 class EnrichmentResponseRequest(BaseModel):
     feed_item_id: str = Field(..., max_length=100)
     signal_type: Literal["relationship_type", "would_refer", "recency"]
-    signal_value: str  # e.g. "colleague", "definitely", "2026-01-15"  # {"type": "colleague"} or {"likelihood": "definitely"}
+    signal_value: str = Field(
+        ..., max_length=100
+    )  # e.g. "colleague", "definitely", "2026-01-15"
 
 
 def _serialize_feed_item(item: FeedItem) -> dict:

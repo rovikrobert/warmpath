@@ -88,3 +88,10 @@ def send_reengagement_d30() -> int:
 @celery_app.task(name="app.tasks.email_tasks.send_reengagement_d90")
 def send_reengagement_d90() -> int:
     return _run_async(_run_email_task("reengagement_d90", "send_reengagement_d90"))
+
+
+@celery_app.task(name="app.tasks.email_tasks.send_credit_expiry_nudge")
+def send_credit_expiry_nudge() -> int:
+    return _run_async(
+        _run_email_task("credit_expiry_nudge", "send_credit_expiry_nudge")
+    )
