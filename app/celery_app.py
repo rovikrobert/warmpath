@@ -130,6 +130,13 @@ celery_app.conf.update(
             "task": "app.tasks.agent_runtime_tasks.dispatch_kpi_check",
             "schedule": crontab(hour=6, minute=0),  # 6 AM UTC daily
         },
+        # --- Qdrant free-tier keep-alive (every 3 days) ---
+        "qdrant-keep-alive": {
+            "task": "app.tasks.infra_tasks.qdrant_keep_alive",
+            "schedule": crontab(
+                hour=4, minute=30, day_of_month="1,4,7,10,13,16,19,22,25,28"
+            ),
+        },
     },
 )
 celery_app.conf.include = [

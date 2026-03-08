@@ -216,3 +216,37 @@ async def detect_and_fail_stuck_uploads(db) -> tuple[int, int]:
         logger.debug("Stuck upload watchdog: no stuck uploads found")
 
     return failed_count, notified_count
+
+
+# ---------------------------------------------------------------------------
+# Qdrant keep-alive — prevent free-tier cluster suspension
+# ---------------------------------------------------------------------------
+
+
+@celery_app.task(name="app.tasks.infra_tasks.qdrant_keep_alive")
+def qdrant_keep_alive() -> None:
+    """Ping Qdrant cluster to prevent free-tier inactivity suspension.
+
+    Qdrant Cloud free clusters are paused after ~7 days of inactivity.
+    This task runs every 3 days via Beat and issues a lightweight
+    collection-list request.
+    """
+    if not settings.VECTOR_SEARCH_ENABLED:
+        logger.debug("Qdrant keep-alive skipped — VECTOR_SEARCH_ENABLED is off")
+        return
+
+    try:
+        from qdrant_client import QdrantClient
+
+        client = QdrantClient(
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY or None,
+            timeout=10,
+        )
+        collections = client.get_collections()
+        logger.info(
+            "Qdrant keep-alive: OK — %d collection(s)",
+            len(collections.collections),
+        )
+    except Exception:
+        logger.warning("Qdrant keep-alive: ping failed", exc_info=True)
