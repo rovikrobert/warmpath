@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.contact import Contact, CsvUpload
+from app.models.credits import CreditTransaction
 from app.models.email_campaign import EmailCampaignLog
 from app.models.enrichment import UsageLog
 from app.models.marketplace import IntroFacilitation, NetworkSharingPreferences
@@ -1030,6 +1031,100 @@ async def send_reengagement_d90(db: AsyncSession) -> int:
         count += 1
     await db.commit()
     logger.info("reengagement_d90: sent %d emails", count)
+    return count
+
+
+# ---------------------------------------------------------------------------
+# Credit expiry nudge
+# ---------------------------------------------------------------------------
+
+
+async def send_credit_expiry_nudge(db: AsyncSession) -> int:
+    """Nudge users with credits expiring within the next 14 days.
+
+    Weekly dedup — at most one email per user per 7 days.
+    """
+    now = datetime.now(timezone.utc)
+    expiry_horizon = now + timedelta(days=14)
+
+    # Find users with earn credits expiring in the next 14 days
+    expiring_q = (
+        select(
+            CreditTransaction.user_id,
+            func.sum(CreditTransaction.amount).label("expiring_amount"),
+        )
+        .where(
+            CreditTransaction.expires_at > now,
+            CreditTransaction.expires_at <= expiry_horizon,
+            CreditTransaction.amount > 0,
+            CreditTransaction.type == "earn",
+        )
+        .group_by(CreditTransaction.user_id)
+    )
+    expiring_result = await db.execute(expiring_q)
+    expiring_rows = expiring_result.all()
+
+    if not expiring_rows:
+        logger.info("credit_expiry_14d: no users with expiring credits")
+        return 0
+
+    user_credits: dict[uuid.UUID, int] = {
+        row.user_id: row.expiring_amount for row in expiring_rows
+    }
+    user_ids = list(user_credits.keys())
+
+    # Load users
+    users_result = await db.execute(
+        select(User).where(
+            User.id.in_(user_ids),
+            User.deleted_at.is_(None),
+            User.marketing_opt_out.is_(False),
+        )
+    )
+    users = users_result.scalars().all()
+
+    # Batch-load already-sent set (weekly window — don't spam daily)
+    seven_days_ago = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+    already_sent_ids: set[uuid.UUID] = set()
+    if user_ids:
+        sent_result = await db.execute(
+            select(EmailCampaignLog.user_id).where(
+                EmailCampaignLog.user_id.in_(user_ids),
+                EmailCampaignLog.email_type == "credit_expiry_14d",
+                EmailCampaignLog.sent_date >= seven_days_ago,
+            )
+        )
+        already_sent_ids = {row[0] for row in sent_result.all()}
+
+    count = 0
+    for u in users:
+        if u.id in already_sent_ids:
+            continue
+        if await _user_email_budget_exhausted(db, u.id):
+            continue
+        amount = user_credits[u.id]
+        first = u.full_name.split()[0] if u.full_name else "there"
+        agent = _agent_signoff(u.intent)
+        html = f"""\
+<div lang="en" dir="ltr" style="{_base_style()}">
+  {_preheader_html(f"You have {amount} credits expiring soon")}
+  <p style="margin: 0 0 16px;">Hi {first},</p>
+  <p style="margin: 0 0 16px;">You have <strong>{amount} credits expiring</strong> in the next 14 days. Search for referrals at your target companies before your credits expire.</p>
+  <div style="margin: 16px 0;">
+    <a href="{APP_URL}/search" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600;">Use Your Credits</a>
+  </div>
+  <p style="margin: 16px 0 0; font-size: 14px; color: #6b7280;">&mdash; {agent}</p>
+  {_footer_html()}
+</div>"""
+        eid = _send_email(
+            u.email,
+            f"{first}, you have {amount} credits expiring soon",
+            html,
+        )
+        await _record_send(db, u.id, "credit_expiry_14d", external_id=eid)
+        count += 1
+    await db.commit()
+    logger.info("credit_expiry_14d: sent %d emails", count)
     return count
 
 

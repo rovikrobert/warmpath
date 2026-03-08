@@ -47,6 +47,10 @@ celery_app.conf.update(
             "task": "app.tasks.email_tasks.send_reengagement_d90",
             "schedule": crontab(hour=9, minute=45),
         },
+        "credit-expiry-nudge-daily": {
+            "task": "app.tasks.email_tasks.send_credit_expiry_nudge",
+            "schedule": crontab(hour=9, minute=30),
+        },
         # --- Cross-user freshness aggregation (before feed generation) ---
         "freshness-aggregation-daily": {
             "task": "app.tasks.feed_tasks.aggregate_freshness",

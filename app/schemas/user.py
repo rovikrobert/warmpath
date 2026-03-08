@@ -44,15 +44,15 @@ class WorkHistoryEntry(BaseModel):
 
 class ConnectorProfileUpsert(BaseModel):
     headline: str | None = Field(default=None, max_length=500)
-    current_company: str | None = None
-    current_title: str | None = None
-    industry: str | None = None
-    location: str | None = None
-    linkedin_url: str | None = None
+    current_company: str | None = Field(default=None, max_length=255)
+    current_title: str | None = Field(default=None, max_length=255)
+    industry: str | None = Field(default=None, max_length=100)
+    location: str | None = Field(default=None, max_length=255)
+    linkedin_url: str | None = Field(default=None, max_length=500)
     github_url: str | None = Field(default=None, max_length=500)
     portfolio_url: str | None = Field(default=None, max_length=500)
     personal_site_url: str | None = Field(default=None, max_length=500)
-    bio_summary: str | None = None
+    bio_summary: str | None = Field(default=None, max_length=2000)
     work_history: list[WorkHistoryEntry] | None = None
 
 
