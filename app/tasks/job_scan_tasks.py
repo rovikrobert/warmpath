@@ -176,58 +176,68 @@ def warm_job_cache_global():
 
             all_anomalies: list[dict] = []
 
-            async def _fetch_one(company_key: str, boards: dict[str, str]) -> int:
+            async def _fetch_one(
+                company_key: str, boards: dict[str, str]
+            ) -> tuple[str, list, int]:
+                """Fetch jobs via HTTP (no DB). Returns (key, jobs, count)."""
                 async with semaphore:
                     try:
                         jobs = await fetcher.fetch_jobs_for_company(company_key, boards)
-                        job_count = len(jobs)
-                        cache_key = f"job_scan:{company_key}"
-
-                        # --- Anomaly detection ---
-                        # Use pre-loaded cache (eliminates N+1 query)
-                        prev_cached = existing_cache.get(cache_key)
-                        prev_count = (
-                            prev_cached.data.get("job_count", 0)
-                            if prev_cached is not None and prev_cached.data
-                            else 0
-                        )
-
-                        anomaly = _detect_job_anomaly(
-                            company_key, boards, job_count, prev_count
-                        )
-                        if anomaly:
-                            all_anomalies.append(anomaly)
-
-                        # --- Cache write ---
-                        job_data = {
-                            "company": company_key,
-                            "job_count": job_count,
-                            "jobs": jobs[:100],  # Cap stored jobs
-                            "scanned_at": now.isoformat(),
-                        }
-                        if prev_cached is not None:
-                            prev_cached.data = job_data
-                            prev_cached.expires_at = now + ttl
-                        else:
-                            prev_cached = EnrichmentCache(
-                                cache_key=cache_key,
-                                source="job_scan",
-                                data=job_data,
-                                expires_at=now + ttl,
-                            )
-                            db.add(prev_cached)
-                        await db.flush()
-                        return job_count
+                        return company_key, jobs, len(jobs)
                     except Exception:
                         logger.exception(
                             "Job cache warming failed for '%s'", company_key
                         )
-                        return 0
+                        return company_key, [], 0
 
-            results = await asyncio.gather(
+            # Fetch all jobs concurrently (HTTP only, no DB)
+            fetch_results = await asyncio.gather(
                 *[_fetch_one(key, boards) for key, boards in to_fetch]
             )
-            total = sum(results)
+
+            # Write cache entries sequentially (asyncpg single-connection)
+            total = 0
+            boards_by_key = dict(to_fetch)
+            for company_key, jobs, job_count in fetch_results:
+                cache_key = f"job_scan:{company_key}"
+                total += job_count
+
+                # Anomaly detection
+                prev_cached = existing_cache.get(cache_key)
+                prev_count = (
+                    prev_cached.data.get("job_count", 0)
+                    if prev_cached is not None and prev_cached.data
+                    else 0
+                )
+                anomaly = _detect_job_anomaly(
+                    company_key,
+                    boards_by_key.get(company_key, {}),
+                    job_count,
+                    prev_count,
+                )
+                if anomaly:
+                    all_anomalies.append(anomaly)
+
+                # Cache write
+                job_data = {
+                    "company": company_key,
+                    "job_count": job_count,
+                    "jobs": jobs[:100],
+                    "scanned_at": now.isoformat(),
+                }
+                if prev_cached is not None:
+                    prev_cached.data = job_data
+                    prev_cached.expires_at = now + ttl
+                else:
+                    prev_cached = EnrichmentCache(
+                        cache_key=cache_key,
+                        source="job_scan",
+                        data=job_data,
+                        expires_at=now + ttl,
+                    )
+                    db.add(prev_cached)
+                await db.flush()
+
             await db.commit()
             logger.info(
                 "Job cache warming complete: %d jobs cached for %d companies",
