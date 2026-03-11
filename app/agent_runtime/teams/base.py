@@ -56,13 +56,44 @@ class TeamRunner:
         return mod.scan()
 
     def _save_report(self, report: AgentReport) -> None:
-        """Persist AgentReport as {agent}_latest.json for CoS daily brief."""
+        """Persist AgentReport as {agent}_latest.json for CoS daily brief.
+
+        Refuses to overwrite a real report with a stub (scan_duration == 0
+        and <= 1 finding with no metrics). This prevents failed scanners
+        from clobbering legitimate data.
+        """
         reports_dir = _resolve_reports_dir(self.team_name)
         if reports_dir is None:
             return
         try:
+            import json as _json
+
             reports_dir.mkdir(parents=True, exist_ok=True)
             path = reports_dir / f"{report.agent}_latest.json"
+
+            # Guard: don't overwrite a real report with a stub
+            if (
+                report.scan_duration_seconds == 0
+                and len(report.findings) <= 1
+                and not report.metrics
+                and path.exists()
+            ):
+                try:
+                    existing = _json.loads(path.read_text(encoding="utf-8"))
+                    if (
+                        existing.get("scan_duration_seconds", 0) > 0
+                        or len(existing.get("findings", [])) > 1
+                    ):
+                        logger.warning(
+                            "Refusing to overwrite real %s report with stub "
+                            "(scan_duration=0, %d findings)",
+                            report.agent,
+                            len(report.findings),
+                        )
+                        return
+                except (ValueError, OSError):
+                    pass  # Existing file is corrupt — ok to overwrite
+
             path.write_text(report.serialize(), encoding="utf-8")
         except Exception:
             logger.debug(
