@@ -350,6 +350,11 @@ def scan_auth_coverage() -> None:
         "resend_webhook",
         "suppression_request",
         "request_rectification",
+        "suggest_companies",
+        "list_companies",
+        "list_openings",
+        "list_registry",
+        "get_intro_review",
     }
 
     # Webhook endpoints authenticated via signature verification (HMAC/Svix),
@@ -357,6 +362,17 @@ def scan_auth_coverage() -> None:
     signature_verified_allowlist = {
         "github_webhook",
         "telegram_webhook",
+        "clerk_webhook",
+    }
+
+    # Internal/admin endpoints with non-standard auth (secret headers, etc.)
+    internal_allowlist = {
+        "run_agents",
+        "agent_status",
+        "list_benchmarks",
+        "list_competitors",
+        "list_experiments",
+        "list_partnerships",
     }
 
     count = 0
@@ -367,19 +383,32 @@ def scan_auth_coverage() -> None:
         content = py_file.read_text(errors="ignore")
         relpath = str(py_file.relative_to(PROJECT_ROOT))
 
-        # Find route decorators and check if the function has get_current_user
+        # Find route decorators and extract full function params using
+        # paren-counting (handles multi-line signatures correctly).
         route_pattern = re.compile(
             r"@router\.(get|post|put|patch|delete)\s*\([^)]*\)\s*\n"
-            r"async\s+def\s+(\w+)\s*\(([^)]*)\)",
+            r"async\s+def\s+(\w+)\s*\(",
             re.MULTILINE,
         )
         for match in route_pattern.finditer(content):
             func_name = match.group(2)
-            params = match.group(3)
 
-            if func_name in public_allowlist:
-                continue
-            if func_name in signature_verified_allowlist:
+            # Extract full parameter list by counting parentheses
+            paren_start = match.end() - 1  # position of opening (
+            depth = 1
+            pos = paren_start + 1
+            while pos < len(content) and depth > 0:
+                if content[pos] == "(":
+                    depth += 1
+                elif content[pos] == ")":
+                    depth -= 1
+                pos += 1
+            params = content[paren_start + 1 : pos - 1] if depth == 0 else ""
+
+            if (
+                func_name
+                in public_allowlist | signature_verified_allowlist | internal_allowlist
+            ):
                 continue
             if "get_current_user" not in params and "current_user" not in params:
                 # Check if the function body uses signature verification

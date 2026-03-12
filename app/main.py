@@ -42,6 +42,10 @@ from app.api import (
     webhooks,
 )
 from app.config import settings
+from app.middleware.db_instrumentation import (
+    DBInstrumentationMiddleware,
+    install_db_instrumentation,
+)
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.middleware.usage import UsageTrackingMiddleware
 from app.utils.error_reporter import send_error_alert
@@ -142,9 +146,24 @@ app.add_middleware(
 app.add_middleware(SecurityHeadersMiddleware)
 
 # ---------------------------------------------------------------------------
+# DB instrumentation (query count + timing per request)
+# ---------------------------------------------------------------------------
+app.add_middleware(DBInstrumentationMiddleware)
+
+# ---------------------------------------------------------------------------
 # Usage tracking
 # ---------------------------------------------------------------------------
 app.add_middleware(UsageTrackingMiddleware)
+
+# ---------------------------------------------------------------------------
+# Install DB event listeners for query instrumentation
+# ---------------------------------------------------------------------------
+try:
+    from app.database import _get_engine
+
+    install_db_instrumentation(_get_engine().sync_engine)
+except Exception:
+    pass
 
 # ---------------------------------------------------------------------------
 # Global exception handlers

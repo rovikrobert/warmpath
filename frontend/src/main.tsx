@@ -9,6 +9,7 @@ import { TooltipProvider } from '@/components/ui/Tooltip';
 import { Toaster } from '@/components/ui/Toast';
 import MissingClerkKey from '@/components/MissingClerkKey';
 import App from './App';
+import { initWebVitals } from './utils/web-vitals';
 import './index.css';
 
 const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -62,3 +63,5 @@ createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </StrictMode>,
 );
+
+initWebVitals();

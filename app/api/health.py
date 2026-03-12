@@ -71,3 +71,69 @@ def perf_stats(
             "thresholds": THRESHOLDS,
         },
     }
+
+
+@router.get("/health/perf/dashboard")
+async def perf_dashboard() -> dict:
+    """Combined performance dashboard: timings + DB stats + queue health.
+
+    Aggregates data from multiple sources into a single overview.
+    Designed for internal monitoring — no auth required (same as /health).
+    """
+    from app.utils.celery_metrics import collect_celery_metrics
+    from app.utils.query_budgets import ENDPOINT_BUDGETS
+
+    # 1. Backend timing stats (from ring buffer)
+    seen_ops: set[str] = set()
+    for m in get_recent_metrics():
+        seen_ops.add(m["op"])
+
+    timing_stats = []
+    for op in sorted(seen_ops):
+        s = get_stats(op)
+        if s:
+            timing_stats.append(s)
+
+    # 2. Celery queue metrics
+    celery_stats = collect_celery_metrics()
+
+    # 3. Query budgets summary
+    budgets = [{"method": m, "path": p, **b} for (m, p), b in ENDPOINT_BUDGETS.items()]
+
+    # 4. Latest daily perf report (from DB cache)
+    daily_report = None
+    try:
+        from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+        from app.database import _get_engine
+
+        factory = async_sessionmaker(_get_engine(), class_=AsyncSession)
+        async with factory() as session:
+            result = await session.execute(
+                text(
+                    "SELECT data FROM enrichment_cache "
+                    "WHERE cache_key = 'perf_report_daily' "
+                    "AND expires_at > NOW() LIMIT 1"
+                )
+            )
+            row = result.first()
+            if row:
+                import json
+
+                daily_report = json.loads(row[0])
+    except Exception:
+        pass
+
+    return {
+        "data": {
+            "timing_stats": timing_stats,
+            "celery": celery_stats,
+            "query_budgets": budgets,
+            "daily_report": daily_report,
+        },
+        "meta": {
+            "operations_tracked": len(timing_stats),
+            "thresholds": THRESHOLDS,
+        },
+    }

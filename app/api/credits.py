@@ -25,6 +25,7 @@ from app.schemas.credits import (
 )
 from app.services.audit_logger import log_event
 from app.services.credits import earn_credits, expire_stale_credits, get_credit_summary
+from app.utils.redis_cache import cached_response, set_cached_response
 from app.utils.security import get_current_user, require_verified_email
 
 router = APIRouter()
@@ -41,11 +42,18 @@ async def credit_balance(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Get current credit balance and summary stats."""
+    cache_key = f"credits:balance:{current_user.id}"
+    cached = await cached_response(cache_key)
+    if cached is not None:
+        return cached
+
     summary = await get_credit_summary(current_user.id, db)
-    return {
+    result = {
         "data": CreditBalanceResponse(**summary).model_dump(),
         "meta": {},
     }
+    await set_cached_response(cache_key, result, ttl_seconds=30)
+    return result
 
 
 # ---------------------------------------------------------------------------
