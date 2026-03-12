@@ -45,3 +45,49 @@ def run_monitor_check() -> dict:
         "checks": len(report.checks),
         "calibration_mode": config.calibration_mode,
     }
+
+
+@celery_app.task(name="monitor.celery_backlog_check", igno[RESEND_KEY_REDACTED]=True)
+def celery_backlog_check() -> dict:
+    """Check Celery queue depths and alert on backlog thresholds.
+
+    Triggered every 5 minutes by Beat. Publishes escalation events
+    to the engineering Redis stream when queues exceed warning/critical levels.
+    """
+    from app.utils.celery_metrics import collect_celery_metrics
+
+    metrics = collect_celery_metrics()
+
+    if metrics["overall_alert"] in ("warning", "critical"):
+        logger.warning(
+            "CELERY_BACKLOG_%s: total_depth=%d, queues=%s",
+            metrics["overall_alert"].upper(),
+            metrics["total_depth"],
+            {k: v["depth"] for k, v in metrics["queues"].items() if v["depth"] > 0},
+        )
+
+        # Escalate to engineering event stream
+        try:
+            import os
+
+            import redis
+
+            from agents.shared.event_stream import format_event
+
+            redis_url = os.getenv("REDIS_URL")
+            if redis_url:
+                r = redis.from_url(redis_url)
+                event = format_event(
+                    team="engineering",
+                    agent="monitor",
+                    action="escalated",
+                    detail=(
+                        f"Celery backlog {metrics['overall_alert']}: "
+                        f"total_depth={metrics['total_depth']}"
+                    ),
+                )
+                r.xadd("cto:events", {k: str(v) for k, v in event.items()})
+        except Exception as exc:
+            logger.warning("Failed to publish backlog alert: %s", exc)
+
+    return metrics

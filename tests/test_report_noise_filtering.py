@@ -1,8 +1,10 @@
 """Tests for report dedup, noise filtering, and stub overwrite protection."""
 
 import json
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
+from agents.shared.learning import filter_resolved_findings
 from agents.shared.report import AgentReport, Finding, merge_reports
 
 
@@ -469,3 +471,230 @@ class TestSynthesizerNoiseFiltering:
 
         decision_ids = [d["id"] for d in brief_data.get("decisions_needed", [])]
         assert "DEP-CVE" in decision_ids
+
+
+# ---------------------------------------------------------------------------
+# filter_resolved_findings — prefix matching, edge cases, skip_until expiry
+# ---------------------------------------------------------------------------
+
+
+def _make_finding(**kwargs):
+    defaults = dict(
+        id="TEST-001",
+        severity="medium",
+        category="security",
+        title="Test finding",
+        detail="d",
+    )
+    defaults.update(kwargs)
+    return Finding(**defaults)
+
+
+def _fake_registry(entries: dict):
+    return patch(
+        "agents.shared.learning._load_resolved_registry",
+        return_value=entries,
+    )
+
+
+class TestFilterResolvedFindings:
+    def test_exact_match_filters_permanently_resolved(self):
+        """Exact ID match with skip_until=None is permanently suppressed."""
+        findings = [_make_finding(id="SEC-001")]
+        reg = {
+            "SEC-001": {
+                "resolution_type": "false_positive",
+                "resolved_at": "2026-01-01T00:00:00+00:00",
+                "reason": "test",
+                "skip_until": None,
+            }
+        }
+        with _fake_registry(reg):
+            result = filter_resolved_findings(findings)
+        assert len(result) == 0
+
+    def test_exact_match_filters_within_skip_window(self):
+        """Finding within skip_until window is suppressed."""
+        future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        findings = [_make_finding(id="DEFER-001")]
+        reg = {
+            "DEFER-001": {
+                "resolution_type": "deferred",
+                "resolved_at": "2026-01-01T00:00:00+00:00",
+                "reason": "test",
+                "skip_until": future,
+            }
+        }
+        with _fake_registry(reg):
+            result = filter_resolved_findings(findings)
+        assert len(result) == 0
+
+    def test_expired_skip_window_resurfaces_finding(self):
+        """Finding past skip_until window reappears."""
+        past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        findings = [_make_finding(id="DEFER-002")]
+        reg = {
+            "DEFER-002": {
+                "resolution_type": "deferred",
+                "resolved_at": "2026-01-01T00:00:00+00:00",
+                "reason": "test",
+                "skip_until": past,
+            }
+        }
+        with _fake_registry(reg):
+            result = filter_resolved_findings(findings)
+        assert len(result) == 1
+        assert result[0].id == "DEFER-002"
+
+    def test_prefix_match_finding_extends_registry_key_within_overlap(self):
+        """Finding 'SEC-001-v2' matches registry 'SEC-001' when overlap >= 50%."""
+        findings = [_make_finding(id="SEC-001-v2")]
+        reg = {
+            "SEC-001": {
+                "resolution_type": "false_positive",
+                "resolved_at": "2026-01-01T00:00:00+00:00",
+                "reason": "test",
+                "skip_until": None,
+            }
+        }
+        with _fake_registry(reg):
+            result = filter_resolved_findings(findings)
+        # SEC-001 (7) vs SEC-001-v2 (10): 7/10=70% >= 50% → matches
+        assert len(result) == 0
+
+    def test_prefix_match_rejects_low_overlap(self):
+        """Finding 'SEC-001-very-long-extra-detail' does NOT match 'SEC-001'."""
+        findings = [_make_finding(id="SEC-001-very-long-extra-detail")]
+        reg = {
+            "SEC-001": {
+                "resolution_type": "false_positive",
+                "resolved_at": "2026-01-01T00:00:00+00:00",
+                "reason": "test",
+                "skip_until": None,
+            }
+        }
+        with _fake_registry(reg):
+            result = filter_resolved_findings(findings)
+        # SEC-001 (7) vs 30 chars: 7/30=23% < 50% → no match
+        assert len(result) == 1
+
+    def test_prefix_match_registry_extends_finding(self):
+        """Registry key 'lc-sec-token_versio' matches finding 'lc-sec-token_vers'."""
+        findings = [_make_finding(id="lc-sec-token_vers")]
+        reg = {
+            "lc-sec-token_versio": {
+                "resolution_type": "false_positive",
+                "resolved_at": "2026-01-01T00:00:00+00:00",
+                "reason": "test",
+                "skip_until": None,
+            }
+        }
+        with _fake_registry(reg):
+            result = filter_resolved_findings(findings)
+        assert len(result) == 0
+
+    def test_short_prefix_does_not_match_long_id(self):
+        """Short prefix 'SEC' must NOT match 'SEC-AUTH-COVERAGE-app-...'."""
+        findings = [_make_finding(id="SEC")]
+        reg = {
+            "SEC-AUTH-COVERAGE-app-api-agents.py:304": {
+                "resolution_type": "false_positive",
+                "resolved_at": "2026-01-01T00:00:00+00:00",
+                "reason": "test",
+                "skip_until": None,
+            }
+        }
+        with _fake_registry(reg):
+            result = filter_resolved_findings(findings)
+        # 'SEC' is too short (3 chars) relative to the registry key (43 chars)
+        assert len(result) == 1
+
+    def test_similar_line_numbers_do_not_cross_match(self):
+        """Findings at :304 and :338 must not cross-match each other."""
+        findings = [
+            _make_finding(id="SEC-AUTH-COVERAGE-app-api-agents.py:338"),
+        ]
+        reg = {
+            "SEC-AUTH-COVERAGE-app-api-agents.py:304": {
+                "resolution_type": "false_positive",
+                "resolved_at": "2026-01-01T00:00:00+00:00",
+                "reason": "test",
+                "skip_until": None,
+            }
+        }
+        with _fake_registry(reg):
+            result = filter_resolved_findings(findings)
+        # :338 is NOT a prefix of :304 and vice versa — must NOT match
+        assert len(result) == 1
+        assert result[0].id == "SEC-AUTH-COVERAGE-app-api-agents.py:338"
+
+    def test_empty_id_finding_is_kept(self):
+        """Finding with empty string ID should not match any registry entry."""
+        findings = [_make_finding(id="")]
+        reg = {
+            "SEC-001": {
+                "resolution_type": "false_positive",
+                "resolved_at": "2026-01-01T00:00:00+00:00",
+                "reason": "test",
+                "skip_until": None,
+            }
+        }
+        with _fake_registry(reg):
+            result = filter_resolved_findings(findings)
+        assert len(result) == 1
+
+    def test_dict_finding_without_id_is_kept(self):
+        """Dict finding with missing 'id' key should not crash or be filtered."""
+        findings = [{"severity": "medium", "title": "No id"}]
+        reg = {
+            "X": {
+                "resolution_type": "false_positive",
+                "resolved_at": "2026-01-01T00:00:00+00:00",
+                "reason": "test",
+                "skip_until": None,
+            }
+        }
+        with _fake_registry(reg):
+            result = filter_resolved_findings(findings)
+        assert len(result) == 1
+
+    def test_dict_finding_with_none_id_is_kept(self):
+        """Dict finding with id=None should not crash or be filtered."""
+        findings = [{"id": None, "severity": "medium", "title": "None id"}]
+        reg = {
+            "X": {
+                "resolution_type": "false_positive",
+                "resolved_at": "2026-01-01T00:00:00+00:00",
+                "reason": "test",
+                "skip_until": None,
+            }
+        }
+        with _fake_registry(reg):
+            result = filter_resolved_findings(findings)
+        assert len(result) == 1
+
+    def test_empty_registry_keeps_all_findings(self):
+        """Empty registry returns all findings unchanged."""
+        findings = [_make_finding(id="A"), _make_finding(id="B")]
+        with _fake_registry({}):
+            result = filter_resolved_findings(findings)
+        assert len(result) == 2
+
+    def test_unresolved_finding_kept_alongside_resolved(self):
+        """Only the resolved finding is filtered; others stay."""
+        findings = [
+            _make_finding(id="RESOLVED"),
+            _make_finding(id="KEPT"),
+        ]
+        reg = {
+            "RESOLVED": {
+                "resolution_type": "fixed",
+                "resolved_at": "2026-01-01T00:00:00+00:00",
+                "reason": "test",
+                "skip_until": "2099-01-01",
+            }
+        }
+        with _fake_registry(reg):
+            result = filter_resolved_findings(findings)
+        assert len(result) == 1
+        assert result[0].id == "KEPT"

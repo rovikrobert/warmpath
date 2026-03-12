@@ -130,6 +130,13 @@ celery_app.conf.update(
             "task": "app.tasks.agent_runtime_tasks.dispatch_kpi_check",
             "schedule": crontab(hour=6, minute=0),  # 6 AM UTC daily
         },
+        # --- Daily DB performance report ---
+        "daily-perf-report": {
+            "task": "app.tasks.perf_report_tasks.daily_perf_report",
+            "schedule": crontab(
+                hour=4, minute=30
+            ),  # 4:30 AM UTC — before business hours
+        },
         # --- Qdrant free-tier keep-alive (every 3 days) ---
         "qdrant-keep-alive": {
             "task": "app.tasks.infra_tasks.qdrant_keep_alive",
@@ -140,6 +147,11 @@ celery_app.conf.update(
         # --- Production monitor health checks ---
         "monitor-health-check": {
             "task": "monitor.run_health_check",
+            "schedule": 300.0,  # Every 5 minutes
+        },
+        # --- Celery backlog monitoring ---
+        "celery-backlog-check": {
+            "task": "monitor.celery_backlog_check",
             "schedule": 300.0,  # Every 5 minutes
         },
     },
@@ -154,4 +166,5 @@ celery_app.conf.include = [
     "app.tasks.vector_tasks",
     "app.tasks.agent_runtime_tasks",
     "app.tasks.monitor_tasks",
+    "app.tasks.perf_report_tasks",
 ]

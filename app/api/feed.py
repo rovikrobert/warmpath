@@ -39,6 +39,8 @@ from app.services.feed_ranker import (
     rank_feed_items,
 )
 from app.config import settings
+from app.utils.pagination import decode_cursor, encode_cursor
+from app.utils.redis_cache import cached_response, set_cached_response
 from app.utils.security import get_current_user
 from app.utils.tracking import track_action
 
@@ -107,6 +109,7 @@ def _serialize_feed_item(item: FeedItem) -> dict:
 async def get_feed(
     limit: int = Query(default=20, ge=1, le=50),
     offset: int = Query(default=0, ge=0),
+    cursor: str | None = Query(default=None),
     item_type: str | None = Query(default=None),
     exclude_type: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
@@ -116,6 +119,9 @@ async def get_feed(
 
     Unseen items appear first. Within each group, items are ranked by
     priority * type_weight * recency_boost (auto-tuned from interaction data).
+
+    Supports keyset pagination via optional ``cursor`` parameter. When
+    provided, ``offset`` is ignored and cursor-based navigation is used.
     """
     await track_action(db, current_user.id, "feed_view")
 
@@ -139,7 +145,11 @@ async def get_feed(
     if settings.BETA_SANDBOX_MODE:
         query = query.where(FeedItem.item_type != "enrichment_prompt")
 
-    # Fetch all matching items (ranking happens in Python via learned weights)
+    # Cap the candidate set to avoid loading unbounded rows.
+    # 200 items is more than enough for ranking + pagination (max 50 per page).
+    CANDIDATE_CAP = 200
+    query = query.order_by(FeedItem.priority.desc()).limit(CANDIDATE_CAP)
+
     result = await db.execute(query)
     all_items = list(result.scalars().all())
 
@@ -150,14 +160,29 @@ async def get_feed(
     type_weights = await get_type_weights(db)
     ranked = rank_feed_items(unseen, type_weights) + rank_feed_items(seen, type_weights)
 
-    # Apply pagination
-    page = ranked[offset : offset + limit]
+    # Apply pagination — keyset cursor takes precedence over offset
+    if cursor:
+        decoded = decode_cursor(cursor)
+        cursor_idx = decoded.get("idx", 0)
+        page = ranked[cursor_idx : cursor_idx + limit]
+        next_idx = cursor_idx + limit
+        has_more = next_idx < len(ranked)
+        next_cursor = encode_cursor({"idx": next_idx}) if has_more else None
+    else:
+        page = ranked[offset : offset + limit]
+        next_cursor = None
+        has_more = False
 
     await db.commit()
 
+    meta: dict = {"offset": offset, "limit": limit, "count": len(page)}
+    if cursor is not None:
+        meta["next_cursor"] = next_cursor
+        meta["has_more"] = has_more
+
     return {
         "data": [_serialize_feed_item(item) for item in page],
-        "meta": {"offset": offset, "limit": limit, "count": len(page)},
+        "meta": meta,
     }
 
 
@@ -172,6 +197,11 @@ async def get_feed_count(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Get unseen and total feed item counts for notification badge."""
+    cache_key = f"feed:count:{current_user.id}"
+    cached = await cached_response(cache_key)
+    if cached is not None:
+        return cached
+
     now = datetime.now(timezone.utc)
 
     # Exclude enrichment_prompt items — they're shown inline on the
@@ -196,7 +226,9 @@ async def get_feed_count(
     )
     total = total_result.scalar_one()
 
-    return {"data": {"unseen": unseen, "total": total}, "meta": {}}
+    result = {"data": {"unseen": unseen, "total": total}, "meta": {}}
+    await set_cached_response(cache_key, result, ttl_seconds=15)
+    return result
 
 
 # ---------------------------------------------------------------------------
