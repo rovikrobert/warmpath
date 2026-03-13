@@ -133,11 +133,26 @@ def _handle_command(
             _send_telegram_reply(chat_id, result)
 
         elif command == "approve":
-            from agents.chief_of_staff.decision_log import record_founder_decision
+            from agents.chief_of_staff.cos_learning import record_founder_decision
 
             item_id = parsed.get("item", "")
             record_founder_decision(item_id, "cos_recommendation", "approved")
             _send_telegram_reply(chat_id, f"Approved: {item_id}")
+
+        elif command == "approve_item":
+            if not is_founder:
+                _send_telegram_reply(chat_id, "Execution is founder-only.")
+                return
+            item = parsed.get("item")
+            value = parsed.get("value", "yes")
+            reject = value in ("no", "n")
+            _send_telegram_reply(
+                chat_id,
+                f"{'Rejecting' if reject else 'Executing'} decision #{item}...",
+            )
+            from app.tasks.approval_tasks import execute_telegram_approval
+
+            execute_telegram_approval.delay(chat_id, item, reject)
 
         elif command == "choose":
             choice = parsed.get("choice", "")
