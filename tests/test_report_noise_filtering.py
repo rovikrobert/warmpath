@@ -698,3 +698,57 @@ class TestFilterResolvedFindings:
             result = filter_resolved_findings(findings)
         assert len(result) == 1
         assert result[0].id == "KEPT"
+
+
+class TestSynthesizerSavesPendingDecisions:
+    def test_daily_brief_saves_pending_decisions_for_critical_findings(self):
+        """synthesize_daily persists pending decisions from critical/high findings."""
+        from unittest.mock import patch as mock_patch
+
+        from agents.chief_of_staff.synthesizer import synthesize_daily
+        from agents.shared.decision_registry import load_pending_decisions
+
+        reports = [
+            AgentReport(
+                agent="security_scanner",
+                scan_duration_seconds=5.0,
+                findings=[
+                    Finding(
+                        id="CVE-CRITICAL",
+                        severity="critical",
+                        category="dependency-vulnerability",
+                        title="Critical CVE",
+                        detail="Fix available",
+                        recommendation="Bump foo>=2.0",
+                        auto_fixable=True,
+                        file="requirements.txt",
+                    ),
+                    Finding(
+                        id="LOW-NOISE",
+                        severity="low",
+                        category="security",
+                        title="Low finding",
+                        detail="Not a decision",
+                    ),
+                ],
+            ),
+        ]
+
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp) / "pending_decisions.json"
+            with (
+                _fake_registry({}),
+                mock_patch("agents.shared.decision_registry.DECISIONS_PATH", tmp_path),
+            ):
+                _brief, _data = synthesize_daily(reports)
+                decisions = load_pending_decisions()
+
+        # Only critical/high findings become pending decisions
+        assert len(decisions) >= 1
+        assert decisions[0].finding_id == "CVE-CRITICAL"
+        # Original Finding fields preserved (not CosFinding)
+        assert decisions[0].finding.get("auto_fixable") is True
+        assert decisions[0].finding.get("file") == "requirements.txt"

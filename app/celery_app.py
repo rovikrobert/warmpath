@@ -167,4 +167,5 @@ celery_app.conf.include = [
     "app.tasks.agent_runtime_tasks",
     "app.tasks.monitor_tasks",
     "app.tasks.perf_report_tasks",
+    "app.tasks.approval_tasks",
 ]
