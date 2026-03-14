@@ -700,6 +700,174 @@ class TestFilterResolvedFindings:
         assert result[0].id == "KEPT"
 
 
+class TestSynthesizerCategorySuppression:
+    """Category-level suppression filters out known false-positive-heavy categories."""
+
+    def test_sql_injection_suppressed_unless_critical(self):
+        """sql_injection findings below critical are suppressed."""
+        from agents.chief_of_staff.synthesizer import synthesize_daily
+
+        reports = [
+            AgentReport(
+                agent="security",
+                scan_duration_seconds=5.0,
+                findings=[
+                    Finding(
+                        id="SEC-SQLI-1",
+                        severity="high",
+                        category="sql_injection",
+                        title="Possible SQL injection",
+                        detail="f-string in execute()",
+                    ),
+                    Finding(
+                        id="REAL-1",
+                        severity="medium",
+                        category="security",
+                        title="Real security issue",
+                        detail="Something real",
+                    ),
+                ],
+            ),
+        ]
+
+        _brief, data = synthesize_daily(reports)
+
+        all_ids = [d["id"] for d in data.get("decisions_needed", [])] + [
+            u["id"] for u in data.get("key_updates", [])
+        ]
+        assert "SEC-SQLI-1" not in all_ids, "sql_injection high should be suppressed"
+        assert "REAL-1" in all_ids, "real security finding should remain"
+
+    def test_auth_coverage_suppressed_unless_critical(self):
+        """auth_coverage findings below critical are suppressed."""
+        from agents.chief_of_staff.synthesizer import synthesize_daily
+
+        reports = [
+            AgentReport(
+                agent="security",
+                scan_duration_seconds=5.0,
+                findings=[
+                    Finding(
+                        id="SEC-AUTH-1",
+                        severity="medium",
+                        category="auth_coverage",
+                        title="Endpoint missing auth",
+                        detail="Scanner false positive",
+                    ),
+                ],
+            ),
+        ]
+
+        _brief, data = synthesize_daily(reports)
+
+        all_ids = [d["id"] for d in data.get("decisions_needed", [])] + [
+            u["id"] for u in data.get("key_updates", [])
+        ]
+        assert "SEC-AUTH-1" not in all_ids
+
+    def test_pii_leak_suppressed_unless_critical(self):
+        """pii_leak findings below critical are suppressed."""
+        from agents.chief_of_staff.synthesizer import synthesize_daily
+
+        reports = [
+            AgentReport(
+                agent="privy",
+                scan_duration_seconds=5.0,
+                findings=[
+                    Finding(
+                        id="PRIV-PII-1",
+                        severity="medium",
+                        category="pii_leak",
+                        title="PII in log",
+                        detail="Logger has .email",
+                    ),
+                ],
+            ),
+        ]
+
+        _brief, data = synthesize_daily(reports)
+
+        all_ids = [d["id"] for d in data.get("decisions_needed", [])] + [
+            u["id"] for u in data.get("key_updates", [])
+        ]
+        assert "PRIV-PII-1" not in all_ids
+
+    def test_critical_suppressed_category_still_surfaces(self):
+        """Critical findings in suppressed categories still surface."""
+        from agents.chief_of_staff.synthesizer import synthesize_daily
+
+        reports = [
+            AgentReport(
+                agent="security",
+                scan_duration_seconds=5.0,
+                findings=[
+                    Finding(
+                        id="SEC-SQLI-CRIT",
+                        severity="critical",
+                        category="sql_injection",
+                        title="Real SQL injection",
+                        detail="User input in query",
+                    ),
+                ],
+            ),
+        ]
+
+        _brief, data = synthesize_daily(reports)
+
+        decision_ids = [d["id"] for d in data.get("decisions_needed", [])]
+        assert "SEC-SQLI-CRIT" in decision_ids
+
+    def test_suppression_applied_to_weekly_synthesis(self):
+        """Weekly synthesis also applies category suppression."""
+        from agents.chief_of_staff.synthesizer import synthesize_weekly
+
+        reports = [
+            AgentReport(
+                agent="security",
+                scan_duration_seconds=5.0,
+                findings=[
+                    Finding(
+                        id="SEC-AUTH-W",
+                        severity="medium",
+                        category="auth_coverage",
+                        title="Endpoint missing auth",
+                        detail="Scanner false positive",
+                    ),
+                ],
+            ),
+        ]
+
+        text = synthesize_weekly(reports)
+
+        # Suppressed category should not appear in weekly output
+        assert "Endpoint missing auth" not in text
+
+    def test_suppression_applied_to_status_synthesis(self):
+        """Status synthesis also applies category suppression."""
+        from agents.chief_of_staff.synthesizer import synthesize_status
+
+        reports = [
+            AgentReport(
+                agent="security",
+                scan_duration_seconds=5.0,
+                findings=[
+                    Finding(
+                        id="SEC-PII-S",
+                        severity="medium",
+                        category="pii_leak",
+                        title="PII in logs",
+                        detail="Scanner FP",
+                    ),
+                ],
+            ),
+        ]
+
+        text = synthesize_status(reports)
+
+        # Finding count should be 0 after suppression
+        assert "0 critical, 0 high" in text
+
+
 class TestSynthesizerSavesPendingDecisions:
     def test_daily_brief_saves_pending_decisions_for_critical_findings(self):
         """synthesize_daily persists pending decisions from critical/high findings."""
