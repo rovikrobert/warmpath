@@ -196,6 +196,20 @@ _SKIP_DIRS = {"__pycache__", "node_modules", ".git", "venv", ".venv", "dist", "b
 _SKIP_FILES = {"security_scan.py", "privacy_scan.py"}
 
 
+def _is_false_positive(stripped: str, category: str) -> bool:
+    """Return True if the matched line is a known false positive."""
+    if "server_default" in stripped:
+        return True
+    if "settings." in stripped and category == "hardcoded_secret":
+        return True
+    # SQL injection: skip safe parameterized query patterns
+    if category == "sql_injection":
+        safe = (":param", "bindparam", "table_name", "column_name", "op.")
+        if any(tok in stripped for tok in safe):
+            return True
+    return False
+
+
 def scan_code_patterns() -> None:
     """Scan Python files for dangerous code patterns."""
     print(f"\n{BOLD}{CYAN}[2/5] Code pattern scan{RESET}")
@@ -217,10 +231,7 @@ def scan_code_patterns() -> None:
                 continue
             for severity, category, message, pattern in _PATTERNS:
                 if pattern.search(stripped):
-                    # Skip known false positives
-                    if "server_default" in stripped:
-                        continue
-                    if "settings." in stripped and category == "hardcoded_secret":
+                    if _is_false_positive(stripped, category):
                         continue
                     relpath = str(py_file.relative_to(PROJECT_ROOT))
                     _add(

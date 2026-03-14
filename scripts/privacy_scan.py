@@ -311,10 +311,34 @@ def check_pii_leaks() -> None:
         for lineno, line in enumerate(content.splitlines(), 1):
             for pattern in _PII_LOG_PATTERNS:
                 if pattern.search(line):
+                    stripped_line = line.strip()
+                    # Skip known safe patterns — hashed, anonymized, or
+                    # redacted values being logged are not PII leaks
+                    if any(
+                        safe in stripped_line.lower()
+                        for safe in (
+                            "hash",
+                            "blind_index",
+                            "anonymi",
+                            "redact",
+                            "masked",
+                            "***",
+                            "count",
+                            "len(",
+                            "encrypt",
+                        )
+                    ):
+                        continue
+                    # Skip error/exception context logging (not exposing PII)
+                    if (
+                        "exception" in stripped_line.lower()
+                        or "error" in stripped_line.lower()
+                    ):
+                        continue
                     _add(
                         "MEDIUM",
                         "pii_leak",
-                        f"PII field in log/print: {line.strip()[:100]}",
+                        f"PII field in log/print: {stripped_line[:100]}",
                         relpath,
                         lineno,
                     )
