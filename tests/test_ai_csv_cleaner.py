@@ -8,6 +8,7 @@ from app.services.ai_provider_pool import _extract_contacts_array
 
 
 class TestCleanContactsMock:
+    @pytest.mark.smoke
     def test_title_cases_names(self):
         """Names with bad capitalization are fixed to title case."""
         contacts = [
@@ -71,6 +72,7 @@ class TestCleanContactsMock:
         assert result[0]["last_name"] == "Brown"
         assert result[0]["full_name"] == "Charlie Brown"
 
+    @pytest.mark.smoke
     def test_normalizes_well_known_company_names(self):
         """Well-known company names are normalized to proper form."""
         contacts = [
@@ -276,6 +278,7 @@ class TestCleanContactsRealMode:
 class TestCleanContactsPublicAPI:
     """Tests for the public clean_contacts() dispatcher."""
 
+    @pytest.mark.smoke
     @pytest.mark.asyncio
     async def test_dispatches_to_mock_when_mock_mode_true(self):
         """clean_contacts() uses mock cleaner when AI_MOCK_MODE=true."""
@@ -314,6 +317,7 @@ class TestCleanContactsPublicAPI:
 class TestCsvProcessingIntegration:
     """Verify AI cleaner is called during CSV upload processing."""
 
+    @pytest.mark.smoke
     @pytest.mark.asyncio
     async def test_uploaded_csv_gets_cleaned_names_and_company(self, client):
         """Messy CSV data has names title-cased and company inferred from email during upload."""
@@ -354,6 +358,7 @@ class TestCsvProcessingIntegration:
 class TestExtractContactsArray:
     """Tests for _extract_contacts_array helper that normalises AI responses."""
 
+    @pytest.mark.smoke
     def test_raw_array_passes_through(self):
         """A plain JSON array is returned as-is."""
         data = [{"first_name": "Alice", "last_name": "Smith"}]

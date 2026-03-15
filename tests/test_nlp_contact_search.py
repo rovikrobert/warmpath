@@ -1,5 +1,7 @@
 """Tests for NLP contact search query parser and scorer."""
 
+import pytest
+
 from app.services.nlp_contact_search import parse_query_mock
 
 
@@ -8,6 +10,7 @@ from app.services.nlp_contact_search import parse_query_mock
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.smoke
 def test_big_tech_group_expands_to_six_companies():
     result = parse_query_mock("engineers at big tech")
     assert "Google" in result.companies
@@ -29,6 +32,7 @@ def test_faang_group_expands_to_five_companies():
     assert "Microsoft" not in result.companies
 
 
+@pytest.mark.smoke
 def test_specific_company_extracted_from_at_pattern():
     result = parse_query_mock("engineers at Stripe in San Francisco")
     assert "Stripe" in result.companies
@@ -49,6 +53,7 @@ def test_c_suite_seniority_detected_from_cto():
     assert "c_suite" in result.seniority
 
 
+@pytest.mark.smoke
 def test_multiple_seniority_levels_detected():
     result = parse_query_mock("senior directors and VPs in engineering")
     assert "senior" in result.seniority
@@ -61,6 +66,7 @@ def test_multiple_seniority_levels_detected():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.smoke
 def test_title_keywords_extracted_from_query():
     result = parse_query_mock("data scientists at Meta in Singapore")
     assert "data scientist" in result.titles
@@ -78,11 +84,13 @@ def test_softwa[RESEND_KEY_REDACTED]():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.smoke
 def test_pm_abbreviation_expands_to_product_manager():
     result = parse_query_mock("PMs at Stripe")
     assert "product manager" in result.titles
 
 
+@pytest.mark.smoke
 def test_swe_abbreviation_expands_to_softwa[RESEND_KEY_REDACTED]():
     result = parse_query_mock("SWEs at Google")
     assert "software engineer" in result.titles
@@ -124,6 +132,7 @@ def test_em_abbreviation_expands_to_engineering_manager():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.smoke
 def test_location_extracted_from_in_clause():
     result = parse_query_mock("engineers in Singapore")
     assert "Singapore" in result.locations
@@ -140,6 +149,7 @@ def test_location_alias_maps_to_canonical_name():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.smoke
 def test_former_colleague_relationship_type_detected():
     result = parse_query_mock("former colleagues at Google")
     assert "former_colleague" in result.relationship_types
@@ -155,6 +165,7 @@ def test_friend_relationship_type_detected():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.smoke
 def test_full_query_extracts_all_dimensions():
     result = parse_query_mock("CTOs from big tech in Singapore")
     assert "c_suite" in result.seniority
@@ -233,6 +244,7 @@ def test_no_match_scores_below_threshold():
     assert score < 20
 
 
+@pytest.mark.smoke
 def test_compound_match_scores_high():
     parsed = ParsedQuery(
         titles=["engineer"],
@@ -273,6 +285,7 @@ from unittest.mock import MagicMock, patch  # noqa: E402
 from app.services.nlp_contact_search import parse_query_real  # noqa: E402
 
 
+@pytest.mark.smoke
 def test_parse_query_real_returns_parsed_query_via_groq():
     mock_message = MagicMock()
     mock_message.content = (
@@ -319,7 +332,6 @@ def test_parse_query_real_falls_back_to_mock_on_groq_error():
 
 import uuid  # noqa: E402
 
-import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 
@@ -423,6 +435,7 @@ async def nlp_contacts(nlp_user_id: uuid.UUID):
     return [alice, bob, carol, dave]
 
 
+@pytest.mark.smoke
 @pytest.mark.asyncio
 async def test_nlp_search_returns_ranked_results(
     nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list
@@ -440,6 +453,7 @@ async def test_nlp_search_returns_ranked_results(
     assert body["meta"]["total_matched"] >= 1
 
 
+@pytest.mark.smoke
 @pytest.mark.asyncio
 async def test_nlp_search_big_tech_query(
     nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list
@@ -496,6 +510,7 @@ async def test_nlp_search_location_filter(
     assert body["meta"]["interpretation"]["locations"] == ["Singapore"]
 
 
+@pytest.mark.smoke
 @pytest.mark.asyncio
 async def test_nlp_search_response_includes_match_score(
     nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list
@@ -520,6 +535,7 @@ async def test_nlp_search_response_includes_match_score(
 class TestNlpSearchMetering:
     """NLP search is metered with free tier limits."""
 
+    @pytest.mark.smoke
     def test_nlp_search_route_is_metered(self):
         from app.middleware.usage_logger import match_metered_action
 
@@ -668,6 +684,7 @@ class TestNlpParsePrecision:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.smoke
 @pytest.mark.asyncio
 async def test_search_user_contacts_returns_dict_shape(
     nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list, nlp_user_id
@@ -738,6 +755,7 @@ async def test_search_user_contacts_empty_query_returns_all(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.smoke
 def test_company_first_query_extracts_company():
     """'Grab engineers' should extract Grab as a company."""
     from app.services.nlp_contact_search import parse_query_mock
@@ -767,6 +785,7 @@ def test_company_first_query_multiword_title():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.smoke
 def test_industry_tech_extracted_from_in_clause():
     result = parse_query_mock("people in tech")
     assert "tech" in result.industries
@@ -793,6 +812,7 @@ def test_industry_startup_extracted():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.smoke
 @pytest.mark.asyncio
 async def test_nlp_search_falls_back_to_name_match(
     nlp_client: AsyncClient, nlp_auth_headers: dict, nlp_contacts: list

@@ -3,6 +3,8 @@
 from dataclasses import asdict
 from unittest.mock import patch
 
+import pytest
+
 from agents.shared.decision_registry import (
     PendingDecision,
     find_decision,
@@ -85,6 +87,7 @@ def _make_decision(number: int = 1, finding_id: str = "CVE-001") -> PendingDecis
 
 
 class TestDecisionRegistry:
+    @pytest.mark.smoke
     def test_save_and_load_round_trip(self, tmp_path):
         """Saved decisions can be loaded back identically."""
         decisions = [_make_decision(1, "A"), _make_decision(2, "B")]
@@ -96,6 +99,7 @@ class TestDecisionRegistry:
         assert loaded[0].finding_id == "A"
         assert loaded[1].number == 2
 
+    @pytest.mark.smoke
     def test_find_decision_by_number(self, tmp_path):
         """find_decision returns the matching decision or None."""
         decisions = [_make_decision(1, "A"), _make_decision(2, "B")]
@@ -108,6 +112,7 @@ class TestDecisionRegistry:
         assert found.finding_id == "B"
         assert missing is None
 
+    @pytest.mark.smoke
     def test_mark_executed_sets_timestamp_and_summary(self, tmp_path):
         """mark_executed stamps executed_at and result_summary."""
         path = tmp_path / "pending_decisions.json"
@@ -205,6 +210,7 @@ class TestDecisionRegistry:
         assert loaded[0].failu[RESEND_KEY_REDACTED] == ["Could break SSO", "May invalidate sessions"]
         assert loaded[0].rollback_plan == "Revert PR, re-enable old auth middleware"
 
+    @pytest.mark.smoke
     def test_from_dict_ignores_unknown_fields(self):
         """from_dict drops unknown keys from future schema versions."""
         data = {
@@ -228,6 +234,7 @@ class TestDecisionRegistry:
         assert d.failu[RESEND_KEY_REDACTED] == []
         assert not hasattr(d, "futu[RESEND_KEY_REDACTED]")
 
+    @pytest.mark.smoke
     def test_load_survives_futu[RESEND_KEY_REDACTED](self, tmp_path):
         """JSON with unknown fields from a future version loads without data loss."""
         import json

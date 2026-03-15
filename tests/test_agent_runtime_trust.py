@@ -1,8 +1,11 @@
 """Tests for graduated trust model."""
 
+import pytest
+
 from app.agent_runtime.trust import TrustLevel, get_allowed_tools, get_max_turns
 
 
+@pytest.mark.smoke
 def test_trust_level_enum_has_four_levels():
     """TrustLevel enum: observer, recommender, contributor, deployer."""
     assert TrustLevel.OBSERVER.value == 0
@@ -11,6 +14,7 @@ def test_trust_level_enum_has_four_levels():
     assert TrustLevel.DEPLOYER.value == 3
 
 
+@pytest.mark.smoke
 def test_observer_gets_read_only_tools():
     """Trust level 0 agents can only read code."""
     tools = get_allowed_tools(TrustLevel.OBSERVER)
@@ -30,6 +34,7 @@ def test_recommender_adds_web_tools():
     assert "Edit" not in tools
 
 
+@pytest.mark.smoke
 def test_contributor_adds_write_tools():
     """Trust level 2 adds file editing and shell access."""
     tools = get_allowed_tools(TrustLevel.CONTRIBUTOR)
@@ -39,12 +44,14 @@ def test_contributor_adds_write_tools():
     assert "Task" not in tools
 
 
+@pytest.mark.smoke
 def test_deployer_adds_subagent_tools():
     """Trust level 3 adds ability to spawn sub-agents."""
     tools = get_allowed_tools(TrustLevel.DEPLOYER)
     assert "Task" in tools
 
 
+@pytest.mark.smoke
 def test_max_turns_scales_with_trust():
     """Higher trust = more turns allowed per SDK session."""
     assert get_max_turns(TrustLevel.OBSERVER) == 10
