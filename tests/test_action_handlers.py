@@ -1,5 +1,6 @@
 """Tests for Telegram approval action handlers."""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from agents.shared.action_handlers import (
@@ -77,6 +78,9 @@ class TestDispatchAction:
         assert "escalat" in result.summary.lower()
 
 
+_FAKE_REQUIREMENTS = "langchain-core>=1.2.16\nfastapi>=0.135.0\n"
+
+
 class TestHandleDependencyBump:
     @patch("agents.shared.action_handlers._run_subprocess")
     def test_success_creates_branch_and_pr(self, mock_run):
@@ -92,8 +96,16 @@ class TestHandleDependencyBump:
             recommendation="Bump langchain-core>=1.2.11",
             file="requirements.txt",
         )
-        result = handle_dependency_bump(f, ExecutionTier.AUTO_PR)
+        with (
+            patch.object(Path, "read_text", return_value=_FAKE_REQUIREMENTS),
+            patch.object(Path, "write_text") as mock_write,
+            patch.object(Path, "exists", return_value=True),
+        ):
+            result = handle_dependency_bump(f, ExecutionTier.AUTO_PR)
         assert result.success
+        # Verify the write used the bumped version, not the original
+        written = mock_write.call_args[0][0]
+        assert "langchain-core>=1.2.11" in written
         calls = [str(c) for c in mock_run.call_args_list]
         assert any("checkout" in c and "-b" in c for c in calls)
         assert any("pr" in c and "create" in c for c in calls)
@@ -121,7 +133,12 @@ class TestHandleDependencyBump:
             category="dependency-vulnerability",
             recommendation="Bump foo>=2.0",
         )
-        result = handle_dependency_bump(f, ExecutionTier.AUTO_PR)
+        with (
+            patch.object(Path, "read_text", return_value=_FAKE_REQUIREMENTS),
+            patch.object(Path, "write_text"),
+            patch.object(Path, "exists", return_value=True),
+        ):
+            result = handle_dependency_bump(f, ExecutionTier.AUTO_PR)
         assert not result.success
         assert result.reverted
         calls = [str(c) for c in mock_run.call_args_list]

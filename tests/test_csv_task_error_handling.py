@@ -6,9 +6,10 @@ is persisted as 'failed' even though the main transaction is rolled back.
 
 import base64
 import contextlib
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import select
 
 from app.models.contact import CsvUpload
@@ -17,33 +18,61 @@ from tests.conftest import TestSessionLocal, create_test_user_in_db
 pytestmark = pytest.mark.usefixtures("truncate_tables")
 
 
-async def test_failed_upload_status_persists_after_rollback():
-    """Upload status must be 'failed' (not stuck in 'processing') when
-    process_csv_upload_core raises an exception — even though the outer
-    _celery_run wrapper rolls back the main transaction."""
-    async with TestSessionLocal() as db:
-        user, _ = await create_test_user_in_db(db, email="fail-test@example.com")
+# ---------------------------------------------------------------------------
+# Shared fixture: create a user + queued upload, return IDs for assertions.
+# Using a proper fixture (instead of inline TestSessionLocal()) ensures the
+# truncate_tables teardown runs *after* the test on the same event loop,
+# preventing stale-session issues under pytest-xdist.
+# ---------------------------------------------------------------------------
 
+
+@pytest_asyncio.fixture
+async def queued_upload():
+    """Create a fresh user + CsvUpload(status='queued') and return their IDs."""
+    async with TestSessionLocal() as db:
+        user, _ = await create_test_user_in_db(
+            db, email=f"csv-task-{id(db)}@example.com"
+        )
         upload = CsvUpload(
             user_id=user.id,
-            filename="fail.csv",
+            filename="test.csv",
             status="queued",
         )
         db.add(upload)
         await db.commit()
         await db.refresh(upload)
-        upload_id = upload.id
-        user_id = user.id
+        return {"upload_id": upload.id, "user_id": user.id}
+
+
+# Shared mock for _get_engine — prevents _celery_run from creating a real
+# asyncpg engine (which can fail or leak resources when PostgreSQL is not
+# available in the test environment).
+def _mock_engine():
+    engine = MagicMock()
+    engine.dispose = AsyncMock()
+    return engine
+
+
+async def test_failed_upload_status_persists_after_rollback(queued_upload):
+    """Upload status must be 'failed' (not stuck in 'processing') when
+    process_csv_upload_core raises an exception — even though the outer
+    _celery_run wrapper rolls back the main transaction."""
+    upload_id = queued_upload["upload_id"]
+    user_id = queued_upload["user_id"]
 
     csv_content = b"First Name,Last Name,Company,Position,Connected On\nAlice,Smith,Acme,Engineer,01 Jan 2024\n"
     b64 = base64.b64encode(csv_content).decode()
 
-    # Patch at app.database where _get_session_factory is defined (it's
-    # imported lazily inside _celery_run, so module-level patch won't work).
+    # Patch both _get_session_factory (for DB sessions) and _get_engine (to
+    # avoid creating a real asyncpg engine that fails without PostgreSQL).
     with (
         patch(
             "app.database._get_session_factory",
             return_value=TestSessionLocal,
+        ),
+        patch(
+            "app.database._get_engine",
+            return_value=_mock_engine(),
         ),
         patch(
             "app.tasks.csv_processing.clean_contacts",
@@ -68,28 +97,23 @@ async def test_failed_upload_status_persists_after_rollback():
         assert upload.completed_at is not None
 
 
-async def test_successful_upload_status_is_completed():
+async def test_successful_upload_status_is_completed(queued_upload):
     """Verify the happy path — successful processing sets status to 'completed'."""
-    async with TestSessionLocal() as db:
-        user, _ = await create_test_user_in_db(db, email="success-test@example.com")
-
-        upload = CsvUpload(
-            user_id=user.id,
-            filename="good.csv",
-            status="queued",
-        )
-        db.add(upload)
-        await db.commit()
-        await db.refresh(upload)
-        upload_id = upload.id
-        user_id = user.id
+    upload_id = queued_upload["upload_id"]
+    user_id = queued_upload["user_id"]
 
     csv_content = b"First Name,Last Name,Company,Position,Connected On\nBob,Jones,Acme,Manager,01 Jan 2024\n"
     b64 = base64.b64encode(csv_content).decode()
 
-    with patch(
-        "app.database._get_session_factory",
-        return_value=TestSessionLocal,
+    with (
+        patch(
+            "app.database._get_session_factory",
+            return_value=TestSessionLocal,
+        ),
+        patch(
+            "app.database._get_engine",
+            return_value=_mock_engine(),
+        ),
     ):
         from app.tasks.csv_processing import _celery_run
 

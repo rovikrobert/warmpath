@@ -868,6 +868,147 @@ class TestSynthesizerCategorySuppression:
         assert "0 critical, 0 high" in text
 
 
+class TestTeamSummariesExcludeFilteredFindings:
+    """Team summaries and progress must not leak resolved or noisy findings."""
+
+    def test_resolved_finding_excluded_from_team_summary_health(self):
+        """A resolved high-severity finding must not make team health 'red'."""
+        from agents.chief_of_staff.synthesizer import synthesize_daily
+
+        reports = [
+            AgentReport(
+                agent="architect",
+                scan_duration_seconds=5.0,
+                findings=[
+                    Finding(
+                        id="RESOLVED-HIGH",
+                        severity="high",
+                        category="security",
+                        title="Resolved security issue",
+                        detail="In resolved registry",
+                    ),
+                ],
+            ),
+        ]
+
+        fake_reg = {
+            "RESOLVED-HIGH": {
+                "resolution_type": "false_positive",
+                "resolved_at": "2026-01-01T00:00:00+00:00",
+                "reason": "test",
+                "skip_until": None,
+            }
+        }
+        with _fake_registry(fake_reg):
+            _brief, data = synthesize_daily(reports)
+
+        # Team summary should be green (no unresolved findings)
+        eng_summary = next(
+            (ts for ts in data["team_summaries"] if ts["team"] == "engineering"),
+            None,
+        )
+        assert eng_summary is not None
+        assert eng_summary["health"] == "green"
+        assert eng_summary["finding_count"] == 0
+
+    def test_noisy_category_excluded_from_team_summary_count(self):
+        """Suppressed-category findings must not inflate team finding counts."""
+        from agents.chief_of_staff.synthesizer import synthesize_daily
+
+        reports = [
+            AgentReport(
+                agent="architect",
+                scan_duration_seconds=5.0,
+                findings=[
+                    Finding(
+                        id="SEC-AUTH-FP",
+                        severity="high",
+                        category="auth_coverage",
+                        title="Endpoint missing auth",
+                        detail="Scanner false positive",
+                    ),
+                    Finding(
+                        id="SEC-SQLI-FP",
+                        severity="medium",
+                        category="sql_injection",
+                        title="SQL injection in search",
+                        detail="Parameterized query",
+                    ),
+                    Finding(
+                        id="REAL-FINDING",
+                        severity="low",
+                        category="lint",
+                        title="Real lint issue",
+                        detail="Unused import",
+                    ),
+                ],
+            ),
+        ]
+
+        with _fake_registry({}):
+            _brief, data = synthesize_daily(reports)
+
+        eng_summary = next(
+            (ts for ts in data["team_summaries"] if ts["team"] == "engineering"),
+            None,
+        )
+        assert eng_summary is not None
+        # Only the real finding should count
+        assert eng_summary["finding_count"] == 1
+        assert eng_summary["health"] == "green"
+
+    def test_resolved_finding_not_in_telegram_decisions(self):
+        """Resolved findings must not appear in Telegram brief decisions."""
+        from agents.chief_of_staff.synthesizer import synthesize_daily
+
+        reports = [
+            AgentReport(
+                agent="security_scanner",
+                scan_duration_seconds=5.0,
+                findings=[
+                    Finding(
+                        id="SEC-DEPENDENCY-0",
+                        severity="high",
+                        category="dependency-vulnerability",
+                        title="langchain-core CVE",
+                        detail="Not exploitable",
+                    ),
+                    Finding(
+                        id="SEC-AUTH-COVERAGE-app-api-credits.py:57",
+                        severity="high",
+                        category="auth_coverage",
+                        title="Endpoint missing auth",
+                        detail="Scanner FP",
+                    ),
+                ],
+            ),
+        ]
+
+        fake_reg = {
+            "SEC-DEPENDENCY-0": {
+                "resolution_type": "deferred",
+                "resolved_at": "2026-03-12T00:00:00+00:00",
+                "reason": "Not exploitable",
+                "skip_until": "2026-05-01",
+            },
+            "SEC-AUTH-COVERAGE-app-api-credits.py:57": {
+                "resolution_type": "false_positive",
+                "resolved_at": "2026-03-12T00:00:00+00:00",
+                "reason": "Scanner FP",
+                "skip_until": None,
+            },
+        }
+        with _fake_registry(fake_reg):
+            _brief, data = synthesize_daily(reports)
+
+        decision_ids = [d["id"] for d in data.get("decisions_needed", [])]
+        assert "SEC-DEPENDENCY-0" not in decision_ids
+        assert "SEC-AUTH-COVERAGE-app-api-credits.py:57" not in decision_ids
+        # Team summaries should also be clean
+        for ts in data.get("team_summaries", []):
+            assert ts["finding_count"] == 0
+
+
 class TestSynthesizerSavesPendingDecisions:
     def test_daily_brief_saves_pending_decisions_for_critical_findings(self):
         """synthesize_daily persists pending decisions from critical/high findings."""
