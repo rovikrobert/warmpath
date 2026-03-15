@@ -1,11 +1,13 @@
 import uuid
 
+import pytest
 from httpx import AsyncClient
 
 from app.models.user import User
 from tests.conftest import TestSessionLocal, create_test_clerk_token
 
 
+@pytest.mark.smoke
 async def test_get_current_user_with_valid_clerk_jwt(client: AsyncClient):
     """Valid Clerk JWT with matching user returns 200 and correct email."""
     clerk_id = f"user_{uuid.uuid4().hex[:12]}"
@@ -98,6 +100,7 @@ async def test_get_current_user_rejects_garbage_token(client: AsyncClient):
     )
 
 
+@pytest.mark.smoke
 async def test_jit_provision_creates_user_when_webhook_missing(
     client: AsyncClient,
     monkeypatch,
@@ -261,6 +264,7 @@ async def test_jit_provision_blocked_for_deleted_user(
     assert "not found" in resp.json()["detail"].lower()
 
 
+@pytest.mark.smoke
 async def test_jit_provision_handles_race_condition(
     client: AsyncClient,
     monkeypatch,

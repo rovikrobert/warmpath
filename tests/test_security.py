@@ -12,6 +12,8 @@ import io
 import json
 import time
 
+import pytest
+
 from httpx import AsyncClient
 from app.models.audit import AuditLog
 from app.services.csv_parser import sanitize_cell
@@ -44,6 +46,7 @@ async def _get_auth_token(client: AsyncClient, email: str = "csv@example.com") -
 
 
 class TestCSVFormulaInjection:
+    @pytest.mark.smoke
     def test_sanitize_equals(self):
         assert sanitize_cell("=SUM(A1:A10)") == "'=SUM(A1:A10)"
 
@@ -104,6 +107,7 @@ class TestCSVFormulaInjection:
 
 
 class TestCSVFileSizeLimit:
+    @pytest.mark.smoke
     async def test_over_10mb_rejected(self, client: AsyncClient):
         token = await _get_auth_token(client)
         # Create a CSV that exceeds 10 MB

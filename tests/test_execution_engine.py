@@ -1,5 +1,6 @@
 """Test the cross-team execution engine."""
 
+import pytest
 from unittest.mock import MagicMock, patch
 
 from agents.shared.execution_engine import (
@@ -24,6 +25,7 @@ def _finding(id="f1", severity="low", auto_fixable=True, category="lint", file=N
     )
 
 
+@pytest.mark.smoke
 def test_triage_auto_do_for_trivial():
     engine = ExecutionEngine(enabled=True)
     f = _finding(category="lint", auto_fixable=True, severity="low")
@@ -31,6 +33,7 @@ def test_triage_auto_do_for_trivial():
     assert tier == ExecutionTier.AUTO_DO
 
 
+@pytest.mark.smoke
 def test_triage_auto_pr_for_medium():
     engine = ExecutionEngine(enabled=True)
     f = _finding(category="test_coverage", auto_fixable=False, severity="medium")
@@ -38,6 +41,7 @@ def test_triage_auto_pr_for_medium():
     assert tier == ExecutionTier.AUTO_PR
 
 
+@pytest.mark.smoke
 def test_triage_escalate_for_critical():
     engine = ExecutionEngine(enabled=True)
     f = _finding(severity="critical")
@@ -45,6 +49,7 @@ def test_triage_escalate_for_critical():
     assert tier == ExecutionTier.ESCALATE
 
 
+@pytest.mark.smoke
 def test_triage_all_report_only_when_disabled():
     engine = ExecutionEngine(enabled=False)
     f = _finding(category="lint", auto_fixable=True, severity="low")
@@ -52,6 +57,7 @@ def test_triage_all_report_only_when_disabled():
     assert tier == ExecutionTier.REPORT_ONLY
 
 
+@pytest.mark.smoke
 def test_circuit_breaker_caps_auto_merges():
     engine = ExecutionEngine(enabled=True, max_auto_merges_per_day=2)
     engine._auto_merge_count = 2
@@ -60,6 +66,7 @@ def test_circuit_breaker_caps_auto_merges():
     assert tier == ExecutionTier.AUTO_PR
 
 
+@pytest.mark.smoke
 def test_execute_returns_result():
     engine = ExecutionEngine(enabled=True)
     f = _finding()
@@ -68,6 +75,7 @@ def test_execute_returns_result():
     assert result.action == ExecutionAction.REPORTED
 
 
+@pytest.mark.smoke
 def test_process_findings_groups_by_tier():
     engine = ExecutionEngine(enabled=True)
     findings = [

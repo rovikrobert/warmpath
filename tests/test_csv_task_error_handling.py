@@ -97,6 +97,7 @@ async def test_failed_upload_status_persists_after_rollback(queued_upload):
         assert upload.completed_at is not None
 
 
+@pytest.mark.smoke
 async def test_successful_upload_status_is_completed(queued_upload):
     """Verify the happy path — successful processing sets status to 'completed'."""
     upload_id = queued_upload["upload_id"]

@@ -16,6 +16,7 @@ async def db(truncate_tables):
 
 
 class TestCsvUploadChunkModel:
+    @pytest.mark.smoke
     @pytest.mark.asyncio
     async def test_create_chunk_with_required_fields(self, db):
         """CsvUploadChunk can be created with upload_id, chunk_index, contacts_count."""
@@ -42,6 +43,7 @@ class TestCsvUploadChunkModel:
         assert saved.status == "pending"
         assert saved.provider_used is None
 
+    @pytest.mark.smoke
     @pytest.mark.asyncio
     async def test_csv_upload_has_chunk_tracking_columns(self, db):
         """CsvUpload has total_chunks, chunks_cleaned, chunks_imported columns."""

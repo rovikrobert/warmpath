@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from unittest.mock import MagicMock, patch
 
 from agents.shared.repair import (
@@ -126,6 +127,7 @@ class TestRepairAutoFixable:
         assert result.skipped_count >= 1
         assert findings[0].repair_status == "skipped"
 
+    @pytest.mark.smoke
     @patch("agents.shared.repair._already_attempted_today", return_value=False)
     @patch("agents.shared.repair._mark_attempted", return_value=True)
     @patch("agents.shared.repair._run")
@@ -157,6 +159,7 @@ class TestRepairAutoFixable:
         assert findings[0].repair_status == "failed"
         assert "Tests failed" in result.errors[0]
 
+    @pytest.mark.smoke
     @patch("agents.shared.repair._already_attempted_today", return_value=False)
     @patch("agents.shared.repair._mark_attempted", return_value=True)
     @patch("agents.shared.repair._run")
@@ -480,6 +483,7 @@ class TestRepairCommitPerFinding:
 
 
 class TestEvaluateFixQuality:
+    @pytest.mark.smoke
     def test_evaluate_fix_quality_returns_score(self) -> None:
         """evaluate_fix_quality returns a score and assessment."""
         from agents.shared.repair import evaluate_fix_quality
@@ -493,6 +497,7 @@ class TestEvaluateFixQuality:
         assert 1 <= result["score"] <= 5
         assert "assessment" in result
 
+    @pytest.mark.smoke
     def test_evaluate_fix_quality_trivial_lint(self) -> None:
         """Trivial lint fixes score 4."""
         from agents.shared.repair import evaluate_fix_quality
@@ -516,6 +521,7 @@ class TestEvaluateFixQuality:
         assert result["score"] == 3
         assert result["needs_human_review"] is False
 
+    @pytest.mark.smoke
     def test_evaluate_fix_quality_llm_fallback_on_import_error(self) -> None:
         """When anthropic is unavailable, falls back to heuristic scoring."""
         from agents.shared.repair import evaluate_fix_quality
@@ -555,6 +561,7 @@ class TestEvaluateFixQuality:
 
 
 class TestPendingDecisionBackwardCompat:
+    @pytest.mark.smoke
     def test_load_old_format_without_new_fields(self, tmp_path) -> None:
         """Old JSON without failure_modes/rollback_plan loads with defaults."""
         import json

@@ -2,9 +2,12 @@
 
 import logging
 
+import pytest
+
 from agents.shared.report import AgentReport, Finding
 
 
+@pytest.mark.smoke
 def test_from_dict_ignores_unknown_fields():
     """AgentReport.from_dict() should silently drop fields not in the dataclass."""
     data = {
@@ -91,6 +94,7 @@ def test_from_dict_does_not_mutate_input():
     assert "findings" in data  # Should NOT be popped from original
 
 
+@pytest.mark.smoke
 def test_round_trip_serialization():
     """to_dict -> from_dict preserves all standard fields."""
     original = AgentReport(
@@ -115,6 +119,7 @@ def test_round_trip_serialization():
     assert restored.metrics == {"coverage": 85}
 
 
+@pytest.mark.smoke
 def test_agent_report_warns_on_empty_recommendation(caplog):
     """AgentReport.__post_init__ logs warning for findings with empty recommendations."""
     findings = [

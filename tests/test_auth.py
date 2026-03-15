@@ -1,5 +1,6 @@
 """Auth endpoint tests — Clerk JWT integration."""
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
@@ -11,6 +12,7 @@ from tests.conftest import (
 )
 
 
+@pytest.mark.smoke
 async def test_me_returns_profile_and_capabilities(client: AsyncClient):
     """GET /me returns user profile with capabilities for valid Clerk JWT."""
     async with TestSessionLocal() as db:
@@ -33,6 +35,7 @@ async def test_me_returns_profile_and_capabilities(client: AsyncClient):
     assert "clerk_user_id" not in body["data"]
 
 
+@pytest.mark.smoke
 async def test_me_includes_profile_completeness(client: AsyncClient):
     """GET /me returns profile_completeness with score and missing fields."""
     async with TestSessionLocal() as db:
@@ -253,6 +256,7 @@ async def test_onboarding_complete_rejects_when_no_work_history(client: AsyncCli
     assert "work history" in body["detail"].lower()
 
 
+@pytest.mark.smoke
 async def test_onboarding_complete_succeeds_with_all_steps(client: AsyncClient):
     """POST /onboarding-complete stamps onboarding_completed_at when all steps done."""
     from app.models.contact import Contact
@@ -292,6 +296,7 @@ async def test_onboarding_complete_succeeds_with_all_steps(client: AsyncClient):
     assert body["data"]["onboarding_complete"] is True
 
 
+@pytest.mark.smoke
 async def test_onboarding_complete_succeeds_for_share_network_without_preferences(
     client: AsyncClient,
 ):
@@ -367,6 +372,7 @@ async def test_onboarding_complete_succeeds_with_csv_upload_but_no_contacts_yet(
     assert resp.json()["data"]["onboarding_complete"] is True
 
 
+@pytest.mark.smoke
 async def test_onboarding_complete_is_idempotent(client: AsyncClient):
     """POST /onboarding-complete twice returns 200 both times."""
     from app.models.contact import Contact
@@ -407,6 +413,7 @@ async def test_onboarding_complete_is_idempotent(client: AsyncClient):
     assert resp2.json()["data"]["onboarding_complete"] is True
 
 
+@pytest.mark.smoke
 async def test_me_returns_onboarding_complete_false_for_new_user(client: AsyncClient):
     """GET /me returns onboarding_complete=false for new users."""
     async with TestSessionLocal() as db:

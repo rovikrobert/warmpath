@@ -32,6 +32,7 @@ class TestGetBalance:
             balance = await get_balance(uid, db)
             assert balance == 0
 
+    @pytest.mark.smoke
     async def test_balance_after_earning(self):
         uid = uuid_mod.uuid4()
         async with TestSessionLocal() as db:
@@ -172,6 +173,7 @@ class TestGetCreditSummary:
 
 
 class TestEarnCredits:
+    @pytest.mark.smoke
     async def test_creates_transaction(self):
         uid = uuid_mod.uuid4()
         async with TestSessionLocal() as db:
@@ -202,6 +204,7 @@ class TestEarnCredits:
 
 
 class TestSpendCredits:
+    @pytest.mark.smoke
     async def test_deducts_balance(self):
         uid = uuid_mod.uuid4()
         async with TestSessionLocal() as db:
@@ -212,6 +215,7 @@ class TestSpendCredits:
             balance = await get_balance(uid, db)
             assert balance == 80
 
+    @pytest.mark.smoke
     async def test_insufficient_balance_raises(self):
         uid = uuid_mod.uuid4()
         async with TestSessionLocal() as db:
@@ -387,6 +391,7 @@ async def user_id(auth_headers: dict, client: AsyncClient) -> str:
 
 
 class TestBalanceEndpoint:
+    @pytest.mark.smoke
     async def test_new_user_has_welcome_bonus(self, client: AsyncClient, auth_headers):
         """New users get 50 welcome credits."""
         resp = await client.get("/api/v1/credits/balance", headers=auth_headers)
@@ -395,6 +400,7 @@ class TestBalanceEndpoint:
         assert data["balance"] == 50
         assert data["earned_total"] == 50
 
+    @pytest.mark.smoke
     async def test_balance_after_operations(
         self, client: AsyncClient, auth_headers, user_id
     ):
@@ -601,6 +607,7 @@ class TestCreditTriggers:
         resp = await client.get("/api/v1/credits/balance", headers=headers)
         assert resp.json()["data"]["balance"] == 50
 
+    @pytest.mark.smoke
     async def test_csv_upload_awards_credits(self, client: AsyncClient, auth_headers):
         """Successful CSV upload awards 100 credits."""
         import io

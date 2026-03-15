@@ -1,5 +1,6 @@
 """Tests for V2 CSV streaming pipeline routing."""
 
+import pytest
 from unittest.mock import patch, MagicMock
 
 
@@ -20,6 +21,7 @@ class TestV2PipelineRouting:
             process_csv_upload.run("upload-id", "user-id", "base64data")
             mock_asyncio.run.assert_called_once()
 
+    @pytest.mark.smoke
     def test_v2_pipeline_dispatched_when_flag_true(self):
         """When CSV_PIPELINE_V2=True, parse task is dispatched."""
         with (
@@ -39,6 +41,7 @@ class TestV2PipelineRouting:
 class TestPipelineTasksExist:
     """Verify pipeline task functions are importable and registered."""
 
+    @pytest.mark.smoke
     def test_csv_parse_task_importable(self):
         from app.tasks.csv_pipeline import csv_parse_task
 

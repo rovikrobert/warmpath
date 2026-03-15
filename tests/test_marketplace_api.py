@@ -3,6 +3,7 @@
 import uuid as uuid_mod
 from datetime import date, timedelta
 
+import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -176,6 +177,7 @@ async def seeker_with_credits(seeker_auth: dict):
 
 
 class TestMarketplaceSearch:
+    @pytest.mark.smoke
     async def test_search_returns_anonymized_results(
         self, client: AsyncClient, seeker_with_credits, marketplace_data
     ):
@@ -215,6 +217,7 @@ class TestMarketplaceSearch:
             assert rep["intros_facilitated"] == 12
             assert rep["response_rate"] == 85
 
+    @pytest.mark.smoke
     async def test_search_deducts_credits(
         self, client: AsyncClient, seeker_with_credits, marketplace_data
     ):
@@ -265,6 +268,7 @@ class TestMarketplaceSearch:
         assert resp.status_code == 200
         assert resp.json()["data"] == []
 
+    @pytest.mark.smoke
     async def test_search_filters_role_level(
         self, client: AsyncClient, seeker_with_credits, marketplace_data
     ):
@@ -333,6 +337,7 @@ class TestIntroRequestFlow:
         assert data["status"] == "requested"
         assert data["marketplace_listing_id"] == listing_id
 
+    @pytest.mark.smoke
     async def test_request_intro_deducts_credits(
         self, client: AsyncClient, seeker_with_credits, marketplace_data
     ):
@@ -384,6 +389,7 @@ class TestIntroRequestFlow:
         )
         assert resp.status_code == 404
 
+    @pytest.mark.smoke
     async def test_request_intro_duplicate_blocked(
         self, client: AsyncClient, seeker_with_credits, marketplace_data
     ):
@@ -637,6 +643,7 @@ class TestIntroRequestFlow:
 
 
 class TestDuplicateDetection:
+    @pytest.mark.smoke
     async def test_intro_blocked_when_contact_in_seeker_vault(
         self,
         client: AsyncClient,
@@ -797,6 +804,7 @@ class TestMyRequests:
 
 
 class TestIncomingRequests:
+    @pytest.mark.smoke
     async def test_holder_sees_full_contact_details(
         self, client: AsyncClient, seeker_with_credits, holder_auth, marketplace_data
     ):
@@ -892,6 +900,7 @@ class TestApproveDecline:
         )
         return resp.json()["data"]["id"]
 
+    @pytest.mark.smoke
     async def test_approve_defers_credits_for_email_relay(
         self, client: AsyncClient, seeker_with_credits, holder_auth, marketplace_data
     ):
@@ -1307,6 +1316,7 @@ class TestConfirmManualSend:
         )
         return fac_id
 
+    @pytest.mark.smoke
     async def test_confirm_sent_awards_credits_and_sets_delivery(
         self,
         client: AsyncClient,

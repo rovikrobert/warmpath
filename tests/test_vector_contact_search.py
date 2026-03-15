@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, patch
 class TestVectorContactSearch:
     """Integration of vector search into NLP contact search."""
 
+    @pytest.mark.smoke
     @pytest.mark.asyncio
     async def test_vector_search_returns_ranked_results(self):
         from app.services.nlp_contact_search import _vector_search_contacts
@@ -88,6 +89,7 @@ class TestVectorContactSearch:
 
         assert result is None
 
+    @pytest.mark.smoke
     @pytest.mark.asyncio
     async def test_vector_search_combines_with_warm_score(self):
         from app.services.nlp_contact_search import _combine_vector_and_warm
