@@ -19,9 +19,11 @@ def _enabled():
 
 class TestMcpSearchMemory:
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    @patch("mcp_server.tools.memory._run_async")
-    def test_search_memory_returns_results(
-        self, mock_run: MagicMock, mock_check: MagicMock
+    @patch("mcp_server.tools.memory._get_session", new_callable=AsyncMock)
+    @patch("app.services.memory_service.MemoryService", autospec=False)
+    @pytest.mark.asyncio
+    async def test_search_memory_returns_results(
+        self, MockSvc: MagicMock, mock_session: AsyncMock, mock_check: MagicMock
     ) -> None:
         fake_results = [
             {
@@ -35,57 +37,80 @@ class TestMcpSearchMemory:
                 "score": 0.72,
             },
         ]
-        mock_run.return_value = {"count": 2, "results": fake_results}
+        session = AsyncMock()
+        mock_session.return_value = session
+        instance = MockSvc.return_value
+        instance.recall = AsyncMock(return_value=fake_results)
 
-        result = search_memory(query="CSV parser fix")
+        result = await search_memory(query="CSV parser fix")
         assert result["count"] == 2
         assert len(result["results"]) == 2
         assert result["results"][0]["score"] == 0.85
 
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    @patch("mcp_server.tools.memory._run_async")
-    def test_search_memory_returns_empty_when_no_matches(
-        self, mock_run: MagicMock, mock_check: MagicMock
+    @patch("mcp_server.tools.memory._get_session", new_callable=AsyncMock)
+    @patch("app.services.memory_service.MemoryService", autospec=False)
+    @pytest.mark.asyncio
+    async def test_search_memory_returns_empty_when_no_matches(
+        self, MockSvc: MagicMock, mock_session: AsyncMock, mock_check: MagicMock
     ) -> None:
-        mock_run.return_value = {"count": 0, "results": []}
+        session = AsyncMock()
+        mock_session.return_value = session
+        instance = MockSvc.return_value
+        instance.recall = AsyncMock(return_value=[])
 
-        result = search_memory(query="nonexistent topic xyz")
+        result = await search_memory(query="nonexistent topic xyz")
         assert result["count"] == 0
         assert result["results"] == []
 
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    @patch("mcp_server.tools.memory._run_async")
-    def test_search_memory_returns_error_dict_on_failure(
-        self, mock_run: MagicMock, mock_check: MagicMock
+    @patch("mcp_server.tools.memory._get_session", new_callable=AsyncMock)
+    @patch("app.services.memory_service.MemoryService", autospec=False)
+    @pytest.mark.asyncio
+    async def test_search_memory_returns_error_dict_on_failure(
+        self, MockSvc: MagicMock, mock_session: AsyncMock, mock_check: MagicMock
     ) -> None:
-        mock_run.side_effect = RuntimeError("DB connection lost")
+        session = AsyncMock()
+        mock_session.return_value = session
+        instance = MockSvc.return_value
+        instance.recall = AsyncMock(side_effect=RuntimeError("DB connection lost"))
 
-        result = search_memory(query="anything")
+        result = await search_memory(query="anything")
         assert "error" in result
         assert "Search failed" in result["error"]
 
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    @patch("mcp_server.tools.memory._run_async")
-    def test_search_memory_passes_team_filter(
-        self, mock_run: MagicMock, mock_check: MagicMock
+    @patch("mcp_server.tools.memory._get_session", new_callable=AsyncMock)
+    @patch("app.services.memory_service.MemoryService", autospec=False)
+    @pytest.mark.asyncio
+    async def test_search_memory_passes_team_filter(
+        self, MockSvc: MagicMock, mock_session: AsyncMock, mock_check: MagicMock
     ) -> None:
-        mock_run.return_value = {"count": 1, "results": [{"id": "x"}]}
+        session = AsyncMock()
+        mock_session.return_value = session
+        instance = MockSvc.return_value
+        instance.recall = AsyncMock(return_value=[{"id": "x"}])
 
-        result = search_memory(query="deploy", team="agents")
+        result = await search_memory(query="deploy", team="agents")
         assert result["count"] == 1
-        mock_run.assert_called_once()
+        instance.recall.assert_awaited_once()
 
 
 class TestMcpSaveMemory:
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    @patch("mcp_server.tools.memory._run_async")
-    def test_save_memory_stores_successfully(
-        self, mock_run: MagicMock, mock_check: MagicMock
+    @patch("mcp_server.tools.memory._get_session", new_callable=AsyncMock)
+    @patch("app.services.memory_service.MemoryService", autospec=False)
+    @pytest.mark.asyncio
+    async def test_save_memory_stores_successfully(
+        self, MockSvc: MagicMock, mock_session: AsyncMock, mock_check: MagicMock
     ) -> None:
-        fake_id = str(uuid.uuid4())
-        mock_run.return_value = {"id": fake_id, "status": "saved"}
+        fake_id = uuid.uuid4()
+        session = AsyncMock()
+        mock_session.return_value = session
+        instance = MockSvc.return_value
+        instance.remember = AsyncMock(return_value=fake_id)
 
-        result = save_memory(
+        result = await save_memory(
             content="Alembic migration requires single head",
             summary="Alembic heads check",
             team="agents",
@@ -93,40 +118,55 @@ class TestMcpSaveMemory:
             importance=0.8,
         )
         assert result["status"] == "saved"
-        assert result["id"] == fake_id
+        assert result["id"] == str(fake_id)
 
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    @patch("mcp_server.tools.memory._run_async")
-    def test_save_memory_returns_error_dict_on_failure(
-        self, mock_run: MagicMock, mock_check: MagicMock
+    @patch("mcp_server.tools.memory._get_session", new_callable=AsyncMock)
+    @patch("app.services.memory_service.MemoryService", autospec=False)
+    @pytest.mark.asyncio
+    async def test_save_memory_returns_error_dict_on_failure(
+        self, MockSvc: MagicMock, mock_session: AsyncMock, mock_check: MagicMock
     ) -> None:
-        mock_run.side_effect = RuntimeError("DB write failed")
+        session = AsyncMock()
+        mock_session.return_value = session
+        instance = MockSvc.return_value
+        instance.remember = AsyncMock(side_effect=RuntimeError("DB write failed"))
 
-        result = save_memory(content="test content")
+        result = await save_memory(content="test content")
         assert "error" in result
         assert "Save failed" in result["error"]
 
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    @patch("mcp_server.tools.memory._run_async")
-    def test_save_memory_with_ttl(
-        self, mock_run: MagicMock, mock_check: MagicMock
+    @patch("mcp_server.tools.memory._get_session", new_callable=AsyncMock)
+    @patch("app.services.memory_service.MemoryService", autospec=False)
+    @pytest.mark.asyncio
+    async def test_save_memory_with_ttl(
+        self, MockSvc: MagicMock, mock_session: AsyncMock, mock_check: MagicMock
     ) -> None:
-        fake_id = str(uuid.uuid4())
-        mock_run.return_value = {"id": fake_id, "status": "saved"}
+        fake_id = uuid.uuid4()
+        session = AsyncMock()
+        mock_session.return_value = session
+        instance = MockSvc.return_value
+        instance.remember = AsyncMock(return_value=fake_id)
 
-        result = save_memory(content="Temporary note", ttl_hours=24)
+        result = await save_memory(content="Temporary note", ttl_hours=24)
         assert result["status"] == "saved"
 
 
 class TestMcpIndexSession:
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    @patch("mcp_server.tools.memory._run_async")
-    def test_index_session_stores_summary_and_learnings(
-        self, mock_run: MagicMock, mock_check: MagicMock
+    @patch("mcp_server.tools.memory._get_session", new_callable=AsyncMock)
+    @patch("app.services.memory_service.MemoryService", autospec=False)
+    @pytest.mark.asyncio
+    async def test_index_session_stores_summary_and_learnings(
+        self, MockSvc: MagicMock, mock_session: AsyncMock, mock_check: MagicMock
     ) -> None:
-        mock_run.return_value = {"status": "indexed", "memories_created": 3}
+        session = AsyncMock()
+        mock_session.return_value = session
+        instance = MockSvc.return_value
+        instance.remember = AsyncMock(return_value=uuid.uuid4())
 
-        result = index_session(
+        result = await index_session(
             session_summary="Fixed CSV parser encoding bug",
             key_learnings=[
                 "UTF-8 BOM must be stripped before parsing",
@@ -137,24 +177,36 @@ class TestMcpIndexSession:
         assert result["memories_created"] == 3
 
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    @patch("mcp_server.tools.memory._run_async")
-    def test_index_session_summary_only(
-        self, mock_run: MagicMock, mock_check: MagicMock
+    @patch("mcp_server.tools.memory._get_session", new_callable=AsyncMock)
+    @patch("app.services.memory_service.MemoryService", autospec=False)
+    @pytest.mark.asyncio
+    async def test_index_session_summary_only(
+        self, MockSvc: MagicMock, mock_session: AsyncMock, mock_check: MagicMock
     ) -> None:
-        mock_run.return_value = {"status": "indexed", "memories_created": 1}
+        session = AsyncMock()
+        mock_session.return_value = session
+        instance = MockSvc.return_value
+        instance.remember = AsyncMock(return_value=uuid.uuid4())
 
-        result = index_session(session_summary="Reviewed marketplace indexer")
+        result = await index_session(session_summary="Reviewed marketplace indexer")
         assert result["status"] == "indexed"
         assert result["memories_created"] == 1
 
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    @patch("mcp_server.tools.memory._run_async")
-    def test_index_session_returns_error_dict_on_failure(
-        self, mock_run: MagicMock, mock_check: MagicMock
+    @patch("mcp_server.tools.memory._get_session", new_callable=AsyncMock)
+    @patch("app.services.memory_service.MemoryService", autospec=False)
+    @pytest.mark.asyncio
+    async def test_index_session_returns_error_dict_on_failure(
+        self, MockSvc: MagicMock, mock_session: AsyncMock, mock_check: MagicMock
     ) -> None:
-        mock_run.side_effect = RuntimeError("Session factory unavailable")
+        session = AsyncMock()
+        mock_session.return_value = session
+        instance = MockSvc.return_value
+        instance.remember = AsyncMock(
+            side_effect=RuntimeError("Session factory unavailable")
+        )
 
-        result = index_session(session_summary="test")
+        result = await index_session(session_summary="test")
         assert "error" in result
         assert "Index failed" in result["error"]
 
@@ -163,19 +215,26 @@ class TestMcpFeatureFlagGating:
     """MCP tools return error when MEMORY_SERVICE_ENABLED=False."""
 
     @patch("mcp_server.tools.memory._check_enabled", return_value={"error": "disabled"})
-    def test_search_memory_gated_when_disabled(self, mock_check: MagicMock) -> None:
-        result = search_memory(query="test")
+    @pytest.mark.asyncio
+    async def test_search_memory_gated_when_disabled(
+        self, mock_check: MagicMock
+    ) -> None:
+        result = await search_memory(query="test")
         assert "error" in result
         assert "disabled" in result["error"]
 
     @patch("mcp_server.tools.memory._check_enabled", return_value={"error": "disabled"})
-    def test_save_memory_gated_when_disabled(self, mock_check: MagicMock) -> None:
-        result = save_memory(content="test")
+    @pytest.mark.asyncio
+    async def test_save_memory_gated_when_disabled(self, mock_check: MagicMock) -> None:
+        result = await save_memory(content="test")
         assert "error" in result
 
     @patch("mcp_server.tools.memory._check_enabled", return_value={"error": "disabled"})
-    def test_index_session_gated_when_disabled(self, mock_check: MagicMock) -> None:
-        result = index_session(session_summary="test")
+    @pytest.mark.asyncio
+    async def test_index_session_gated_when_disabled(
+        self, mock_check: MagicMock
+    ) -> None:
+        result = await index_session(session_summary="test")
         assert "error" in result
 
 
@@ -183,20 +242,29 @@ class TestMcpInputValidation:
     """MCP tools validate inputs before hitting the DB."""
 
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    def test_search_empty_query_returns_empty(self, mock_check: MagicMock) -> None:
-        result = search_memory(query="")
+    @pytest.mark.asyncio
+    async def test_search_empty_query_returns_empty(
+        self, mock_check: MagicMock
+    ) -> None:
+        result = await search_memory(query="")
         assert result["count"] == 0
         assert result["results"] == []
 
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    def test_save_empty_content_returns_error(self, mock_check: MagicMock) -> None:
-        result = save_memory(content="")
+    @pytest.mark.asyncio
+    async def test_save_empty_content_returns_error(
+        self, mock_check: MagicMock
+    ) -> None:
+        result = await save_memory(content="")
         assert "error" in result
         assert "empty" in result["error"].lower()
 
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    def test_index_empty_summary_returns_error(self, mock_check: MagicMock) -> None:
-        result = index_session(session_summary="")
+    @pytest.mark.asyncio
+    async def test_index_empty_summary_returns_error(
+        self, mock_check: MagicMock
+    ) -> None:
+        result = await index_session(session_summary="")
         assert "error" in result
         assert "empty" in result["error"].lower()
 
@@ -205,12 +273,13 @@ class TestMcpMemoryIntegration:
     """Tests that verify the async plumbing between MCP tools and MemoryService."""
 
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    @patch("mcp_server.tools.memory._get_session")
+    @patch("mcp_server.tools.memory._get_session", new_callable=AsyncMock)
     @patch("app.services.memory_service.MemoryService", autospec=False)
-    def test_search_memory_calls_recall(
+    @pytest.mark.asyncio
+    async def test_search_memory_calls_recall(
         self,
         MockSvc: MagicMock,
-        mock_get_session: MagicMock,
+        mock_get_session: AsyncMock,
         mock_check: MagicMock,
     ) -> None:
         """Verify search_memory creates a session and calls svc.recall()."""
@@ -221,24 +290,20 @@ class TestMcpMemoryIntegration:
         instance = MockSvc.return_value
         instance.recall = AsyncMock(return_value=fake_results)
 
-        # Patch _run_async to actually run the coroutine
-        with patch(
-            "mcp_server.tools.memory._run_async",
-            side_effect=lambda c: __import__("asyncio").run(c),
-        ):
-            result = search_memory(query="test query")
+        result = await search_memory(query="test query")
 
         assert result["count"] == 1
         assert result["results"] == fake_results
         mock_session.close.assert_awaited_once()
 
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    @patch("mcp_server.tools.memory._get_session")
+    @patch("mcp_server.tools.memory._get_session", new_callable=AsyncMock)
     @patch("app.services.memory_service.MemoryService", autospec=False)
-    def test_save_memory_calls_remember(
+    @pytest.mark.asyncio
+    async def test_save_memory_calls_remember(
         self,
         MockSvc: MagicMock,
-        mock_get_session: MagicMock,
+        mock_get_session: AsyncMock,
         mock_check: MagicMock,
     ) -> None:
         """Verify save_memory creates a session and calls svc.remember()."""
@@ -249,11 +314,7 @@ class TestMcpMemoryIntegration:
         instance = MockSvc.return_value
         instance.remember = AsyncMock(return_value=fake_id)
 
-        with patch(
-            "mcp_server.tools.memory._run_async",
-            side_effect=lambda c: __import__("asyncio").run(c),
-        ):
-            result = save_memory(content="important insight")
+        result = await save_memory(content="important insight")
 
         assert result["status"] == "saved"
         assert result["id"] == str(fake_id)
@@ -261,12 +322,13 @@ class TestMcpMemoryIntegration:
         mock_session.close.assert_awaited_once()
 
     @patch("mcp_server.tools.memory._check_enabled", return_value=None)
-    @patch("mcp_server.tools.memory._get_session")
+    @patch("mcp_server.tools.memory._get_session", new_callable=AsyncMock)
     @patch("app.services.memory_service.MemoryService", autospec=False)
-    def test_index_session_creates_multiple_memories(
+    @pytest.mark.asyncio
+    async def test_index_session_creates_multiple_memories(
         self,
         MockSvc: MagicMock,
-        mock_get_session: MagicMock,
+        mock_get_session: AsyncMock,
         mock_check: MagicMock,
     ) -> None:
         """Verify index_session calls remember once per learning + once for summary."""
@@ -276,14 +338,10 @@ class TestMcpMemoryIntegration:
         instance = MockSvc.return_value
         instance.remember = AsyncMock(return_value=uuid.uuid4())
 
-        with patch(
-            "mcp_server.tools.memory._run_async",
-            side_effect=lambda c: __import__("asyncio").run(c),
-        ):
-            result = index_session(
-                session_summary="Session summary",
-                key_learnings=["learning 1", "learning 2"],
-            )
+        result = await index_session(
+            session_summary="Session summary",
+            key_learnings=["learning 1", "learning 2"],
+        )
 
         assert result["status"] == "indexed"
         assert result["memories_created"] == 3

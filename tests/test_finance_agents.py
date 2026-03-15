@@ -22,9 +22,11 @@ class TestFinanceQueryExecutor:
         assert qe1 is qe2
 
     def test_graceful_degradation_without_db(self):
-        from finance_team.shared.query_executor import get_finance_executor
+        from finance_team.shared.query_executor import FinanceQueryExecutor
 
-        qe = get_finance_executor()
+        qe = FinanceQueryExecutor()
+        # Simulate no DB by clearing the delegate
+        qe._delegate = None
         result = qe.query_template("credit_balances", {"start_date": "2024-01-01"})
         assert result == []
 
