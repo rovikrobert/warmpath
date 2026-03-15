@@ -46,7 +46,7 @@ class FeedItem(Base):
             "'marketplace_signal', 'outcome_check', 'platform_activity', "
             "'network_insight', 'follow_up_nudge', "
             "'intro_approval_nudge', 'manual_send_reminder', "
-            "'csv_completion')",
+            "'csv_completion', 'agent_auto_repair')",
             name="ck_feed_items_type",
         ),
         CheckConstraint(

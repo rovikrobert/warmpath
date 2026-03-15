@@ -15,9 +15,14 @@ RUN npm run build
 FROM python:3.11-slim AS runtime
 WORKDIR /app
 
-# System deps for psycopg2-binary
+# System deps: libpq for psycopg2, gh CLI for agent PR creation
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
+    libpq5 curl \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+       | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+       | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps
@@ -53,6 +58,8 @@ COPY --from=frontend-build /build/dist ./frontend/dist
 RUN useradd --create-home appuser \
     && chown -R appuser:appuser /app
 USER appuser
+RUN git config --global user.email "autofix@warmpath.app" \
+    && git config --global user.name "WarmPath Agent"
 
 ENV PORT=8000
 EXPOSE ${PORT}

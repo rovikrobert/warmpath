@@ -152,3 +152,30 @@ class TestDecisionRegistry:
             save_pending_decisions(decisions)
             loaded = load_pending_decisions()
         assert len(loaded) == 3
+
+    def test_find_decision_by_finding_id(self, tmp_path):
+        """find_decision returns the matching decision by stable finding_id."""
+        decisions = [_make_decision(1, "sec-001"), _make_decision(2, "lint-042")]
+        path = tmp_path / "pending_decisions.json"
+        with patch("agents.shared.decision_registry.DECISIONS_PATH", path):
+            save_pending_decisions(decisions)
+            found = find_decision(finding_id="lint-042")
+            missing = find_decision(finding_id="nonexistent")
+        assert found is not None
+        assert found.number == 2
+        assert found.finding_id == "lint-042"
+        assert missing is None
+
+    def test_find_decision_finding_id_stable_across_reorder(self, tmp_path):
+        """finding_id lookup is stable even if positional number changes."""
+        decisions = [_make_decision(1, "sec-001"), _make_decision(2, "lint-042")]
+        path = tmp_path / "pending_decisions.json"
+        with patch("agents.shared.decision_registry.DECISIONS_PATH", path):
+            save_pending_decisions(decisions)
+            # Simulate brief regeneration: same finding_id but different number
+            reordered = [_make_decision(1, "lint-042"), _make_decision(2, "sec-001")]
+            save_pending_decisions(reordered)
+            found = find_decision(finding_id="sec-001")
+        assert found is not None
+        assert found.number == 2  # position changed but lookup still works
+        assert found.finding_id == "sec-001"
