@@ -1,5 +1,7 @@
 """Tests for AgentReport serialization and deserialization."""
 
+import logging
+
 from agents.shared.report import AgentReport, Finding
 
 
@@ -111,3 +113,43 @@ def test_round_trip_serialization():
     assert len(restored.findings) == 1
     assert restored.findings[0].title == "SQL injection"
     assert restored.metrics == {"coverage": 85}
+
+
+def test_agent_report_warns_on_empty_recommendation(caplog):
+    """AgentReport.__post_init__ logs warning for findings with empty recommendations."""
+    findings = [
+        Finding(
+            id="F1",
+            severity="high",
+            category="security",
+            title="SQL injection",
+            detail="Unparameterized query",
+            recommendation="",
+        ),
+        Finding(
+            id="F2",
+            severity="low",
+            category="style",
+            title="Minor style",
+            detail="Indentation",
+            recommendation="Fix indentation in app/api/search.py:42",
+        ),
+    ]
+    with caplog.at_level(logging.WARNING, logger="agents.shared.report"):
+        AgentReport(agent="test", findings=findings)
+    assert "F1" in caplog.text
+    assert "empty recommendation" in caplog.text.lower()
+
+
+def test_finding_actionable_recommendation_format():
+    """Recommendation should follow 'do X in Y because Z' format when populated."""
+    f = Finding(
+        id="F1",
+        severity="high",
+        category="security",
+        title="SQL injection",
+        detail="d",
+        recommendation="Parameterize query in app/api/search.py:42. Convention: no raw SQL (CLAUDE.md)",
+    )
+    assert len(f.recommendation) > 10
+    assert f.recommendation != ""

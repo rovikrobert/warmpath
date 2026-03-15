@@ -1,6 +1,9 @@
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 timeout = 30
+markers = [
+    "smoke: Critical-path tests (<10s) — run after every edit for fast feedback (Tier 1)",
+]
 filterwarnings = [
     "error::DeprecationWarning",
     # passlib imports deprecated crypt module (removed in 3.13) — suppress until passlib updates
