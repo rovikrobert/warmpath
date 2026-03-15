@@ -124,7 +124,14 @@ def _execute_approval(chat_id: int, decision_number: int, reject: bool) -> None:
             return
 
         # 4. Kill switch
-        enabled = os.getenv("AUTONOMOUS_EXECUTION_ENABLED", "false").lower() == "true"
+        try:
+            from app.config import settings as _settings
+
+            enabled = _settings.AUTONOMOUS_EXECUTION_ENABLED
+        except Exception:
+            enabled = (
+                os.getenv("AUTONOMOUS_EXECUTION_ENABLED", "false").lower() == "true"
+            )
         if not enabled:
             _send_telegram_reply(
                 chat_id,

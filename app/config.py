@@ -102,6 +102,7 @@ class Settings(BaseSettings):
     POSTHOG_HOST: str = "https://app.posthog.com"
     # Agent runtime (LangGraph)
     AGENT_RUNTIME_ENABLED: bool = False
+    AUTONOMOUS_EXECUTION_ENABLED: bool = False
     AGENT_RUNTIME_BUDGET_DAILY_USD: float = 10.0
     AGENT_RUNTIME_EVENT_COOLDOWN_SECONDS: int = 900  # 15 min dedup
     GITHUB_AGENT_WEBHOOK_SECRET: str = ""
