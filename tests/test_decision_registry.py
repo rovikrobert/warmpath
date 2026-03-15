@@ -153,6 +153,114 @@ class TestDecisionRegistry:
             loaded = load_pending_decisions()
         assert len(loaded) == 3
 
+    def test_pending_decision_includes_failu[RESEND_KEY_REDACTED](self):
+        """PendingDecision should store failu[RESEND_KEY_REDACTED] and rollback_plan."""
+        d = PendingDecision(
+            number=1,
+            finding_id="CVE-001",
+            finding={
+                "id": "CVE-001",
+                "severity": "high",
+                "category": "dep",
+                "title": "t",
+                "detail": "d",
+            },
+            brief_date="2026-03-15",
+            tier="auto_pr",
+            action_plan="Bump dep",
+            failu[RESEND_KEY_REDACTED]=["Breaks API compat if new version drops method"],
+            rollback_plan="Revert bump commit, pin to previous version",
+        )
+        assert d.failu[RESEND_KEY_REDACTED] == ["Breaks API compat if new version drops method"]
+        assert d.rollback_plan == "Revert bump commit, pin to previous version"
+
+    def test_pending_decision_failu[RESEND_KEY_REDACTED](self):
+        """failu[RESEND_KEY_REDACTED] defaults to empty list, rollback_plan to empty string."""
+        d = _make_decision(1)
+        assert d.failu[RESEND_KEY_REDACTED] == []
+        assert d.rollback_plan == ""
+
+    def test_failu[RESEND_KEY_REDACTED](self, tmp_path):
+        """failu[RESEND_KEY_REDACTED] and rollback_plan persist through save/load cycle."""
+        d = PendingDecision(
+            number=1,
+            finding_id="A",
+            finding={
+                "id": "A",
+                "severity": "high",
+                "category": "t",
+                "title": "t",
+                "detail": "d",
+            },
+            brief_date="2026-03-15",
+            tier="escalate",
+            action_plan="Fix auth bypass",
+            failu[RESEND_KEY_REDACTED]=["Could break SSO", "May invalidate sessions"],
+            rollback_plan="Revert PR, re-enable old auth middleware",
+        )
+        path = tmp_path / "pending_decisions.json"
+        with patch("agents.shared.decision_registry.DECISIONS_PATH", path):
+            save_pending_decisions([d])
+            loaded = load_pending_decisions()
+        assert loaded[0].failu[RESEND_KEY_REDACTED] == ["Could break SSO", "May invalidate sessions"]
+        assert loaded[0].rollback_plan == "Revert PR, re-enable old auth middleware"
+
+    def test_from_dict_ignores_unknown_fields(self):
+        """from_dict drops unknown keys from future schema versions."""
+        data = {
+            "number": 1,
+            "finding_id": "F1",
+            "finding": {
+                "id": "F1",
+                "severity": "low",
+                "category": "t",
+                "title": "t",
+                "detail": "d",
+            },
+            "brief_date": "2026-03-15",
+            "tier": "auto_pr",
+            "action_plan": "Fix it",
+            "futu[RESEND_KEY_REDACTED]": "should be ignored",
+            "another_new": 42,
+        }
+        d = PendingDecision.from_dict(data)
+        assert d.finding_id == "F1"
+        assert d.failu[RESEND_KEY_REDACTED] == []
+        assert not hasattr(d, "futu[RESEND_KEY_REDACTED]")
+
+    def test_load_survives_futu[RESEND_KEY_REDACTED](self, tmp_path):
+        """JSON with unknown fields from a future version loads without data loss."""
+        import json
+
+        path = tmp_path / "pending_decisions.json"
+        futu[RESEND_KEY_REDACTED] = [
+            {
+                "number": 1,
+                "finding_id": "FUT-1",
+                "finding": {
+                    "id": "FUT-1",
+                    "severity": "high",
+                    "category": "t",
+                    "title": "t",
+                    "detail": "d",
+                },
+                "brief_date": "2026-04-01",
+                "tier": "escalate",
+                "action_plan": "Do something",
+                "failu[RESEND_KEY_REDACTED]": ["risk A"],
+                "rollback_plan": "revert",
+                "executed_at": None,
+                "result_summary": None,
+                "new_futu[RESEND_KEY_REDACTED]": "from v2",
+            }
+        ]
+        path.write_text(json.dumps(futu[RESEND_KEY_REDACTED]))
+        with patch("agents.shared.decision_registry.DECISIONS_PATH", path):
+            loaded = load_pending_decisions()
+        assert len(loaded) == 1
+        assert loaded[0].finding_id == "FUT-1"
+        assert loaded[0].failu[RESEND_KEY_REDACTED] == ["risk A"]
+
     def test_find_decision_by_finding_id(self, tmp_path):
         """find_decision returns the matching decision by stable finding_id."""
         decisions = [_make_decision(1, "sec-001"), _make_decision(2, "lint-042")]
