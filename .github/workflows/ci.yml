@@ -140,6 +140,38 @@ jobs:
         #   Unfixable: python-jobspy pins markdownify<0.14.0. Low risk — internal job scraping only.
         run: pip-audit -r requirements.txt --ignore-vuln GHSA-w8v5-vhqr-4h9v --ignore-vuln GHSA-7mpr-5m44-h73r
 
+  async-lint:
+    name: Async/Sync Misuse Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check for async/sync connection misuse
+        # stdlib-only script (uses ast module) — no pip install needed
+        # Exit codes: 0=clean, 1=findings — block on any finding
+        run: python -m scripts.async_lint
+
+  agent-config-check:
+    name: Agent Config Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate agent scan targets
+        run: python3 scripts/validate_agent_targets.py
+
   telemetry-scan:
     name: Scope Telemetry Verification
     runs-on: ubuntu-latest
