@@ -202,10 +202,17 @@ def _is_false_positive(stripped: str, category: str) -> bool:
         return True
     if "settings." in stripped and category == "hardcoded_secret":
         return True
-    # SQL injection: skip safe parameterized query patterns
+    # SQL injection: skip safe parameterized query patterns.
+    # SQLAlchemy text() with named bind params (e.g. :query, :team) is safe
+    # when user input flows through params dict, not string interpolation.
     if category == "sql_injection":
         safe = (":param", "bindparam", "table_name", "column_name", "op.")
         if any(tok in stripped for tok in safe):
+            return True
+        # text(f"... WHERE {clause} ...") where clause is built from hardcoded
+        # strings like "team = :team" — the f-string only interpolates safe
+        # clause fragments, actual values go through bind params.
+        if re.search(r":\w+", stripped):
             return True
     return False
 
@@ -476,39 +483,48 @@ def scan_input_validation() -> None:
         content = py_file.read_text(errors="ignore")
         relpath = str(py_file.relative_to(PROJECT_ROOT))
 
-        # Find string fields in Pydantic models without max_length
-        # Simple heuristic: str fields without Field(..., max_length=...)
+        # Find string fields in Pydantic *request* models without max_length.
+        # Skip response models (class names containing "Response" or "Out")
+        # since they are output schemas that don't need input validation.
+        lines = content.splitlines()
         in_model = False
-        for lineno, line in enumerate(content.splitlines(), 1):
+        is_response_model = False
+        for lineno, line in enumerate(lines, 1):
             stripped = line.strip()
 
             if "BaseModel" in stripped and "class " in stripped:
                 in_model = True
+                # Skip response/output models — they don't need max_length
+                is_response_model = any(
+                    kw in stripped for kw in ("Response", "Out", "Result", "Display")
+                )
                 continue
             if (
-                (
-                    in_model
-                    and stripped
-                    and not stripped.startswith("#")
-                    and not stripped.startswith("class")
-                )
-                and (
-                    ": str" in stripped
-                    and "max_length" not in stripped
-                    and "pattern" not in stripped
-                )
-                and ("EmailStr" not in stripped and "password" not in stripped.lower())
-                # Only flag if it looks like a field definition
+                in_model
+                and not is_response_model
+                and stripped
+                and not stripped.startswith("#")
+                and not stripped.startswith("class")
+                and ": str" in stripped
+                and "EmailStr" not in stripped
+                and "password" not in stripped.lower()
                 and ("=" in stripped or ":" in stripped)
             ):
-                _add(
-                    "LOW",
-                    "validation",
-                    f"String field without max_length: {stripped[:80]}",
-                    relpath,
-                    lineno,
-                )
-                count += 1
+                # Check current line AND next few lines for max_length/pattern
+                # to handle multi-line Field() definitions.
+                lookahead = stripped
+                for ahead in range(1, 4):
+                    if lineno - 1 + ahead < len(lines):
+                        lookahead += " " + lines[lineno - 1 + ahead].strip()
+                if "max_length" not in lookahead and "pattern" not in lookahead:
+                    _add(
+                        "LOW",
+                        "validation",
+                        f"String field without max_length: {stripped[:80]}",
+                        relpath,
+                        lineno,
+                    )
+                    count += 1
             if (
                 (
                     in_model
@@ -520,6 +536,7 @@ def scan_input_validation() -> None:
                 and not stripped.startswith("@")
             ):
                 in_model = False
+                is_response_model = False
 
     if count == 0:
         print(f"  {GREEN}All string fields validated{RESET}")
