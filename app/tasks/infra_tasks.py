@@ -164,6 +164,14 @@ async def detect_and_fail_stuck_uploads(db) -> tuple[int, int]:
     )
     uploads = list(result.scalars())
 
+    # Batch-load all referenced users in one query (avoids N+1)
+    user_ids = list({u.user_id for u in uploads if u.user_id})
+    if user_ids:
+        users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
+        users_by_id = {u.id: u for u in users_result.scalars()}
+    else:
+        users_by_id = {}
+
     failed_count = 0
     notified_count = 0
 
@@ -189,9 +197,8 @@ async def detect_and_fail_stuck_uploads(db) -> tuple[int, int]:
         upload.completed_at = now
         failed_count += 1
 
-        # Load user and send notification email
-        user_result = await db.execute(select(User).where(User.id == upload.user_id))
-        user = user_result.scalar_one_or_none()
+        # Look up user from pre-loaded batch (no extra query)
+        user = users_by_id.get(upload.user_id)
         if user:
             sent = await send_upload_failure_notification(user, upload.id, db)
             if sent:
