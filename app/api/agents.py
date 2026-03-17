@@ -304,7 +304,7 @@ def _verify_secret(x_agent_secret: str) -> None:
 @router.post("/run")
 async def run_agents(
     background_tasks: BackgroundTasks,
-    mode: RunMode = "cos-daily",
+    mode: RunMode = "full-scan",
     x_agent_secret: str = Header(...),
 ) -> dict:
     """Trigger an agent run in the background.
