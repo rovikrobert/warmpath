@@ -389,25 +389,26 @@ class MemoryService:
         source_type: str | None = None,
     ) -> dict[uuid.UUID, float]:
         """Full-text search using Postgres tsvector/tsquery."""
-        clauses = ["expires_at IS NULL OR expires_at > NOW()"]
+        whe[RESEND_KEY_REDACTED] = [
+            "plainto_tsquery('english', :query) @@ content_tsv",
+            "(expires_at IS NULL OR expires_at > NOW())",
+        ]
         params: dict[str, Any] = {"query": query, "limit": limit}
 
         if team:
-            clauses.append("team = :team")
+            whe[RESEND_KEY_REDACTED].append("team = :team")
             params["team"] = team
         if source_type:
-            clauses.append("source_type = :source_type")
+            whe[RESEND_KEY_REDACTED].append("source_type = :source_type")
             params["source_type"] = source_type
 
-        where = " AND ".join(clauses)
-        sql = text(f"""
-            SELECT id, ts_rank_cd(content_tsv, plainto_tsquery('english', :query)) AS rank
-            FROM memories
-            WHERE plainto_tsquery('english', :query) @@ content_tsv
-              AND {where}
-            ORDER BY rank DESC
-            LIMIT :limit
-        """)
+        whe[RESEND_KEY_REDACTED] = " AND ".join(whe[RESEND_KEY_REDACTED])
+        sql = text(
+            "SELECT id, ts_rank_cd(content_tsv, plainto_tsquery('english', :query)) AS rank"
+            " FROM memories"
+            " WHERE " + whe[RESEND_KEY_REDACTED] + " ORDER BY rank DESC"
+            " LIMIT :limit"
+        )
 
         result = await self.db.execute(sql, params)
         return {row[0]: float(row[1]) for row in result.fetchall()}

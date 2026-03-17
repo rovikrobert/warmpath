@@ -27,6 +27,18 @@ def _finding_hash(finding: dict[str, Any]) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
+def _new_finding_record(finding: dict[str, Any]) -> dict[str, Any]:
+    """Build a Redis record for a newly seen finding."""
+    return {
+        "title": finding.get("title", ""),
+        "source_team": finding.get("source_team", ""),
+        "category": finding.get("category", ""),
+        "severity": finding.get("severity", "medium"),
+        "seen_count": 1,
+        "state": "new",
+    }
+
+
 class FindingStore:
     """Track finding lifecycle across agent scans."""
 
@@ -59,40 +71,43 @@ class FindingStore:
         known: list[dict[str, Any]] = []
 
         for finding in findings:
-            fhash = _finding_hash(finding)
-            key = f"{PREFIX}:{fhash}"
-            try:
-                existing = await r.get(key)
-            except Exception:
-                logger.warning("FindingStore Redis error during classify")
-                continue
-
-            finding["finding_hash"] = fhash
-
-            if existing is None:
-                finding["finding_state"] = "new"
-                record = {
-                    "title": finding.get("title", ""),
-                    "source_team": finding.get("source_team", ""),
-                    "category": finding.get("category", ""),
-                    "severity": finding.get("severity", "medium"),
-                    "seen_count": 1,
-                    "state": "new",
-                }
-                with contextlib.suppress(Exception):
-                    await r.set(key, json.dumps(record), ex=FINDING_TTL_SECONDS)
+            bucket = await self._classify_single(r, finding)
+            if bucket == "new":
                 new.append(finding)
-            else:
-                record = json.loads(existing)
-                record["seen_count"] = record.get("seen_count", 0) + 1
-                record["state"] = "known"
-                finding["finding_state"] = "known"
-                finding["seen_count"] = record["seen_count"]
-                with contextlib.suppress(Exception):
-                    await r.set(key, json.dumps(record), ex=FINDING_TTL_SECONDS)
+            elif bucket == "known":
                 known.append(finding)
 
         return new, known
+
+    async def _classify_single(
+        self, r: aioredis.Redis, finding: dict[str, Any]
+    ) -> str | None:
+        """Classify one finding against Redis. Returns 'new', 'known', or None on error."""
+        fhash = _finding_hash(finding)
+        key = f"{PREFIX}:{fhash}"
+        try:
+            existing = await r.get(key)
+        except Exception:
+            logger.warning("FindingStore Redis error during classify")
+            return None
+
+        finding["finding_hash"] = fhash
+
+        if existing is None:
+            finding["finding_state"] = "new"
+            record = _new_finding_record(finding)
+            with contextlib.suppress(Exception):
+                await r.set(key, json.dumps(record), ex=FINDING_TTL_SECONDS)
+            return "new"
+
+        record = json.loads(existing)
+        record["seen_count"] = record.get("seen_count", 0) + 1
+        record["state"] = "known"
+        finding["finding_state"] = "known"
+        finding["seen_count"] = record["seen_count"]
+        with contextlib.suppress(Exception):
+            await r.set(key, json.dumps(record), ex=FINDING_TTL_SECONDS)
+        return "known"
 
     async def mark_resolved(self, finding_hash: str) -> bool:
         """Mark a finding as resolved. Returns True if it existed.
