@@ -389,25 +389,26 @@ class MemoryService:
         source_type: str | None = None,
     ) -> dict[uuid.UUID, float]:
         """Full-text search using Postgres tsvector/tsquery."""
-        clauses = ["expires_at IS NULL OR expires_at > NOW()"]
+        where_parts = [
+            "plainto_tsquery('english', :query) @@ content_tsv",
+            "(expires_at IS NULL OR expires_at > NOW())",
+        ]
         params: dict[str, Any] = {"query": query, "limit": limit}
 
         if team:
-            clauses.append("team = :team")
+            where_parts.append("team = :team")
             params["team"] = team
         if source_type:
-            clauses.append("source_type = :source_type")
+            where_parts.append("source_type = :source_type")
             params["source_type"] = source_type
 
-        where = " AND ".join(clauses)
-        sql = text(f"""
-            SELECT id, ts_rank_cd(content_tsv, plainto_tsquery('english', :query)) AS rank
-            FROM memories
-            WHERE plainto_tsquery('english', :query) @@ content_tsv
-              AND {where}
-            ORDER BY rank DESC
-            LIMIT :limit
-        """)
+        where_clause = " AND ".join(where_parts)
+        sql = text(
+            "SELECT id, ts_rank_cd(content_tsv, plainto_tsquery('english', :query)) AS rank"
+            " FROM memories"
+            " WHERE " + where_clause + " ORDER BY rank DESC"
+            " LIMIT :limit"
+        )
 
         result = await self.db.execute(sql, params)
         return {row[0]: float(row[1]) for row in result.fetchall()}
