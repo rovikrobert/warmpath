@@ -29,7 +29,7 @@ def _send_telegram_reply(chat_id: int, text: str) -> None:
     """Send a reply to Telegram (best-effort)."""
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     if not token:
-        logger.info("TELEGRAM_BOT_TOKEN not set — reply not sent: %s", text[:100])
+        logger.info("TELEGRAM_BOT_TOKEN not set — reply not sent")
         return
     try:
         with httpx.Client(timeout=10.0) as client:

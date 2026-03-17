@@ -6,11 +6,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# TODO: Before deploying, create an Alembic migration to update the
-# ck_feed_items_type CHECK constraint to include 'agent_auto_repair'.
-# Run: alembic revision --autogenerate -m "add agent_auto_repair feed item type"
-# Verify with: alembic heads (must show exactly 1 head before creating migration)
-
 
 def create_repair_feed_item(
     *,
