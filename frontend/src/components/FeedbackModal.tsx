@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import posthog from 'posthog-js';
 import { feedback as feedbackApi } from '../api/client';
 
 const RATINGS = [
@@ -29,6 +30,17 @@ export default function FeedbackModal({ feature, resourceId, onClose }: Feedback
         rating,
         comment: comment.trim() || undefined,
       });
+      // Track in PostHog alongside the API call
+      try {
+        posthog.capture('feedback_submitted', {
+          feature,
+          resource_id: resourceId,
+          rating,
+          has_comment: !!comment.trim(),
+        });
+      } catch {
+        // PostHog may not be initialized — non-critical
+      }
     } catch (err) {
       console.error('FeedbackModal: submit failed', err);
       // Non-critical — don't block user

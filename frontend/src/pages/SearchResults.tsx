@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { search as searchApi, matches as matchesApi } from '../api/client';
+import FeedbackModal from '../components/FeedbackModal';
 import MatchBadge from '../components/MatchBadge';
 import ScoreExplainer from '../components/ScoreExplainer';
 import { MATCH_TIERS } from '../utils/scores';
@@ -49,6 +50,7 @@ export default function SearchResults() {
   });
   const [introLoading, setIntroLoading] = useState(null);
   const [introModal, setIntroModal] = useState(null);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const loadResults = useCallback(async () => {
     setLoading(true);
@@ -72,6 +74,13 @@ export default function SearchResults() {
   }, [id]);
 
   useEffect(() => { loadResults(); }, [loadResults]);
+
+  useEffect(() => {
+    if (!loading && results.length > 0) {
+      const timer = setTimeout(() => setShowFeedback(true), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, results.length]);
 
   const setFilter = (key, value) => {
     setFilters((f) => ({ ...f, [key]: value, page: 1 }));
@@ -293,6 +302,14 @@ export default function SearchResults() {
       )}
 
       {introModal && <IntroModal intro={introModal} onClose={() => setIntroModal(null)} />}
+
+      {showFeedback && (
+        <FeedbackModal
+          feature="search_results"
+          resourceId={id}
+          onClose={() => setShowFeedback(false)}
+        />
+      )}
     </div>
   );
 }
