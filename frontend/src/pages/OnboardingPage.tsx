@@ -13,6 +13,7 @@ import { KEEVS_TRIVIA, shuffleArray } from '../utils/keevs-trivia';
 import Button from '../components/ui/Button';
 import SourceTag from '../components/ui/SourceTag';
 import Spinner from '../components/ui/Spinner';
+import { WarmPathLogo } from '../components/WarmPathLogo';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 function ResumePreviewModal({ data, onApply, onClose }) {
@@ -482,7 +483,7 @@ export default function OnboardingPage() {
         {/* Logo */}
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold text-foreground">
-            <span className="text-primary">~</span> WarmPath
+            <WarmPathLogo iconSize={28} />
           </h1>
         </div>
 

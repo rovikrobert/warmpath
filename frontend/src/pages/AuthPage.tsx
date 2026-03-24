@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SourceTag from '../components/ui/SourceTag';
 import { SOURCES } from '../utils/sources';
+import { WarmPathLogo } from '../components/WarmPathLogo';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 function hashIndicatesSignup() {
@@ -37,7 +38,7 @@ export default function AuthPage() {
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-foreground">
-            <span className="text-primary">~</span> WarmPath
+            <WarmPathLogo iconSize={32} />
           </h1>
           <p className="mt-2 text-lg font-medium text-secondary-foreground">
             Get referred to your dream job

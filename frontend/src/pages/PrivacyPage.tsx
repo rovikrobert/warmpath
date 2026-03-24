@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import useDocumentTitle from '../hooks/useDocumentTitle';
+import { WarmPathLogo } from '../components/WarmPathLogo';
 
 const SECTIONS = [
   { id: 'commitment', label: 'Our Privacy Commitment' },
@@ -62,8 +63,7 @@ export default function PrivacyPage() {
       <header className="border-b border-border bg-card">
         <nav className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3 sm:px-6" role="navigation" aria-label="Privacy page navigation">
           <Link to="/" className="flex items-center gap-2 text-xl font-bold text-foreground" aria-label="WarmPath home">
-            <span className="text-primary">~</span>
-            <span>WarmPath</span>
+            <WarmPathLogo iconSize={24} />
           </Link>
           <Link to="/" className="text-sm text-primary transition-colors duration-200 hover:text-primary/80">
             Back to app

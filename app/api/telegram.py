@@ -90,6 +90,57 @@ def _send_telegram_reply(chat_id: int, text: str) -> None:
         logger.debug("Failed to send Telegram reply to %s", chat_id)
 
 
+def _get_platform_stats() -> str:
+    """Query live platform stats using the sync DB session."""
+    from sqlalchemy import text as sa_text
+
+    from app.database import _get_sync_engine
+
+    engine = _get_sync_engine()
+    queries = {
+        "total_users": "SELECT COUNT(*) FROM users WHERE deleted_at IS NULL",
+        "users_with_uploads": "SELECT COUNT(DISTINCT user_id) FROM csv_uploads",
+        "total_contacts": "SELECT COUNT(*) FROM contacts WHERE deleted_at IS NULL",
+        "marketplace_listings": (
+            "SELECT COUNT(*) FROM marketplace_listings WHERE deleted_at IS NULL"
+        ),
+        "active_subscribers": (
+            "SELECT COUNT(*) FROM users"
+            " WHERE plan_tier NOT IN ('free') AND plan_tier IS NOT NULL"
+            " AND deleted_at IS NULL"
+        ),
+        "intro_requests": "SELECT COUNT(*) FROM intro_facilitations",
+        "signups_7d": (
+            "SELECT COUNT(*) FROM users"
+            " WHERE deleted_at IS NULL AND created_at >= NOW() - INTERVAL '7 days'"
+        ),
+    }
+    results: dict[str, int] = {}
+    with engine.connect() as conn:
+        for key, sql in queries.items():
+            row = conn.execute(sa_text(sql)).scalar()
+            results[key] = row or 0
+
+    pct_uploaded = (
+        round(results["users_with_uploads"] / results["total_users"] * 100)
+        if results["total_users"]
+        else 0
+    )
+
+    return (
+        "Platform Stats\n"
+        "==============\n"
+        f"Total users: {results['total_users']}\n"
+        f"  Signups (7d): {results['signups_7d']}\n"
+        f"  Uploaded CSV: {results['users_with_uploads']} ({pct_uploaded}%)\n"
+        f"  Active subscribers: {results['active_subscribers']}\n"
+        f"\n"
+        f"Contacts: {results['total_contacts']}\n"
+        f"Marketplace listings: {results['marketplace_listings']}\n"
+        f"Intro requests: {results['intro_requests']}"
+    )
+
+
 def _handle_consultation(chat_id: int, raw_text: str) -> None:
     """Route a free-form message through the consultant engine."""
     from agents.shared.consultant import consult
@@ -126,7 +177,14 @@ def _handle_command(
 ) -> None:
     """Execute a command and reply via Telegram."""
     try:
-        if command == "status":
+        if command == "stats":
+            if not is_founder:
+                _send_telegram_reply(chat_id, "Stats is founder-only.")
+                return
+            result = _get_platform_stats()
+            _send_telegram_reply(chat_id, result)
+
+        elif command == "status":
             from agents.chief_of_staff.cos_agent import run_status
 
             result = run_status()
@@ -180,7 +238,7 @@ def _handle_command(
             if not raw_text:
                 _send_telegram_reply(
                     chat_id,
-                    "Commands: status, cost, approve <id>, ship <feature>, brief me on <topic>\n"
+                    "Commands: stats, status, cost, approve <id>, ship <feature>, brief me on <topic>\n"
                     "Or just type a question to consult any agent team.",
                 )
                 return

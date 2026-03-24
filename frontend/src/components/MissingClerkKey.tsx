@@ -1,3 +1,5 @@
+import { WarmPathIcon } from './WarmPathLogo';
+
 export default function MissingClerkKey() {
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -5,7 +7,7 @@ export default function MissingClerkKey() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-lg text-center">
         <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-          <span className="text-3xl font-bold text-primary">~</span>
+          <WarmPathIcon size={36} className="text-primary" />
         </div>
 
         <h1 className="text-2xl font-bold text-foreground">

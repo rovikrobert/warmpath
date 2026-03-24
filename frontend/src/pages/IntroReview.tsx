@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import Spinner from "../components/ui/Spinner";
 import { introReview } from "../api/client";
 import useDocumentTitle from "../hooks/useDocumentTitle";
+import { WarmPathLogo } from "../components/WarmPathLogo";
 
 export default function IntroReview() {
   const { token } = useParams();
@@ -39,8 +40,7 @@ export default function IntroReview() {
             className="flex items-center gap-2 text-xl font-bold text-foreground"
             aria-label="WarmPath home"
           >
-            <span className="text-primary">~</span>
-            <span>WarmPath</span>
+            <WarmPathLogo iconSize={24} />
           </Link>
           <Link
             to="/#sign-up"
