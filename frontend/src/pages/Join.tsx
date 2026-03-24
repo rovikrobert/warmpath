@@ -4,6 +4,7 @@ import SourceTag from "../components/ui/SourceTag";
 import MarketplaceVisibilityExplainer from "../components/MarketplaceVisibilityExplainer";
 import { SOURCES } from "../utils/sources";
 import useDocumentTitle from "../hooks/useDocumentTitle";
+import { WarmPathLogo } from "../components/WarmPathLogo";
 
 const CONTENT = {
   network: {
@@ -287,8 +288,7 @@ export default function Join() {
             className="flex items-center gap-2 text-xl font-bold text-foreground"
             aria-label="WarmPath home"
           >
-            <span className="text-primary">~</span>
-            <span>WarmPath</span>
+            <WarmPathLogo iconSize={24} />
           </Link>
           <Link
             to="/#sign-up"
