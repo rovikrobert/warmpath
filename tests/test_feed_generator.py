@@ -339,3 +339,143 @@ async def test_generate_manual_send_reminder_contact_name_fallback(
     assert len(items) == 1
     # Should resolve to actual contact first_name since listing exists
     assert "Alex" in items[0].title
+
+
+# ---------------------------------------------------------------------------
+# generate_marketplace_optin_nudge tests
+# ---------------------------------------------------------------------------
+
+
+async def _setup_user_with_contacts(
+    db: AsyncSession,
+    *,
+    opt_in: bool | None = None,
+) -> tuple:
+    """Create user + company + contacts. opt_in=None means no prefs row."""
+    from app.models.company import Company
+    from app.models.marketplace import NetworkSharingPreferences
+
+    user = _make_user()
+    db.add(user)
+    await db.flush()
+
+    company = Company(id=uuid.uuid4(), name="Stripe")
+    db.add(company)
+    await db.flush()
+
+    for i in range(5):
+        contact = Contact(
+            user_id=user.id,
+            company_id=company.id,
+            full_name=f"Contact {i}",
+        )
+        db.add(contact)
+    await db.flush()
+
+    if opt_in is not None:
+        prefs = NetworkSharingPreferences(
+            user_id=user.id,
+            opt_in_marketplace=opt_in,
+        )
+        db.add(prefs)
+        await db.flush()
+
+    return user, company
+
+
+@pytest.mark.asyncio
+async def test_marketplace_optin_nudge_creates_item_when_not_opted_in(
+    db: AsyncSession,
+) -> None:
+    """Users with contacts but no marketplace opt-in get a nudge."""
+    from app.services.feed_generator import generate_marketplace_optin_nudge
+
+    user, _company = await _setup_user_with_contacts(db, opt_in=None)
+
+    items = await generate_marketplace_optin_nudge(user.id, db)
+
+    assert len(items) == 1
+    item = items[0]
+    assert item.item_type == "marketplace_optin_nudge"
+    assert item.action_url == "/settings/sharing"
+    assert item.action_label == "Enable sharing"
+    assert item.priority in (60, 75)
+    assert item.user_id == user.id
+    assert "contacts" in item.title.lower() or "searched" in item.title.lower()
+
+
+@pytest.mark.asyncio
+async def test_marketplace_optin_nudge_skips_opted_in_user(
+    db: AsyncSession,
+) -> None:
+    """Users already opted into marketplace should NOT get a nudge."""
+    from app.services.feed_generator import generate_marketplace_optin_nudge
+
+    user, _company = await _setup_user_with_contacts(db, opt_in=True)
+
+    items = await generate_marketplace_optin_nudge(user.id, db)
+
+    assert len(items) == 0
+
+
+@pytest.mark.asyncio
+async def test_marketplace_optin_nudge_skips_user_with_no_contacts(
+    db: AsyncSession,
+) -> None:
+    """Users with zero contacts should NOT get a nudge."""
+    from app.services.feed_generator import generate_marketplace_optin_nudge
+
+    user = _make_user()
+    db.add(user)
+    await db.flush()
+
+    items = await generate_marketplace_optin_nudge(user.id, db)
+
+    assert len(items) == 0
+
+
+@pytest.mark.asyncio
+async def test_marketplace_optin_nudge_dedup(db: AsyncSession) -> None:
+    """Running the generator twice should NOT create duplicate nudges."""
+    from app.services.feed_generator import generate_marketplace_optin_nudge
+
+    user, _company = await _setup_user_with_contacts(db, opt_in=False)
+
+    items1 = await generate_marketplace_optin_nudge(user.id, db)
+    assert len(items1) == 1
+
+    items2 = await generate_marketplace_optin_nudge(user.id, db)
+    assert len(items2) == 0
+
+
+@pytest.mark.asyncio
+async def test_marketplace_optin_nudge_with_demand_signal(
+    db: AsyncSession,
+) -> None:
+    """When other users have searched for the user's companies, use demand template."""
+    from app.models.search_request import SearchRequest
+    from app.services.feed_generator import generate_marketplace_optin_nudge
+
+    user, company = await _setup_user_with_contacts(db, opt_in=False)
+
+    # Create a search by another user targeting "Stripe"
+    searcher = _make_user()
+    db.add(searcher)
+    await db.flush()
+
+    search = SearchRequest(
+        user_id=searcher.id,
+        name="Find referrals",
+        target_companies=["Stripe"],
+        created_at=datetime.now(timezone.utc) - timedelta(hours=12),
+    )
+    db.add(search)
+    await db.flush()
+
+    items = await generate_marketplace_optin_nudge(user.id, db)
+
+    assert len(items) == 1
+    item = items[0]
+    assert item.priority == 75  # demand-signal template has higher priority
+    assert "Stripe" in item.title
+    assert "searched" in item.title.lower()

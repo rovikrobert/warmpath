@@ -878,6 +878,176 @@ async def generate_manual_send_reminder(
 
 
 # ---------------------------------------------------------------------------
+# Generator 11: Marketplace Opt-in Nudge
+# "3 people searched for connections at Stripe this week — you have 12 contacts there"
+# ---------------------------------------------------------------------------
+
+
+async def generate_marketplace_optin_nudge(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+) -> list[FeedItem]:
+    """Nudge users with contacts to enable marketplace sharing.
+
+    Only targets users who:
+    - Have at least 1 contact
+    - Have NOT opted into marketplace (no prefs row, or opt_in=False)
+    - Haven't dismissed this nudge type in the last 14 days
+    """
+    from app.models.marketplace import NetworkSharingPreferences
+    from app.models.search_request import SearchRequest
+
+    # Check if user already opted in — skip if so
+    prefs_result = await db.execute(
+        select(NetworkSharingPreferences).where(
+            NetworkSharingPreferences.user_id == user_id
+        )
+    )
+    prefs = prefs_result.scalar_one_or_none()
+    if prefs and prefs.opt_in_marketplace and not prefs.is_paused:
+        return []
+
+    # Must have contacts to share
+    contact_count = (
+        await db.scalar(
+            select(func.count(Contact.id)).where(Contact.user_id == user_id)
+        )
+        or 0
+    )
+    if contact_count == 0:
+        return []
+
+    # Dedup key is user-scoped (not date-dependent) — one active nudge at a time
+    dedup_key = _dedup("marketplace_optin_nudge", str(user_id))
+    if await _user_has_feed_item(db, user_id, dedup_key):
+        return []
+
+    # Try to find companies where OTHER users have recently searched
+    # This powers the "3 people searched for connections at X" messaging
+    from app.models.company import Company
+
+    since = datetime.now(timezone.utc) - timedelta(days=7)
+    recent_searches = await db.execute(
+        select(SearchRequest.target_companies)
+        .where(
+            SearchRequest.user_id != user_id,
+            SearchRequest.created_at >= since,
+            SearchRequest.target_companies.isnot(None),
+        )
+        .limit(50)
+    )
+
+    searched_company_names: dict[str, int] = {}
+    for row in recent_searches.all():
+        companies = row[0] or []
+        # ARRAY columns may come back as JSON strings in some DB backends
+        if isinstance(companies, str):
+            import json as _json
+
+            try:
+                companies = _json.loads(companies)
+            except (ValueError, TypeError):
+                companies = []
+        for name in companies:
+            if isinstance(name, str):
+                key = name.lower()
+                searched_company_names[key] = searched_company_names.get(key, 0) + 1
+
+    # Find which of the user's contact companies overlap with searched companies
+    if searched_company_names:
+        user_companies = await db.execute(
+            select(
+                func.lower(Company.name).label("company_key"),
+                Company.name.label("display_name"),
+                func.count(Contact.id).label("contact_count"),
+            )
+            .join(Company, Contact.company_id == Company.id)
+            .where(
+                Contact.user_id == user_id,
+                Contact.deleted_at.is_(None),
+                func.lower(Company.name).in_(list(searched_company_names.keys())),
+            )
+            .group_by(func.lower(Company.name), Company.name)
+            .order_by(func.count(Contact.id).desc())
+            .limit(3)
+        )
+        demand_companies = user_companies.all()
+    else:
+        demand_companies = []
+
+    if demand_companies:
+        # Template 1: demand-signal personalized
+        company_names = [r.display_name for r in demand_companies]
+        search_counts = [
+            searched_company_names.get(r.company_key, 0) for r in demand_companies
+        ]
+        top = company_names[0]
+        top_searches = search_counts[0]
+
+        title = (
+            f"{top_searches} {'person' if top_searches == 1 else 'people'} "
+            f"searched for connections at {top} this week"
+        )
+        contact_at_top = demand_companies[0].contact_count
+        body = (
+            f"You have {contact_at_top} "
+            f"{'contact' if contact_at_top == 1 else 'contacts'} there. "
+            "Enable sharing to show up in their results — "
+            "you review every request before anything moves forward."
+        )
+        priority = 75
+        metadata = {
+            "demand_companies": [
+                {"name": r.display_name, "user_contacts": r.contact_count}
+                for r in demand_companies
+            ],
+            "total_contacts": contact_count,
+        }
+    else:
+        # Template 2: generic fallback
+        # Get top companies by contact count for personalization
+        top_companies = await db.execute(
+            select(Company.name, func.count(Contact.id).label("cnt"))
+            .join(Company, Contact.company_id == Company.id)
+            .where(Contact.user_id == user_id, Contact.deleted_at.is_(None))
+            .group_by(Company.name)
+            .order_by(func.count(Contact.id).desc())
+            .limit(3)
+        )
+        top_rows = top_companies.all()
+        company_list = (
+            ", ".join(r.name for r in top_rows) if top_rows else "your companies"
+        )
+
+        title = f"Your {contact_count} contacts aren't visible to the marketplace yet"
+        body = (
+            f"People looking for referrals at {company_list} can't find you. "
+            "Your contacts stay anonymous — you approve every intro."
+        )
+        priority = 60
+        metadata = {
+            "top_companies": [r.name for r in top_rows],
+            "total_contacts": contact_count,
+        }
+
+    item = FeedItem(
+        user_id=user_id,
+        item_type="marketplace_optin_nudge",
+        title=title,
+        body=body,
+        icon="share",
+        action_url="/settings/sharing",
+        action_label="Enable sharing",
+        priority=priority,
+        dedup_key=dedup_key,
+        metadata_=metadata,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=14),
+    )
+    db.add(item)
+    return [item]
+
+
+# ---------------------------------------------------------------------------
 # Orchestrator: run all generators for a single user
 # ---------------------------------------------------------------------------
 
@@ -900,6 +1070,7 @@ async def generate_feed_for_user(
         ("network_insights", generate_network_insights),
         ("intro_approval_nudge", generate_intro_approval_nudge),
         ("manual_send_reminder", generate_manual_send_reminder),
+        ("marketplace_optin_nudge", generate_marketplace_optin_nudge),
     ]
 
     for name, gen_fn in generators:

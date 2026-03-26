@@ -106,7 +106,14 @@ export default function FindReferrals() {
   useDocumentTitle('Find Referrals');
   const navigate = useNavigate();
   const location = useLocation();
-  const [companies, setCompanies] = useState(() => location.state?.prefillCompanies ?? []);
+  const [companies, setCompanies] = useState(() => {
+    const urlCompany = new URLSearchParams(window.location.search).get('company');
+    const prefill = location.state?.prefillCompanies ?? [];
+    if (urlCompany && !prefill.includes(urlCompany)) {
+      return [...prefill, urlCompany];
+    }
+    return prefill;
+  });
   const [scope, setScope] = useState('own_network');
   const [scopeTouched, setScopeTouched] = useState(false);
   const [experimentVariant] = useState<'control' | 'treatment'>(() => getExperimentVariant());
