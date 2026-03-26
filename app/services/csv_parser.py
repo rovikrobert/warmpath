@@ -372,7 +372,11 @@ def parse_linkedin_csv(raw_bytes: bytes) -> list[dict]:
     if fmt == "manual":
         return parse_manual_csv(raw_bytes)
     if fmt == "unknown":
-        return []
+        raise ValueError(
+            "This file doesn't contain recognizable LinkedIn connections. "
+            "To export your connections: go to linkedin.com/mypreferences/d/download-my-data, "
+            "select 'Connections', and upload the downloaded CSV."
+        )
 
     header_map: dict[str, str] = {}
     for raw_header in reader.fieldnames:
@@ -426,6 +430,13 @@ def parse_linkedin_csv(raw_bytes: bytes) -> list[dict]:
                 "phone": phone,
                 "raw_csv_row": dict(row),
             }
+        )
+
+    if not contacts and row_count == 0:
+        raise ValueError(
+            "This file doesn't contain recognizable LinkedIn connections. "
+            "To export your connections: go to linkedin.com/mypreferences/d/download-my-data, "
+            "select 'Connections', and upload the downloaded CSV."
         )
 
     return contacts

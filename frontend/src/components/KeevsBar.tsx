@@ -16,7 +16,7 @@ const ROUTE_FEED_TYPE = {
   '/referrals': 'marketplace_signal',
   '/applications': 'outcome_check',
   '/marketplace': 'marketplace_signal',
-  '/settings': null,
+  '/settings': 'marketplace_optin_nudge',
   '/credits': null,
 };
 

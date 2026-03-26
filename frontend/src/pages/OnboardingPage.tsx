@@ -163,7 +163,9 @@ export default function OnboardingPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
-  const [optInMarketplace, setOptInMarketplace] = useState(false);
+  const [optInMarketplace, setOptInMarketplace] = useState(
+    () => intent === 'share_network'
+  );
   // Step 3 (NH): Current employer
   const [nhEmployer, setNhEmployer] = useState('');
   const [error, setError] = useState('');
@@ -171,6 +173,11 @@ export default function OnboardingPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadProgressWidth, setUploadProgressWidth] = useState(0);
   const [uploadProgressMsg, setUploadProgressMsg] = useState('');
+
+  // Default marketplace opt-in to true for share_network users
+  useEffect(() => {
+    if (intent === 'share_network') setOptInMarketplace(true);
+  }, [intent]);
 
   // Keevs trivia rotation during upload
   const [triviaPool, setTriviaPool] = useState([]);
@@ -471,7 +478,7 @@ export default function OnboardingPage() {
     }
   };
 
-  const postWizardRoute = intent === 'share_network' ? '/contacts' : '/coach';
+  const postWizardRoute = intent === 'share_network' ? '/contacts' : '/referrals';
 
   const isHolder = intent === 'share_network' || intent === 'explore';
 
@@ -947,6 +954,20 @@ export default function OnboardingPage() {
                   </div>
                 )}
               </div>
+
+              <details className="mt-4 rounded-lg border border-border bg-secondary/30 p-4">
+                <summary className="cursor-pointer text-sm font-medium text-foreground">
+                  How to export your LinkedIn connections
+                </summary>
+                <ol className="mt-3 space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+                  <li>Go to <a href="https://www.linkedin.com/mypreferences/d/download-my-data" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">LinkedIn Data Export</a></li>
+                  <li>Select <strong>Connections</strong> only</li>
+                  <li>Click <strong>Request archive</strong></li>
+                  <li>Wait for the email from LinkedIn (usually 10 minutes)</li>
+                  <li>Download the ZIP file and find <strong>Connections.csv</strong> inside</li>
+                  <li>Upload that file here</li>
+                </ol>
+              </details>
 
               {isHolder && (
                 <label className="flex items-start gap-3 rounded-lg border border-border p-3">

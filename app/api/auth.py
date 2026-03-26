@@ -213,30 +213,40 @@ async def complete_onboarding(
         if not prefs or not prefs.target_role:
             missing.append("Job preferences with target role not set (step 2)")
 
-    # Step 9: at least one contact OR a queued/processing CSV upload
-    # Check CsvUpload first — it exists immediately even when async processing
-    # hasn't finished creating Contact rows yet.
+    # Step 9: at least one contact required.
+    # If a CSV upload is still processing (queued/processing), allow through —
+    # contacts haven't been created yet but will be.
+    # If uploads exist but are completed/failed with 0 contacts, block —
+    # the file was likely not a valid LinkedIn CSV (e.g. a resume).
     from app.models.contact import CsvUpload
 
-    csv_upload_count = (
+    contact_count = (
         await db.scalar(
             select(func.count())
-            .select_from(CsvUpload)
-            .where(CsvUpload.user_id == current_user.id)
+            .select_from(Contact)
+            .where(Contact.user_id == current_user.id)
         )
         or 0
     )
-    if csv_upload_count == 0:
-        contact_count = (
+    if contact_count == 0:
+        # No contacts yet — check if there's an in-progress upload
+        in_progress_count = (
             await db.scalar(
                 select(func.count())
-                .select_from(Contact)
-                .where(Contact.user_id == current_user.id)
+                .select_from(CsvUpload)
+                .where(
+                    CsvUpload.user_id == current_user.id,
+                    CsvUpload.status.in_(["pending", "queued", "processing"]),
+                )
             )
             or 0
         )
-        if contact_count == 0:
-            missing.append("No contacts uploaded (step 9)")
+        if in_progress_count == 0:
+            missing.append(
+                "No contacts found — your uploaded file may not be a LinkedIn "
+                "connections CSV. Export from linkedin.com/mynetwork/invite-connect "
+                "and re-upload (step 9)"
+            )
 
     # Step 10: connector profile with work history
     profile = (

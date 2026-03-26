@@ -121,10 +121,30 @@ class TestParseLinkedinCsv:
         contacts = parse_linkedin_csv(b"")
         assert contacts == []
 
-    def test_header_only_csv_returns_empty_list(self):
+    def test_header_only_linkedin_csv_raises_valueerror(self):
         csv_bytes = b"First Name,Last Name,Email Address,Company,Position\n"
-        contacts = parse_linkedin_csv(csv_bytes)
-        assert contacts == []
+        import pytest
+
+        with pytest.raises(ValueError, match="LinkedIn"):
+            parse_linkedin_csv(csv_bytes)
+
+    def test_parse_linkedin_csv_rejects_non_linkedin_csv(self):
+        """A CSV with random columns (not LinkedIn) should raise ValueError."""
+        import pytest
+
+        csv_bytes = b"name,age,city\nAlice,30,NYC\nBob,25,SF\n"
+        with pytest.raises(ValueError, match="LinkedIn"):
+            parse_linkedin_csv(csv_bytes)
+
+    def test_parse_linkedin_csv_rejects_empty_data_rows(self):
+        """A CSV with LinkedIn headers but zero parseable data rows should raise ValueError."""
+        import pytest
+
+        csv_bytes = (
+            b"First Name,Last Name,Email Address,Company,Position,Connected On\n"
+        )
+        with pytest.raises(ValueError, match="linkedin.com/mypreferences"):
+            parse_linkedin_csv(csv_bytes)
 
     def test_raw_csv_row_preserved(self):
         contacts = parse_linkedin_csv(SAMPLE_CSV.encode("utf-8"))

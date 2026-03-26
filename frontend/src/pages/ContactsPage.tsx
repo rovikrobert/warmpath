@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { contacts as contactsApi, companies as companiesApi, feed as feedApi } from '../api/client';
 import MatchBadge from '../components/MatchBadge';
 import { getNlpMatchTier, WARM_TIERS } from '../utils/scores';
@@ -880,6 +881,16 @@ export default function ContactsPage() {
                                 <p className="text-xs text-muted-foreground">
                                   {c.current_title && `${c.current_title} at `}{c.current_company || ''}
                                 </p>
+                                {c.current_company && (
+                                  <Link
+                                    to={`/referrals?company=${encodeURIComponent(c.current_company)}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="text-xs text-primary hover:underline"
+                                    aria-label={`Find referrals at ${c.current_company}`}
+                                  >
+                                    Find referrals at {c.current_company}
+                                  </Link>
+                                )}
                               </div>
                               <RelBadge
                                 type={c.relationship_type}
@@ -986,6 +997,16 @@ export default function ContactsPage() {
                       <p className="text-xs text-muted-foreground">
                         {c.current_title && `${c.current_title} at `}{c.current_company || ''}
                       </p>
+                      {c.current_company && (
+                        <Link
+                          to={`/referrals?company=${encodeURIComponent(c.current_company)}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs text-primary hover:underline"
+                          aria-label={`Find referrals at ${c.current_company}`}
+                        >
+                          Find referrals at {c.current_company}
+                        </Link>
+                      )}
                     </div>
                     <RelBadge
                       type={c.relationship_type}

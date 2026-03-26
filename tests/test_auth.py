@@ -372,6 +372,128 @@ async def test_onboarding_complete_succeeds_with_csv_upload_but_no_contacts_yet(
     assert resp.json()["data"]["onboarding_complete"] is True
 
 
+async def test_onboarding_complete_rejects_completed_csv_with_zero_contacts(
+    client: AsyncClient,
+):
+    """POST /onboarding-complete fails when CsvUpload exists with status='completed'
+    but 0 contacts were created (e.g. user uploaded a resume, not a LinkedIn CSV)."""
+    from app.models.contact import CsvUpload
+    from app.models.job import UserJobPreferences
+    from app.models.user import ConnectorProfile
+
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email="badcsv@test.com", full_name="Bad CSV"
+        )
+        user.intent = "find_referrals"
+        prefs = UserJobPreferences(
+            user_id=user.id,
+            target_role="Engineer",
+            target_industries=[],
+            target_locations=[],
+        )
+        db.add(prefs)
+        csv_upload = CsvUpload(
+            user_id=user.id,
+            filename="CSV resume.csv",
+            file_size_bytes=2048,
+            status="completed",
+            contacts_created=0,
+        )
+        db.add(csv_upload)
+        profile = ConnectorProfile(
+            user_id=user.id,
+            work_history=[{"company": "Acme", "title": "SWE"}],
+        )
+        db.add(profile)
+        await db.commit()
+    resp = await client.post("/api/v1/auth/onboarding-complete", headers=headers)
+    assert resp.status_code == 422
+    body = resp.json()
+    assert "contact" in body["detail"].lower()
+    assert "linkedin" in body["detail"].lower()
+
+
+async def test_onboarding_complete_rejects_failed_csv_with_zero_contacts(
+    client: AsyncClient,
+):
+    """POST /onboarding-complete fails when CsvUpload has status='failed'
+    and 0 contacts exist."""
+    from app.models.contact import CsvUpload
+    from app.models.job import UserJobPreferences
+    from app.models.user import ConnectorProfile
+
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email="failedcsv@test.com", full_name="Failed CSV"
+        )
+        user.intent = "find_referrals"
+        prefs = UserJobPreferences(
+            user_id=user.id,
+            target_role="Engineer",
+            target_industries=[],
+            target_locations=[],
+        )
+        db.add(prefs)
+        csv_upload = CsvUpload(
+            user_id=user.id,
+            filename="connections.csv",
+            file_size_bytes=512,
+            status="failed",
+            error_message="Parse error",
+        )
+        db.add(csv_upload)
+        profile = ConnectorProfile(
+            user_id=user.id,
+            work_history=[{"company": "Acme", "title": "SWE"}],
+        )
+        db.add(profile)
+        await db.commit()
+    resp = await client.post("/api/v1/auth/onboarding-complete", headers=headers)
+    assert resp.status_code == 422
+    body = resp.json()
+    assert "contact" in body["detail"].lower()
+
+
+async def test_onboarding_complete_passes_with_processing_csv_and_zero_contacts(
+    client: AsyncClient,
+):
+    """POST /onboarding-complete passes when CsvUpload has status='processing'
+    and 0 contacts (upload still in progress, contacts will appear soon)."""
+    from app.models.contact import CsvUpload
+    from app.models.job import UserJobPreferences
+    from app.models.user import ConnectorProfile
+
+    async with TestSessionLocal() as db:
+        user, headers = await create_test_user_in_db(
+            db, email="processingcsv@test.com", full_name="Processing CSV"
+        )
+        user.intent = "find_referrals"
+        prefs = UserJobPreferences(
+            user_id=user.id,
+            target_role="Engineer",
+            target_industries=[],
+            target_locations=[],
+        )
+        db.add(prefs)
+        csv_upload = CsvUpload(
+            user_id=user.id,
+            filename="connections.csv",
+            file_size_bytes=1024,
+            status="processing",
+        )
+        db.add(csv_upload)
+        profile = ConnectorProfile(
+            user_id=user.id,
+            work_history=[{"company": "Acme", "title": "SWE"}],
+        )
+        db.add(profile)
+        await db.commit()
+    resp = await client.post("/api/v1/auth/onboarding-complete", headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["data"]["onboarding_complete"] is True
+
+
 @pytest.mark.smoke
 async def test_onboarding_complete_is_idempotent(client: AsyncClient):
     """POST /onboarding-complete twice returns 200 both times."""
