@@ -25,6 +25,7 @@ from app.models.csv_chunk import CsvUploadChunk
 from app.models.company import Company
 from app.models.privacy import SuppressionList
 from app.models.user import ConnectorProfile
+from app.services.company_normalizer import normalize_company_name
 from app.services.csv_parser import classify_relationship, parse_linkedin_csv
 from app.services.credits import earn_credits
 from app.services.warm_scorer import batch_compute_scores
@@ -45,6 +46,96 @@ logger = logging.getLogger(__name__)
 
 IMPORT_BATCH_SIZE = 500
 CLEAN_CONSUMER_GROUP = "cleaners"
+_COMPANY_LINK_BATCH = 500
+
+
+async def _link_companies_for_upload(
+    session,
+    upload_uuid: uuid.UUID,
+    company_cache: dict[str, uuid.UUID | None],
+) -> None:
+    """Link contacts from this upload to Company rows using the in-memory cache.
+
+    Contacts are loaded as ORM objects so that EncryptedString fields decrypt
+    transparently — SQL-level string ops on ciphertext are not allowed.
+    """
+    offset = 0
+    while True:
+        result = await session.execute(
+            select(Contact)
+            .where(
+                Contact.csv_upload_id == upload_uuid,
+                Contact.company_id.is_(None),
+                Contact.deleted_at.is_(None),
+            )
+            .limit(_COMPANY_LINK_BATCH)
+            .offset(offset)
+        )
+        contacts = result.scalars().all()
+        if not contacts:
+            break
+
+        any_linked = False
+        for contact in contacts:
+            raw = contact.current_company
+            if not raw or not raw.strip():
+                continue
+            normalized = normalize_company_name(raw)
+            if not normalized:
+                continue
+            cache_key = normalized.lower()
+            cached_id = company_cache.get(cache_key)
+            if cached_id is not None:
+                contact.company_id = cached_id
+                any_linked = True
+            else:
+                company = Company(name=normalized)
+                session.add(company)
+                await session.flush()
+                company_cache[cache_key] = company.id
+                contact.company_id = company.id
+                any_linked = True
+
+        await session.flush()
+
+        if not any_linked:
+            # Remaining contacts have empty/unresolvable names; advance offset
+            offset += _COMPANY_LINK_BATCH
+        # Linked contacts now have company_id set, so they won't appear in the
+        # next iteration's WHERE clause — no offset bump needed.
+
+    logger.info("Company linking complete for upload %s", upload_uuid)
+
+
+async def _regenerate_marketplace_listings(
+    factory,
+    user_uuid: uuid.UUID,
+    upload_uuid: uuid.UUID,
+) -> None:
+    """Re-index marketplace listings if user has opted in (mirrors V1 pattern)."""
+    try:
+        async with factory() as mp_session:
+            from app.models.marketplace import NetworkSharingPreferences
+            from app.services.marketplace_indexer import (
+                generate_marketplace_listings,
+            )
+
+            nsp_result = await mp_session.execute(
+                select(NetworkSharingPreferences).where(
+                    NetworkSharingPreferences.user_id == user_uuid,
+                    NetworkSharingPreferences.opt_in_marketplace.is_(True),
+                    NetworkSharingPreferences.is_paused.is_(False),
+                )
+            )
+            if nsp_result.scalar_one_or_none():
+                await generate_marketplace_listings(user_uuid, mp_session)
+                await mp_session.commit()
+    except Exception:
+        logger.warning(
+            "Marketplace listing regeneration failed for upload %s",
+            upload_uuid,
+            exc_info=True,
+        )
 
 
 async def _create_gemini_cache(csv_upload_id: str) -> str | None:
@@ -695,6 +786,9 @@ async def _import_async(csv_upload_id: str, user_id: str) -> None:
             # Finalize
             await session.flush()
 
+            # Link contacts to companies (mirrors V1 _link_companies_from_cache)
+            await _link_companies_for_upload(session, upload_uuid, _company_cache)
+
             # Score
             await _update_upload(factory, upload_uuid, progress_phase="scoring")
             await batch_compute_scores(user_uuid, session)
@@ -722,6 +816,10 @@ async def _import_async(csv_upload_id: str, user_id: str) -> None:
             )
 
             await session.commit()
+
+            # Re-index marketplace listings if user has opted in (mirrors V1)
+            if created > 0:
+                await _regenerate_marketplace_listings(factory, user_uuid, upload_uuid)
 
             # Mark complete and cleanup
             await _update_upload(
