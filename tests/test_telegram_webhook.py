@@ -111,14 +111,24 @@ class TestTelegramWebhook:
 class TestGetPlatformStats:
     """Tests for the _get_platform_stats helper."""
 
-    @staticmethod
-    def _make_mock_engine(values: list[int]):
-        """Build a mock sync engine returning given scalar values in order."""
+    _STAT_KEYS = [
+        "total_users",
+        "users_with_uploads",
+        "total_contacts",
+        "marketplace_listings",
+        "active_subscribers",
+        "intro_requests",
+        "signups_7d",
+    ]
+
+    @classmethod
+    def _make_mock_engine(cls, values: list[int]):
+        """Build a mock sync engine returning a single row with all stats."""
         from unittest.mock import MagicMock
 
-        results_iter = iter(values)
+        row_dict = dict(zip(cls._STAT_KEYS, values, strict=True))
         mock_conn = MagicMock()
-        mock_conn.execute.return_value.scalar.side_effect = lambda: next(results_iter)
+        mock_conn.execute.return_value.mappings.return_value.one.return_value = row_dict
         mock_conn.__enter__ = lambda self: self
         mock_conn.__exit__ = MagicMock(return_value=False)
 
