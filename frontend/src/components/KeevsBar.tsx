@@ -34,8 +34,8 @@ const SEED_NUDGES = {
     action_url: '/contacts',
   },
   '/contacts_nh': {
-    title: 'Your imported connections are here. Review and manage what you share on the marketplace.',
-    action_label: 'Manage sharing',
+    title: 'Your connections are imported. Enable marketplace sharing to start receiving intro requests and earn referral bonuses.',
+    action_label: 'Enable sharing',
     action_url: '/settings',
   },
   '/referrals': {

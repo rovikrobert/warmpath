@@ -61,7 +61,7 @@ async def _link_companies_for_upload(
     """
     offset = 0
     while True:
-        result = await session.execute(
+        result = await session.execute(  # n1-ok: intentional batch pagination
             select(Contact)
             .where(
                 Contact.csv_upload_id == upload_uuid,

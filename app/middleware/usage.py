@@ -109,7 +109,7 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
             db_dep = _app.dependency_overrides.get(get_db, get_db)
             async for db in db_dep():
                 # Resolve clerk_user_id → WarmPath UUID
-                result = await db.execute(
+                result = await db.execute(  # n1-ok: single-yield get_db generator
                     select(User.id).where(User.clerk_user_id == clerk_user_id)
                 )
                 user_id = result.scalar_one_or_none()

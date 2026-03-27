@@ -478,7 +478,7 @@ export default function OnboardingPage() {
     }
   };
 
-  const postWizardRoute = intent === 'share_network' ? '/contacts' : '/referrals';
+  const postWizardRoute = intent === 'share_network' ? '/settings' : '/referrals';
 
   const isHolder = intent === 'share_network' || intent === 'explore';
 
@@ -1048,6 +1048,19 @@ export default function OnboardingPage() {
                 <p className="text-sm text-muted-foreground">
                   Your contacts are being imported in the background. You can continue — they'll be ready shortly.
                 </p>
+              ) : isHolder ? (
+                <div className="space-y-2">
+                  {optInMarketplace && (
+                    <p className="text-sm font-medium text-success">
+                      Marketplace sharing is on — you're ready to receive intro requests.
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    When candidates match your contacts, you'll review and approve each intro.
+                    Successful referral hires earn <span className="font-medium text-foreground">$2-10K in employer bonuses</span>.
+                    <span className="ml-1 text-xs text-muted-foreground">(Source: industry average employer referral bonus range)</span>
+                  </p>
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Add your work history to improve referral matching — contacts at your former companies get boosted scores.

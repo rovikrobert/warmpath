@@ -116,6 +116,21 @@ jobs:
           python -m scripts.privacy_scan || code=$?
           if [ "${code:-0}" -eq 2 ]; then exit 2; fi
 
+  n-plus-one-check:
+    name: N+1 Query Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check for N+1 query patterns
+        run: python -m scripts.check_n_plus_one
+
   dep-audit:
     name: Dependency Audit
     runs-on: ubuntu-latest

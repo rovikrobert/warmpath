@@ -97,29 +97,21 @@ def _get_platform_stats() -> str:
     from app.database import _get_sync_engine
 
     engine = _get_sync_engine()
-    queries = {
-        "total_users": "SELECT COUNT(*) FROM users WHERE deleted_at IS NULL",
-        "users_with_uploads": "SELECT COUNT(DISTINCT user_id) FROM csv_uploads",
-        "total_contacts": "SELECT COUNT(*) FROM contacts WHERE deleted_at IS NULL",
-        "marketplace_listings": (
-            "SELECT COUNT(*) FROM marketplace_listings WHERE deleted_at IS NULL"
-        ),
-        "active_subscribers": (
-            "SELECT COUNT(*) FROM users"
-            " WHERE plan_tier NOT IN ('free') AND plan_tier IS NOT NULL"
-            " AND deleted_at IS NULL"
-        ),
-        "intro_requests": "SELECT COUNT(*) FROM intro_facilitations",
-        "signups_7d": (
-            "SELECT COUNT(*) FROM users"
-            " WHERE deleted_at IS NULL AND created_at >= NOW() - INTERVAL '7 days'"
-        ),
-    }
-    results: dict[str, int] = {}
+    batch_sql = sa_text(
+        "SELECT"
+        " (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL) AS total_users,"
+        " (SELECT COUNT(DISTINCT user_id) FROM csv_uploads) AS users_with_uploads,"
+        " (SELECT COUNT(*) FROM contacts WHERE deleted_at IS NULL) AS total_contacts,"
+        " (SELECT COUNT(*) FROM marketplace_listings WHERE deleted_at IS NULL) AS marketplace_listings,"
+        " (SELECT COUNT(*) FROM users WHERE plan_tier NOT IN ('free')"
+        "   AND plan_tier IS NOT NULL AND deleted_at IS NULL) AS active_subscribers,"
+        " (SELECT COUNT(*) FROM intro_facilitations) AS intro_requests,"
+        " (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL"
+        "   AND created_at >= NOW() - INTERVAL '7 days') AS signups_7d"
+    )
     with engine.connect() as conn:
-        for key, sql in queries.items():
-            row = conn.execute(sa_text(sql)).scalar()
-            results[key] = row or 0
+        row = conn.execute(batch_sql).mappings().one()
+        results: dict[str, int] = {k: (v or 0) for k, v in row.items()}
 
     pct_uploaded = (
         round(results["users_with_uploads"] / results["total_users"] * 100)
