@@ -4,7 +4,8 @@
 #   web    — uvicorn only (default, binds $PORT)
 #   worker — celery worker only
 #   beat   — celery beat only
-#   scan   — run agent team scans, then exit (Railway Cron)
+#   scan        — run agent team scans, then exit (Railway Cron)
+#   qdrant-ping — ping Qdrant Cloud to prevent free-tier suspension (Railway Cron)
 #
 # Each role uses `exec` to replace the shell — the target process
 # becomes PID 1 and receives SIGTERM/SIGINT directly from the runtime.
@@ -63,8 +64,12 @@ case "$ROLE" in
         echo "[entrypoint] Starting MCP server (SSE, port=${PORT:-8001})"
         exec python3 -m mcp_server --transport sse --port "${PORT:-8001}"
         ;;
+    qdrant-ping)
+        echo "[entrypoint] Running Qdrant keep-alive ping"
+        exec python3 scripts/qdrant_keepalive.py
+        ;;
     *)
-        echo "[entrypoint] Unknown SERVICE_ROLE: $ROLE (expected: web, worker, beat, scan, agent-runtime, mcp)"
+        echo "[entrypoint] Unknown SERVICE_ROLE: $ROLE (expected: web, worker, beat, scan, agent-runtime, mcp, qdrant-ping)"
         exit 1
         ;;
 esac
