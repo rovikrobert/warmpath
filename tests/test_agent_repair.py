@@ -565,6 +565,7 @@ class TestPendingDecisionBackwardCompat:
     def test_load_old_format_without_new_fields(self, tmp_path) -> None:
         """Old JSON without failu[RESEND_KEY_REDACTED]/rollback_plan loads with defaults."""
         import json
+        from datetime import datetime, timezone
 
         from agents.shared.decision_registry import load_pending_decisions
 
@@ -580,7 +581,7 @@ class TestPendingDecisionBackwardCompat:
                     "title": "t",
                     "detail": "d",
                 },
-                "brief_date": "2026-03-01",
+                "brief_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 "tier": "auto_pr",
                 "action_plan": "Fix it",
                 "executed_at": None,

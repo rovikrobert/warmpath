@@ -1,6 +1,7 @@
 """Tests for decision registry and Finding serialization."""
 
 from dataclasses import asdict
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
@@ -70,6 +71,8 @@ class TestFindingFromDict:
 
 
 def _make_decision(number: int = 1, finding_id: str = "CVE-001") -> PendingDecision:
+    from datetime import datetime, timezone
+
     return PendingDecision(
         number=number,
         finding_id=finding_id,
@@ -80,7 +83,7 @@ def _make_decision(number: int = 1, finding_id: str = "CVE-001") -> PendingDecis
             "title": "Test finding",
             "detail": "d",
         },
-        brief_date="2026-03-13",
+        brief_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         tier="auto_pr",
         action_plan="Bump dep to fix CVE",
     )
@@ -170,7 +173,7 @@ class TestDecisionRegistry:
                 "title": "t",
                 "detail": "d",
             },
-            brief_date="2026-03-15",
+            brief_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             tier="auto_pr",
             action_plan="Bump dep",
             failu[RESEND_KEY_REDACTED]=["Breaks API compat if new version drops method"],
@@ -197,7 +200,7 @@ class TestDecisionRegistry:
                 "title": "t",
                 "detail": "d",
             },
-            brief_date="2026-03-15",
+            brief_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             tier="escalate",
             action_plan="Fix auth bypass",
             failu[RESEND_KEY_REDACTED]=["Could break SSO", "May invalidate sessions"],

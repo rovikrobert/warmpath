@@ -1225,3 +1225,189 @@ class TestResolvedRegistryIdMismatchPrevention:
             result = filter_resolved_findings(findings)
 
         assert len(result) == 0, "Exact match should suppress the finding"
+
+
+# ---------------------------------------------------------------------------
+# Shared N+1 scanner (agents/shared/n1_scanner.py)
+# ---------------------------------------------------------------------------
+
+
+class TestSharedN1Scanner:
+    """Tests for the unified N+1 scanner used by both agents."""
+
+    def test_detects_execute_in_loop(self, tmp_path):
+        """Shared scanner finds db.execute inside a for loop."""
+        from agents.shared.n1_scanner import scan_n_plus_one
+
+        f = tmp_path / "service.py"
+        f.write_text(
+            "async def run(db):\n"
+            "    for item in items:\n"
+            "        await db.execute(query)\n"
+        )
+
+        findings = scan_n_plus_one([f], id_prefix="TEST")
+        assert len(findings) == 1
+        assert findings[0].id.startswith("TEST-SERVICE-L")
+        assert "execute" in findings[0].title
+
+    def test_suppresses_n1_ok_comment(self, tmp_path):
+        """Shared scanner respects # n1-ok suppression."""
+        from agents.shared.n1_scanner import scan_n_plus_one
+
+        f = tmp_path / "pipeline.py"
+        f.write_text(
+            "async def batch(db):\n"
+            "    while True:\n"
+            "        r = await db.execute(q)  # n1-ok: pagination\n"
+            "        if not r: break\n"
+        )
+
+        findings = scan_n_plus_one([f], id_prefix="TEST")
+        assert len(findings) == 0
+
+    def test_requi[RESEND_KEY_REDACTED](self, tmp_path):
+        """requi[RESEND_KEY_REDACTED]=True only flags awaited calls."""
+        from agents.shared.n1_scanner import scan_n_plus_one
+
+        f = tmp_path / "sync.py"
+        f.write_text(
+            "def run(db):\n    for item in items:\n        db.execute(query)\n"
+        )
+
+        # Without requi[RESEND_KEY_REDACTED] — should detect
+        findings = scan_n_plus_one([f], id_prefix="T", requi[RESEND_KEY_REDACTED]=False)
+        assert len(findings) == 1
+
+        # With requi[RESEND_KEY_REDACTED] — should skip (no await)
+        findings = scan_n_plus_one([f], id_prefix="T", requi[RESEND_KEY_REDACTED]=True)
+        assert len(findings) == 0
+
+    def test_detects_scalar_and_service_funcs(self, tmp_path):
+        """Shared scanner detects scalar() and known service functions."""
+        from agents.shared.n1_scanner import scan_n_plus_one
+
+        f = tmp_path / "checker.py"
+        f.write_text(
+            "async def check(db):\n"
+            "    for item in items:\n"
+            "        await db.scalar(query)\n"
+        )
+
+        findings = scan_n_plus_one([f], id_prefix="T", requi[RESEND_KEY_REDACTED]=True)
+        assert len(findings) == 1
+        assert "scalar" in findings[0].title
+
+    def test_skips_safe_receiver_suffixes(self, tmp_path):
+        """Shared scanner skips .get() on _map/_cache variables."""
+        from agents.shared.n1_scanner import scan_n_plus_one
+
+        f = tmp_path / "safe.py"
+        f.write_text(
+            "async def run():\n"
+            "    for item in items:\n"
+            "        v = await user_cache.get(item)\n"
+        )
+
+        findings = scan_n_plus_one([f], id_prefix="T", requi[RESEND_KEY_REDACTED]=True)
+        assert len(findings) == 0
+
+
+# ---------------------------------------------------------------------------
+# Decision auto-expiry (AG-004)
+# ---------------------------------------------------------------------------
+
+
+class TestDecisionAutoExpiry:
+    """Verify pending decisions auto-expire after DECISION_TTL_DAYS."""
+
+    def test_stale_decisions_pruned_on_load(self, tmp_path):
+        """Decisions older than TTL are removed when loaded."""
+        from agents.shared.decision_registry import (
+            PendingDecision,
+            load_pending_decisions,
+            save_pending_decisions,
+        )
+
+        stale = PendingDecision(
+            number=1,
+            finding_id="OLD-001",
+            finding={"id": "OLD-001", "severity": "high"},
+            brief_date="2026-01-01",
+            tier="escalate",
+            action_plan="Review old issue",
+        )
+        fresh = PendingDecision(
+            number=2,
+            finding_id="NEW-001",
+            finding={"id": "NEW-001", "severity": "high"},
+            brief_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            tier="escalate",
+            action_plan="Review new issue",
+        )
+
+        with patch(
+            "agents.shared.decision_registry.DECISIONS_PATH",
+            tmp_path / "decisions.json",
+        ):
+            save_pending_decisions([stale, fresh])
+            loaded = load_pending_decisions()
+
+        assert len(loaded) == 1
+        assert loaded[0].finding_id == "NEW-001"
+
+    def test_executed_decisions_kept_for_idempotency(self, tmp_path):
+        """Executed decisions kept on load (approval pipeline checks executed_at)."""
+        from agents.shared.decision_registry import (
+            PendingDecision,
+            load_pending_decisions,
+            save_pending_decisions,
+        )
+
+        executed = PendingDecision(
+            number=1,
+            finding_id="DONE-001",
+            finding={"id": "DONE-001"},
+            brief_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            tier="auto_pr",
+            action_plan="Fixed",
+            executed_at=datetime.now(timezone.utc).isoformat(),
+            result_summary="PR opened",
+        )
+
+        with patch(
+            "agents.shared.decision_registry.DECISIONS_PATH",
+            tmp_path / "decisions.json",
+        ):
+            save_pending_decisions([executed])
+            loaded = load_pending_decisions()
+
+        assert len(loaded) == 1
+        assert loaded[0].executed_at is not None
+
+    def test_fresh_unexecuted_decisions_kept(self, tmp_path):
+        """Decisions within TTL and not executed are preserved."""
+        from agents.shared.decision_registry import (
+            PendingDecision,
+            load_pending_decisions,
+            save_pending_decisions,
+        )
+
+        fresh = PendingDecision(
+            number=1,
+            finding_id="ACTIVE-001",
+            finding={"id": "ACTIVE-001"},
+            brief_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            tier="escalate",
+            action_plan="Needs review",
+        )
+
+        with patch(
+            "agents.shared.decision_registry.DECISIONS_PATH",
+            tmp_path / "decisions.json",
+        ):
+            save_pending_decisions([fresh])
+            loaded = load_pending_decisions()
+
+        assert len(loaded) == 1
+        assert loaded[0].finding_id == "ACTIVE-001"
