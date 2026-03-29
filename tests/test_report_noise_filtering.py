@@ -1061,3 +1061,167 @@ class TestSynthesizerSavesPendingDecisions:
         # Original Finding fields preserved (not CosFinding)
         assert decisions[0].finding.get("auto_fixable") is True
         assert decisions[0].finding.get("file") == "requirements.txt"
+
+
+# ---------------------------------------------------------------------------
+# N+1 scanner: # n1-ok suppression and ID stability
+# ---------------------------------------------------------------------------
+
+
+class TestN1OkSuppression:
+    """Verify that both N+1 scanners respect # n1-ok comments."""
+
+    def test_perf_monitor_skips_n1_ok_lines(self, tmp_path):
+        """perf_monitor _scan_n_plus_one ignores lines with # n1-ok."""
+        from agents.perf_monitor.perf_monitor import _scan_n_plus_one
+
+        # Create a fake app dir with a file containing n1-ok
+        tasks_dir = tmp_path / "app" / "tasks"
+        tasks_dir.mkdir(parents=True)
+        (tasks_dir / "__init__.py").touch()
+        (tasks_dir / "example.py").write_text(
+            "import ast\n"
+            "async def batch_load(db):\n"
+            "    while True:\n"
+            "        result = await db.execute(query)  # n1-ok: batch pagination\n"
+            "        if not result:\n"
+            "            break\n"
+        )
+        # Also a file WITHOUT the comment (should be detected)
+        (tasks_dir / "bad.py").write_text(
+            "import ast\n"
+            "async def loop_query(db):\n"
+            "    for item in items:\n"
+            "        result = await db.execute(query)\n"
+        )
+
+        with patch("agents.perf_monitor.perf_monitor.PROJECT_ROOT", tmp_path):
+            findings, count = _scan_n_plus_one(tmp_path / "app")
+
+        ids = [f.id for f in findings]
+        # The n1-ok file should be suppressed
+        assert not any("EXAMPLE" in fid for fid in ids), f"n1-ok not suppressed: {ids}"
+        # The bad file should still be detected
+        assert any("BAD" in fid for fid in ids), f"Bad file not detected: {ids}"
+        assert count == 1
+
+    def test_architect_skips_n1_ok_lines(self, tmp_path):
+        """architect _scan_n_plus_one ignores lines with # n1-ok."""
+        from agents.architect.architect import _scan_n_plus_one
+
+        suppressed = tmp_path / "suppressed.py"
+        suppressed.write_text(
+            "async def batch(db):\n"
+            "    while True:\n"
+            "        r = await db.execute(q)  # n1-ok: intentional\n"
+            "        if not r:\n"
+            "            break\n"
+        )
+        detected = tmp_path / "detected.py"
+        detected.write_text(
+            "async def bad(db):\n    for x in items:\n        r = await db.execute(q)\n"
+        )
+
+        findings: list[Finding] = []
+        _scan_n_plus_one([suppressed, detected], findings)
+
+        ids = [f.id for f in findings]
+        assert not any("SUPPRESSED" in fid for fid in ids), (
+            f"n1-ok not suppressed: {ids}"
+        )
+        assert any("DETECTED" in fid for fid in ids), f"Bad file not detected: {ids}"
+
+
+class TestArchitectN1IdStability:
+    """Verify architect N+1 findings have unique, location-specific IDs."""
+
+    def test_different_files_get_different_ids(self, tmp_path):
+        """N+1 findings in different files get distinct IDs."""
+        from agents.architect.architect import _scan_n_plus_one
+
+        file_a = tmp_path / "alpha.py"
+        file_a.write_text(
+            "async def a(db):\n    for x in items:\n        r = await db.execute(q)\n"
+        )
+        file_b = tmp_path / "beta.py"
+        file_b.write_text(
+            "async def b(db):\n    for y in stuff:\n        r = await db.execute(q)\n"
+        )
+
+        findings: list[Finding] = []
+        _scan_n_plus_one([file_a, file_b], findings)
+
+        assert len(findings) == 2
+        assert findings[0].id != findings[1].id
+        assert "ALPHA" in findings[0].id
+        assert "BETA" in findings[1].id
+
+    def test_id_includes_line_number(self, tmp_path):
+        """N+1 finding IDs include file stem and line number."""
+        from agents.architect.architect import _scan_n_plus_one
+
+        f = tmp_path / "myservice.py"
+        f.write_text(
+            "async def run(db):\n"
+            "    for item in batch:\n"
+            "        await db.execute(query)\n"
+        )
+
+        findings: list[Finding] = []
+        _scan_n_plus_one([f], findings)
+
+        assert len(findings) == 1
+        assert findings[0].id.startswith("ARCH-N+1-MYSERVICE-L")
+
+
+class TestResolvedRegistryIdMismatchPrevention:
+    """Verify that the filter catches findings with mismatched IDs."""
+
+    def test_treb_live_funnel_not_matched_by_treb_001(self):
+        """treb-live-funnel-001 must NOT be matched by treb-001 registry entry."""
+        fake_registry = {
+            "treb-001": {
+                "resolution_type": "deferred",
+                "resolved_at": "2026-03-12T00:00:00+00:00",
+                "reason": "Test",
+                "skip_until": "2026-04-15",
+            }
+        }
+        findings = [
+            Finding(
+                id="treb-live-funnel-001",
+                severity="high",
+                category="nh_funnel",
+                title="NH signup->upload rate critically low",
+                detail="d",
+            )
+        ]
+        with _fake_registry(fake_registry):
+            result = filter_resolved_findings(findings)
+
+        # treb-001 should NOT suppress treb-live-funnel-001 (different findings)
+        assert len(result) == 1, "treb-001 incorrectly suppressed treb-live-funnel-001"
+
+    def test_exact_id_match_suppresses_correctly(self):
+        """treb-live-funnel-001 IS suppressed when its exact ID is in registry."""
+        fake_registry = {
+            "treb-live-funnel-001": {
+                "resolution_type": "deferred",
+                "resolved_at": "2026-03-29T00:00:00+00:00",
+                "reason": "Pre-launch expected",
+                "skip_until": "2026-05-01",
+            }
+        }
+        findings = [
+            Finding(
+                id="treb-live-funnel-001",
+                severity="high",
+                category="nh_funnel",
+                title="NH signup->upload rate critically low",
+                detail="d",
+            )
+        ]
+        with _fake_registry(fake_registry):
+            result = filter_resolved_findings(findings)
+
+        assert len(result) == 0, "Exact match should suppress the finding"
