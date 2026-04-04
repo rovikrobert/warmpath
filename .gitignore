@@ -64,7 +64,9 @@ gtm_team/cross_team_requests/*.json
 # Shared agent caches
 agents/shared/.web_cache/
 agents/shared/shared_insights.json
-agents/shared/resolved_registry.json
+# resolved_registry.json is NOT ignored — it must ship to Railway
+# so that filter_resolved_findings() works in production
+agents/chief_of_staff/reports/telegram/telegram-last-fingerprint.json
 
 coverage.json
 .coverage
