@@ -1314,6 +1314,93 @@ class TestSharedN1Scanner:
 
 
 # ---------------------------------------------------------------------------
+# N+1 scanner false positive reduction
+# ---------------------------------------------------------------------------
+
+
+class TestN1ScannerFalsePositiveReduction:
+    """Tests for scanner improvements that reduce false positives."""
+
+    def test_skips_chunked_batch_with_in_clause(self, tmp_path):
+        """Chunked batch pattern (for chunk in chunks: db.execute(...in_(chunk)))
+        is intentional batching, not N+1."""
+        from agents.shared.n1_scanner import scan_n_plus_one
+
+        f = tmp_path / "batcher.py"
+        f.write_text(
+            "async def batch_load(db, ids):\n"
+            "    chunks = [ids[i:i+100] for i in range(0, len(ids), 100)]\n"
+            "    for chunk in chunks:\n"
+            "        result = await db.execute(select(User).where(User.id.in_(chunk)))\n"
+        )
+
+        findings = scan_n_plus_one([f], id_prefix="T")
+        assert len(findings) == 0, (
+            "Chunked batch with .in_() should not be flagged as N+1"
+        )
+
+    def test_skips_batch_variable_names(self, tmp_path):
+        """Loops over batch/page/slice variables with db.execute are intentional."""
+        from agents.shared.n1_scanner import scan_n_plus_one
+
+        f = tmp_path / "pager.py"
+        f.write_text(
+            "async def paginate(db, pages):\n"
+            "    for page in pages:\n"
+            "        result = await db.execute(select(Item).offset(page * 100))\n"
+        )
+
+        findings = scan_n_plus_one([f], id_prefix="T")
+        assert len(findings) == 0, (
+            "Loop over 'page' variable should not be flagged as N+1"
+        )
+
+    def test_still_flags_real_n_plus_one_per_item_query(self, tmp_path):
+        """A real N+1 (db.execute per item) should still be detected."""
+        from agents.shared.n1_scanner import scan_n_plus_one
+
+        f = tmp_path / "bad.py"
+        f.write_text(
+            "async def load_orders(db, user_ids):\n"
+            "    for user_id in user_ids:\n"
+            "        result = await db.execute(select(Order).where(Order.user_id == user_id))\n"
+        )
+
+        findings = scan_n_plus_one([f], id_prefix="T")
+        assert len(findings) == 1, "Real N+1 per-item query must still be flagged"
+
+    def test_still_flags_service_func_in_loop(self, tmp_path):
+        """Known DB service functions inside loops are still flagged."""
+        from agents.shared.n1_scanner import scan_n_plus_one
+
+        f = tmp_path / "checker.py"
+        f.write_text(
+            "async def check_all(items):\n"
+            "    for item in items:\n"
+            "        await check_suppression(item.hash)\n"
+        )
+
+        findings = scan_n_plus_one([f], id_prefix="T")
+        assert len(findings) == 1, "DB service function in loop must still be flagged"
+
+    def test_skips_batch_with_slice_variable(self, tmp_path):
+        """Loop variable named 'batch' or 'slice' with db.execute is intentional."""
+        from agents.shared.n1_scanner import scan_n_plus_one
+
+        f = tmp_path / "chunker.py"
+        f.write_text(
+            "async def process(db, batches):\n"
+            "    for batch in batches:\n"
+            "        await db.execute(insert(Item).values(batch))\n"
+        )
+
+        findings = scan_n_plus_one([f], id_prefix="T")
+        assert len(findings) == 0, (
+            "Loop over 'batch' variable should not be flagged as N+1"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Decision auto-expiry (AG-004)
 # ---------------------------------------------------------------------------
 
