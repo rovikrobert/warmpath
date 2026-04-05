@@ -1545,8 +1545,8 @@ class TestRecommendationsRespectSuppression:
         assert len(recs) == 1
         assert "auth bypass" in recs[0]
 
-    def test_suppressed_nh_funnel_excluded_from_recommendations(self):
-        """nh_funnel findings should NOT produce recommendations."""
+    def test_nh_funnel_surfaces_in_recommendations(self):
+        """nh_funnel findings should surface — real signal with live users."""
         from agents.shared.repair import _collect_recommendations
 
         from agents.chief_of_staff.synthesizer import filter_noisy_findings
@@ -1556,14 +1556,15 @@ class TestRecommendationsRespectSuppression:
                 id="TREB-001",
                 severity="high",
                 category="nh_funnel",
-                title="NH signup->upload rate critically low (43%)",
-                detail="3 of 7 NHs uploaded",
+                title="NH signup->upload rate critically low (36%)",
+                detail="14 NHs signed up, 5 uploaded",
                 recommendation="Investigate onboarding friction",
             ),
         ]
         filtered = filter_noisy_findings(findings)
         recs = _collect_recommendations(filtered)
-        assert len(recs) == 0
+        assert len(recs) == 1
+        assert "onboarding" in recs[0]
 
     def test_critical_suppressed_category_still_surfaces(self):
         """Critical findings in suppressed categories should still appear."""
