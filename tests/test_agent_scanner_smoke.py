@@ -252,7 +252,7 @@ class TestSynthesizerConfidenceFiltering:
 
     def test_low_confidence_filtered_from_brief(self):
         """Findings with confidence < 0.5 should not appear in briefs."""
-        from agents.chief_of_staff.synthesizer import _filter_noisy_findings
+        from agents.chief_of_staff.synthesizer import filter_noisy_findings
 
         findings = [
             Finding(
@@ -272,13 +272,13 @@ class TestSynthesizerConfidenceFiltering:
                 confidence=0.3,
             ),
         ]
-        filtered = _filter_noisy_findings(findings)
+        filtered = filter_noisy_findings(findings)
         assert len(filtered) == 1
         assert filtered[0].id == "a"
 
     def test_critical_bypasses_confidence_filter(self):
         """Critical findings always surface regardless of confidence."""
-        from agents.chief_of_staff.synthesizer import _filter_noisy_findings
+        from agents.chief_of_staff.synthesizer import filter_noisy_findings
 
         findings = [
             Finding(
@@ -290,6 +290,6 @@ class TestSynthesizerConfidenceFiltering:
                 confidence=0.2,
             ),
         ]
-        filtered = _filter_noisy_findings(findings)
+        filtered = filter_noisy_findings(findings)
         assert len(filtered) == 1
         assert filtered[0].id == "c"
