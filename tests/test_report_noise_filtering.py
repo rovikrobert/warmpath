@@ -1411,3 +1411,90 @@ class TestDecisionAutoExpiry:
 
         assert len(loaded) == 1
         assert loaded[0].finding_id == "ACTIVE-001"
+
+
+# ---------------------------------------------------------------------------
+# Recommendations respect suppressed categories (regression for #114 bypass)
+# ---------------------------------------------------------------------------
+
+
+class TestRecommendationsRespectSuppression:
+    """Verify that repair recommendations filter suppressed categories.
+
+    PR #114 added category suppression to the synthesizer, but the
+    recommendations pipeline in repair.py bypassed it. The fix applies
+    the same filter in cos_agent before collecting recommendations.
+    """
+
+    def test_suppressed_n_plus_1_excluded_from_recommendations(self):
+        """n_plus_1 findings should NOT produce recommendations."""
+        from agents.shared.repair import _collect_recommendations
+
+        findings = [
+            Finding(
+                id="N1-001",
+                severity="high",
+                category="n_plus_1",
+                title="Potential N+1: db.execute inside loop",
+                detail="Loop in app/api/jobs.py",
+                recommendation="Batch the query",
+            ),
+            Finding(
+                id="SEC-999",
+                severity="high",
+                category="security",
+                title="Real security issue",
+                detail="Auth bypass in middleware",
+                recommendation="Fix the auth bypass",
+            ),
+        ]
+        # _collect_recommendations itself doesn't filter categories —
+        # the caller (cos_agent) must filter before calling.
+        # This test validates the filtering applied in the daily cycle.
+        from agents.chief_of_staff.synthesizer import filter_noisy_findings
+
+        filtered = filter_noisy_findings(findings)
+        recs = _collect_recommendations(filtered)
+        assert len(recs) == 1
+        assert "auth bypass" in recs[0]
+
+    def test_suppressed_nh_funnel_excluded_from_recommendations(self):
+        """nh_funnel findings should NOT produce recommendations."""
+        from agents.shared.repair import _collect_recommendations
+
+        from agents.chief_of_staff.synthesizer import filter_noisy_findings
+
+        findings = [
+            Finding(
+                id="TREB-001",
+                severity="high",
+                category="nh_funnel",
+                title="NH signup->upload rate critically low (43%)",
+                detail="3 of 7 NHs uploaded",
+                recommendation="Investigate onboarding friction",
+            ),
+        ]
+        filtered = filter_noisy_findings(findings)
+        recs = _collect_recommendations(filtered)
+        assert len(recs) == 0
+
+    def test_critical_suppressed_category_still_surfaces(self):
+        """Critical findings in suppressed categories should still appear."""
+        from agents.shared.repair import _collect_recommendations
+
+        from agents.chief_of_staff.synthesizer import filter_noisy_findings
+
+        findings = [
+            Finding(
+                id="N1-CRIT",
+                severity="critical",
+                category="n_plus_1",
+                title="Critical N+1 causing outage",
+                detail="Production query storm",
+                recommendation="Emergency fix needed",
+            ),
+        ]
+        filtered = filter_noisy_findings(findings)
+        recs = _collect_recommendations(filtered)
+        assert len(recs) == 1
+        assert "Emergency fix" in recs[0]
