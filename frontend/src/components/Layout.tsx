@@ -7,6 +7,7 @@ import BetaFeedbackButton from './BetaFeedbackButton';
 import CommandPalette from './CommandPalette';
 import KeyboardShortcutsModal from './KeyboardShortcutsModal';
 import KeevsBar from './KeevsBar';
+import SunsetBanner from './SunsetBanner';
 import TrustShield from './TrustShield';
 import { WarmPathLogo } from './WarmPathLogo';
 import { ThemeToggle } from './ThemeToggle';
@@ -398,6 +399,7 @@ export default function Layout() {
 
         <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
+            <SunsetBanner />
             <KeevsBar />
             <div key={location.pathname} className="page-enter">
               <Outlet />
