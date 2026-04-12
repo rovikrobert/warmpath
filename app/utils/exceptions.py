@@ -34,3 +34,8 @@ class RateLimitError(AppError):
 class ValidationError(AppError):
     def __init__(self, message: str = "Validation failed"):
         super().__init__(message=message, code="VALIDATION_ERROR", status_code=422)
+
+
+class GoneError(AppError):
+    def __init__(self, message: str = "This resource is no longer available"):
+        super().__init__(message=message, code="GONE", status_code=410)
