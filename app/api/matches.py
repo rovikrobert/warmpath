@@ -22,6 +22,7 @@ from app.services.intro_drafter import (
     CLAUDE_MODEL as INTRO_MODEL,
     draft_referral_request,
 )
+from app.utils.exceptions import GoneError
 from app.utils.security import get_current_user
 
 router = APIRouter()
@@ -87,6 +88,11 @@ async def create_intro(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Create an intro request and generate referral message drafts."""
+    if settings.SUNSET_MODE:
+        raise GoneError(
+            "WarmPath is shutting down. New intro requests are no longer accepted. "
+            "Check your email for details."
+        )
     contact, match_result, job_opening, connector_profile = await _load_intro_context(
         body, current_user.id, db
     )
