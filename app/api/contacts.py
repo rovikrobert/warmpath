@@ -30,7 +30,7 @@ from app.services.company_normalizer import link_contact_to_company
 from app.services.csv_parser import generate_fingerprint, parse_linkedin_csv
 from app.services.warm_scorer import batch_compute_scores
 from app.utils.encryption import compute_blind_index
-from app.utils.exceptions import RateLimitError
+from app.utils.exceptions import GoneError, RateLimitError
 from app.utils.security import get_current_user
 
 router = APIRouter()
@@ -122,6 +122,11 @@ async def upload_csv(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Upload a LinkedIn CSV file to import contacts."""
+    if settings.SUNSET_MODE:
+        raise GoneError(
+            "WarmPath is shutting down. CSV uploads are no longer accepted. "
+            "Check your email for details."
+        )
     # Rate limit check
     allowed, count = await check_rate_limit(
         current_user.id,
