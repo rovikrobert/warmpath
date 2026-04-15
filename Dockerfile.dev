@@ -1,0 +1,22 @@
+# Development image for docker-compose.dev.yml
+# Runs the FastAPI backend and Celery worker with hot-reload.
+# Source dirs (app/, alembic/, scripts/) are bind-mounted by compose,
+# so this image only installs system + Python dependencies.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System deps: libpq for psycopg2, curl for healthchecks, git for scripts
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpq5 curl git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python deps — dev file includes prod requirements via -r requirements.txt
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+ENV PORT=8000 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+EXPOSE ${PORT}
