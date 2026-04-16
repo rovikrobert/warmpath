@@ -1,16 +1,50 @@
-# React + Vite
+# WarmPath frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + Vite 7 + TypeScript + Tailwind CSS 4. Routed via
+`react-router-dom`, auth via Clerk, UI primitives from Radix +
+[shadcn/ui](https://ui.shadcn.com/) (see `components.json`).
 
-Currently, two official plugins are available:
+> Project status: **sunset April 28, 2026.** See the
+> [root README](../README.md) for context. PRs/issues are not reviewed.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Setup
 
-## React Compiler
+```bash
+# from repo root, the easy path:
+make dev                      # brings up frontend in Docker on :5173
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+# or run the dev server directly against a local API:
+cd frontend
+npm install
+npm run dev                   # http://localhost:5173
+```
 
-## Expanding the ESLint configuration
+The Vite dev server proxies API calls; configure auth in
+[`.env.dev`](../.env.dev.example) (`VITE_CLERK_PUBLISHABLE_KEY`,
+`VITE_API_URL`, `VITE_BETA_MODE`).
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Vite dev server with HMR |
+| `npm run build` | Production build to `dist/` (served by FastAPI in prod) |
+| `npm run preview` | Preview the built bundle |
+| `npm run lint` | ESLint over `src/` |
+| `npm run test:e2e` | Playwright end-to-end tests (headless) |
+| `npm run test:e2e:headed` | Playwright with a visible browser |
+| `npm run build:analyze` | Bundle size visualizer |
+
+## Layout
+
+```
+src/         application code (pages, components, hooks, lib)
+public/      static assets served as-is
+e2e/         Playwright specs
+scripts/     local utility scripts
+```
+
+## License
+
+Apache-2.0, same as the rest of the repo. See [LICENSE](../LICENSE) and
+[NOTICE](../NOTICE).

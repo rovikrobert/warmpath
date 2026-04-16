@@ -48,6 +48,14 @@ Visit `http://localhost:5173` for the frontend.
 - **Auth:** Clerk
 - **Task Queue:** Celery + Redis
 
+## For forks and self-maintainers
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — local dev setup, tests, lint
+- [SECURITY.md](SECURITY.md) — security posture (no patches will ship)
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — Contributor Covenant v2.1
+- [ARCHITECTURE.md](ARCHITECTURE.md) — system design overview
+- [frontend/README.md](frontend/README.md) — frontend setup and scripts
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

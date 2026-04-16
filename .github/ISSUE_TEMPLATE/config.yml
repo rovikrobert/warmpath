@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Project status (read first)
+    url: https://github.com/rovikrobert/warmpath/blob/master/README.md
+    about: WarmPath was sunset on April 28, 2026. Issues are not reviewed — please read the README before opening one.
+  - name: Sister repo (warmpath-agents)
+    url: https://github.com/Rovik/warmpath-agents
+    about: The agent framework that monitored this product is in a separate (also archived) repo.
