@@ -19,10 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - uses: ./.github/actions/setup-python-warmpath
 
       - uses: astral-sh/setup-uv@v4
 
@@ -39,10 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - uses: ./.github/actions/setup-python-warmpath
 
       - name: Install ruff
         run: pip install ruff==0.15.1
@@ -85,10 +79,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - uses: ./.github/actions/setup-python-warmpath
 
       - name: Run security scanner
         # stdlib-only script — if it ever imports project code, add: pip install -r requirements.txt
@@ -104,10 +95,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - uses: ./.github/actions/setup-python-warmpath
 
       - name: Run privacy scanner
         # stdlib-only script — if it ever imports project code, add: pip install -r requirements.txt
@@ -123,10 +111,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - uses: ./.github/actions/setup-python-warmpath
 
       - name: Check for N+1 query patterns
         run: python -m scripts.check_n_plus_one
@@ -138,10 +123,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - uses: ./.github/actions/setup-python-warmpath
 
       - uses: astral-sh/setup-uv@v4
 
@@ -162,10 +144,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - uses: ./.github/actions/setup-python-warmpath
 
       - name: Check for async/sync connection misuse
         # stdlib-only script (uses ast module) — no pip install needed
@@ -179,10 +158,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - uses: ./.github/actions/setup-python-warmpath
 
       - name: Validate agent scan targets
         run: python3 scripts/validate_agent_targets.py
@@ -194,10 +170,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - uses: ./.github/actions/setup-python-warmpath
 
       - name: Verify Phase 3 scope telemetry sequence
         env:
