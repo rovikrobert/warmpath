@@ -22,6 +22,11 @@ jobs:
       - uses: ./.github/actions/setup-python-warmpath
 
       - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            requirements*.txt
+            requirements*.lock
 
       - name: Install dependencies
         run: uv pip install --system -r requirements-test.txt
@@ -129,6 +134,11 @@ jobs:
       - uses: ./.github/actions/setup-python-warmpath
 
       - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            requirements*.txt
+            requirements*.lock
 
       - name: Install pip-audit
         run: uv pip install --system pip-audit==2.9.0
