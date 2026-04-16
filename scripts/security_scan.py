@@ -73,6 +73,9 @@ def _parse_requirements() -> dict[str, str]:
                 name, ver = line.split(op, 1)
                 name = name.strip().split("[")[0]  # strip extras like [cryptography]
                 ver = ver.split("#")[0].strip()  # strip inline comments
+                # Compound specs like ">=2.54.0,<3.0" — keep only the lower bound.
+                # Sending the full string to OSV returns every historical CVE.
+                ver = ver.split(",")[0].strip()
                 pkgs[name] = ver
                 break
     return pkgs
