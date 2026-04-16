@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import math
 import uuid
@@ -704,8 +705,41 @@ async def _run_smart_search(
     )
     profile = profile_result.scalar_one_or_none()
 
-    companies_results: list[dict] = []
+    # Phase 1 (sequential, db): resolve job-board hints for each company.
+    # Quick small queries — kept sequential to avoid concurrent use of the
+    # shared AsyncSession (SQLAlchemy AsyncSession is not concurrency-safe).
+    boards_by_company: dict[str, tuple[dict[str, str] | None, bool]] = {}
+    for company_name in company_names:
+        boards_by_company[company_name] = await lookup_or_discover_boards(
+            company_name, db
+        )
 
+    # Phase 2 (concurrent, network only): fetch raw jobs from external boards
+    # / JobSpy / Adzuna. Bounded by a semaphore so we don't fan out unbounded
+    # outbound HTTP if a user smart-searches the max 10 companies at once.
+    location_hint = target_locations[0] if target_locations else None
+    sem = asyncio.Semaphore(max(1, settings.SMART_SEARCH_FETCH_CONCURRENCY))
+
+    async def _bounded_fetch(name: str) -> tuple[str, list[dict]]:
+        boards, _ = boards_by_company[name]
+        async with sem:
+            try:
+                jobs = await fetcher.fetch_jobs_for_company(
+                    name, boards, location_hint=location_hint
+                )
+            except Exception:
+                logger.exception("Smart search fetch failed for %s", name)
+                jobs = []
+        return name, jobs
+
+    fetch_results = await asyncio.gather(
+        *(_bounded_fetch(name) for name in company_names)
+    )
+    raw_jobs_by_company: dict[str, list[dict]] = dict(fetch_results)
+
+    # Phase 3 (sequential, db + AI): per-company processing using prefetched
+    # results. Stays sequential because each call uses the shared db session.
+    companies_results: list[dict] = []
     for company_name in company_names:
         company_data = await _process_company(
             company_name=company_name,
@@ -719,6 +753,8 @@ async def _run_smart_search(
             user=user,
             fetcher=fetcher,
             db=db,
+            prefetched_boards=boards_by_company[company_name],
+            prefetched_raw_jobs=raw_jobs_by_company[company_name],
         )
 
         # If marketplace scope, also search marketplace listings
@@ -771,18 +807,32 @@ async def _fetch_and_filter_openings(
     open_to_remote: bool,
     fetcher: JobFetcher,
     db: AsyncSession,
+    prefetched_boards: tuple[dict[str, str] | None, bool] | None = None,
+    prefetched_raw_jobs: list[dict] | None = None,
 ) -> tuple[list[dict], int, int, str]:
-    """Fetch job board openings, filter, and return (openings, fetched, matched, status)."""
-    boards, was_discovered = await lookup_or_discover_boards(company_name, db)
+    """Fetch job board openings, filter, and return (openings, fetched, matched, status).
+
+    When called from the orchestrator, ``prefetched_boards`` and
+    ``prefetched_raw_jobs`` come from earlier sequential/concurrent phases so
+    we don't repeat the work. Standalone callers pass None and the function
+    runs the full original sequential pipeline.
+    """
+    if prefetched_boards is not None:
+        boards, was_discovered = prefetched_boards
+    else:
+        boards, was_discovered = await lookup_or_discover_boards(company_name, db)
 
     # Pass first target location as hint for JobSpy/Adzuna fallback
     location_hint = target_locations[0] if target_locations else None
 
-    # Let fetch_jobs_for_company run the full fallback chain
-    # (ATS boards → career page → JobSpy → Adzuna) even without a known board.
-    raw_jobs = await fetcher.fetch_jobs_for_company(
-        company_name, boards, location_hint=location_hint
-    )
+    if prefetched_raw_jobs is not None:
+        raw_jobs = prefetched_raw_jobs
+    else:
+        # Let fetch_jobs_for_company run the full fallback chain
+        # (ATS boards → career page → JobSpy → Adzuna) even without a known board.
+        raw_jobs = await fetcher.fetch_jobs_for_company(
+            company_name, boards, location_hint=location_hint
+        )
     total_jobs_fetched = len(raw_jobs)
 
     if raw_jobs:
@@ -907,6 +957,8 @@ async def _process_company(
     db: AsyncSession,
     target_locations: list[str] | None = None,
     open_to_remote: bool = True,
+    prefetched_boards: tuple[dict[str, str] | None, bool] | None = None,
+    prefetched_raw_jobs: list[dict] | None = None,
 ) -> dict:
     """Process a single company: fetch openings + find referral paths."""
     (
@@ -922,6 +974,8 @@ async def _process_company(
         open_to_remote,
         fetcher,
         db,
+        prefetched_boards=prefetched_boards,
+        prefetched_raw_jobs=prefetched_raw_jobs,
     )
 
     # Find user's contacts who work at this company

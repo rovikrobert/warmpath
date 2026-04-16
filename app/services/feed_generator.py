@@ -25,6 +25,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.contact import Contact
 from app.models.feed import ContactFreshnessSignal, FeedItem
@@ -55,9 +56,20 @@ def _dedup(item_type: str, *parts: str) -> str:
 
 
 async def _user_has_feed_item(
-    db: AsyncSession, user_id: uuid.UUID, dedup_key: str
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    dedup_key: str,
+    existing_keys: set[str] | None = None,
 ) -> bool:
-    """Check if a non-dismissed feed item with this dedup key already exists."""
+    """Check if a non-dismissed feed item with this dedup key already exists.
+
+    When called from the orchestrator, ``existing_keys`` is preloaded (one query
+    per user instead of one per candidate) and used as a fast set-membership
+    check. When a generator is invoked standalone, the parameter is None and the
+    function falls back to a per-call COUNT query.
+    """
+    if existing_keys is not None:
+        return dedup_key in existing_keys
     result = await db.execute(
         select(func.count(FeedItem.id)).where(
             FeedItem.user_id == user_id,
@@ -66,6 +78,19 @@ async def _user_has_feed_item(
         )
     )
     return result.scalar_one() > 0
+
+
+async def _load_active_dedup_keys(
+    db: AsyncSession, user_id: uuid.UUID
+) -> set[str]:
+    """Preload all non-dismissed feed item dedup keys for a user (one query)."""
+    result = await db.execute(
+        select(FeedItem.dedup_key).where(
+            FeedItem.user_id == user_id,
+            FeedItem.dismissed_at.is_(None),
+        )
+    )
+    return {row[0] for row in result.all() if row[0]}
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +103,7 @@ async def generate_job_alerts(
     user_id: uuid.UUID,
     db: AsyncSession,
     lookback_hours: int = 24,
+    existing_keys: set[str] | None = None,
 ) -> list[FeedItem]:
     """Find new job openings at companies where user has warm paths."""
     # Get user's job preferences
@@ -103,10 +129,12 @@ async def generate_job_alerts(
     if not company_contacts:
         return []
 
-    # Find recent job openings at those companies
+    # Find recent job openings at those companies. Eager-load Company to avoid
+    # an N+1 lazy-load when we read job.company.name below.
     since = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
     jobs_result = await db.execute(
         select(JobOpening)
+        .options(selectinload(JobOpening.company))
         .where(
             JobOpening.company_id.in_(list(company_contacts.keys())),
             JobOpening.is_active.is_(True),
@@ -138,7 +166,7 @@ async def generate_job_alerts(
         job_count = len(matching)
 
         dedup_key = _dedup("job_alert", str(company_id))
-        if await _user_has_feed_item(db, user_id, dedup_key):
+        if await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
             continue
 
         title = (
@@ -173,6 +201,8 @@ async def generate_job_alerts(
         )
         db.add(item)
         items.append(item)
+        if existing_keys is not None:
+            existing_keys.add(dedup_key)
 
     return items
 
@@ -187,6 +217,7 @@ async def generate_enrichment_prompts(
     user_id: uuid.UUID,
     db: AsyncSession,
     batch_size: int = 5,
+    existing_keys: set[str] | None = None,
 ) -> list[FeedItem]:
     """Generate prompts for contacts missing relationship type or recency."""
 
@@ -224,7 +255,7 @@ async def generate_enrichment_prompts(
             break
 
         dedup_key = _dedup("enrichment_prompt", str(contact.id), "relationship")
-        if await _user_has_feed_item(db, user_id, dedup_key):
+        if await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
             continue
 
         name = contact.full_name or "a contact"
@@ -277,6 +308,7 @@ async def generate_would_refer_prompts(
     user_id: uuid.UUID,
     db: AsyncSession,
     batch_size: int = 3,
+    existing_keys: set[str] | None = None,
 ) -> list[FeedItem]:
     """Prompt for would_refer on contacts that have relationship_type but no would_refer."""
     contacts_result = await db.execute(
@@ -301,7 +333,7 @@ async def generate_would_refer_prompts(
             break
 
         dedup_key = _dedup("enrichment_prompt", str(contact.id), "would_refer")
-        if await _user_has_feed_item(db, user_id, dedup_key):
+        if await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
             continue
 
         name = contact.full_name or "a contact"
@@ -348,6 +380,7 @@ async def generate_last_interaction_prompts(
     user_id: uuid.UUID,
     db: AsyncSession,
     batch_size: int = 3,
+    existing_keys: set[str] | None = None,
 ) -> list[FeedItem]:
     """Prompt for last_interaction_date on old connections missing it."""
     one_year_ago = datetime.now(timezone.utc) - timedelta(days=365)
@@ -374,7 +407,7 @@ async def generate_last_interaction_prompts(
             break
 
         dedup_key = _dedup("enrichment_prompt", str(contact.id), "last_interaction")
-        if await _user_has_feed_item(db, user_id, dedup_key):
+        if await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
             continue
 
         name = contact.full_name or "a contact"
@@ -424,6 +457,7 @@ async def generate_last_interaction_prompts(
 async def generate_outcome_checks(
     user_id: uuid.UUID,
     db: AsyncSession,
+    existing_keys: set[str] | None = None,
 ) -> list[FeedItem]:
     """Prompt users to update application status for stale intros."""
     # Find approved intros where the application hasn't been updated recently
@@ -445,7 +479,7 @@ async def generate_outcome_checks(
     items: list[FeedItem] = []
     for app in stale_apps:
         dedup_key = _dedup("outcome_check", str(app.id))
-        if await _user_has_feed_item(db, user_id, dedup_key):
+        if await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
             continue
 
         days_ago = (datetime.now(timezone.utc) - app.updated_at).days
@@ -490,6 +524,7 @@ async def generate_marketplace_signals(
     user_id: uuid.UUID,
     db: AsyncSession,
     lookback_hours: int = 24,
+    existing_keys: set[str] | None = None,
 ) -> list[FeedItem]:
     """Alert job seekers when new marketplace listings appear at target companies."""
     # Get user's target preferences for company targeting
@@ -552,7 +587,7 @@ async def generate_marketplace_signals(
     items: list[FeedItem] = []
     for row in new_listings.all():
         dedup_key = _dedup("marketplace_signal", row.company_key)
-        if await _user_has_feed_item(db, user_id, dedup_key):
+        if await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
             continue
 
         count = row.listing_count
@@ -596,6 +631,7 @@ async def generate_marketplace_signals(
 async def generate_follow_up_nudges(
     user_id: uuid.UUID,
     db: AsyncSession,
+    existing_keys: set[str] | None = None,
 ) -> list[FeedItem]:
     """Nudge users when approved intros haven't led to applications."""
     stale_window = datetime.now(timezone.utc) - timedelta(days=2)
@@ -613,7 +649,7 @@ async def generate_follow_up_nudges(
     items: list[FeedItem] = []
     for intro in approved_intros.scalars().all():
         dedup_key = _dedup("follow_up_nudge", str(intro.id))
-        if await _user_has_feed_item(db, user_id, dedup_key):
+        if await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
             continue
 
         days_ago = (datetime.now(timezone.utc) - intro.updated_at).days
@@ -654,6 +690,7 @@ async def generate_follow_up_nudges(
 async def generate_network_insights(
     user_id: uuid.UUID,
     db: AsyncSession,
+    existing_keys: set[str] | None = None,
 ) -> list[FeedItem]:
     """Surface insights about the user's network health."""
     # Count contacts with stale data (connected > 1 year ago, no recent interaction)
@@ -672,7 +709,7 @@ async def generate_network_insights(
 
     if stale_count >= 5:
         dedup_key = _dedup("network_insight", "stale_contacts", str(user_id))
-        if not await _user_has_feed_item(db, user_id, dedup_key):
+        if not await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
             item = FeedItem(
                 user_id=user_id,
                 item_type="network_insight",
@@ -714,7 +751,7 @@ async def generate_network_insights(
     if total > 0 and enriched < total * 0.5:
         pct = round(enriched / total * 100) if total > 0 else 0
         dedup_key = _dedup("network_insight", "enrichment_progress", str(user_id))
-        if not await _user_has_feed_item(db, user_id, dedup_key):
+        if not await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
             item = FeedItem(
                 user_id=user_id,
                 item_type="network_insight",
@@ -750,6 +787,7 @@ async def generate_network_insights(
 async def generate_intro_approval_nudge(
     user_id: uuid.UUID,
     db: AsyncSession,
+    existing_keys: set[str] | None = None,
 ) -> list[FeedItem]:
     """After NH approves an intro, encourage them to share more connections."""
     recent = await db.execute(
@@ -764,7 +802,7 @@ async def generate_intro_approval_nudge(
     items: list[FeedItem] = []
     for f in recent.scalars():
         dedup_key = _dedup("intro_approval_nudge", str(f.id))
-        if await _user_has_feed_item(db, user_id, dedup_key):
+        if await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
             continue
         js_name = (f.job_seeker_profile_snapshot or {}).get("full_name", "someone")
         item = FeedItem(
@@ -801,6 +839,7 @@ async def generate_intro_approval_nudge(
 async def generate_manual_send_reminder(
     user_id: uuid.UUID,
     db: AsyncSession,
+    existing_keys: set[str] | None = None,
 ) -> list[FeedItem]:
     """Nudge NH if they approved but haven't confirmed sending after 48 hours."""
     stale = await db.execute(
@@ -841,7 +880,7 @@ async def generate_manual_send_reminder(
     items: list[FeedItem] = []
     for f in facilitations:
         dedup_key = _dedup("manual_send_reminder", str(f.id))
-        if await _user_has_feed_item(db, user_id, dedup_key):
+        if await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
             continue
 
         listing = (
@@ -886,6 +925,7 @@ async def generate_manual_send_reminder(
 async def generate_marketplace_optin_nudge(
     user_id: uuid.UUID,
     db: AsyncSession,
+    existing_keys: set[str] | None = None,
 ) -> list[FeedItem]:
     """Nudge users with contacts to enable marketplace sharing.
 
@@ -919,7 +959,7 @@ async def generate_marketplace_optin_nudge(
 
     # Dedup key is user-scoped (not date-dependent) — one active nudge at a time
     dedup_key = _dedup("marketplace_optin_nudge", str(user_id))
-    if await _user_has_feed_item(db, user_id, dedup_key):
+    if await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
         return []
 
     # Try to find companies where OTHER users have recently searched
@@ -1056,8 +1096,15 @@ async def generate_feed_for_user(
     user_id: uuid.UUID,
     db: AsyncSession,
 ) -> list[FeedItem]:
-    """Run all feed generators for a single user. Returns new items created."""
+    """Run all feed generators for a single user. Returns new items created.
+
+    Dedup keys for this user's active feed items are loaded once up front and
+    passed into every generator. Each generator updates the set as it adds new
+    items, so subsequent generators in the same run won't re-create the same
+    item. This replaces what used to be one COUNT query per candidate item.
+    """
     all_items: list[FeedItem] = []
+    existing_keys = await _load_active_dedup_keys(db, user_id)
 
     generators = [
         ("job_alerts", generate_job_alerts),
@@ -1075,7 +1122,7 @@ async def generate_feed_for_user(
 
     for name, gen_fn in generators:
         try:
-            items = await gen_fn(user_id, db)
+            items = await gen_fn(user_id, db, existing_keys=existing_keys)
             all_items.extend(items)
             if items:
                 logger.info(
@@ -1150,7 +1197,7 @@ async def generate_csv_completion(
     Called directly from the import pipeline, not from the periodic generator.
     """
     dedup_key = _dedup("csv_completion", str(upload_id))
-    if await _user_has_feed_item(db, user_id, dedup_key):
+    if await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
         return []
 
     contacts_str = f"{contacts_created:,}"

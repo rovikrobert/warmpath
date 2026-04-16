@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     ADZUNA_APP_KEY: str = ""
     JOBSPY_ENABLED: bool = True
     JOBSPY_SEARCH_ALL_SITES: bool = True
+    # Bounded concurrency for the per-company network fetch in smart search.
+    # Higher = faster wall-clock for multi-company searches but more pressure
+    # on outbound rate limits (job boards, JobSpy, Adzuna).
+    SMART_SEARCH_FETCH_CONCURRENCY: int = 4
 
     # Vector search (Qdrant)
     VECTOR_SEARCH_ENABLED: bool = False

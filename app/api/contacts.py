@@ -585,6 +585,33 @@ async def list_contacts(
     }
 
 
+_EXPORT_CSV_HEADER = [
+    "Name",
+    "Title",
+    "Company",
+    "Email",
+    "Location",
+    "Relationship",
+    "Connection Score",
+    "Connected On",
+    "Source",
+]
+
+
+def _format_export_row(contact: Contact, score_val: float | None) -> list[str]:
+    return [
+        contact.full_name or "",
+        contact.current_title or "",
+        contact.current_company or "",
+        contact.email or "",
+        contact.location or "",
+        contact.relationship_type or "",
+        str(round(float(score_val), 1)) if score_val is not None else "",
+        str(contact.connected_on) if contact.connected_on else "",
+        contact.source or "",
+    ]
+
+
 @router.get("/export")
 @timed("contacts_export")
 async def export_contacts_csv(
@@ -594,7 +621,13 @@ async def export_contacts_csv(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Export contacts as CSV, respecting current search/filter."""
+    """Export contacts as CSV, streaming rows so memory stays bounded.
+
+    Previously loaded every row into a list and built the entire CSV in a
+    single StringIO buffer before responding. For users with ~100k contacts
+    that materialized hundreds of MB. Now we stream rows from the DB and
+    yield CSV chunks incrementally.
+    """
     import csv
     import io
 
@@ -618,55 +651,41 @@ async def export_contacts_csv(
     if source:
         base_query = base_query.where(Contact.source == source)
 
-    result = await db.execute(base_query)
-    all_rows = result.all()
+    search_lower = search.lower() if search else None
 
-    # Apply in-memory text search if provided
-    if search:
-        s = search.lower()
-        all_rows = [
-            (c, sc)
-            for c, sc in all_rows
-            if s in (c.full_name or "").lower()
-            or s in (c.current_company or "").lower()
-            or s in (c.current_title or "").lower()
-            or s in (c.email or "").lower()
-        ]
+    async def _iter_csv_chunks():
+        # Reusable per-chunk buffer keeps allocation bounded regardless of
+        # total row count. We write one row, drain, reset, repeat.
+        buf = io.StringIO()
+        writer = csv.writer(buf)
 
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow(
-        [
-            "Name",
-            "Title",
-            "Company",
-            "Email",
-            "Location",
-            "Relationship",
-            "Connection Score",
-            "Connected On",
-            "Source",
-        ]
-    )
-    for contact, score_val in all_rows:
-        writer.writerow(
-            [
-                contact.full_name or "",
-                contact.current_title or "",
-                contact.current_company or "",
-                contact.email or "",
-                contact.location or "",
-                contact.relationship_type or "",
-                round(float(score_val), 1) if score_val is not None else "",
-                str(contact.connected_on) if contact.connected_on else "",
-                contact.source or "",
-            ]
-        )
+        writer.writerow(_EXPORT_CSV_HEADER)
+        yield buf.getvalue()
+        buf.seek(0)
+        buf.truncate(0)
 
-    buf.seek(0)
+        # db.stream() yields rows in batches (default 1000 for postgres)
+        # without materializing the full result set in memory.
+        result = await db.stream(base_query)
+        async for contact, score_val in result:
+            if search_lower is not None:
+                # Encrypted columns are decrypted on attribute access — filter
+                # in Python because SQL ILIKE against ciphertext is meaningless.
+                if not (
+                    search_lower in (contact.full_name or "").lower()
+                    or search_lower in (contact.current_company or "").lower()
+                    or search_lower in (contact.current_title or "").lower()
+                    or search_lower in (contact.email or "").lower()
+                ):
+                    continue
+            writer.writerow(_format_export_row(contact, score_val))
+            yield buf.getvalue()
+            buf.seek(0)
+            buf.truncate(0)
+
     filename = f"warmpath-contacts-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
     return StreamingResponse(
-        iter([buf.getvalue()]),
+        _iter_csv_chunks(),
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
