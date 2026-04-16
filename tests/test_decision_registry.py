@@ -254,7 +254,7 @@ class TestDecisionRegistry:
                     "title": "t",
                     "detail": "d",
                 },
-                "brief_date": "2026-04-01",
+                "brief_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 "tier": "escalate",
                 "action_plan": "Do something",
                 "failure_modes": ["risk A"],
