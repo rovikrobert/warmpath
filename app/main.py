@@ -163,7 +163,12 @@ try:
 
     install_db_instrumentation(_get_engine().sync_engine)
 except Exception:
-    pass
+    logger.warning(
+        "DB instrumentation listeners failed to install — per-request query "
+        "count and timing will be unavailable. Health endpoint will report this "
+        "as a degraded check.",
+        exc_info=True,
+    )
 
 # ---------------------------------------------------------------------------
 # Global exception handlers
@@ -196,17 +201,24 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
 
     # Telegram alert for founder (rate-limited per endpoint)
     user_hint = None
-    try:
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        from fastapi import HTTPException as _HTTPException
+
         from app.utils.security import verify_clerk_token
 
-        auth_header = request.headers.get("authorization", "")
-        if auth_header.startswith("Bearer "):
+        try:
             payload = verify_clerk_token(auth_header[7:])
             clerk_id = payload.get("sub")
             if clerk_id:
                 user_hint = f"clerk:{clerk_id}"
-    except Exception:
-        pass
+        except _HTTPException:
+            # Invalid/expired token — proceed with no user hint
+            pass
+        except Exception:
+            logger.warning(
+                "Failed to extract user hint for error alert", exc_info=True
+            )
     send_error_alert(request.method, request.url.path, exc, user_hint)
 
     return JSONResponse(

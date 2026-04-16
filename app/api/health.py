@@ -1,15 +1,29 @@
 import hashlib
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Query
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.utils.performance import THRESHOLDS, get_recent_metrics, get_stats
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Top-level status values returned by /health.
+# - healthy:   every critical dependency is reachable.
+# - degraded:  every CRITICAL dep is reachable but at least one non-critical
+#              dep is degraded/unavailable. Returns 200 so load balancers keep
+#              the instance in the pool — operators see the degradation.
+# - unhealthy: at least one critical dependency is unreachable. Returns 503
+#              so load balancers can eject the instance.
+_HEALTHY = "healthy"
+_DEGRADED = "degraded"
+_UNHEALTHY = "unhealthy"
 
 
 def _frontend_version() -> str:
@@ -21,27 +35,111 @@ def _frontend_version() -> str:
     return hashlib.md5(content).hexdigest()[:8]
 
 
-@router.get("/health")
-def health_check() -> dict:
-    """Application health check — verifies API + Celery connectivity."""
-    celery_status = "unavailable"
+async def _check_db() -> dict[str, Any]:
+    """Run a SELECT 1 against the configured database (critical)."""
+    from app.database import _get_engine
+
+    start = time.monotonic()
+    try:
+        engine = _get_engine()
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return {
+            "status": "ok",
+            "latency_ms": round((time.monotonic() - start) * 1000, 2),
+        }
+    except Exception as exc:
+        logger.warning("Health check: database unreachable", exc_info=True)
+        return {
+            "status": "unavailable",
+            "error": type(exc).__name__,
+            "latency_ms": round((time.monotonic() - start) * 1000, 2),
+        }
+
+
+def _check_celery() -> dict[str, Any]:
+    """Ping Celery workers via the broker (non-critical)."""
+    start = time.monotonic()
     try:
         from app.celery_app import celery_app
 
-        result = celery_app.control.ping(timeout=2.0)
-        if result:
-            celery_status = "connected"
-    except Exception:
-        logger.debug("Celery ping failed", exc_info=True)
+        replies = celery_app.control.ping(timeout=2.0) or []
+        latency_ms = round((time.monotonic() - start) * 1000, 2)
+        if replies:
+            return {
+                "status": "ok",
+                "latency_ms": latency_ms,
+                "workers": len(replies),
+            }
+        # Broker reachable but zero workers — degraded, not unavailable.
+        return {
+            "status": "degraded",
+            "latency_ms": latency_ms,
+            "workers": 0,
+            "error": "no workers responded",
+        }
+    except Exception as exc:
+        logger.warning("Health check: Celery ping failed", exc_info=True)
+        return {
+            "status": "unavailable",
+            "error": type(exc).__name__,
+            "latency_ms": round((time.monotonic() - start) * 1000, 2),
+        }
 
-    return {
+
+def _roll_up_status(checks: dict[str, dict[str, Any]], critical: set[str]) -> str:
+    """Roll dependency-level status into the overall health status."""
+    for name in critical:
+        if checks.get(name, {}).get("status") != "ok":
+            return _UNHEALTHY
+    if any(c.get("status") != "ok" for c in checks.values()):
+        return _DEGRADED
+    return _HEALTHY
+
+
+@router.get("/health")
+async def health_check() -> JSONResponse:
+    """Application health check — DB (critical) + Celery (non-critical).
+
+    Response shape (additive vs the prior version — all old fields preserved):
+
+        {
+          "data": {
+            "status": "healthy" | "degraded" | "unhealthy",
+            "celery": "connected" | "unavailable",     # legacy compat
+            "frontend_version": "<hash>",
+            "checks": {
+              "db":     {"status": "ok"|"unavailable", "latency_ms": ..., "error"?: ...},
+              "celery": {"status": "ok"|"degraded"|"unavailable", "latency_ms": ...,
+                          "workers"?: ..., "error"?: ...}
+            }
+          },
+          "meta": {}
+        }
+
+    HTTP status: 200 for healthy/degraded, 503 for unhealthy. The 503 lets
+    load balancers and k8s readiness probes eject the instance.
+    """
+    db_check = await _check_db()
+    celery_check = _check_celery()
+    checks = {"db": db_check, "celery": celery_check}
+
+    # DB is critical; Celery is non-critical (worker can be down without
+    # breaking the synchronous API surface). Adjust the set when adding deps.
+    overall = _roll_up_status(checks, critical={"db"})
+
+    payload = {
         "data": {
-            "status": "healthy",
-            "celery": celery_status,
+            "status": overall,
+            # Legacy field kept for backwards-compat with existing consumers.
+            "celery": "connected" if celery_check["status"] == "ok" else "unavailable",
             "frontend_version": _frontend_version(),
+            "checks": checks,
         },
         "meta": {},
     }
+    http_status = 503 if overall == _UNHEALTHY else 200
+    return JSONResponse(status_code=http_status, content=payload)
 
 
 @router.get("/health/perf")

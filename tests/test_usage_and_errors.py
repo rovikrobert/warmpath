@@ -44,10 +44,15 @@ def _csv_file(content: str = SAMPLE_CSV):
 
 async def test_health_check(client: AsyncClient):
     resp = await client.get("/health")
+    # 200 for healthy or degraded; tests run without a Celery broker, so DB-only
+    # is reachable and overall rolls up to "degraded".
     assert resp.status_code == 200
-    assert resp.json()["data"]["status"] == "healthy"
-    # Celery field present (unavailable in tests since no broker)
-    assert resp.json()["data"]["celery"] in ("connected", "unavailable")
+    body = resp.json()["data"]
+    assert body["status"] in ("healthy", "degraded")
+    assert body["celery"] in ("connected", "unavailable")
+    # New structured per-dependency block
+    assert body["checks"]["db"]["status"] == "ok"
+    assert body["checks"]["celery"]["status"] in ("ok", "degraded", "unavailable")
 
 
 # ---------------------------------------------------------------------------
