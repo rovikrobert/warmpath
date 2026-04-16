@@ -19,7 +19,7 @@ import hmac
 import logging
 import warnings
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import Text
 from sqlalchemy.sql.expression import ColumnElement
 from sqlalchemy.types import TypeDecorator
@@ -29,26 +29,88 @@ from app.utils.hashing import hash_for_suppression
 
 logger = logging.getLogger(__name__)
 
+
+class EncryptionConfigError(RuntimeError):
+    """Raised when the encryption policy forbids the current configuration."""
+
+
 # ---------------------------------------------------------------------------
-# Cached Fernet singleton — avoids creating a new instance per value
+# Cached Fernet singleton — keyed by the configured key so settings overrides
+# (e.g. in tests) take effect without manual cache invalidation.
 # ---------------------------------------------------------------------------
 
 _fernet: Fernet | None = None
-_fernet_checked = False
+_cached_key: str | None = None
+_plaintext_warned = False
 
 
 def _get_fernet() -> Fernet | None:
-    """Return the cached Fernet instance, or None if ENCRYPTION_KEY is empty."""
-    global _fernet, _fernet_checked
-    if not _fernet_checked:
-        key = settings.ENCRYPTION_KEY
-        if not key:
-            logger.warning("ENCRYPTION_KEY not set — PII stored as plaintext")
-            _fernet = None
-        else:
-            _fernet = Fernet(key.encode())
-        _fernet_checked = True
+    """Return the cached Fernet instance, or None if plaintext fallback is allowed.
+
+    Policy:
+      - production: ENCRYPTION_KEY required — raise if missing.
+      - non-production: ENCRYPTION_KEY required unless
+        ALLOW_PLAINTEXT_PII_FALLBACK=true is set explicitly.
+    """
+    global _fernet, _cached_key, _plaintext_warned
+    key = settings.ENCRYPTION_KEY
+    if not key:
+        if settings.is_production:
+            raise EncryptionConfigError(
+                "ENCRYPTION_KEY is required in production. "
+                "Set ENCRYPTION_KEY to a 44-byte base64 Fernet key."
+            )
+        if not settings.ALLOW_PLAINTEXT_PII_FALLBACK:
+            raise EncryptionConfigError(
+                "ENCRYPTION_KEY is missing. Set ENCRYPTION_KEY, or explicitly opt in "
+                "to plaintext storage by setting ALLOW_PLAINTEXT_PII_FALLBACK=true "
+                "(non-production only)."
+            )
+        if not _plaintext_warned:
+            logger.warning(
+                "ENCRYPTION_KEY not set and ALLOW_PLAINTEXT_PII_FALLBACK=true — "
+                "PII will be stored AS PLAINTEXT. Never use this in production."
+            )
+            _plaintext_warned = True
+        # invalidate any previously cached Fernet from a prior key
+        _fernet = None
+        _cached_key = None
+        return None
+
+    if key != _cached_key:
+        _fernet = Fernet(key.encode())
+        _cached_key = key
     return _fernet
+
+
+def _decrypt_or_fallback(value: str) -> str:
+    """Decrypt a stored value, applying the documented fallback policy on failure.
+
+    Production: any decrypt failure raises (fail closed).
+    Non-production with ALLOW_PLAINTEXT_PII_FALLBACK=true: log a loud warning
+    and return the raw stored value (used to migrate pre-encryption rows).
+    Otherwise: raise.
+    """
+    f = _get_fernet()
+    if f is None:
+        # _get_fernet() already enforced policy and logged; passthrough is allowed.
+        return value
+    try:
+        return f.decrypt(value.encode()).decode()
+    except InvalidToken:
+        if settings.is_production:
+            logger.error(
+                "Failed to decrypt PII column value in production — refusing to "
+                "silently return ciphertext."
+            )
+            raise
+        if settings.ALLOW_PLAINTEXT_PII_FALLBACK:
+            logger.warning(
+                "Decrypt failed; returning stored value as-is (plaintext fallback). "
+                "This indicates a pre-encryption row or a key rotation issue."
+            )
+            return value
+        raise
 
 
 class _EncryptedComparator(TypeDecorator.Comparator):  # type: ignore[type-arg]
@@ -110,16 +172,7 @@ class EncryptedString(TypeDecorator):
     def process_result_value(self, value, dialect) -> str | None:
         if value is None:
             return None
-        f = _get_fernet()
-        if f is None:
-            return value
-        try:
-            return f.decrypt(value.encode()).decode()
-        except Exception:
-            # Graceful fallback: pre-encryption plaintext rows survive migration.
-            # Fernet tokens always start with "gAAAAA" so real plaintext will
-            # fail decryption and fall through here.
-            return value
+        return _decrypt_or_fallback(value)
 
 
 class EncryptedText(TypeDecorator):
@@ -140,13 +193,7 @@ class EncryptedText(TypeDecorator):
     def process_result_value(self, value, dialect) -> str | None:
         if value is None:
             return None
-        f = _get_fernet()
-        if f is None:
-            return value
-        try:
-            return f.decrypt(value.encode()).decode()
-        except Exception:
-            return value
+        return _decrypt_or_fallback(value)
 
 
 def compute_blind_index(value: str) -> str:

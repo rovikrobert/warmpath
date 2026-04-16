@@ -24,8 +24,12 @@ class Settings(BaseSettings):
     RESEND_WEBHOOK_SECRET: str = ""
     FROM_EMAIL: str = "WarmPath <noreply@majiq.agency>"
     FRONTEND_URL: str = "http://localhost:3000"
-    ENCRYPTION_KEY: str = ""  # Fernet key (44-char base64). Empty = passthrough.
+    ENCRYPTION_KEY: str = ""  # Fernet key (44-char base64). Required in production.
     BLIND_INDEX_KEY: str = ""  # HMAC key (hex). Empty = SHA-256 fallback.
+    # Security fail-open policy flags. Both default to False (secure).
+    # Production ignores these — production always fails closed.
+    ALLOW_INSECURE_WEBHOOKS: bool = False  # accept unsigned webhooks (dev/test only)
+    ALLOW_PLAINTEXT_PII_FALLBACK: bool = False  # store/read PII without encryption (dev/test only)
     RATE_LIMIT_CSV_UPLOADS_PER_DAY: int = 10
     RATE_LIMIT_SEARCH_RUNS_PER_DAY: int = 50
     RATE_LIMIT_CREDIT_PURCHASES_PER_DAY: int = 5

@@ -23,6 +23,44 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _assert_unsigned_webhook_allowed(provider: str) -> None:
+    """Apply the unsigned-webhook policy when the provider's secret is missing.
+
+    Production: always reject (503 — server is misconfigured, not a client error).
+    Non-production: reject unless ALLOW_INSECURE_WEBHOOKS=true is set explicitly.
+    Allowed path logs a loud warning so dev fallback is never silent.
+    """
+    if settings.is_production:
+        logger.error(
+            "%s webhook secret missing in production — refusing to accept "
+            "unsigned payload.",
+            provider,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"{provider} webhook is not configured on this server",
+        )
+    if not settings.ALLOW_INSECURE_WEBHOOKS:
+        logger.error(
+            "%s webhook secret missing and ALLOW_INSECURE_WEBHOOKS=false — "
+            "refusing to accept unsigned payload.",
+            provider,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                f"{provider} webhook secret not configured. Set the secret, or "
+                "explicitly opt in by setting ALLOW_INSECURE_WEBHOOKS=true "
+                "(non-production only)."
+            ),
+        )
+    logger.warning(
+        "%s webhook ACCEPTED WITHOUT SIGNATURE VERIFICATION "
+        "(ALLOW_INSECURE_WEBHOOKS=true). Never use this in production.",
+        provider,
+    )
+
+
 def _verify_stripe_signature(payload: bytes, sig_header: str, secret: str) -> bool:
     """Verify Stripe webhook signature using HMAC-SHA256.
 
@@ -89,9 +127,7 @@ async def stripe_webhook(
                 detail="Invalid webhook signature",
             )
     else:
-        logger.warning(
-            "STRIPE_WEBHOOK_SECRET not set — accepting webhook without verification"
-        )
+        _assert_unsigned_webhook_allowed("Stripe")
 
     try:
         event = json.loads(payload)
@@ -499,9 +535,7 @@ async def resend_webhook(
     if settings.RESEND_WEBHOOK_SECRET:
         _verify_resend_svix_signature(request, payload)
     else:
-        logger.warning(
-            "RESEND_WEBHOOK_SECRET not set — accepting webhook without verification"
-        )
+        _assert_unsigned_webhook_allowed("Resend")
 
     try:
         event = json.loads(payload)

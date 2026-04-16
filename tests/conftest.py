@@ -12,6 +12,9 @@ os.environ["VECTOR_SEARCH_ENABLED"] = "false"
 os.environ["CSV_ASYNC_PROCESSING"] = "false"
 # Disable Resend in tests — prevents real email sends
 os.environ["RESEND_API_KEY"] = ""
+# Test suite intentionally exercises webhook handlers without provider secrets.
+# The opt-in below is required by the hardened webhook policy in app/api/webhooks.py.
+os.environ.setdefault("ALLOW_INSECURE_WEBHOOKS", "true")
 
 # Enable encryption in tests — validates the full encrypt/decrypt cycle
 from cryptography.fernet import Fernet
