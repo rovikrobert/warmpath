@@ -1,7 +1,9 @@
 # Developer shortcuts for WarmPath local dev environment
 # Usage: make <target>
 
-.PHONY: dev down seed test lint format logs logs-app clean rebuild migrate migration help
+.PHONY: dev down seed test lint format logs logs-app clean rebuild migrate migration help lock lock-check
+
+UV_COMPILE_FLAGS := --generate-hashes --no-header --python-platform linux --python-version 3.11
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -47,3 +49,18 @@ migrate: ## Run alembic migrations in the app container
 
 migration: ## Create a new alembic migration (usage: make migration m="description")
 	docker compose -f docker-compose.dev.yml exec app alembic revision --autogenerate -m "$(m)"
+
+lock: ## Regenerate requirements-test.lock from requirements-test.txt
+	uv pip compile $(UV_COMPILE_FLAGS) requirements-test.txt -o requirements-test.lock
+
+lock-check: ## Verify requirements-test.lock is fresh (used by CI)
+	@tmp=$$(mktemp) && \
+	uv pip compile $(UV_COMPILE_FLAGS) requirements-test.txt -o "$$tmp" >/dev/null && \
+	if ! diff -u requirements-test.lock "$$tmp"; then \
+	  echo ""; \
+	  echo "ERROR: requirements-test.lock is out of date. Run 'make lock' and commit the result."; \
+	  rm -f "$$tmp"; \
+	  exit 1; \
+	fi && \
+	rm -f "$$tmp" && \
+	echo "requirements-test.lock is up to date."
