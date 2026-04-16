@@ -144,11 +144,13 @@ jobs:
         run: uv pip install --system pip-audit==2.9.0
 
       - name: Audit dependencies
+        # Audits the exact pinned versions CI installs (requirements-test.lock is a
+        # superset of requirements.txt via its -r directive, so all prod deps are covered).
         # GHSA-w8v5-vhqr-4h9v: diskcache pickle deserialization (transitive via weave).
         #   Local-only (CVSS 5.2), no fix version available. Revisit when diskcache >5.6.3 ships.
         # GHSA-7mpr-5m44-h73r: markdownify memory DoS via large HTML headlines.
         #   Unfixable: python-jobspy pins markdownify<0.14.0. Low risk — internal job scraping only.
-        run: pip-audit -r requirements.txt --ignore-vuln GHSA-w8v5-vhqr-4h9v --ignore-vuln GHSA-7mpr-5m44-h73r
+        run: pip-audit -r requirements-test.lock --ignore-vuln GHSA-w8v5-vhqr-4h9v --ignore-vuln GHSA-7mpr-5m44-h73r
 
   async-lint:
     name: Async/Sync Misuse Scan
