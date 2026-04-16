@@ -15,12 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/setup-python-warmpath
         with:
-          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt pip-audit
+        run: pip install -r requirements.txt pip-audit uv
 
       - name: Run pip-audit
         id: audit
@@ -61,6 +62,22 @@ jobs:
           "
           rm -f requirements.txt.new
 
+      - name: Regenerate requirements-test.lock
+        id: relock
+        if: steps.audit.outputs.has_vulns == 'true'
+        continue-on-error: true
+        run: make lock
+
+      - name: Record relock outcome
+        if: steps.audit.outputs.has_vulns == 'true'
+        id: relock_status
+        run: |
+          if [ "${{ steps.relock.outcome }}" = "success" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check for changes
         id: changes
         run: |
@@ -79,7 +96,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
-          git add requirements.txt
+
+          if [ "${{ steps.relock_status.outputs.ok }}" = "true" ]; then
+            git add requirements.txt requirements-test.lock
+            BODY="Automated dependency security fixes applied by \`pip-audit --fix\`. Lock file regenerated via \`make lock\`. Review changed package versions before merging."
+          else
+            git add requirements.txt
+            BODY=$'Automated dependency security fixes applied by `pip-audit --fix`.\n\n**:warning: lock regeneration failed** — `requirements-test.lock` was NOT updated. The `lock-freshness` job on this PR will block merge. To resolve:\n\n```\nmake lock\ngit add requirements-test.lock\ngit commit --amend --no-edit\ngit push --force-with-lease\n```\n\nReview changed package versions before merging.'
+          fi
+
           git commit -m "chore(deps): auto-fix security vulnerabilities
 
           Automated weekly dependency security scan via pip-audit.
@@ -88,5 +113,5 @@ jobs:
           git push origin "$BRANCH"
           gh pr create \
             --title "chore(deps): security patches $(date +%Y-%m-%d)" \
-            --body "Automated dependency security fixes applied by \`pip-audit --fix\`. Review changed package versions before merging." \
+            --body "$BODY" \
             --label "automated,security"
