@@ -16,6 +16,8 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Installs from requirements-test.lock. If install fails with a hash mismatch,
+    # the root cause is likely a stale lock — check the `lock-freshness` job first.
     steps:
       - uses: actions/checkout@v4
 
@@ -128,6 +130,8 @@ jobs:
     name: Dependency Audit
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Audits requirements-test.lock. If the lock is stale, this job audits
+    # the wrong versions — check the `lock-freshness` job first.
     steps:
       - uses: actions/checkout@v4
 

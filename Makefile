@@ -54,13 +54,12 @@ lock: ## Regenerate requirements-test.lock from requirements-test.txt
 	uv pip compile $(UV_COMPILE_FLAGS) requirements-test.txt -o requirements-test.lock
 
 lock-check: ## Verify requirements-test.lock is fresh (used by CI)
-	@tmp=$$(mktemp) && \
+	@tmp=$$(mktemp); \
+	trap 'rm -f "$$tmp"' EXIT; \
 	uv pip compile $(UV_COMPILE_FLAGS) requirements-test.txt -o "$$tmp" >/dev/null && \
 	if ! diff -u requirements-test.lock "$$tmp"; then \
 	  echo ""; \
 	  echo "ERROR: requirements-test.lock is out of date. Run 'make lock' and commit the result."; \
-	  rm -f "$$tmp"; \
 	  exit 1; \
 	fi && \
-	rm -f "$$tmp" && \
 	echo "requirements-test.lock is up to date."
