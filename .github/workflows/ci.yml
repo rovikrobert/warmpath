@@ -196,3 +196,22 @@ jobs:
             exit 0
           fi
           python3 scripts/verify_scope_telemetry.py --days 7 --limit 200
+
+  lock-freshness:
+    name: Lock Freshness
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-python-warmpath
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            requirements*.txt
+            requirements*.lock
+
+      - name: Verify requirements-test.lock is fresh
+        run: make lock-check
