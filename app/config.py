@@ -29,7 +29,9 @@ class Settings(BaseSettings):
     # Security fail-open policy flags. Both default to False (secure).
     # Production ignores these — production always fails closed.
     ALLOW_INSECURE_WEBHOOKS: bool = False  # accept unsigned webhooks (dev/test only)
-    ALLOW_PLAINTEXT_PII_FALLBACK: bool = False  # store/read PII without encryption (dev/test only)
+    ALLOW_PLAINTEXT_PII_FALLBACK: bool = (
+        False  # store/read PII without encryption (dev/test only)
+    )
     RATE_LIMIT_CSV_UPLOADS_PER_DAY: int = 10
     RATE_LIMIT_SEARCH_RUNS_PER_DAY: int = 50
     RATE_LIMIT_CREDIT_PURCHASES_PER_DAY: int = 5

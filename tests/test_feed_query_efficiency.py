@@ -133,7 +133,9 @@ async def test_orchestrator_loads_dedup_keys_only_once():
         # number of data queries. The dedup preload itself is a single SELECT.
         # Without the optimization a 5-contact user would add 10-25+ COUNT
         # queries on top. Cap at a reasonable bound to catch regressions.
-        print(f"\n[BENCH] orchestrator (11 generators, 5 contacts): {counter[0]} queries")
+        print(
+            f"\n[BENCH] orchestrator (11 generators, 5 contacts): {counter[0]} queries"
+        )
         assert counter[0] < 60, (
             f"orchestrator should issue <60 queries for a 5-contact user, "
             f"got {counter[0]}"

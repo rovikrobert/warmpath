@@ -80,9 +80,7 @@ async def _user_has_feed_item(
     return result.scalar_one() > 0
 
 
-async def _load_active_dedup_keys(
-    db: AsyncSession, user_id: uuid.UUID
-) -> set[str]:
+async def _load_active_dedup_keys(db: AsyncSession, user_id: uuid.UUID) -> set[str]:
     """Preload all non-dismissed feed item dedup keys for a user (one query)."""
     result = await db.execute(
         select(FeedItem.dedup_key).where(

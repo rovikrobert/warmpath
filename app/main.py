@@ -216,9 +216,7 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
             # Invalid/expired token — proceed with no user hint
             pass
         except Exception:
-            logger.warning(
-                "Failed to extract user hint for error alert", exc_info=True
-            )
+            logger.warning("Failed to extract user hint for error alert", exc_info=True)
     send_error_alert(request.method, request.url.path, exc, user_hint)
 
     return JSONResponse(
