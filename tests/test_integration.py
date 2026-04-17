@@ -11,6 +11,7 @@ Sections:
 import io
 from datetime import date, timedelta
 
+import pytest
 from httpx import AsyncClient
 
 from app.models.privacy import SuppressionList
@@ -345,6 +346,7 @@ async def test_full_user_journey(client: AsyncClient):
 # ===========================================================================
 
 
+@pytest.mark.slow
 async def test_complete_solo_journey(client: AsyncClient):
     """Full job-seeker lifecycle: CSV upload, preferences, smart search,
     application tracking, and usage stats."""

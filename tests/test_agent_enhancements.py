@@ -15,6 +15,8 @@ import ast
 import textwrap
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 from agents.shared.report import AgentReport, Finding
 
@@ -314,6 +316,7 @@ class TestArchitectDeadCode:
 class TestArchitectExternalIntel:
     """Test that architect scan wires in external intelligence."""
 
+    @pytest.mark.slow
     def test_scan_includes_intel_notes(self):
         """architect.scan() doesn't crash when intelligence module is available."""
         from agents.architect.architect import scan
@@ -640,6 +643,7 @@ class TestArchitectMutationTesting:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 class TestArchitectScanIntegration:
     """Verify scan() includes the new scanners in its report."""
 

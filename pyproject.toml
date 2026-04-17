@@ -16,6 +16,7 @@ asyncio_mode = "auto"
 timeout = 30
 markers = [
     "smoke: Critical-path tests (<10s) — run after every edit for fast feedback (Tier 1)",
+    "slow: Tests that take >5s individually or require heavy fixtures (Tier 3)",
 ]
 filterwarnings = [
     "error::DeprecationWarning",

@@ -220,6 +220,7 @@ class TestProductTeamReport:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 class TestUXLeadScan:
     """UXLead scan() should return a ProductTeamReport with findings."""
 
@@ -895,6 +896,7 @@ class TestProductManagerExperiments:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 class TestUXLeadAccessibility:
     """UXLead pa11y accessibility audit."""
 
@@ -969,6 +971,7 @@ class TestUXLeadAccessibility:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 class TestUXLeadFlowAnalysis:
     """UXLead cross-page flow analysis."""
 

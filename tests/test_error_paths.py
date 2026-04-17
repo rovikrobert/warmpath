@@ -150,6 +150,7 @@ class TestJobsErrors:
         resp = await client.get("/api/v1/jobs/openings")
         assert resp.status_code == 401
 
+    @pytest.mark.slow
     @pytest.mark.asyncio
     async def test_scan_unknown_company_returns_empty(self, client: AsyncClient):
         """GET /api/v1/jobs/scan/{company} for unknown company returns 200 with empty results."""
