@@ -1,3 +1,16 @@
+[project]
+name = "warmpath"
+version = "0.0.0"
+description = "Archived: referral marketplace platform — privacy-first, AI-powered intro matching"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Rovik" }]
+
+[project.urls]
+Repository = "https://github.com/rovikrobert/warmpath"
+"Agent Framework" = "https://github.com/rovikrobert/warmpath-agents"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 timeout = 30
