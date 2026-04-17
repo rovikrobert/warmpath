@@ -25,9 +25,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get update && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python deps
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python deps (hash-verified from lock file)
+COPY requirements.lock ./
+RUN pip install --no-cache-dir -r requirements.lock
 
 # Copy application code
 COPY app/ ./app/

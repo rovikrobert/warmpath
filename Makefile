@@ -50,16 +50,23 @@ migrate: ## Run alembic migrations in the app container
 migration: ## Create a new alembic migration (usage: make migration m="description")
 	docker compose -f docker-compose.dev.yml exec app alembic revision --autogenerate -m "$(m)"
 
-lock: ## Regenerate requirements-test.lock from requirements-test.txt
+lock: ## Regenerate requirements.lock and requirements-test.lock
+	uv pip compile $(UV_COMPILE_FLAGS) requirements.txt -o requirements.lock
 	uv pip compile $(UV_COMPILE_FLAGS) requirements-test.txt -o requirements-test.lock
 
-lock-check: ## Verify requirements-test.lock is fresh (used by CI)
-	@tmp=$$(mktemp); \
-	trap 'rm -f "$$tmp"' EXIT; \
-	uv pip compile $(UV_COMPILE_FLAGS) requirements-test.txt -o "$$tmp" >/dev/null && \
-	if ! diff -u requirements-test.lock "$$tmp"; then \
-	  echo ""; \
-	  echo "ERROR: requirements-test.lock is out of date. Run 'make lock' and commit the result."; \
-	  exit 1; \
-	fi && \
-	echo "requirements-test.lock is up to date."
+lock-check: ## Verify both lock files are fresh (used by CI)
+	@ok=true; \
+	for pair in "requirements.txt requirements.lock" "requirements-test.txt requirements-test.lock"; do \
+	  set -- $$pair; src=$$1; lck=$$2; \
+	  tmp=$$(mktemp); \
+	  trap 'rm -f "$$tmp"' EXIT; \
+	  uv pip compile $(UV_COMPILE_FLAGS) "$$src" -o "$$tmp" >/dev/null && \
+	  if ! diff -u "$$lck" "$$tmp" >/dev/null 2>&1; then \
+	    diff -u "$$lck" "$$tmp" || true; \
+	    echo ""; \
+	    echo "ERROR: $$lck is out of date. Run 'make lock' and commit the result."; \
+	    ok=false; \
+	  fi; \
+	  rm -f "$$tmp"; \
+	done; \
+	if [ "$$ok" = "true" ]; then echo "All lock files up to date."; else exit 1; fi

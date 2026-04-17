@@ -105,11 +105,11 @@ jobs:
           git checkout -b "$BRANCH"
 
           if [ "${{ steps.relock_status.outputs.ok }}" = "true" ]; then
-            git add requirements.txt requirements-test.lock
-            BODY="Automated dependency security fixes applied by \`pip-audit --fix\`. Lock file regenerated via \`make lock\`. Review changed package versions before merging."
+            git add requirements.txt requirements.lock requirements-test.lock
+            BODY="Automated dependency security fixes applied by \`pip-audit --fix\`. Lock files regenerated via \`make lock\`. Review changed package versions before merging."
           else
             git add requirements.txt
-            BODY=$'Automated dependency security fixes applied by `pip-audit --fix`.\n\n**:warning: lock regeneration failed** — `requirements-test.lock` was NOT updated. The `lock-freshness` job on this PR will block merge. To resolve:\n\n```\nmake lock\ngit add requirements-test.lock\ngit commit --amend --no-edit\ngit push --force-with-lease\n```\n\nReview changed package versions before merging.'
+            BODY=$'Automated dependency security fixes applied by `pip-audit --fix`.\n\n**:warning: lock regeneration failed** — lock files were NOT updated. The `lock-freshness` job on this PR will block merge. To resolve:\n\n```\nmake lock\ngit add requirements.lock requirements-test.lock\ngit commit --amend --no-edit\ngit push --force-with-lease\n```\n\nReview changed package versions before merging.'
           fi
 
           git commit -m "chore(deps): auto-fix security vulnerabilities

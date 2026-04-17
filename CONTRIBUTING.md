@@ -26,10 +26,10 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the high-level design and
 ## Updating dependencies
 
 1. Edit `requirements.txt` (production) or `requirements-test.txt` (test-only additions).
-2. Run `make lock` to regenerate `requirements-test.lock`. Requires `uv` — install with `pipx install uv` (or the upstream installer from <https://docs.astral.sh/uv/>) if missing.
-3. Commit the `.txt` and the `.lock` together. CI's `lock-freshness` job will fail the PR otherwise.
+2. Run `make lock` to regenerate both `requirements.lock` (prod) and `requirements-test.lock` (test). Requires `uv` — install with `pipx install uv` (or the upstream installer from <https://docs.astral.sh/uv/>) if missing.
+3. Commit the `.txt` and both `.lock` files together. CI's `lock-freshness` job will fail the PR otherwise.
 
-The lock file is Linux-x86_64-pinned (`--python-platform linux --python-version 3.11`). `make lock` produces the same output on any dev machine. Local installs on macOS/Windows should use `pip install -r requirements-test.txt` (floor bounds) rather than the lock — the lock will refuse to install on other platforms.
+Lock files are Linux-x86_64-pinned (`--python-platform linux --python-version 3.11`). `make lock` produces the same output on any dev machine. Docker images install from `requirements.lock` (prod deps, hash-verified). Local installs on macOS/Windows should use `pip install -r requirements-test.txt` (floor bounds) rather than the lock.
 
 ## Tests and linting
 
