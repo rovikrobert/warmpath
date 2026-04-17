@@ -1,0 +1,29 @@
+{
+  "competitors": [
+    {
+      "name": "Acme Referrals",
+      "search_queries": [
+        "acme referrals hiring platform news"
+      ]
+    },
+    {
+      "name": "ReferNet",
+      "search_queries": [
+        "refernet employee referral marketplace"
+      ]
+    },
+    {
+      "name": "ConnectUp",
+      "search_queries": [
+        "connectup professional networking referrals"
+      ]
+    },
+    {
+      "name": "TalentBridge",
+      "search_queries": [
+        "talentbridge referral platform updates"
+      ]
+    }
+  ],
+  "last_full_scan": "2026-04-17T03:10:56.141136+00:00"
+}

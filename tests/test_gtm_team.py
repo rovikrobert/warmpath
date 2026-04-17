@@ -246,13 +246,14 @@ class TestGTMTeamReport:
 class TestStrategyContext:
     """Strategy doc loading and extraction helpers."""
 
-    def test_load_strategy_docs_finds_claude_md(self):
+    def test_load_strategy_docs_finds_architecture_md(self):
         from gtm_team.shared.strategy_context import load_strategy_docs
 
         docs = load_strategy_docs()
-        # CLAUDE.md should always exist at project root
-        assert "CLAUDE.md" in docs
-        assert len(docs["CLAUDE.md"]) > 1000
+        # ARCHITECTURE.md is a load-bearing strategy doc on this repo.
+        # (CLAUDE.md is not shipped in the OSS distribution — developer-only.)
+        assert "ARCHITECTURE.md" in docs
+        assert len(docs["ARCHITECTURE.md"]) > 1000
 
     def test_extract_pricing_info(self):
         from gtm_team.shared.strategy_context import extract_pricing_info

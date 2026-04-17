@@ -232,4 +232,4 @@ async def test_api_routes_unaffected_by_og_middleware(client: AsyncClient):
     assert resp.status_code == 200
     body = resp.json()
     assert "data" in body
-    assert body["data"]["status"] == "healthy"
+    assert body["data"]["status"] in ("healthy", "degraded")

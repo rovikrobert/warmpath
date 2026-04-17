@@ -16,6 +16,14 @@ os.environ["RESEND_API_KEY"] = ""
 # The opt-in below is required by the hardened webhook policy in app/api/webhooks.py.
 os.environ.setdefault("ALLOW_INSECURE_WEBHOOKS", "true")
 
+# Tests use an in-memory SQLite for the session fixture, but app.database._get_engine
+# (called by /health and a few other startup paths) reads settings.DATABASE_URL directly
+# at import time. If the env has no DATABASE_URL (plain GitHub Actions), SQLAlchemy
+# raises ArgumentError on `create_async_engine("")`, which cascades into 503 health
+# responses and tracebacks during app import. setdefault leaves real DBs (local dev,
+# Railway) untouched.
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+
 # Enable encryption in tests — validates the full encrypt/decrypt cycle
 from cryptography.fernet import Fernet
 

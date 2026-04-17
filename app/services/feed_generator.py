@@ -1195,7 +1195,7 @@ async def generate_csv_completion(
     Called directly from the import pipeline, not from the periodic generator.
     """
     dedup_key = _dedup("csv_completion", str(upload_id))
-    if await _user_has_feed_item(db, user_id, dedup_key, existing_keys):
+    if await _user_has_feed_item(db, user_id, dedup_key):
         return []
 
     contacts_str = f"{contacts_created:,}"
